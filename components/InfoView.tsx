@@ -37,7 +37,7 @@ const InfoView: React.FC = () => {
           if (isElectron) {
             const result = await window.electronAPI!.readDoc(filename);
             // Fix: Restructured the type guard to use an if/else block. This makes the type narrowing more explicit, ensuring TypeScript correctly identifies the type of 'result' in each branch.
-            if (result.success) {
+            if (result.success === true) {
               text = result.content;
             } else {
               throw new Error(result.error || `Failed to load ${filename} from main process.`);
