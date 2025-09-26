@@ -1,0 +1,64 @@
+{
+  "name": "docforge",
+  "version": "0.2.4",
+  "description": "An application to manage and refine LLM prompts.",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "node esbuild.config.js",
+    "watch": "node esbuild.config.js --watch",
+    "package": "npm run build && electron-builder",
+    "release": "npm run build && electron-builder --publish always",
+    "publish": "npm run build && electron-builder --publish always"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.10",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "electron": "^28.2.1",
+    "electron-builder": "^24.9.1",
+    "esbuild": "^0.19.11",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "electron-updater": "^6.1.7",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "build": {
+    "appId": "com.yourcompany.docforge",
+    "productName": "DocForge",
+    "files": [
+      "dist/**/*",
+      "index.html",
+      "README.md",
+      "FUNCTIONAL_MANUAL.md",
+      "TECHNICAL_MANUAL.md",
+      "VERSION_LOG.md",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      "./README.md",
+      "./FUNCTIONAL_MANUAL.md",
+      "./TECHNICAL_MANUAL.md",
+      "./VERSION_LOG.md",
+      "./electron/migrations/001_initial_schema.sql"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

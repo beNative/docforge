@@ -1,0 +1,100 @@
+import { useCallback, useMemo } from 'react';
+import type { Node, PromptOrFolder } from '../types';
+import { useNodes } from './useNodes';
+
+/**
+ * Adapter function to convert the new `Node` data structure
+ * to the legacy `PromptOrFolder` structure that UI components still use.
+ */
+const nodeToPromptOrFolder = (node: Node): PromptOrFolder => ({
+  id: node.node_id,
+  type: node.node_type === 'document' ? 'prompt' : 'folder',
+  title: node.title,
+  content: node.document?.content,
+  createdAt: node.created_at,
+  updatedAt: node.updated_at,
+  parentId: node.parent_id,
+});
+
+/**
+ * Recursively flattens the node tree into a simple array.
+ */
+const flattenNodes = (nodes: Node[]): Node[] => {
+    return nodes.reduce<Node[]>((acc, node) => {
+        acc.push(node);
+        if (node.children) {
+            acc.push(...flattenNodes(node.children));
+        }
+        return acc;
+    }, []);
+};
+
+/**
+ * Recursively finds all descendant IDs for a given node ID.
+ */
+const getDescendantIdsRecursive = (nodeId: string, allNodes: Node[]): Set<string> => {
+    const children = allNodes.filter(n => n.parent_id === nodeId);
+    const descendantIds = new Set<string>();
+    for (const child of children) {
+        descendantIds.add(child.node_id);
+        const grandchildrenIds = getDescendantIdsRecursive(child.node_id, allNodes);
+        grandchildrenIds.forEach(id => descendantIds.add(id));
+    }
+    return descendantIds;
+};
+
+/**
+ * A hook that adapts the new `useNodes` hook to the legacy API expected by `App.tsx`.
+ * This allows the UI to function without a full refactor of all components.
+ */
+export const usePrompts = () => {
+  const { nodes, addNode, updateNode, deleteNode, moveNodes, updateDocumentContent, refreshNodes } = useNodes();
+
+  const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
+  const items: PromptOrFolder[] = useMemo(() => allNodesFlat.map(nodeToPromptOrFolder), [allNodesFlat]);
+
+  const addPrompt = useCallback(async ({ parentId, title = 'New Prompt', content = '' }: { parentId: string | null, title?: string, content?: string }) => {
+    const newNode = await addNode({
+      parent_id: parentId,
+      node_type: 'document',
+      title,
+      document: { content, doc_type: 'prompt' } as any,
+    });
+    return nodeToPromptOrFolder(newNode);
+  }, [addNode]);
+
+  const addFolder = useCallback(async (parentId: string | null, title: string = 'New Folder') => {
+    const newNode = await addNode({
+      parent_id: parentId,
+      node_type: 'folder',
+      title,
+    });
+    return nodeToPromptOrFolder(newNode);
+  }, [addNode]);
+
+  const updateItem = useCallback(async (id: string, updates: Partial<Omit<PromptOrFolder, 'id'>>) => {
+    if (updates.title !== undefined || updates.parentId !== undefined) {
+        await updateNode(id, { title: updates.title, parent_id: updates.parentId });
+    }
+    if (updates.content !== undefined) {
+        await updateDocumentContent(id, updates.content);
+    }
+    // No need to refresh here for title updates, as useNodes does an optimistic update.
+    // Full refresh is handled inside useNodes for structural changes.
+  }, [updateNode, updateDocumentContent]);
+
+  const deleteItem = useCallback(async (id: string) => {
+      await deleteNode(id);
+      // The `useNodes` hook handles refreshing the state.
+  }, [deleteNode]);
+
+  const moveItems = useCallback(async (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => {
+      await moveNodes(draggedIds, targetId, position);
+  }, [moveNodes]);
+
+  const getDescendantIds = useCallback((nodeId: string): Set<string> => {
+      return getDescendantIdsRecursive(nodeId, allNodesFlat);
+  }, [allNodesFlat]);
+
+  return { items, addPrompt, addFolder, updateItem, deleteItem, moveItems, getDescendantIds, refresh: refreshNodes };
+};
