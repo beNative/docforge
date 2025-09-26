@@ -11,12 +11,14 @@ interface CreateFromTemplateModalProps {
 }
 
 const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templates, onCreate, onClose }) => {
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(templates[0]?.id || '');
+  // Fix: Use template_id instead of id
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>(templates[0]?.template_id || '');
   const [promptTitle, setPromptTitle] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
 
   const selectedTemplate = useMemo(() => {
-    return templates.find(t => t.id === selectedTemplateId);
+    // Fix: Use template_id instead of id
+    return templates.find(t => t.template_id === selectedTemplateId);
   }, [selectedTemplateId, templates]);
 
   const templateVariables = useMemo(() => {
@@ -61,7 +63,8 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
             className="w-full p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
           >
             {templates.map(t => (
-              <option key={t.id} value={t.id}>{t.title}</option>
+              // Fix: Use template_id instead of id
+              <option key={t.template_id} value={t.template_id}>{t.title}</option>
             ))}
           </select>
         </div>

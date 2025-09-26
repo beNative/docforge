@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^9.4.3",
+    "electron-squirrel-startup": "^1.0.0",
     "electron-updater": "^6.1.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

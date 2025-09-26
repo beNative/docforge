@@ -70,7 +70,8 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onSave, onDel
             )}
         </div>
         <div className="flex items-center gap-2">
-            <Button variant="destructive" onClick={() => onDelete(template.id)}>
+            {/* Fix: Use template.template_id instead of template.id */}
+            <Button variant="destructive" onClick={() => onDelete(template.template_id)}>
               <TrashIcon className="w-4 h-4 mr-2" />
               Delete Template
             </Button>

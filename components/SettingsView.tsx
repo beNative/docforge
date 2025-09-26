@@ -37,7 +37,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discovere
   const [isDirty, setIsDirty] = useState(false);
   const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
 
-  const sectionRefs = useRef<Record<SettingsCategory, HTMLDivElement | null>>({});
+  // Fix: Use Partial for the record type to allow an empty object as the initial value for the ref.
+  const sectionRefs = useRef<Partial<Record<SettingsCategory, HTMLDivElement | null>>>({});
   const mainPanelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
