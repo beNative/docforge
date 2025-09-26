@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 
 // Let TypeScript know that 'marked' is available globally from the script tag in index.html
@@ -36,13 +37,14 @@ const InfoView: React.FC = () => {
           if (isElectron) {
             // Fix: Use optional chaining.
             const result = await window.electronAPI!.readDoc(filename);
-            // Fix: Correctly narrow the type of `result` by checking the failure case first.
-            if (!result.success) {
+            // Fix: Refactored to use an if/else block for more explicit type narrowing, resolving the error.
+            if (result.success) {
+              // After the guard, TypeScript knows `result` has `success: true` and a `content` property.
+              text = result.content;
+            } else {
               // If success is false, TypeScript correctly infers that `result` has an `error` property.
               throw new Error(result.error || `Failed to load ${filename} from main process.`);
             }
-            // After the guard, TypeScript knows `result` has `success: true` and a `content` property.
-            text = result.content;
           } else {
             const response = await fetch(`./${filename}`);
             if (!response.ok) {
