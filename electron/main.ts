@@ -1,4 +1,3 @@
-
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
@@ -32,7 +31,7 @@ const createWindow = () => {
 
   // The esbuild config outputs to `dist`. In dev mode with `--watch`, it rebuilds there.
   // We assume index.html is copied to `dist` as part of the build process.
-  mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+  mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
   if (isDev) {
     mainWindow.webContents.openDevTools();
@@ -165,8 +164,9 @@ ipcMain.handle('db:migrate-from-json', async (_, data) => {
 });
 
 // FS Handlers
-const userDataPath = app.getPath('userData');
 ipcMain.handle('fs:legacy-file-exists', async (_, filename) => {
+    // FIX: Move this call inside the handler to ensure it runs after app is ready.
+    const userDataPath = app.getPath('userData');
     try {
         await fs.promises.access(path.join(userDataPath, `${filename}.json`));
         return true;
@@ -176,6 +176,8 @@ ipcMain.handle('fs:legacy-file-exists', async (_, filename) => {
 });
 
 ipcMain.handle('fs:read-legacy-file', async (_, filename) => {
+    // FIX: Move this call inside the handler to ensure it runs after app is ready.
+    const userDataPath = app.getPath('userData');
     try {
         const content = await fs.promises.readFile(path.join(userDataPath, `${filename}.json`), 'utf-8');
         return { success: true, data: content };
