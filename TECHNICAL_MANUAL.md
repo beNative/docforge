@@ -40,7 +40,7 @@ doc-forge/
 ├── contexts/             # React context providers for global state.
 ├── electron/             # Source code for the Electron main process.
 │   ├── database.ts       # Manages the SQLite database connection and migrations.
-│   ├── migrations/       # SQL files for database schema evolution.
+│   ├── schema.ts         # Contains the embedded SQL schema string.
 │   ├── main.ts           # Main process entry point.
 │   └── preload.ts        # Preload script for secure IPC.
 ├── hooks/                # Custom React hooks for business logic.
@@ -90,7 +90,7 @@ The renderer process is responsible for the entire user interface.
 
 This is the core data persistence layer, replacing the old JSON file system.
 
--   **`electron/database.ts` (Main Process):** Manages the physical database file and connection using `better-sqlite3`. It handles schema creation and versioning via SQL migration scripts located in `electron/migrations/`.
+-   **`electron/database.ts` (Main Process):** Manages the physical database file and connection using `better-sqlite3`. It handles schema creation and versioning by executing SQL scripts embedded directly within the application's source code (`electron/schema.ts`). This removes the need for external `.sql` files and simplifies packaging.
 -   **`services/repository.ts` (Renderer Process):** The data access layer for the UI. It acts as an abstraction over the IPC communication. It contains all the application's SQL queries and provides clear, async methods (e.g., `getNodeTree()`, `updateDocumentContent()`) for the React hooks to use. It does *not* access the database directly.
 -   **Schema:** The database uses a highly normalized schema with tables for `nodes` (hierarchy), `documents`, `content_store` (for content-addressable storage and deduplication), and `doc_versions`.
 -   **One-Time Migration:** The repository contains logic to detect if it's the first run with the new database. If old JSON files are found, it reads them and sends the data to the main process to be migrated into the SQLite database in a single, safe transaction.

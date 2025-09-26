@@ -1,92 +1,62 @@
+
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
-import fs from 'fs/promises';
-import { autoUpdater } from 'electron-updater';
-import { platform } from 'os';
+import fs from 'fs';
 import { databaseService } from './database';
+import { autoUpdater } from 'electron-updater';
 
-declare const __dirname: string;
+// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+if (require('electron-squirrel-startup')) {
+  app.quit();
+}
 
-let mainWindow: BrowserWindow | null = null;
 const isDev = !app.isPackaged;
+let mainWindow: BrowserWindow | null = null;
 
 const createWindow = () => {
   mainWindow = new BrowserWindow({
-    width: 1200,
+    width: 1280,
     height: 800,
-    frame: false,
-    autoHideMenuBar: true,
+    minWidth: 940,
+    minHeight: 600,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
+    frame: false,
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 15, y: 13 },
+    backgroundColor: '#1e1e1e', // Match dark theme to avoid flash
   });
 
-  mainWindow.on('maximize', () => mainWindow?.webContents.send('window:state-change', { isMaximized: true }));
-  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:state-change', { isMaximized: false }));
+  // The esbuild config outputs to `dist`. In dev mode with `--watch`, it rebuilds there.
+  // We assume index.html is copied to `dist` as part of the build process.
+  mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
 
-  mainWindow.loadFile(path.join(__dirname, '../index.html'));
-  
   if (isDev) {
     mainWindow.webContents.openDevTools();
   }
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  mainWindow.on('maximize', () => mainWindow?.webContents.send('window:state-change', { isMaximized: true }));
+  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:state-change', { isMaximized: false }));
+
+  mainWindow.once('ready-to-show', () => {
+    autoUpdater.checkForUpdatesAndNotify();
   });
 };
 
-autoUpdater.logger = console;
-autoUpdater.on('update-downloaded', (info) => {
-  console.log(`Update downloaded: ${info.version}. Notifying renderer.`);
-  mainWindow?.webContents.send('update:downloaded', info.version);
-});
-
-ipcMain.on('updater:set-allow-prerelease', (_, allow: boolean) => {
-  autoUpdater.allowPrerelease = allow;
-});
-ipcMain.on('updater:quit-and-install', () => autoUpdater.quitAndInstall());
-
-app.on('window-all-closed', () => {
-  if (platform() !== 'darwin') {
-    app.quit();
-  }
-});
-
-app.on('will-quit', () => {
-  databaseService.close();
-});
-
 app.whenReady().then(() => {
-  // Initialize the database
   try {
     databaseService.open();
-  } catch (error) {
-    console.error("Fatal: Could not initialize database. The application will close.");
-    dialog.showErrorBox("Database Error", "Failed to initialize the application database. Please check file permissions or try reinstalling.");
+  } catch (e) {
+    console.error('FATAL: Could not open database. App will close.', e);
+    dialog.showErrorBox('Database Error', 'Could not open the application database. See logs for details. The application will now close.');
     app.quit();
     return;
   }
-
-  // Set up IPC handlers
-  setupIpcHandlers();
-
+  
   createWindow();
-
-  // Handle auto-updater based on initial settings from DB
-  try {
-    const prereleaseSetting = databaseService.get("SELECT value FROM settings WHERE key = 'allowPrerelease'");
-    autoUpdater.allowPrerelease = prereleaseSetting?.value === 'true';
-    console.log(`Initial updater allowPrerelease set to: ${autoUpdater.allowPrerelease}`);
-  } catch(e) {
-    console.log("Could not read initial prerelease setting, defaulting to false.");
-    autoUpdater.allowPrerelease = false;
-  }
-
-  if (!isDev) {
-    autoUpdater.checkForUpdatesAndNotify();
-  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -95,146 +65,177 @@ app.whenReady().then(() => {
   });
 });
 
-function setupIpcHandlers() {
-  ipcMain.handle('app:get-version', () => app.getVersion());
-  ipcMain.handle('app:get-platform', () => platform());
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
 
-  ipcMain.on('window:minimize', () => mainWindow?.minimize());
-  ipcMain.on('window:maximize', () => {
-    if (mainWindow?.isMaximized()) mainWindow.unmaximize();
-    else mainWindow?.maximize();
-  });
-  ipcMain.on('window:close', () => mainWindow?.close());
+app.on('will-quit', () => {
+  databaseService.close();
+});
 
-  ipcMain.handle('db:query', (_, sql, params) => databaseService.query(sql, params));
-  ipcMain.handle('db:get', (_, sql, params) => databaseService.get(sql, params));
-  ipcMain.handle('db:run', (_, sql, params) => databaseService.run(sql, params));
-  ipcMain.handle('db:is-new', () => databaseService.isNew);
+// --- IPC Handlers ---
 
-  ipcMain.handle('db:migrate-from-json', (_, data) => {
-    console.log("Starting migration from JSON data...");
-    const { nodes, documents, docVersions, contentStore, templates, settings } = data;
-    
-    const migrationTransaction = databaseService.transaction(() => {
-        const insertNode = databaseService.run.bind(databaseService, "INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        const insertDoc = databaseService.run.bind(databaseService, "INSERT INTO documents (node_id, doc_type, language_hint) VALUES (?, ?, ?)");
-        const insertContent = databaseService.run.bind(databaseService, "INSERT INTO content_store (sha256_hex, text_content) VALUES (?, ?)");
-        const insertVersion = databaseService.run.bind(databaseService, "INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)");
-        const updateDocVersion = databaseService.run.bind(databaseService, "UPDATE documents SET current_version_id = ? WHERE document_id = ?");
-        const insertTemplate = databaseService.run.bind(databaseService, "INSERT INTO templates (template_id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)");
-        const insertSetting = databaseService.run.bind(databaseService, "INSERT INTO settings (key, value) VALUES (?, ?)");
-        const getContentId = databaseService.get.bind(databaseService, "SELECT content_id FROM content_store WHERE sha256_hex = ?");
+// Database
+ipcMain.handle('db:query', (_, sql, params) => databaseService.query(sql, params));
+ipcMain.handle('db:get', (_, sql, params) => databaseService.get(sql, params));
+ipcMain.handle('db:run', (_, sql, params) => databaseService.run(sql, params));
+ipcMain.handle('db:is-new', () => databaseService.isNew);
+
+ipcMain.handle('db:migrate-from-json', async (_, data) => {
+    try {
+        const { nodes, documents, docVersions, contentStore, templates, settings } = data;
         
-        for (const content of contentStore) {
-            insertContent([content.sha256_hex, content.text_content]);
-        }
-        for (const node of nodes) {
-            insertNode([node.node_id, node.parent_id, node.node_type, node.title, node.sort_order, node.created_at, node.updated_at]);
-        }
-        for (const doc of documents) {
-            const result = insertDoc([doc.node_id, doc.doc_type, doc.language_hint]);
-            const documentId = result.lastInsertRowid;
+        // Manual transaction control
+        databaseService.run('BEGIN');
+        try {
+            // Clear tables
+            ['nodes', 'documents', 'doc_versions', 'content_store', 'templates', 'settings'].forEach(table => {
+                databaseService.run(`DELETE FROM ${table}`);
+            });
+            
+            // Content Store
+            const contentIdMap = new Map<string, number | bigint>();
+            for (const content of contentStore) {
+                const res = databaseService.run('INSERT INTO content_store (sha256_hex, text_content) VALUES (?, ?)', [content.sha256_hex, content.text_content]);
+                contentIdMap.set(content.sha256_hex, res.lastInsertRowid);
+            }
+            
+            // Nodes
+            for (const node of nodes) {
+                databaseService.run('INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [node.node_id, node.parent_id, node.node_type, node.title, node.sort_order, node.created_at, node.updated_at]);
+            }
+            
+            // Documents
+            const docIdMap = new Map<string, number | bigint>();
+            for (const doc of documents) {
+                const res = databaseService.run('INSERT INTO documents (node_id, doc_type, language_hint) VALUES (?, ?, ?)', [doc.node_id, doc.doc_type, doc.language_hint]);
+                docIdMap.set(doc.node_id, res.lastInsertRowid);
+            }
+            
+            // Versions
+            const versionsByNode = docVersions.reduce((acc: Record<string, any[]>, version: any) => {
+                if (!acc[version.node_id]) acc[version.node_id] = [];
+                acc[version.node_id].push(version);
+                return acc;
+            }, {});
 
-            const versionsForThisDoc = docVersions.filter(v => v.node_id === doc.node_id);
-            let latestVersionId: number | null = null;
-
-            for (const version of versionsForThisDoc) {
-                const content = getContentId([version.sha256_hex]);
-                const versionResult = insertVersion([documentId, version.created_at, content.content_id]);
-                if (latestVersionId === null) { // The first one we insert is the latest
-                    latestVersionId = Number(versionResult.lastInsertRowid);
+            for (const nodeId in versionsByNode) {
+                const nodeVersions = versionsByNode[nodeId].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                let latestVersionId: number | bigint | null = null;
+                const documentId = docIdMap.get(nodeId);
+                
+                if (documentId) {
+                    for (const version of nodeVersions) {
+                        const contentId = contentIdMap.get(version.sha256_hex);
+                        if (contentId) {
+                            const res = databaseService.run('INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)', [documentId, version.created_at, contentId]);
+                            if (!latestVersionId) {
+                                latestVersionId = res.lastInsertRowid;
+                            }
+                        }
+                    }
+                    if (latestVersionId) {
+                        databaseService.run('UPDATE documents SET current_version_id = ? WHERE document_id = ?', [latestVersionId, documentId]);
+                    }
                 }
             }
-            if(latestVersionId) {
-                updateDocVersion([latestVersionId, documentId]);
+            
+            // Templates
+            for (const t of templates) {
+                databaseService.run('INSERT INTO templates (template_id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [t.template_id, t.title, t.content, t.created_at, t.updated_at]);
             }
+            
+            // Settings
+            for (const s of settings) {
+                databaseService.run('INSERT INTO settings (key, value) VALUES (?, ?)', [s.key, s.value]);
+            }
+            
+            databaseService.run('COMMIT');
+            return { success: true };
+        } catch (error) {
+            databaseService.run('ROLLBACK');
+            throw error; // Re-throw to be caught by the outer catch block
         }
-        for (const template of templates) {
-            insertTemplate([template.template_id, template.title, template.content, template.created_at, template.updated_at]);
-        }
-        for (const setting of settings) {
-            insertSetting([setting.key, setting.value]);
-        }
-    });
-
-    try {
-        migrationTransaction();
-        console.log("JSON migration successful.");
-        // Rename old files to prevent re-migration
-        const userDataPath = app.getPath('userData');
-        const oldFiles = [
-            'promptforge_prompts.json', 'promptforge_templates.json', 
-            'promptforge_prompt_versions.json', 'promptforge_settings.json'
-        ];
-        for (const file of oldFiles) {
-            const oldPath = path.join(userDataPath, file);
-            const newPath = path.join(userDataPath, `${file}.bak`);
-            fs.rename(oldPath, newPath).catch(err => console.error(`Could not rename ${file}:`, err));
-        }
-        return { success: true };
     } catch (error) {
-        console.error("JSON migration failed:", error);
-        return { success: false, error: (error as Error).message };
+        console.error("Migration from JSON failed in main process:", error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
-  });
+});
 
-  // --- File System Access for Legacy JSON files (Migration Only) ---
-  const legacyDataPath = (filename: string) => path.join(app.getPath('userData'), filename);
-  
-  ipcMain.handle('fs:legacy-file-exists', async (_, filename: string) => {
+// FS Handlers
+const userDataPath = app.getPath('userData');
+ipcMain.handle('fs:legacy-file-exists', async (_, filename) => {
     try {
-        await fs.access(legacyDataPath(filename));
+        await fs.promises.access(path.join(userDataPath, `${filename}.json`));
         return true;
     } catch {
         return false;
     }
-  });
+});
 
-  ipcMain.handle('fs:read-legacy-file', async (_, filename: string) => {
+ipcMain.handle('fs:read-legacy-file', async (_, filename) => {
     try {
-      const data = await fs.readFile(legacyDataPath(filename), 'utf-8');
-      return { success: true, data };
+        const content = await fs.promises.readFile(path.join(userDataPath, `${filename}.json`), 'utf-8');
+        return { success: true, data: content };
     } catch (error) {
-      return { success: false, error: (error as Error).message };
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
-  });
-  
-  // Handlers for dialogs and file I/O
-  // Fix: Replaced Electron.SaveDialogOptions with `any` to resolve missing namespace error.
-  ipcMain.handle('dialog:save', async (_, options: any, content: string) => {
-    const window = BrowserWindow.getFocusedWindow();
-    if (!window) return { success: false, error: 'No focused window' };
-    const { canceled, filePath } = await dialog.showSaveDialog(window, options);
-    if (canceled || !filePath) return { success: false, error: 'Dialog was canceled.' };
-    try {
-      await fs.writeFile(filePath, content, 'utf-8');
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
-  });
+});
 
-  // Fix: Replaced Electron.OpenDialogOptions with `any` to resolve missing namespace error.
-  ipcMain.handle('dialog:open', async (_, options: any) => {
-    const window = BrowserWindow.getFocusedWindow();
-    if (!window) return { success: false, error: 'No focused window' };
-    const { canceled, filePaths } = await dialog.showOpenDialog(window, options);
-    if (canceled || filePaths.length === 0) return { success: false, error: 'Dialog was canceled.' };
-    try {
-      const content = await fs.readFile(filePaths[0], 'utf-8');
-      return { success: true, content };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
+// App Info
+ipcMain.handle('app:get-version', () => app.getVersion());
+ipcMain.handle('app:get-platform', () => process.platform);
+
+// Updater
+autoUpdater.on('update-downloaded', (info) => {
+    mainWindow?.webContents.send('update:downloaded', info.version);
+});
+ipcMain.on('updater:set-allow-prerelease', (_, allow) => { autoUpdater.allowPrerelease = allow; });
+ipcMain.on('updater:quit-and-install', () => { autoUpdater.quitAndInstall(); });
+
+// Window Controls
+ipcMain.on('window:minimize', () => mainWindow?.minimize());
+ipcMain.on('window:maximize', () => { mainWindow?.isMaximized() ? mainWindow.unmaximize() : mainWindow?.maximize(); });
+ipcMain.on('window:close', () => mainWindow?.close());
+
+// Dialogs & Docs
+ipcMain.handle('dialog:save', async (_, options, content) => {
+    if (!mainWindow) return { success: false, error: 'Main window not available' };
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, options);
+    if (!canceled && filePath) {
+        try {
+            await fs.promises.writeFile(filePath, content, 'utf-8');
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
     }
-  });
-  
-  ipcMain.handle('docs:read', async (_, filename: string) => {
-    try {
-      const filePath = isDev ? path.join(app.getAppPath(), filename) : path.join((process as any).resourcesPath, filename);
-      const content = await fs.readFile(filePath, 'utf-8');
-      return { success: true, content };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
+    return { success: false, error: 'Save dialog canceled' };
+});
+
+ipcMain.handle('dialog:open', async (_, options) => {
+    if (!mainWindow) return { success: false, error: 'Main window not available' };
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, options);
+    if (!canceled && filePaths.length > 0) {
+        try {
+            const content = await fs.promises.readFile(filePaths[0], 'utf-8');
+            return { success: true, content };
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
+        }
     }
-  });
-}
+    return { success: false, error: 'Open dialog canceled' };
+});
+
+ipcMain.handle('docs:read', async (_, filename) => {
+    try {
+        const basePath = isDev ? process.cwd() : (process as any).resourcesPath;
+        const docPath = path.join(basePath, filename);
+        const content = await fs.promises.readFile(docPath, 'utf-8');
+        return { success: true, content };
+    } catch (error) {
+        return { success: false, error: `Could not read doc file ${filename}: ${error instanceof Error ? error.message : String(error)}` };
+    }
+});

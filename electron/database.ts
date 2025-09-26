@@ -1,14 +1,15 @@
+
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { app } from 'electron';
+import { INITIAL_SCHEMA } from './schema';
 
 const isDev = !app.isPackaged;
 
 class DatabaseService {
   private db: Database.Database | null = null;
   private readonly dbPath: string;
-  private readonly migrationsPath: string;
 
   constructor() {
     const oldDbName = 'promptforge.db';
@@ -27,11 +28,6 @@ class DatabaseService {
     } catch (error) {
         console.error('Failed to rename database file:', error);
     }
-    
-    // Path to migration files.
-    this.migrationsPath = isDev
-      ? path.join(app.getAppPath(), 'electron/migrations')
-      : path.join((process as any).resourcesPath, 'electron/migrations');
   }
 
   public open(): void {
@@ -68,28 +64,29 @@ class DatabaseService {
     console.log(`Current database version: ${currentVersion}`);
 
     try {
-      const migrationFiles = fs.readdirSync(this.migrationsPath)
-        .filter(file => file.endsWith('.sql'))
-        .sort();
-
       this.db.transaction(() => {
-        for (const file of migrationFiles) {
-          const version = parseInt(file.split('_')[0], 10);
-          if (version > currentVersion) {
-            console.log(`Applying migration: ${file}`);
-            const script = fs.readFileSync(path.join(this.migrationsPath, file), 'utf-8');
-            this.db!.exec(script);
-            this.db!.pragma(`user_version = ${version}`);
-          }
+        // Migration to version 1: Initial Schema
+        if (currentVersion < 1) {
+          console.log('Applying migration: version 1 (initial schema)');
+          this.db!.exec(INITIAL_SCHEMA);
+          this.db!.pragma(`user_version = 1`);
         }
-      })();
 
+        // Future migrations can be added here, e.g.:
+        // if (currentVersion < 2) {
+        //   console.log('Applying migration: version 2');
+        //   this.db!.exec(MIGRATION_V2_SCRIPT);
+        //   this.db!.pragma(`user_version = 2`);
+        // }
+      })();
+      
       const newVersion = this.db.pragma('user_version', { simple: true }) as number;
       if (newVersion > currentVersion) {
         console.log(`Database migrated to version: ${newVersion}`);
       } else {
         console.log('Database is up to date.');
       }
+
     } catch (error) {
       console.error('Migration failed:', error);
       throw error;
@@ -129,7 +126,9 @@ class DatabaseService {
     }
   }
   
-  public transaction<T extends (...args: any[]) => any>(fn: T): T {
+  // Fix: Correct the return type to match what better-sqlite3's transaction method returns.
+  // The original 'T' was incorrect as the library wraps the function in a Transaction object.
+  public transaction<T extends (...args: any[]) => any>(fn: T): Database.Transaction<T> {
     if (!this.db) throw new Error('Database is not open.');
     return this.db.transaction(fn);
   }

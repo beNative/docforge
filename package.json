@@ -1,28 +1,26 @@
 {
   "name": "docforge",
   "version": "0.2.4",
-  "description": "An application to manage and refine LLM prompts.",
+  "description": "An application to manage and refine documents.",
   "main": "dist/main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "npm run build && electron .",
     "build": "node esbuild.config.js",
     "watch": "node esbuild.config.js --watch",
     "package": "npm run build && electron-builder",
-    "release": "npm run build && electron-builder --publish always",
-    "publish": "npm run build && electron-builder --publish always"
+    "release": "npm run build && electron-builder --publish always"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Tim Sirmov",
+  "license": "MIT",
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.10",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
     "@types/uuid": "^9.0.8",
-    "electron": "^28.2.1",
-    "electron-builder": "^24.9.1",
-    "esbuild": "^0.19.11",
-    "typescript": "^5.3.3"
+    "electron": "^27.1.0",
+    "electron-builder": "^24.6.4",
+    "esbuild": "^0.19.5",
+    "typescript": "^5.2.2"
   },
   "dependencies": {
     "better-sqlite3": "^9.4.3",
@@ -32,35 +30,31 @@
     "uuid": "^9.0.1"
   },
   "build": {
-    "appId": "com.yourcompany.docforge",
+    "appId": "com.timsirmov.docforge",
     "productName": "DocForge",
     "files": [
       "dist/**/*",
+      "node_modules/**/*",
+      "package.json",
       "index.html",
-      "README.md",
-      "FUNCTIONAL_MANUAL.md",
-      "TECHNICAL_MANUAL.md",
-      "VERSION_LOG.md",
-      "node_modules/**/*"
-    ],
-    "extraResources": [
-      "./README.md",
-      "./FUNCTIONAL_MANUAL.md",
-      "./TECHNICAL_MANUAL.md",
-      "./VERSION_LOG.md",
-      "./electron/migrations/001_initial_schema.sql"
+      "*.md",
+      "assets/icon.png"
     ],
     "directories": {
+      "buildResources": "assets",
       "output": "release"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/icon.png"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "assets/icon.png"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "assets/icon.png"
     }
   }
 }

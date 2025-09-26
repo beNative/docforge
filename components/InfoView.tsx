@@ -35,16 +35,13 @@ const InfoView: React.FC = () => {
           let text = '';
 
           if (isElectron) {
-            // Fix: Use optional chaining.
             const result = await window.electronAPI!.readDoc(filename);
-            // Fix: Refactored to use an if/else block for more explicit type narrowing, resolving the error.
-            if (result.success) {
-              // After the guard, TypeScript knows `result` has `success: true` and a `content` property.
-              text = result.content;
-            } else {
-              // If success is false, TypeScript correctly infers that `result` has an `error` property.
+            // Fix: Use a guard clause to properly narrow the type of the 'result' object, resolving the error.
+            // This ensures that accessing 'result.error' or 'result.content' is type-safe.
+            if (!result.success) {
               throw new Error(result.error || `Failed to load ${filename} from main process.`);
             }
+            text = result.content;
           } else {
             const response = await fetch(`./${filename}`);
             if (!response.ok) {
