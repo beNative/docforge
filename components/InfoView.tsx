@@ -36,12 +36,12 @@ const InfoView: React.FC = () => {
 
           if (isElectron) {
             const result = await window.electronAPI!.readDoc(filename);
-            // Fix: Use a type guard to ensure `result.error` is only accessed when `result.success` is false.
-            if (result.success) {
-              text = result.content;
-            } else {
+            // Fix: Use a type guard on `result.success` to safely access properties on the discriminated union type.
+            // When `success` is false, `error` is available; otherwise, `content` is available.
+            if (!result.success) {
               throw new Error(result.error || `Failed to load ${filename} from main process.`);
             }
+            text = result.content;
           } else {
             const response = await fetch(`./${filename}`);
             if (!response.ok) {

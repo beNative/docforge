@@ -9,9 +9,19 @@ const isDev = !app.isPackaged;
 
 class DatabaseService {
   private db: Database.Database | null = null;
-  private readonly dbPath: string;
+  private dbPath: string | null = null;
 
   constructor() {
+    // Constructor is now empty. Path-dependent logic is deferred.
+  }
+
+  /**
+   * Initializes the database path and handles renaming from the old app name.
+   * This must be called after the app is 'ready'.
+   */
+  private initializePath(): void {
+    if (this.dbPath) return; // Ensure this only runs once
+
     const oldDbName = 'promptforge.db';
     const dbName = 'docforge.db';
     const userDataPath = app.getPath('userData');
@@ -32,6 +42,13 @@ class DatabaseService {
 
   public open(): void {
     try {
+      // Initialize the path here, safely after the app is ready.
+      this.initializePath();
+
+      if (!this.dbPath) {
+        throw new Error('Database path could not be determined.');
+      }
+
       this.db = new Database(this.dbPath, { verbose: isDev ? console.log : undefined });
       this.db.pragma('journal_mode = WAL');
       this.db.pragma('foreign_keys = ON');
