@@ -1,1 +1,56 @@
-full contents of package.json
+{
+  "name": "docforge",
+  "version": "0.2.4",
+  "description": "An application to manage and refine documents.",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "node esbuild.config.js --watch & electron .",
+    "build": "node esbuild.config.js",
+    "package": "npm run build && electron-builder",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "author": "DocForge Team",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.1.2",
+    "electron-log": "^5.1.5",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-updater": "^6.2.1",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^10.0.0",
+    "electron": "^31.1.0",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.23.0",
+    "typescript": "^5.5.3"
+  },
+  "build": {
+    "appId": "com.electron.docforge",
+    "productName": "DocForge",
+    "files": [
+      "dist/**/*",
+      "index.html",
+      "assets/**/*",
+      "docs/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    }
+  }
+}
