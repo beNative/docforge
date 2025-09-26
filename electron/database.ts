@@ -1,10 +1,10 @@
 
-import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { Database, open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import { INITIAL_SCHEMA } from './schema';
+import log from 'electron-log';
 
 // This is a simplified type mirroring what's sent from the renderer.
 interface MigrationPayload {
@@ -18,40 +18,55 @@ interface MigrationPayload {
 
 export class DatabaseService {
     private db: Database | null = null;
-    private dbPath: string;
+    private dbPath: string = '';
     private isNewDB: boolean = false;
 
-    constructor() {
-        const dbFolder = app.getPath('userData');
+    // The constructor is now empty and does not access `app`.
+    constructor() {}
+
+    // The path is now passed in during initialization, which happens after `app` is ready.
+    async open(userDataPath: string): Promise<void> {
+        const dbFolder = path.join(userDataPath, 'db');
         if (!fs.existsSync(dbFolder)) {
             fs.mkdirSync(dbFolder, { recursive: true });
         }
-        this.dbPath = path.join(dbFolder, 'docforge.sqlite3');
-    }
-
-    async init(): Promise<void> {
+        
+        // Handle renaming from old db file for seamless user update
+        const oldDbPath = path.join(userDataPath, 'docforge.sqlite3');
+        const newDbPath = path.join(dbFolder, 'docforge.db');
+        if (fs.existsSync(oldDbPath) && !fs.existsSync(newDbPath)) {
+            log.info(`Found old database at ${oldDbPath}, moving to ${newDbPath}`);
+            fs.renameSync(oldDbPath, newDbPath);
+        }
+        
+        this.dbPath = newDbPath;
         this.isNewDB = !fs.existsSync(this.dbPath);
         
-        this.db = await open({
-            filename: this.dbPath,
-            driver: sqlite3.Database
-        });
+        try {
+            this.db = await open({
+                filename: this.dbPath,
+                driver: sqlite3.Database
+            });
 
-        await this.db.exec('PRAGMA journal_mode = WAL;');
-        await this.db.exec('PRAGMA foreign_keys = ON;');
+            await this.db.exec('PRAGMA journal_mode = WAL;');
+            await this.db.exec('PRAGMA foreign_keys = ON;');
 
-        if (this.isNewDB) {
-            console.log('Database does not exist, creating new one...');
-            await this.db.exec(INITIAL_SCHEMA);
-            console.log('Database schema created.');
-        } else {
-            console.log('Opened existing database.');
+            if (this.isNewDB) {
+                log.info('Database does not exist, creating new one...');
+                await this.db.exec(INITIAL_SCHEMA);
+                log.info('Database schema created successfully.');
+            } else {
+                log.info(`Opened existing database at: ${this.dbPath}`);
+            }
+        } catch (error) {
+            log.error('Failed to open or initialize database:', error);
+            throw error; // Propagate error to be caught in main.ts
         }
     }
 
     private ensureDb(): Database {
         if (!this.db) {
-            throw new Error('Database is not initialized.');
+            throw new Error('Database is not initialized or failed to open.');
         }
         return this.db;
     }
@@ -92,7 +107,7 @@ export class DatabaseService {
                 if (res.lastID) shaToIdMap.set(item.sha256_hex, res.lastID);
             }
             await contentStmt.finalize();
-            console.log(`Migrated ${payload.contentStore.length} content items.`);
+            log.info(`Migrated ${payload.contentStore.length} content items.`);
 
             // 2. Nodes
             const nodeStmt = await db.prepare('INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
@@ -100,7 +115,7 @@ export class DatabaseService {
                 await nodeStmt.run(node.node_id, node.parent_id, node.node_type, node.title, node.sort_order, node.created_at, node.updated_at);
             }
             await nodeStmt.finalize();
-            console.log(`Migrated ${payload.nodes.length} nodes.`);
+            log.info(`Migrated ${payload.nodes.length} nodes.`);
 
             // 3. Documents
             const docStmt = await db.prepare('INSERT INTO documents (node_id, doc_type, language_hint) VALUES (?, ?, ?)');
@@ -110,7 +125,7 @@ export class DatabaseService {
                 if (res.lastID) nodeIdToDocIdMap.set(doc.node_id, res.lastID);
             }
             await docStmt.finalize();
-            console.log(`Migrated ${payload.documents.length} documents.`);
+            log.info(`Migrated ${payload.documents.length} documents.`);
 
             // 4. Versions
             const versionStmt = await db.prepare('INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)');
@@ -129,7 +144,7 @@ export class DatabaseService {
                 }
             }
             await versionStmt.finalize();
-            console.log(`Migrated ${payload.docVersions.length} versions.`);
+            log.info(`Migrated ${payload.docVersions.length} versions.`);
 
             // 5. Update documents with latest version
             const updateDocStmt = await db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?');
@@ -148,7 +163,7 @@ export class DatabaseService {
                 await templateStmt.run(t.template_id || t.id, t.title, t.content, t.created_at || t.createdAt, t.updated_at || t.updatedAt);
             }
             await templateStmt.finalize();
-            console.log(`Migrated ${payload.templates.length} templates.`);
+            log.info(`Migrated ${payload.templates.length} templates.`);
 
             // 7. Settings
             const settingsStmt = await db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
@@ -156,14 +171,14 @@ export class DatabaseService {
                 await settingsStmt.run(s.key, s.value);
             }
             await settingsStmt.finalize();
-            console.log(`Migrated ${payload.settings.length} settings.`);
+            log.info(`Migrated ${payload.settings.length} settings.`);
             
             await db.exec('COMMIT');
             return { success: true };
         } catch (error) {
             await db.exec('ROLLBACK');
             const message = error instanceof Error ? error.message : String(error);
-            console.error('Migration transaction failed:', message);
+            log.error('Migration transaction failed:', message);
             return { success: false, error: message };
         }
     }

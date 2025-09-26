@@ -4,6 +4,17 @@ import path from 'path';
 import fs from 'fs/promises';
 import { autoUpdater } from 'electron-updater';
 import { DatabaseService } from './database';
+import log from 'electron-log';
+
+// Configure electron-log
+log.transports.file.resolvePath = () => path.join(app.getPath('userData'), 'logs/main.log');
+log.initialize();
+log.info('App starting...');
+
+// Handle creating/removing shortcuts on Windows when installing/uninstalling.
+if (require('electron-squirrel-startup')) {
+  app.quit();
+}
 
 let mainWindow: BrowserWindow | null = null;
 const dbService = new DatabaseService();
@@ -28,8 +39,6 @@ function createWindow() {
         backgroundColor: '#1a1a1a', // Match dark theme to avoid flash
     });
     
-    // In production, load the index.html file. In development, you might use a dev server.
-    // The esbuild config suggests a file-based approach.
     mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
 
     if (isDev) {
@@ -38,6 +47,7 @@ function createWindow() {
     
     mainWindow.once('ready-to-show', () => {
         mainWindow?.show();
+        log.info('Main window is ready to show.');
         autoUpdater.checkForUpdatesAndNotify();
     });
 
@@ -45,7 +55,6 @@ function createWindow() {
         mainWindow = null;
     });
     
-    // Window state change events
     const sendWindowState = () => {
         if (mainWindow) {
             mainWindow.webContents.send('window:state-change', {
@@ -57,65 +66,47 @@ function createWindow() {
     mainWindow.on('unmaximize', sendWindowState);
 }
 
-// Basic menu for copy/paste etc.
 const menuTemplate: (Electron.MenuItemConstructorOptions | Electron.MenuItem)[] = [
     ...(isMac ? [{
         label: app.name,
         submenu: [
-            { role: 'about' },
-            { type: 'separator' },
-            { role: 'services' },
-            { type: 'separator' },
-            { role: 'hide' },
-            { role: 'hideOthers' },
-            { role: 'unhide' },
-            { type: 'separator' },
-            { role: 'quit' }
+            { role: 'about' }, { type: 'separator' }, { role: 'services' }, { type: 'separator' },
+            { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }
         ]
     }] : []) as Electron.MenuItemConstructorOptions[],
     {
         label: 'Edit',
         submenu: [
-            { role: 'undo' },
-            { role: 'redo' },
-            { type: 'separator' },
-            { role: 'cut' },
-            { role: 'copy' },
-            { role: 'paste' },
+            { role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
             ...(isMac ? [
-                { role: 'pasteAndMatchStyle' },
-                { role: 'delete' },
-                { role: 'selectAll' },
-                { type: 'separator' },
-                {
-                    label: 'Speech',
-                    submenu: [
-                        { role: 'startSpeaking' },
-                        { role: 'stopSpeaking' }
-                    ]
-                }
+                { role: 'pasteAndMatchStyle' }, { role: 'delete' }, { role: 'selectAll' }, { type: 'separator' },
+                { label: 'Speech', submenu: [{ role: 'startSpeaking' }, { role: 'stopSpeaking' }] }
             ] : [
-                { role: 'delete' },
-                { type: 'separator' },
-                { role: 'selectAll' }
+                { role: 'delete' }, { type: 'separator' }, { role: 'selectAll' }
             ]) as Electron.MenuItemConstructorOptions[]
         ]
     },
-    {
-        label: 'View',
-        submenu: [
-            { role: 'reload' },
-            { role: 'forceReload' },
-            { role: 'toggleDevTools' },
-        ]
-    }
+    { label: 'View', submenu: [{ role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }] }
 ];
 Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
 
-
+// Fix: Get userDataPath ONLY after app is ready.
 app.on('ready', async () => {
-    await dbService.init();
-    createWindow();
+    const userDataPath = app.getPath('userData');
+    log.info(`User data path: ${userDataPath}`);
+
+    try {
+        await dbService.open(userDataPath);
+        log.info('Database service initialized successfully.');
+        createWindow();
+    } catch (error) {
+        log.error('Fatal: Could not initialize database. Application will exit.', error);
+        dialog.showErrorBox(
+            'Database Error',
+            'Could not open the application database. See logs for details. The application will now close.'
+        );
+        app.quit();
+    }
 });
 
 app.on('window-all-closed', () => {
@@ -144,12 +135,15 @@ ipcMain.handle('app:get-version', () => app.getVersion());
 ipcMain.handle('app:get-platform', () => process.platform);
 
 autoUpdater.on('update-downloaded', (info) => {
+    log.info(`Update downloaded: version ${info.version}`);
     mainWindow?.webContents.send('update:downloaded', info.version);
 });
 ipcMain.on('updater:quit-and-install', () => {
+    log.info('User requested update. Quitting and installing.');
     autoUpdater.quitAndInstall();
 });
 ipcMain.on('updater:set-allow-prerelease', (_, allow) => {
+    log.info(`Setting allowPrerelease to: ${allow}`);
     autoUpdater.allowPrerelease = allow;
 });
 
@@ -164,7 +158,9 @@ ipcMain.on('window:maximize', () => {
 });
 ipcMain.on('window:close', () => mainWindow?.close());
 
-// Dialogs
+// Dialogs and FS. These now get userDataPath safely after 'ready'.
+const getSafeUserDataPath = () => app.getPath('userData');
+
 ipcMain.handle('dialog:save', async (_, options, content) => {
     if (!mainWindow) return { success: false, error: 'Main window not available' };
     const { filePath } = await dialog.showSaveDialog(mainWindow, options);
@@ -172,9 +168,7 @@ ipcMain.handle('dialog:save', async (_, options, content) => {
         try {
             await fs.writeFile(filePath, content, 'utf8');
             return { success: true };
-        } catch (error) {
-            return { success: false, error: (error as Error).message };
-        }
+        } catch (error) { return { success: false, error: (error as Error).message }; }
     }
     return { success: false, error: 'Save dialog cancelled' };
 });
@@ -186,41 +180,33 @@ ipcMain.handle('dialog:open', async (_, options) => {
         try {
             const content = await fs.readFile(filePaths[0], 'utf8');
             return { success: true, content };
-        } catch (error) {
-            return { success: false, error: (error as Error).message };
-        }
+        } catch (error) { return { success: false, error: (error as Error).message }; }
     }
     return { success: false, error: 'Open dialog cancelled' };
 });
 
-// FS Access (Legacy and Docs)
-const userDataPath = app.getPath('userData');
 ipcMain.handle('fs:legacy-file-exists', async (_, filename) => {
     try {
-        await fs.access(path.join(userDataPath, filename));
+        await fs.access(path.join(getSafeUserDataPath(), filename));
         return true;
-    } catch {
-        return false;
-    }
+    } catch { return false; }
 });
 
 ipcMain.handle('fs:read-legacy-file', async (_, filename) => {
     try {
-        const data = await fs.readFile(path.join(userDataPath, filename), 'utf8');
+        const data = await fs.readFile(path.join(getSafeUserDataPath(), filename), 'utf8');
         return { success: true, data };
-    } catch (error) {
-        return { success: false, error: (error as Error).message };
-    }
+    } catch (error) { return { success: false, error: (error as Error).message }; }
 });
 
 ipcMain.handle('docs:read', async (_, filename) => {
     try {
-        // In a packaged app, files are in the resources directory. In dev, they're in the project root.
         const basePath = isDev ? process.cwd() : process.resourcesPath;
         const docPath = path.join(basePath, 'docs', filename);
         const content = await fs.readFile(docPath, 'utf8');
         return { success: true, content };
     } catch (error) {
+        log.error(`Failed to read doc file '${filename}':`, error);
         return { success: false, error: (error as Error).message };
     }
 });
