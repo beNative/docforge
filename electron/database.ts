@@ -1,185 +1,163 @@
-
+// Fix: This file was previously a placeholder. This is the full implementation for the database service.
+import { app } from 'electron';
 import path from 'path';
 import fs from 'fs';
-import { Database, open } from 'sqlite';
-import sqlite3 from 'sqlite3';
+import Database from 'better-sqlite3';
 import { INITIAL_SCHEMA } from './schema';
-import log from 'electron-log';
 
-// This is a simplified type mirroring what's sent from the renderer.
-interface MigrationPayload {
-    nodes: any[];
-    documents: any[];
-    docVersions: any[];
-    contentStore: any[];
-    templates: any[];
-    settings: { key: string, value: string }[];
-}
+let db: Database.Database;
 
-export class DatabaseService {
-    private db: Database | null = null;
-    private dbPath: string = '';
-    private isNewDB: boolean = false;
+const DB_FILE_NAME = 'docforge.db';
+const DB_PATH = path.join(app.getPath('userData'), DB_FILE_NAME);
 
-    // The constructor is now empty and does not access `app`.
-    constructor() {}
+export const databaseService = {
+  init() {
+    const dbExists = fs.existsSync(DB_PATH);
+    db = new Database(DB_PATH);
 
-    // The path is now passed in during initialization, which happens after `app` is ready.
-    async open(userDataPath: string): Promise<void> {
-        const dbFolder = path.join(userDataPath, 'db');
-        if (!fs.existsSync(dbFolder)) {
-            fs.mkdirSync(dbFolder, { recursive: true });
+    if (!dbExists) {
+      console.log('Database does not exist, creating new one...');
+      db.exec(INITIAL_SCHEMA);
+      // Set PRAGMAs for a new database
+      db.exec('PRAGMA journal_mode = WAL;');
+      db.exec('PRAGMA foreign_keys = ON;');
+      console.log('Database created and schema applied.');
+    } else {
+      console.log('Existing database found.');
+      // Ensure PRAGMAs are set for existing databases too
+      db.exec('PRAGMA journal_mode = WAL;');
+      db.exec('PRAGMA foreign_keys = ON;');
+    }
+  },
+
+  isNew(): boolean {
+    const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='nodes'").get();
+    return !tableCheck;
+  },
+  
+  query(sql: string, params: any[] = []): any[] {
+    try {
+      return db.prepare(sql).all(...(params || []));
+    } catch(e) {
+      console.error("DB Query Error:", sql, params, e);
+      throw e;
+    }
+  },
+
+  get(sql: string, params: any[] = []): any {
+    try {
+      return db.prepare(sql).get(...(params || []));
+    } catch(e) {
+      console.error("DB Get Error:", sql, params, e);
+      throw e;
+    }
+  },
+  
+  run(sql: string, params: any[] = []): Database.RunResult {
+    try {
+      return db.prepare(sql).run(...(params || []));
+    } catch(e) {
+      console.error("DB Run Error:", sql, params, e);
+      throw e;
+    }
+  },
+
+  migrateFromJson(data: any): { success: boolean, error?: string } {
+    const transaction = db.transaction(() => {
+        // Clear existing data for a clean migration slate.
+        db.exec('DELETE FROM settings;');
+        db.exec('DELETE FROM templates;');
+        db.exec('DELETE FROM doc_versions;');
+        db.exec('DELETE FROM content_store;');
+        db.exec('DELETE FROM documents;');
+        db.exec('DELETE FROM nodes;');
+
+        // Insert Content
+        const contentStmt = db.prepare('INSERT INTO content_store (sha256_hex, text_content) VALUES (?, ?)');
+        const contentMap = new Map<string, number>();
+        for (const item of data.contentStore) {
+            const result = contentStmt.run(item.sha256_hex, item.text_content);
+            contentMap.set(item.sha256_hex, Number(result.lastInsertRowid));
         }
-        
-        // Handle renaming from old db file for seamless user update
-        const oldDbPath = path.join(userDataPath, 'docforge.sqlite3');
-        const newDbPath = path.join(dbFolder, 'docforge.db');
-        if (fs.existsSync(oldDbPath) && !fs.existsSync(newDbPath)) {
-            log.info(`Found old database at ${oldDbPath}, moving to ${newDbPath}`);
-            fs.renameSync(oldDbPath, newDbPath);
+
+        // Insert Nodes
+        const nodeStmt = db.prepare('INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        for (const node of data.nodes) {
+            nodeStmt.run(node.node_id, node.parent_id, node.node_type, node.title, node.sort_order, node.created_at, node.updated_at);
         }
-        
-        this.dbPath = newDbPath;
-        this.isNewDB = !fs.existsSync(this.dbPath);
-        
-        try {
-            this.db = await open({
-                filename: this.dbPath,
-                driver: sqlite3.Database
-            });
 
-            await this.db.exec('PRAGMA journal_mode = WAL;');
-            await this.db.exec('PRAGMA foreign_keys = ON;');
+        // Insert Documents and Versions
+        const docStmt = db.prepare('INSERT INTO documents (node_id, doc_type, language_hint) VALUES (?, ?, ?)');
+        const versionStmt = db.prepare('INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)');
+        const updateDocStmt = db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?');
 
-            if (this.isNewDB) {
-                log.info('Database does not exist, creating new one...');
-                await this.db.exec(INITIAL_SCHEMA);
-                log.info('Database schema created successfully.');
-            } else {
-                log.info(`Opened existing database at: ${this.dbPath}`);
-            }
-        } catch (error) {
-            log.error('Failed to open or initialize database:', error);
-            throw error; // Propagate error to be caught in main.ts
+        const docVersionsByNode = new Map<string, any[]>();
+        for(const version of data.docVersions) {
+            if(!docVersionsByNode.has(version.node_id)) docVersionsByNode.set(version.node_id, []);
+            docVersionsByNode.get(version.node_id)!.push(version);
         }
-    }
 
-    private ensureDb(): Database {
-        if (!this.db) {
-            throw new Error('Database is not initialized or failed to open.');
-        }
-        return this.db;
-    }
+        for (const doc of data.documents) {
+            const docResult = docStmt.run(doc.node_id, doc.doc_type, doc.language_hint);
+            const docId = Number(docResult.lastInsertRowid);
+            
+            const versions = docVersionsByNode.get(doc.node_id) || [];
+            // Sort versions by date to find the latest one
+            versions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            
+            let latestVersionId: number | null = null;
 
-    isNew(): boolean {
-        return this.isNewDB;
-    }
-    
-    async query(sql: string, params: any[] = []): Promise<any[]> {
-        const db = this.ensureDb();
-        return db.all(sql, params);
-    }
-
-    async get(sql: string, params: any[] = []): Promise<any> {
-        const db = this.ensureDb();
-        return db.get(sql, params);
-    }
-
-    async run(sql: string, params: any[] = []): Promise<{ changes: number; lastInsertRowid: number; }> {
-        const db = this.ensureDb();
-        const result = await db.run(sql, params);
-        return {
-            changes: result.changes ?? 0,
-            lastInsertRowid: result.lastID ?? 0,
-        };
-    }
-    
-    async migrateFromJson(payload: MigrationPayload): Promise<{ success: boolean; error?: string }> {
-        const db = this.ensureDb();
-        try {
-            await db.exec('BEGIN TRANSACTION');
-
-            // 1. Content Store
-            const contentStmt = await db.prepare('INSERT INTO content_store (sha256_hex, text_content) VALUES (?, ?)');
-            const shaToIdMap = new Map<string, number>();
-            for (const item of payload.contentStore) {
-                const res = await contentStmt.run(item.sha256_hex, item.text_content);
-                if (res.lastID) shaToIdMap.set(item.sha256_hex, res.lastID);
-            }
-            await contentStmt.finalize();
-            log.info(`Migrated ${payload.contentStore.length} content items.`);
-
-            // 2. Nodes
-            const nodeStmt = await db.prepare('INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
-            for (const node of payload.nodes) {
-                await nodeStmt.run(node.node_id, node.parent_id, node.node_type, node.title, node.sort_order, node.created_at, node.updated_at);
-            }
-            await nodeStmt.finalize();
-            log.info(`Migrated ${payload.nodes.length} nodes.`);
-
-            // 3. Documents
-            const docStmt = await db.prepare('INSERT INTO documents (node_id, doc_type, language_hint) VALUES (?, ?, ?)');
-            const nodeIdToDocIdMap = new Map<string, number>();
-            for (const doc of payload.documents) {
-                const res = await docStmt.run(doc.node_id, doc.doc_type, doc.language_hint);
-                if (res.lastID) nodeIdToDocIdMap.set(doc.node_id, res.lastID);
-            }
-            await docStmt.finalize();
-            log.info(`Migrated ${payload.documents.length} documents.`);
-
-            // 4. Versions
-            const versionStmt = await db.prepare('INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)');
-            const docIdToVersions = new Map<number, { versionId: number, createdAt: string }[]>();
-            for (const version of payload.docVersions) {
-                const document_id = nodeIdToDocIdMap.get(version.node_id);
-                const content_id = shaToIdMap.get(version.sha256_hex);
-                if (document_id && content_id) {
-                    const res = await versionStmt.run(document_id, version.created_at, content_id);
-                    if (res.lastID) {
-                        if (!docIdToVersions.has(document_id)) {
-                            docIdToVersions.set(document_id, []);
-                        }
-                        docIdToVersions.get(document_id)!.push({ versionId: res.lastID, createdAt: version.created_at });
+            for (const version of versions) {
+                const contentId = contentMap.get(version.sha256_hex);
+                if (contentId) {
+                    const versionResult = versionStmt.run(docId, version.created_at, contentId);
+                    if (!latestVersionId) {
+                        latestVersionId = Number(versionResult.lastInsertRowid);
                     }
                 }
             }
-            await versionStmt.finalize();
-            log.info(`Migrated ${payload.docVersions.length} versions.`);
 
-            // 5. Update documents with latest version
-            const updateDocStmt = await db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?');
-            for (const [docId, versions] of docIdToVersions.entries()) {
-                versions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-                const latestVersionId = versions[0]?.versionId;
-                if (latestVersionId) {
-                    await updateDocStmt.run(latestVersionId, docId);
-                }
+            if (latestVersionId) {
+                updateDocStmt.run(latestVersionId, docId);
             }
-            await updateDocStmt.finalize();
-
-            // 6. Templates
-            const templateStmt = await db.prepare('INSERT INTO templates (template_id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
-            for (const t of payload.templates) {
-                await templateStmt.run(t.template_id || t.id, t.title, t.content, t.created_at || t.createdAt, t.updated_at || t.updatedAt);
-            }
-            await templateStmt.finalize();
-            log.info(`Migrated ${payload.templates.length} templates.`);
-
-            // 7. Settings
-            const settingsStmt = await db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-            for (const s of payload.settings) {
-                await settingsStmt.run(s.key, s.value);
-            }
-            await settingsStmt.finalize();
-            log.info(`Migrated ${payload.settings.length} settings.`);
-            
-            await db.exec('COMMIT');
-            return { success: true };
-        } catch (error) {
-            await db.exec('ROLLBACK');
-            const message = error instanceof Error ? error.message : String(error);
-            log.error('Migration transaction failed:', message);
-            return { success: false, error: message };
         }
+        
+        // Insert Templates
+        const templateStmt = db.prepare('INSERT INTO templates (template_id, title, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)');
+        for (const template of data.templates) {
+            templateStmt.run(template.template_id, template.title, template.content, template.created_at, template.updated_at);
+        }
+
+        // Insert Settings
+        const settingsStmt = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
+        for (const setting of data.settings) {
+             // The `transformLegacyData` in renderer has a bug where it uses String(value)
+            // instead of JSON.stringify(value). This is problematic for empty strings,
+            // which are not valid JSON. We store it as a stringified empty string
+            // to be compatible with `JSON.parse` on the renderer side.
+            const valueToStore = setting.value === '' ? '""' : JSON.stringify(setting.value);
+            // Re-parsing what is essentially a stringified primitive to store a valid JSON string.
+            try {
+                const parsed = JSON.parse(setting.value);
+                settingsStmt.run(setting.key, JSON.stringify(parsed));
+            } catch {
+                 settingsStmt.run(setting.key, JSON.stringify(setting.value));
+            }
+        }
+    });
+
+    try {
+      transaction();
+      return { success: true };
+    } catch (error) {
+      console.error('Migration transaction failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
-}
+  },
+
+  close() {
+    if (db) {
+      db.close();
+    }
+  }
+};

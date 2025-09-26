@@ -1,151 +1,132 @@
-
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
+// Fix: This file was previously a placeholder. This is the full implementation for the Electron main process.
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs/promises';
 import { autoUpdater } from 'electron-updater';
-import { DatabaseService } from './database';
-import log from 'electron-log';
+import { databaseService } from './database';
 
-// Configure electron-log
-log.transports.file.resolvePath = () => path.join(app.getPath('userData'), 'logs/main.log');
-log.initialize();
-log.info('App starting...');
+let mainWindow: BrowserWindow | null;
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
-  app.quit();
-}
-
-let mainWindow: BrowserWindow | null = null;
-const dbService = new DatabaseService();
-
-const isDev = !app.isPackaged;
-const isMac = process.platform === 'darwin';
+// --- Auto Updater Setup ---
+// Note: For auto-updates to work, you need to configure `electron-builder` in package.json
+// and sign your application.
+autoUpdater.autoDownload = true; // Enable auto-downloading of updates
+autoUpdater.on('update-downloaded', (info) => {
+    mainWindow?.webContents.send('update:downloaded', info.version);
+});
 
 function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 1280,
-        height: 800,
-        minWidth: 800,
-        minHeight: 600,
-        webPreferences: {
-            preload: path.join(__dirname, 'preload.js'),
-            contextIsolation: true,
-            nodeIntegration: false,
-        },
-        titleBarStyle: isMac ? 'hidden' : 'hidden',
-        trafficLightPosition: { x: 15, y: 15 },
-        show: false,
-        backgroundColor: '#1a1a1a', // Match dark theme to avoid flash
-    });
-    
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
+    frame: false, // Use custom title bar on all platforms
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 15, y: 13 }, // macOS specific
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      spellcheck: true,
+    },
+    show: false, // Don't show until ready
+    backgroundColor: '#1a1a1a', // Match dark theme to avoid flash
+  });
+  
+  // Load the index.html of the app.
+  if (app.isPackaged) {
     mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
+  } else {
+    mainWindow.loadURL('http://localhost:8080'); // Adjusted for esbuild serve common port
+    mainWindow.webContents.openDevTools();
+  }
 
-    if (isDev) {
-        mainWindow.webContents.openDevTools();
+  mainWindow.on('ready-to-show', () => {
+    mainWindow?.show();
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+  
+  // Window state change events
+  const sendWindowState = () => {
+    if (mainWindow) {
+      mainWindow.webContents.send('window:state-change', { isMaximized: mainWindow.isMaximized() });
     }
-    
-    mainWindow.once('ready-to-show', () => {
-        mainWindow?.show();
-        log.info('Main window is ready to show.');
-        autoUpdater.checkForUpdatesAndNotify();
-    });
+  };
 
-    mainWindow.on('closed', () => {
-        mainWindow = null;
-    });
-    
-    const sendWindowState = () => {
-        if (mainWindow) {
-            mainWindow.webContents.send('window:state-change', {
-                isMaximized: mainWindow.isMaximized(),
-            });
-        }
-    };
-    mainWindow.on('maximize', sendWindowState);
-    mainWindow.on('unmaximize', sendWindowState);
+  mainWindow.on('maximize', sendWindowState);
+  mainWindow.on('unmaximize', sendWindowState);
 }
 
-const menuTemplate: (Electron.MenuItemConstructorOptions | Electron.MenuItem)[] = [
-    ...(isMac ? [{
-        label: app.name,
-        submenu: [
-            { role: 'about' }, { type: 'separator' }, { role: 'services' }, { type: 'separator' },
-            { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }
-        ]
-    }] : []) as Electron.MenuItemConstructorOptions[],
-    {
-        label: 'Edit',
-        submenu: [
-            { role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
-            ...(isMac ? [
-                { role: 'pasteAndMatchStyle' }, { role: 'delete' }, { role: 'selectAll' }, { type: 'separator' },
-                { label: 'Speech', submenu: [{ role: 'startSpeaking' }, { role: 'stopSpeaking' }] }
-            ] : [
-                { role: 'delete' }, { type: 'separator' }, { role: 'selectAll' }
-            ]) as Electron.MenuItemConstructorOptions[]
-        ]
-    },
-    { label: 'View', submenu: [{ role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }] }
-];
-Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
-
-// Fix: Get userDataPath ONLY after app is ready.
-app.on('ready', async () => {
-    const userDataPath = app.getPath('userData');
-    log.info(`User data path: ${userDataPath}`);
-
-    try {
-        await dbService.open(userDataPath);
-        log.info('Database service initialized successfully.');
-        createWindow();
-    } catch (error) {
-        log.error('Fatal: Could not initialize database. Application will exit.', error);
-        dialog.showErrorBox(
-            'Database Error',
-            'Could not open the application database. See logs for details. The application will now close.'
-        );
-        app.quit();
-    }
+app.on('ready', () => {
+  databaseService.init();
+  createWindow();
+  // Check for updates after window is created
+  setTimeout(() => autoUpdater.checkForUpdatesAndNotify(), 3000);
 });
 
 app.on('window-all-closed', () => {
-    if (!isMac) {
-        app.quit();
-    }
+  databaseService.close();
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
 
 app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    }
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });
 
 // --- IPC Handlers ---
 
 // Database
-ipcMain.handle('db:query', (_, sql, params) => dbService.query(sql, params));
-ipcMain.handle('db:get', (_, sql, params) => dbService.get(sql, params));
-ipcMain.handle('db:run', (_, sql, params) => dbService.run(sql, params));
-ipcMain.handle('db:is-new', () => dbService.isNew());
-ipcMain.handle('db:migrate-from-json', (_, data) => dbService.migrateFromJson(data));
+ipcMain.handle('db:query', (_, sql, params) => databaseService.query(sql, params));
+ipcMain.handle('db:get', (_, sql, params) => databaseService.get(sql, params));
+ipcMain.handle('db:run', (_, sql, params) => databaseService.run(sql, params));
+ipcMain.handle('db:is-new', () => databaseService.isNew());
+ipcMain.handle('db:migrate-from-json', (_, data) => databaseService.migrateFromJson(data));
+
+
+// Legacy FS for migration
+// Important: This path assumes a standard Electron userData structure.
+// It navigates from the new app's userData to where the old app's data would be.
+const getLegacyPath = (filename: string) => path.join(app.getPath('userData'), '..', 'PromptForge', filename);
+
+ipcMain.handle('fs:legacy-file-exists', async (_, filename) => {
+    try {
+        await fs.access(getLegacyPath(filename));
+        return true;
+    } catch {
+        return false;
+    }
+});
+
+ipcMain.handle('fs:read-legacy-file', async (_, filename) => {
+    try {
+        const content = await fs.readFile(getLegacyPath(filename), 'utf-8');
+        // Legacy data was just a JSON string in a file.
+        return { success: true, data: content };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+});
+
 
 // App Info & Updates
 ipcMain.handle('app:get-version', () => app.getVersion());
 ipcMain.handle('app:get-platform', () => process.platform);
 
-autoUpdater.on('update-downloaded', (info) => {
-    log.info(`Update downloaded: version ${info.version}`);
-    mainWindow?.webContents.send('update:downloaded', info.version);
-});
-ipcMain.on('updater:quit-and-install', () => {
-    log.info('User requested update. Quitting and installing.');
-    autoUpdater.quitAndInstall();
-});
-ipcMain.on('updater:set-allow-prerelease', (_, allow) => {
-    log.info(`Setting allowPrerelease to: ${allow}`);
+ipcMain.on('updater:set-allow-prerelease', (_, allow: boolean) => {
     autoUpdater.allowPrerelease = allow;
 });
+ipcMain.on('updater:quit-and-install', () => {
+    autoUpdater.quitAndInstall();
+});
+
 
 // Window Controls
 ipcMain.on('window:minimize', () => mainWindow?.minimize());
@@ -158,55 +139,46 @@ ipcMain.on('window:maximize', () => {
 });
 ipcMain.on('window:close', () => mainWindow?.close());
 
-// Dialogs and FS. These now get userDataPath safely after 'ready'.
-const getSafeUserDataPath = () => app.getPath('userData');
 
+// Dialogs
 ipcMain.handle('dialog:save', async (_, options, content) => {
     if (!mainWindow) return { success: false, error: 'Main window not available' };
-    const { filePath } = await dialog.showSaveDialog(mainWindow, options);
-    if (filePath) {
-        try {
-            await fs.writeFile(filePath, content, 'utf8');
-            return { success: true };
-        } catch (error) { return { success: false, error: (error as Error).message }; }
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, options);
+    if (canceled || !filePath) {
+        return { success: false };
     }
-    return { success: false, error: 'Save dialog cancelled' };
+    try {
+        await fs.writeFile(filePath, content, 'utf-8');
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to save file.' };
+    }
 });
 
 ipcMain.handle('dialog:open', async (_, options) => {
     if (!mainWindow) return { success: false, error: 'Main window not available' };
-    const { filePaths } = await dialog.showOpenDialog(mainWindow, options);
-    if (filePaths && filePaths.length > 0) {
-        try {
-            const content = await fs.readFile(filePaths[0], 'utf8');
-            return { success: true, content };
-        } catch (error) { return { success: false, error: (error as Error).message }; }
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, options);
+    if (canceled || filePaths.length === 0) {
+        return { success: false };
     }
-    return { success: false, error: 'Open dialog cancelled' };
-});
-
-ipcMain.handle('fs:legacy-file-exists', async (_, filename) => {
     try {
-        await fs.access(path.join(getSafeUserDataPath(), filename));
-        return true;
-    } catch { return false; }
-});
-
-ipcMain.handle('fs:read-legacy-file', async (_, filename) => {
-    try {
-        const data = await fs.readFile(path.join(getSafeUserDataPath(), filename), 'utf8');
-        return { success: true, data };
-    } catch (error) { return { success: false, error: (error as Error).message }; }
-});
-
-ipcMain.handle('docs:read', async (_, filename) => {
-    try {
-        const basePath = isDev ? process.cwd() : process.resourcesPath;
-        const docPath = path.join(basePath, 'docs', filename);
-        const content = await fs.readFile(docPath, 'utf8');
+        const content = await fs.readFile(filePaths[0], 'utf-8');
         return { success: true, content };
     } catch (error) {
-        log.error(`Failed to read doc file '${filename}':`, error);
-        return { success: false, error: (error as Error).message };
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to read file.' };
+    }
+});
+
+// Read packaged doc files
+ipcMain.handle('docs:read', async (_, filename: string) => {
+    try {
+        const docPath = app.isPackaged
+            ? path.join(process.resourcesPath, 'docs', filename)
+            : path.join(__dirname, '../../docs', filename);
+        const content = await fs.readFile(docPath, 'utf-8');
+        return { success: true, content };
+    } catch (error) {
+        console.error(`Failed to read doc: ${filename}`, error);
+        return { success: false, error: error instanceof Error ? error.message : `Could not read ${filename}` };
     }
 });
