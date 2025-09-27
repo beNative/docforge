@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Modal from './Modal';
 import Button from './Button';
 import type { DocumentTemplate } from '../types';
@@ -14,6 +14,7 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(templates[0]?.template_id || '');
   const [documentTitle, setDocumentTitle] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
+  const createButtonRef = useRef<HTMLButtonElement>(null);
 
   const selectedTemplate = useMemo(() => {
     // Fix: Use template_id instead of id
@@ -48,76 +49,85 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
   
   const isFormValid = documentTitle.trim() !== '' && templateVariables.every(key => (variables[key] || '').trim() !== '');
 
-  return (
-    <Modal onClose={onClose} title="Create Document from Template">
-      <div className="p-6 text-text-main space-y-4">
-        <div>
-          <label htmlFor="template-select" className="block text-sm font-medium text-text-secondary mb-1">
-            Template
-          </label>
-          <select
-            id="template-select"
-            value={selectedTemplateId}
-            onChange={(e) => setSelectedTemplateId(e.target.value)}
-            className="w-full p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
-          >
-            {templates.map(t => (
-              // Fix: Use template_id instead of id
-              <option key={t.template_id} value={t.template_id}>{t.title}</option>
-            ))}
-          </select>
-        </div>
-        
-        {selectedTemplate && (
-          <>
-            <div>
-              <label htmlFor="prompt-title" className="block text-sm font-medium text-text-secondary mb-1">
-                New Document Title
-              </label>
-              <input
-                id="prompt-title"
-                type="text"
-                value={documentTitle}
-                onChange={(e) => setDocumentTitle(e.target.value)}
-                className="w-full p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-            </div>
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isFormValid) {
+      handleCreate();
+    }
+  };
 
-            {templateVariables.length > 0 && (
-              <fieldset className="border-t border-border-color pt-4">
-                <legend className="text-sm font-medium text-text-secondary mb-2">Fill in Variables</legend>
-                <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                  {templateVariables.map(key => (
-                    <div key={key}>
-                      <label htmlFor={`var-${key}`} className="block text-sm font-medium text-text-main capitalize">
-                        {key.replace(/_/g, ' ')}
-                      </label>
-                      <input
-                        id={`var-${key}`}
-                        type="text"
-                        value={variables[key] || ''}
-                        onChange={(e) => setVariables(prev => ({ ...prev, [key]: e.target.value }))}
-                        className="mt-1 w-full p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-             {templateVariables.length === 0 && (
-                <p className="text-sm text-text-secondary text-center pt-4">This template has no variables.</p>
-             )}
-          </>
-        )}
-      </div>
-      <div className="flex justify-end gap-3 px-6 py-4 bg-background/50 border-t border-border-color rounded-b-lg">
-        <Button onClick={onClose} variant="secondary">
-          Cancel
-        </Button>
-        <Button onClick={handleCreate} variant="primary" disabled={!selectedTemplate || !isFormValid}>
-          Create Document
-        </Button>
-      </div>
+  return (
+    <Modal onClose={onClose} title="Create Document from Template" initialFocusRef={createButtonRef}>
+      <form onSubmit={handleSubmit}>
+        <div className="p-6 text-text-main space-y-4">
+          <div>
+            <label htmlFor="template-select" className="block text-sm font-medium text-text-secondary mb-1">
+              Template
+            </label>
+            <select
+              id="template-select"
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              className="w-full p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              {templates.map(t => (
+                // Fix: Use template_id instead of id
+                <option key={t.template_id} value={t.template_id}>{t.title}</option>
+              ))}
+            </select>
+          </div>
+          
+          {selectedTemplate && (
+            <>
+              <div>
+                <label htmlFor="prompt-title" className="block text-sm font-medium text-text-secondary mb-1">
+                  New Document Title
+                </label>
+                <input
+                  id="prompt-title"
+                  type="text"
+                  value={documentTitle}
+                  onChange={(e) => setDocumentTitle(e.target.value)}
+                  className="w-full p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+              </div>
+
+              {templateVariables.length > 0 && (
+                <fieldset className="border-t border-border-color pt-4">
+                  <legend className="text-sm font-medium text-text-secondary mb-2">Fill in Variables</legend>
+                  <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                    {templateVariables.map(key => (
+                      <div key={key}>
+                        <label htmlFor={`var-${key}`} className="block text-sm font-medium text-text-main capitalize">
+                          {key.replace(/_/g, ' ')}
+                        </label>
+                        <input
+                          id={`var-${key}`}
+                          type="text"
+                          value={variables[key] || ''}
+                          onChange={(e) => setVariables(prev => ({ ...prev, [key]: e.target.value }))}
+                          className="mt-1 w-full p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+               {templateVariables.length === 0 && (
+                  <p className="text-sm text-text-secondary text-center pt-4">This template has no variables.</p>
+               )}
+            </>
+          )}
+        </div>
+        <div className="flex justify-end gap-3 px-6 py-4 bg-background/50 border-t border-border-color rounded-b-lg">
+          <Button onClick={onClose} variant="secondary" type="button">
+            Cancel
+          </Button>
+          <Button ref={createButtonRef} type="submit" variant="primary" disabled={!selectedTemplate || !isFormValid}>
+            Create Document
+          </Button>
+        </div>
+      </form>
     </Modal>
   );
 };

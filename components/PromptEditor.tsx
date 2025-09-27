@@ -118,6 +118,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
   
   const isResizing = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
+  const acceptButtonRef = useRef<HTMLButtonElement>(null);
 
   // Reset content and view when the document ID or external content changes.
   useEffect(() => {
@@ -277,6 +278,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
     addLog('INFO', `AI refinement discarded for document: "${title}"`);
     setRefinedContent(null);
   }
+  
+  const handleAcceptSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    acceptRefinement();
+  };
 
   const handleCopy = async () => {
     if (!content.trim()) return;
@@ -422,21 +428,23 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
       </div>
       
       {refinedContent && (
-        <Modal onClose={discardRefinement} title="AI Refinement Suggestion">
+        <Modal onClose={discardRefinement} title="AI Refinement Suggestion" initialFocusRef={acceptButtonRef}>
+          <form onSubmit={handleAcceptSubmit}>
             <div className="p-6 text-text-main">
                 <p className="text-text-secondary mb-4 text-sm">The AI suggests the following refinement. You can accept this change or discard it.</p>
                 <div className="p-3 my-4 bg-background border border-border-color rounded-md whitespace-pre-wrap font-mono text-sm max-h-96 overflow-y-auto">
                     {refinedContent}
                 </div>
                 <div className="flex justify-end gap-3 mt-6">
-                    <Button onClick={discardRefinement} variant="secondary">
+                    <Button onClick={discardRefinement} variant="secondary" type="button">
                         Discard
                     </Button>
-                    <Button onClick={acceptRefinement} variant="primary">
+                    <Button ref={acceptButtonRef} type="submit" variant="primary">
                         Accept
                     </Button>
                 </div>
             </div>
+          </form>
         </Modal>
       )}
     </div>

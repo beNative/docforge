@@ -117,14 +117,14 @@ You can drop an item (or a group of items):
 
 ### AI-Powered Refinement
 
-Clicking the **Refine with AI** (sparkles) button in the editor toolbar sends your current document content to your configured local LLM. The AI's task is not to *answer* the document's request, but to *improve* the document itself. A modal will appear with the suggested refinement, which you can then accept or discard.
+Clicking the **Refine with AI** (sparkles) button in the editor toolbar sends your current document content to your configured local LLM. The AI's task is not to *answer* the document's request, but to *improve* the document itself. A modal will appear with the suggested refinement, which you can then accept or discard. The "Accept" button is the default and can be triggered by pressing `Enter`.
 
 ### Using Templates
 
 Templates are useful for documents you create often.
 
 - **Create a Template:** Use the "New Template" button in the sidebar. In the template editor, use `{{variable_name}}` syntax to define placeholders.
-- **Create from Template:** Click the "New from Template..." button at the bottom of the sidebar. A modal will appear allowing you to select a template and fill in the values for its variables. This will generate a new document with the content filled in.
+- **Create from Template:** Click the "New from Template..." button at the bottom of the sidebar. A modal will appear allowing you to select a template and fill in the values for its variables. This will generate a new document with the content filled in. Pressing `Enter` in this dialog will create the document once all required fields are filled.
 
 ### Version History
 
