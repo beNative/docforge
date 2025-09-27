@@ -37,13 +37,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- Dialogs & Docs (keep original names for compatibility) ---
   saveLog: (defaultFilename: string, content: string) => ipcRenderer.invoke('dialog:save', {
       title: 'Save Log File',
-      defaultPath: `promptforge-log-${new Date().toISOString().split('T')[0]}.log`,
+      defaultPath: `docforge-log-${new Date().toISOString().split('T')[0]}.log`,
       filters: [{ name: 'Log Files', extensions: ['log'] }, { name: 'All Files', extensions: ['*'] }]
   }, content),
   
   settingsExport: (content: string) => ipcRenderer.invoke('dialog:save', {
       title: 'Export Settings',
-      defaultPath: 'promptforge_settings.json',
+      defaultPath: 'docforge_settings.json',
       filters: [{ name: 'JSON Files', extensions: ['json'] }, { name: 'All Files', extensions: ['*'] }]
   }, content),
 
