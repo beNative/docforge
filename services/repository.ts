@@ -357,25 +357,15 @@ export const repository = {
         `, [nodeId]);
     },
 
-    async deleteDocVersions(versionIds: number[]): Promise<void> {
+    async deleteDocVersions(documentId: number, versionIds: number[]): Promise<void> {
         if (versionIds.length === 0) return;
-
-        const placeholders = versionIds.map(() => '?').join(',');
-        
-        // Safety check: ensure we are not deleting a version that is currently active for any document.
-        const activeCheck = await window.electronAPI!.dbQuery(
-            `SELECT 1 FROM documents WHERE current_version_id IN (${placeholders})`,
-            versionIds
-        );
-        if (activeCheck.length > 0) {
-            throw new Error("Cannot delete a version that is currently active.");
+        if (!window.electronAPI?.dbDeleteVersions) {
+            throw new Error("Version deletion is not supported in this environment.");
         }
-
-        await window.electronAPI!.dbRun(
-            `DELETE FROM doc_versions WHERE version_id IN (${placeholders})`,
-            versionIds
-        );
-        // Note: This does not garbage collect from content_store, which is acceptable for now.
+        const result = await window.electronAPI.dbDeleteVersions(documentId, versionIds);
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to delete versions in main process.');
+        }
     },
     
     async getAllTemplates(): Promise<PromptTemplate[]> {

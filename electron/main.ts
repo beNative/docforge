@@ -11,10 +11,13 @@ import log from 'electron-log/main';
 // Fix: Inform TypeScript about the __dirname global variable provided by Node.js, which is present in a CommonJS-like environment.
 declare const __dirname: string;
 
-// Fix: Add type declaration for the Electron-specific 'resourcesPath' property on the process object.
+// Note: The type declaration for process.resourcesPath has been moved to types.ts to centralize global augmentations.
+// This empty block is kept to satisfy the original file structure but the augmentation now happens in types.ts.
 declare global {
   namespace NodeJS {
     interface Process {
+      // The `resourcesPath` property is augmented in `types.ts`
+      // FIX: Add the type declaration here directly to resolve the build error for the main process.
       resourcesPath: string;
     }
   }
@@ -130,6 +133,7 @@ ipcMain.handle('db:run', (_, sql, params) => databaseService.run(sql, params));
 ipcMain.handle('db:is-new', () => databaseService.isNew());
 ipcMain.handle('db:migrate-from-json', (_, data) => databaseService.migrateFromJson(data));
 ipcMain.handle('db:duplicate-nodes', (_, nodeIds) => databaseService.duplicateNodes(nodeIds));
+ipcMain.handle('db:delete-versions', (_, documentId, versionIds) => databaseService.deleteVersions(documentId, versionIds));
 
 
 // Legacy FS for migration
@@ -216,9 +220,7 @@ ipcMain.handle('dialog:open', async (_, options) => {
 ipcMain.handle('docs:read', async (_, filename: string) => {
     try {
         const docPath = app.isPackaged
-            // Fix: Error on line 201 is resolved by augmenting the Process type.
             ? path.join(process.resourcesPath, 'docs', filename)
-            // Fix: Error on line 202 is resolved by declaring __dirname above.
             : path.join(__dirname, '../../docs', filename);
         const content = await fs.readFile(docPath, 'utf-8');
         return { success: true, content };

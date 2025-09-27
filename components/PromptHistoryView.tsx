@@ -1,13 +1,12 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-// Fix: Import correct types. PromptVersion is an alias for DocVersion now.
-import type { DocumentOrFolder, PromptVersion as Version } from '../types';
-// Fix: Import the new standalone hook.
+import type { DocumentOrFolder } from '../types';
 import { usePromptHistory } from '../hooks/usePromptHistory';
 import Button from './Button';
 import DiffViewer from './DiffViewer';
 import { CheckIcon, CopyIcon, UndoIcon, ArrowLeftIcon, TrashIcon } from './Icons';
 import IconButton from './IconButton';
 import ConfirmModal from './ConfirmModal';
+import ToggleSwitch from './ToggleSwitch';
 
 interface PromptHistoryViewProps {
   prompt: DocumentOrFolder;
@@ -36,25 +35,59 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
           content: prompt.content || '',
           createdAt: prompt.updatedAt,
           version_id: -1,
-          document_id: -1,
+          document_id: -1, // This is a client-side concept
           content_id: -1,
       },
       ...historyVersions
     ];
   }, [prompt, versions]);
 
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(0);
+  const [primarySelectedIndex, setPrimarySelectedIndex] = useState(0);
+  const [secondarySelectedIndex, setSecondarySelectedIndex] = useState<number | null>(null);
+  const [compareToCurrent, setCompareToCurrent] = useState(false);
+  const [lastActionIndex, setLastActionIndex] = useState<number>(0);
   const listRef = useRef<HTMLUListElement>(null);
 
   useEffect(() => {
     listRef.current?.focus();
   }, []);
 
-  const selectedVersion = versionsWithCurrent[selectedIndex];
-  const previousVersion = versionsWithCurrent[selectedIndex + 1];
+  const { oldVersion, newVersion, diffHeaderText } = useMemo(() => {
+    let newV, oldV;
+    let headerText;
+
+    const getVersionName = (index: number) => {
+      if (index === 0) return 'Current Version';
+      return `Version ${versionsWithCurrent.length - 1 - index}`;
+    };
+
+    if (compareToCurrent) {
+        newV = { content: prompt.content || '', createdAt: new Date().toISOString() };
+        oldV = versionsWithCurrent[primarySelectedIndex];
+        headerText = <>Comparing <strong>Current Editor Content</strong> vs. <strong>{getVersionName(primarySelectedIndex)}</strong></>;
+    } else {
+        newV = versionsWithCurrent[primarySelectedIndex];
+        oldV = secondarySelectedIndex !== null 
+            ? versionsWithCurrent[secondarySelectedIndex] 
+            : versionsWithCurrent[primarySelectedIndex + 1];
+        
+        if (secondarySelectedIndex !== null) {
+            headerText = <>Comparing <strong>{getVersionName(primarySelectedIndex)}</strong> vs. <strong>{getVersionName(secondarySelectedIndex)}</strong></>;
+        } else {
+            headerText = <>Changes in <strong>{getVersionName(primarySelectedIndex)}</strong></>;
+        }
+    }
+    
+    return { 
+        oldVersion: oldV, 
+        newVersion: newV,
+        diffHeaderText
+    };
+}, [primarySelectedIndex, secondarySelectedIndex, compareToCurrent, versionsWithCurrent, prompt.content]);
+
 
   const handleCopy = async (content: string) => {
+    if (!content) return;
     try {
         await navigator.clipboard.writeText(content);
         setIsCopied(true);
@@ -85,33 +118,26 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
   const handleDeleteSelected = async () => {
     await deleteVersions(Array.from(selectedVersionIds));
     setSelectedVersionIds(new Set());
-    setSelectedIndex(0); // Reset selection to current after delete
-    setLastSelectedIndex(0);
+    setPrimarySelectedIndex(0);
+    setSecondarySelectedIndex(null);
+    setLastActionIndex(0);
     setIsConfirmingDelete(false);
   };
 
   const handleVersionClick = (e: React.MouseEvent, index: number) => {
-    const versionId = versionsWithCurrent[index].version_id;
-    const isShift = e.shiftKey;
     const isCtrl = e.ctrlKey || e.metaKey;
 
-    if (isShift && lastSelectedIndex !== null) {
-        const start = Math.min(lastSelectedIndex, index);
-        const end = Math.max(lastSelectedIndex, index);
-        const rangeIds = versionsWithCurrent.slice(start, end + 1)
-            .map(v => v.version_id)
-            .filter(id => id !== -1);
-        setSelectedVersionIds(new Set(rangeIds));
-    } else if (isCtrl) {
-        handleToggleVersionSelection(versionId);
-        setLastSelectedIndex(index);
+    setCompareToCurrent(false);
+    
+    if (isCtrl) {
+      if (index === primarySelectedIndex) return; // Can't compare a version to itself
+      setSecondarySelectedIndex(prev => prev === index ? null : index);
     } else {
-        setSelectedVersionIds(versionId !== -1 ? new Set([versionId]) : new Set());
-        setLastSelectedIndex(index);
+      setPrimarySelectedIndex(index);
+      setSecondarySelectedIndex(null);
     }
-    setSelectedIndex(index);
   };
-
+  
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const { key, shiftKey, metaKey, ctrlKey } = e;
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -120,24 +146,25 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
     if (key === 'ArrowUp' || key === 'ArrowDown') {
       e.preventDefault();
       const newIndex = key === 'ArrowUp'
-        ? Math.max(0, selectedIndex - 1)
-        : Math.min(versionsWithCurrent.length - 1, selectedIndex + 1);
+        ? Math.max(0, primarySelectedIndex - 1)
+        : Math.min(versionsWithCurrent.length - 1, primarySelectedIndex + 1);
+
+      setPrimarySelectedIndex(newIndex);
+      setSecondarySelectedIndex(null); // Reset secondary selection on navigation
+      setCompareToCurrent(false);
 
       if (shiftKey) {
-        const anchor = lastSelectedIndex === null ? selectedIndex : lastSelectedIndex;
-        const start = Math.min(anchor, newIndex);
-        const end = Math.max(anchor, newIndex);
+        const start = Math.min(lastActionIndex, newIndex);
+        const end = Math.max(lastActionIndex, newIndex);
         const rangeIds = versionsWithCurrent.slice(start, end + 1)
           .map(v => v.version_id).filter(id => id !== -1);
         setSelectedVersionIds(new Set(rangeIds));
       } else {
-        setSelectedVersionIds(new Set());
-        setLastSelectedIndex(newIndex);
+        setLastActionIndex(newIndex);
       }
-      setSelectedIndex(newIndex);
     } else if (key === ' ') {
       e.preventDefault();
-      handleToggleVersionSelection(versionsWithCurrent[selectedIndex].version_id);
+      handleToggleVersionSelection(versionsWithCurrent[primarySelectedIndex].version_id);
     } else if (isCtrlCmd && (key === 'a' || key === 'A')) {
       e.preventDefault();
       const allIds = versionsWithCurrent.map(v => v.version_id).filter(id => id !== -1);
@@ -149,9 +176,16 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
       }
     }
   };
+  
+  const handleCompareToggle = (isChecked: boolean) => {
+    setCompareToCurrent(isChecked);
+    if (isChecked) {
+        setSecondarySelectedIndex(null);
+    }
+  };
 
   return (
-    <div className="flex-1 flex flex-col bg-background overflow-y-auto">
+    <div className="flex-1 flex flex-col bg-background overflow-y-auto h-full">
         <header className="flex justify-between items-center px-6 py-6 gap-4 flex-shrink-0 border-b border-border-color bg-secondary">
             <div className="flex items-center gap-3 flex-1 min-w-0">
                 <h1 className="text-2xl font-semibold text-text-main truncate">
@@ -179,22 +213,23 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
                        Delete ({selectedVersionIds.size})
                     </Button>
                 </div>
-                <ul ref={listRef} onKeyDown={handleKeyDown} tabIndex={0} className="space-y-1 overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary rounded-md">
+                <ul ref={listRef} onKeyDown={handleKeyDown} tabIndex={0} className="space-y-1 overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary rounded-md p-1 -m-1">
                     {versionsWithCurrent.map((version, index) => {
-                        const isFocused = selectedIndex === index;
-                        const isSelected = selectedVersionIds.has(version.version_id);
+                        const isPrimary = primarySelectedIndex === index;
+                        const isSecondary = secondarySelectedIndex === index;
+                        const isSelectedForDelete = selectedVersionIds.has(version.version_id);
+                        
+                        let bgClass = 'hover:bg-border-color/50 hover:text-text-main';
+                        if (isPrimary) bgClass = 'bg-primary/10 text-primary font-semibold';
+                        else if (isSelectedForDelete) bgClass = 'bg-border-color text-text-main';
+
                         return (
                             <li key={version.id}>
                                 <button
                                     onClick={(e) => handleVersionClick(e, index)}
-                                    className={`w-full text-left p-2 rounded-md text-sm transition-colors ${
-                                        isFocused
-                                        ? 'bg-primary/10 text-primary font-semibold'
-                                        : isSelected
-                                        ? 'bg-border-color'
-                                        : 'text-text-secondary hover:bg-border-color/50 hover:text-text-main'
-                                    }`}
+                                    className={`relative w-full text-left p-2 rounded-md text-sm transition-colors ${bgClass}`}
                                 >
+                                    {isSecondary && <div className="absolute inset-0 ring-2 ring-blue-500 rounded-md pointer-events-none"></div>}
                                     <span className="block">{formatDate(version.createdAt)}</span>
                                     <span className="text-xs opacity-80">{index === 0 ? '(Current Version)' : `Version ${versionsWithCurrent.length - 1 - index}`}</span>
                                 </button>
@@ -210,16 +245,17 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
             <main className="flex-1 flex flex-col overflow-hidden">
                 <div className="flex justify-between items-center mb-4 flex-shrink-0">
                     <div>
-                        <h3 className="text-lg font-semibold">Changes in this version</h3>
-                        <p className="text-sm text-text-secondary">
-                            {selectedIndex === versionsWithCurrent.length - 1 ? 'This is the first version.' : 'Compared to the previous version.'}
-                        </p>
+                        <h3 className="text-lg font-semibold">{diffHeaderText}</h3>
+                        <div className="flex items-center gap-3 mt-2">
+                            <label htmlFor="compare-current-toggle" className="text-sm font-medium text-text-secondary">Compare to Current</label>
+                            <ToggleSwitch id="compare-current-toggle" checked={compareToCurrent} onChange={handleCompareToggle} />
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
-                        <IconButton onClick={() => handleCopy(selectedVersion.content)} tooltip={isCopied ? "Copied!" : "Copy Content"}>
+                        <IconButton onClick={() => handleCopy(newVersion?.content || '')} tooltip={isCopied ? "Copied!" : "Copy Content"}>
                             {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
                         </IconButton>
-                        <Button onClick={() => onRestore(selectedVersion.content)} disabled={selectedIndex === 0} variant="secondary">
+                        <Button onClick={() => onRestore(newVersion.content)} disabled={primarySelectedIndex === 0 && !compareToCurrent} variant="secondary">
                             <UndoIcon className="w-4 h-4 mr-2"/>
                             Restore this version
                         </Button>
@@ -227,8 +263,8 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
                 </div>
                 
                 <DiffViewer
-                    oldText={previousVersion ? previousVersion.content : ''}
-                    newText={selectedVersion.content}
+                    oldText={oldVersion?.content || ''}
+                    newText={newVersion?.content || ''}
                 />
             </main>
         </div>

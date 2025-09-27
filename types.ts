@@ -1,6 +1,7 @@
 import type React from 'react';
 
 // Fix: Add global declaration for window.electronAPI to inform TypeScript of the preload script's additions.
+// Added NodeJS.Process augmentation to fix type error in main process.
 declare global {
   interface Window {
     electronAPI?: {
@@ -10,6 +11,7 @@ declare global {
       dbIsNew: () => Promise<boolean>;
       dbMigrateFromJson: (data: any) => Promise<{ success: boolean, error?: string }>;
       dbDuplicateNodes: (nodeIds: string[]) => Promise<{ success: boolean; error?: string }>;
+      dbDeleteVersions: (documentId: number, versionIds: number[]) => Promise<{ success: boolean; error?: string }>;
       legacyFileExists: (filename: string) => Promise<boolean>;
       readLegacyFile: (filename: string) => Promise<{ success: boolean, data?: string, error?: string }>;
       getAppVersion: () => Promise<string>;
@@ -27,6 +29,12 @@ declare global {
       settingsImport: () => Promise<{ success: boolean; content?: string; error?: string }>;
       readDoc: (filename: string) => Promise<{ success: true; content: string } | { success: false; error: string }>;
     };
+  }
+  // This is for the Electron main process, to add properties attached by Electron.
+  namespace NodeJS {
+    interface Process {
+      resourcesPath: string;
+    }
   }
 }
 

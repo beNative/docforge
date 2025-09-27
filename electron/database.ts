@@ -248,6 +248,46 @@ export const databaseService = {
     }
   },
 
+  deleteVersions(documentId: number, versionIds: number[]): { success: boolean, error?: string } {
+    if (versionIds.length === 0) {
+      return { success: true };
+    }
+
+    const transaction = db.transaction(() => {
+      const docInfo = db.prepare('SELECT current_version_id FROM documents WHERE document_id = ?').get(documentId) as { current_version_id: number | null };
+      if (!docInfo) {
+        throw new Error(`Document with id ${documentId} not found.`);
+      }
+      
+      const currentVersionId = docInfo.current_version_id;
+      const idsToDelete = new Set(versionIds);
+
+      if (currentVersionId && idsToDelete.has(currentVersionId)) {
+        const placeholders = versionIds.map(() => '?').join(',');
+        const nextVersion = db.prepare(`
+          SELECT version_id FROM doc_versions 
+          WHERE document_id = ? AND version_id NOT IN (${placeholders})
+          ORDER BY created_at DESC 
+          LIMIT 1
+        `).get(documentId, ...versionIds) as { version_id: number } | undefined;
+
+        const newCurrentVersionId = nextVersion ? nextVersion.version_id : null;
+        db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?').run(newCurrentVersionId, documentId);
+      }
+
+      const deletePlaceholders = versionIds.map(() => '?').join(',');
+      db.prepare(`DELETE FROM doc_versions WHERE version_id IN (${deletePlaceholders})`).run(...versionIds);
+    });
+
+    try {
+      transaction();
+      return { success: true };
+    } catch (error) {
+      console.error('Delete versions transaction failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
   close() {
     if (db) {
       db.close();
