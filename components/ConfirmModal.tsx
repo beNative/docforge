@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import Modal from './Modal';
 import Button from './Button';
 import { WarningIcon } from './Icons';
@@ -22,6 +22,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   cancelText = 'Cancel',
   confirmVariant = 'destructive',
 }) => {
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +30,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   };
 
   return (
-    <Modal onClose={onCancel} title={title}>
+    <Modal onClose={onCancel} title={title} initialFocusRef={confirmButtonRef}>
       <form onSubmit={handleSubmit}>
         <div className="p-6">
           <div className="flex items-start gap-4">
@@ -45,7 +46,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <Button onClick={onCancel} variant="secondary" type="button">
             {cancelText}
           </Button>
-          <Button type="submit" variant={confirmVariant} autoFocus>
+          <Button ref={confirmButtonRef} type="submit" variant={confirmVariant}>
             {confirmText}
           </Button>
         </div>

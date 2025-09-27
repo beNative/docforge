@@ -7,9 +7,10 @@ interface ModalProps {
   onClose: () => void;
   children: React.ReactNode;
   title: string;
+  initialFocusRef?: React.RefObject<HTMLElement>;
 }
 
-const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
+const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,26 +27,35 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
 
   // Effect for focus trapping
   useEffect(() => {
-    const modalNode = modalRef.current;
-    if (!modalNode) return;
+    const focusTimer = setTimeout(() => {
+      const modalNode = modalRef.current;
+      if (!modalNode) return;
 
-    // Find all focusable elements within the modal
+      // Prioritize the explicitly passed ref for initial focus
+      if (initialFocusRef?.current) {
+        initialFocusRef.current.focus();
+      } else {
+        // Fallback: find all focusable elements and focus the first one
+        const focusableElements = modalNode.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements.length > 0) {
+          focusableElements[0].focus();
+        }
+      }
+    }, 0); // Use a timeout to ensure the DOM is ready for focus
+
+    // Focus trapping logic for Tab key
+    const modalNode = modalRef.current;
+    if (!modalNode) return () => clearTimeout(focusTimer);
+    
     const focusableElements = modalNode.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
-    if (focusableElements.length === 0) return;
+    if (focusableElements.length === 0) return () => clearTimeout(focusTimer);
 
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
-
-    const autoFocusElement = modalNode.querySelector<HTMLElement>('[autoFocus]');
-
-    // Focus the element with autoFocus, otherwise fall back to the first focusable element.
-    if (autoFocusElement) {
-      autoFocusElement.focus();
-    } else {
-        firstElement.focus();
-    }
 
     const handleTabKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
@@ -63,15 +73,15 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
       }
     };
     
-    // We attach the listener to the modal node itself. It will catch bubbling keydown events.
     modalNode.addEventListener('keydown', handleTabKey);
 
     return () => {
+        clearTimeout(focusTimer);
         if (modalNode) {
             modalNode.removeEventListener('keydown', handleTabKey);
         }
     };
-  }, [children]); // Dependency on children ensures this runs when content is ready
+  }, [onClose, initialFocusRef]);
 
   const modalContent = (
     <div
