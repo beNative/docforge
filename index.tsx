@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { LoggerProvider } from './contexts/LoggerContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { IconProvider } from './contexts/IconContext';
 
 const container = document.getElementById('root');
 if (container) {
@@ -11,7 +12,9 @@ if (container) {
     <React.StrictMode>
       <LoggerProvider>
         <ThemeProvider>
-          <App />
+          <IconProvider value={{ iconSet: 'heroicons' }}>
+            <App />
+          </IconProvider>
         </ThemeProvider>
       </LoggerProvider>
     </React.StrictMode>
