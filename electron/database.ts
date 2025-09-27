@@ -4,6 +4,9 @@ import path from 'path';
 import fs from 'fs';
 import Database from 'better-sqlite3';
 import { INITIAL_SCHEMA } from './schema';
+import { v4 as uuidv4 } from 'uuid';
+// Fix: Import types to use for casting
+import type { Node, Document, DocVersion } from '../types';
 
 let db: Database.Database;
 
@@ -151,6 +154,96 @@ export const databaseService = {
       return { success: true };
     } catch (error) {
       console.error('Migration transaction failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+  
+  duplicateNodes(nodeIds: string[]): { success: boolean, error?: string } {
+    const transaction = db.transaction((ids: string[]) => {
+      const _recursiveDuplicate = (nodeId: string, newParentId: string | null, sortOrder: number): string => {
+        // Fix: Cast the result to the Node type to resolve property access errors.
+        const originalNode = db.prepare('SELECT * FROM nodes WHERE node_id = ?').get(nodeId) as Node;
+        if (!originalNode) return '';
+  
+        const newNodeId = uuidv4();
+        const now = new Date().toISOString();
+  
+        db.prepare(`
+          INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(newNodeId, newParentId, originalNode.node_type, `Copy of ${originalNode.title}`, sortOrder, now, now);
+  
+        if (originalNode.node_type === 'document') {
+          // Fix: Cast the result to the Document type.
+          const originalDoc = db.prepare('SELECT * FROM documents WHERE node_id = ?').get(nodeId) as Document;
+          if (originalDoc) {
+            const newDocResult = db.prepare(`
+              INSERT INTO documents (node_id, doc_type, language_hint, current_version_id)
+              VALUES (?, ?, ?, NULL)
+            `).run(newNodeId, originalDoc.doc_type, originalDoc.language_hint);
+            const newDocId = newDocResult.lastInsertRowid;
+  
+            // Fix: Cast the result to DocVersion array.
+            const originalVersions = db.prepare('SELECT * FROM doc_versions WHERE document_id = ?').all(originalDoc.document_id) as DocVersion[];
+            const versionMap = new Map<number, number>();
+  
+            for (const version of originalVersions) {
+              const newVersionResult = db.prepare(`
+                INSERT INTO doc_versions (document_id, created_at, content_id)
+                VALUES (?, ?, ?)
+              `).run(newDocId, version.created_at, version.content_id);
+              versionMap.set(version.version_id, Number(newVersionResult.lastInsertRowid));
+            }
+  
+            if (originalDoc.current_version_id && versionMap.has(originalDoc.current_version_id)) {
+              const newCurrentVersionId = versionMap.get(originalDoc.current_version_id)!;
+              db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?').run(newCurrentVersionId, newDocId);
+            }
+          }
+        } else if (originalNode.node_type === 'folder') {
+          // Fix: Cast the result to Node array.
+          const children = db.prepare('SELECT * FROM nodes WHERE parent_id = ? ORDER BY sort_order').all(nodeId) as Node[];
+          children.forEach((child, index) => {
+            _recursiveDuplicate(child.node_id, newNodeId, index);
+          });
+        }
+        return newNodeId;
+      };
+  
+      const parentGroups = new Map<string, { id: string, sort_order: number }[]>();
+      for (const id of ids) {
+        // Fix: Cast the result to a specific object type.
+        const node = db.prepare('SELECT parent_id, sort_order FROM nodes WHERE node_id = ?').get(id) as { parent_id: string | null; sort_order: number; };
+        if (node) {
+          const parentIdKey = node.parent_id || 'root';
+          if (!parentGroups.has(parentIdKey)) parentGroups.set(parentIdKey, []);
+          parentGroups.get(parentIdKey)!.push({ id, sort_order: node.sort_order });
+        }
+      }
+  
+      for (const [parentIdKey, nodesToDuplicate] of parentGroups.entries()) {
+        const parentId = parentIdKey === 'root' ? null : parentIdKey;
+        // Fix: Cast the result to a specific object type.
+        const maxSortOrderResult = db.prepare(
+          `SELECT MAX(sort_order) as max_order FROM nodes WHERE parent_id ${parentId ? '= ?' : 'IS NULL'}`
+        ).get(parentId ? [parentId] : []) as { max_order: number | null };
+        let nextSortOrder = (maxSortOrderResult?.max_order ?? -1) + 1;
+  
+        // Sort nodes to duplicate by their original sort order to maintain relative position
+        nodesToDuplicate.sort((a, b) => a.sort_order - b.sort_order);
+
+        for (const node of nodesToDuplicate) {
+          _recursiveDuplicate(node.id, parentId, nextSortOrder);
+          nextSortOrder++;
+        }
+      }
+    });
+
+    try {
+      transaction(nodeIds);
+      return { success: true };
+    } catch (error) {
+      console.error('Duplicate nodes transaction failed:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   },

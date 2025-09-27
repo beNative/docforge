@@ -112,6 +112,7 @@ ipcMain.handle('db:get', (_, sql, params) => databaseService.get(sql, params));
 ipcMain.handle('db:run', (_, sql, params) => databaseService.run(sql, params));
 ipcMain.handle('db:is-new', () => databaseService.isNew());
 ipcMain.handle('db:migrate-from-json', (_, data) => databaseService.migrateFromJson(data));
+ipcMain.handle('db:duplicate-nodes', (_, nodeIds) => databaseService.duplicateNodes(nodeIds));
 
 
 // Legacy FS for migration

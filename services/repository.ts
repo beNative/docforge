@@ -282,6 +282,14 @@ export const repository = {
     async deleteNode(nodeId: string) {
         await window.electronAPI!.dbRun(`DELETE FROM nodes WHERE node_id = ?`, [nodeId]);
     },
+
+    async duplicateNodes(nodeIds: string[]) {
+        if (!window.electronAPI?.dbDuplicateNodes) return;
+        const result = await window.electronAPI.dbDuplicateNodes(nodeIds);
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to duplicate nodes in the main process.');
+        }
+    },
     
     async moveNodes(draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') {
         const parentId = position === 'inside'

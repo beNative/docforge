@@ -208,6 +208,17 @@ export const FolderPlusIcon: React.FC<IconProps> = (props) => {
     }
 };
 
+export const FolderDownIcon: React.FC<IconProps> = (props) => {
+    const { iconSet } = useIconSet();
+    switch (iconSet) {
+      case 'lucide': return <LucideIcons.FolderDownIcon {...props} />;
+      case 'feather': return <FeatherIcons.FolderDownIcon {...props} />;
+      case 'tabler': return <TablerIcons.FolderDownIcon {...props} />;
+      case 'material': return <MaterialIcons.FolderDownIcon {...props} />;
+      case 'heroicons': default: return <HeroIcons.FolderDownIcon {...props} />;
+    }
+};
+
 export const KeyboardIcon: React.FC<IconProps> = (props) => {
     const { iconSet } = useIconSet();
     switch (iconSet) {
@@ -407,6 +418,7 @@ export const RestoreIcon: React.FC<IconProps> = (props) => {
 };
 
 export const CloseIcon: React.FC<IconProps> = (props) => {
+    // Fix: CloseIcon should just be an alias for XIcon, which is defined above.
     return <XIcon {...props} />;
 };
 

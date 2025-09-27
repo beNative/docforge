@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbRun: (sql: string, params?: any[]) => ipcRenderer.invoke('db:run', sql, params),
   dbIsNew: () => ipcRenderer.invoke('db:is-new'),
   dbMigrateFromJson: (data: any) => ipcRenderer.invoke('db:migrate-from-json', data),
+  dbDuplicateNodes: (nodeIds: string[]) => ipcRenderer.invoke('db:duplicate-nodes', nodeIds),
 
   // --- Migration-related FS access ---
   legacyFileExists: (filename: string) => ipcRenderer.invoke('fs:legacy-file-exists', filename),

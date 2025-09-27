@@ -9,6 +9,7 @@ declare global {
       dbRun: (sql: string, params?: any[]) => Promise<{ changes: number; lastInsertRowid: number | bigint; }>;
       dbIsNew: () => Promise<boolean>;
       dbMigrateFromJson: (data: any) => Promise<{ success: boolean, error?: string }>;
+      dbDuplicateNodes: (nodeIds: string[]) => Promise<{ success: boolean; error?: string }>;
       legacyFileExists: (filename: string) => Promise<boolean>;
       readLegacyFile: (filename: string) => Promise<{ success: boolean, data?: string, error?: string }>;
       getAppVersion: () => Promise<string>;

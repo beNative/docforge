@@ -91,7 +91,7 @@ const App: React.FC = () => {
 const MainApp: React.FC = () => {
     // State Hooks
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, moveItems, getDescendantIds } = useDocuments();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, moveItems, getDescendantIds, duplicateItems } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate } = useTemplates();
     
     // Active Item State
@@ -272,7 +272,7 @@ const MainApp: React.FC = () => {
         setView('editor');
     }, [addDocument, getParentIdForNewItem]);
     
-    const handleNewFolder = useCallback(async () => {
+    const handleNewRootFolder = useCallback(async () => {
         const newFolder = await addFolder(null);
         setActiveNodeId(newFolder.id);
         setSelectedIds(new Set([newFolder.id]));
@@ -280,6 +280,21 @@ const MainApp: React.FC = () => {
         setDocumentView('editor');
         setView('editor');
     }, [addFolder]);
+
+    const handleNewSubfolder = useCallback(async () => {
+        if (activeNode?.type === 'folder') {
+            const newFolder = await addFolder(activeNode.id, 'New Folder');
+            setActiveNodeId(newFolder.id);
+            setSelectedIds(new Set([newFolder.id]));
+            setExpandedFolderIds(prev => new Set(prev).add(activeNode.id));
+        }
+    }, [addFolder, activeNode]);
+
+    const handleDuplicateSelection = useCallback(async () => {
+        if (selectedIds.size > 0) {
+            await duplicateItems(Array.from(selectedIds));
+        }
+    }, [selectedIds, duplicateItems]);
 
     const handleNewTemplate = useCallback(async () => {
         const newTemplate = await addTemplate();
@@ -607,9 +622,10 @@ const MainApp: React.FC = () => {
     // Command Palette Commands
     const commands: Command[] = useMemo(() => [
         { id: 'new-document', name: 'Create New Document', action: handleNewDocument, category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'], keywords: 'add create file' },
-        { id: 'new-folder', name: 'Create New Folder', action: handleNewFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
+        { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
         { id: 'new-from-template', name: 'New Document from Template...', action: () => setCreateFromTemplateOpen(true), category: 'File', icon: PlusIcon, keywords: 'add create file instance' },
+        { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: DocumentDuplicateIcon, keywords: 'copy clone' },
         { id: 'delete-item', name: 'Delete Current Item', action: () => {
             if (activeTemplateId) handleDeleteTemplate(activeTemplateId);
             else if (activeNodeId) handleDeleteNode(activeNodeId);
@@ -618,7 +634,7 @@ const MainApp: React.FC = () => {
         { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
         { id: 'toggle-info', name: 'Toggle Info View', action: () => setView(v => v === 'info' ? 'editor' : 'info'), category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => setIsLoggerVisible(v => !v), category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [activeNodeId, activeTemplateId, handleNewDocument, handleNewFolder, handleDeleteNode, handleDeleteTemplate, handleNewTemplate, toggleSettingsView]);
+    ], [activeNodeId, activeTemplateId, handleNewDocument, handleNewRootFolder, handleDeleteNode, handleDeleteTemplate, handleNewTemplate, toggleSettingsView, handleDuplicateSelection]);
 
     const getSupportedIconSet = (iconSet: Settings['iconSet']): 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material' => {
         const supportedSets: Array<Settings['iconSet']> = ['heroicons', 'lucide', 'feather', 'tabler', 'material'];
@@ -713,7 +729,9 @@ const MainApp: React.FC = () => {
                                     onRenamePrompt={handleRenameNode}
                                     onMovePrompt={moveItems}
                                     onNewPrompt={handleNewDocument}
-                                    onNewFolder={handleNewFolder}
+                                    onNewRootFolder={handleNewRootFolder}
+                                    onNewSubfolder={handleNewSubfolder}
+                                    onDuplicateSelection={handleDuplicateSelection}
                                     onCopyPromptContent={handleCopyNodeContent}
                                     expandedFolderIds={expandedFolderIds}
                                     onToggleExpand={handleToggleExpand}

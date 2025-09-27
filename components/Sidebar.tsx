@@ -4,7 +4,7 @@ import TemplateList from './TemplateList';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, PromptTemplate } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, FolderDownIcon } from './Icons';
 import Button from './Button';
 import { PromptNode } from './PromptTreeItem';
 
@@ -17,7 +17,9 @@ interface SidebarProps {
   onRenamePrompt: (id: string, newTitle: string) => void;
   onMovePrompt: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onNewPrompt: () => void;
-  onNewFolder: () => void;
+  onNewRootFolder: () => void;
+  onNewSubfolder: () => void;
+  onDuplicateSelection: () => void;
   onCopyPromptContent: (id: string) => void;
   expandedFolderIds: Set<string>;
   onToggleExpand: (id: string) => void;
@@ -52,7 +54,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
-  const { promptTree, navigableItems } = useMemo(() => {
+  const { promptTree, navigableItems, activeNode } = useMemo(() => {
+    const activeNode = props.prompts.find(p => p.id === props.activePromptId) || null;
     // --- Build Prompt Tree ---
     let itemsToBuildFrom = props.prompts;
     if (searchTerm.trim()) {
@@ -115,8 +118,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     flatten(finalTree);
     props.templates.forEach(t => flatList.push({ id: t.template_id, type: 'template', parentId: null }));
 
-    return { promptTree: finalTree, navigableItems: flatList };
-  }, [props.prompts, props.templates, searchTerm, props.expandedFolderIds]);
+    return { promptTree: finalTree, navigableItems: flatList, activeNode };
+  }, [props.prompts, props.templates, searchTerm, props.expandedFolderIds, props.activePromptId]);
 
   // Effect to manage focus state
   useEffect(() => {
@@ -254,11 +257,17 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         <header className="flex items-center justify-between p-2 flex-shrink-0">
             <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
             <div className="flex items-center gap-1">
-            <IconButton onClick={props.onNewFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
-                <FolderPlusIcon />
-            </IconButton>
             <IconButton onClick={props.onNewPrompt} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
                 <PlusIcon />
+            </IconButton>
+            <IconButton onClick={props.onNewRootFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
+                <FolderPlusIcon />
+            </IconButton>
+            <IconButton onClick={props.onNewSubfolder} disabled={!activeNode || activeNode.type !== 'folder'} tooltip="New Subfolder" size="sm" tooltipPosition="bottom">
+                <FolderDownIcon />
+            </IconButton>
+            <IconButton onClick={props.onDuplicateSelection} disabled={props.selectedIds.size === 0} tooltip="Duplicate Selection" size="sm" tooltipPosition="bottom">
+                <DocumentDuplicateIcon />
             </IconButton>
             </div>
         </header>
