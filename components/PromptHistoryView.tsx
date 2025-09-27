@@ -20,6 +20,15 @@ const formatDate = (dateString: string) => {
   return date.toLocaleString();
 };
 
+// FIX: Moved getVersionName outside the component to make it a pure utility function.
+// This resolves the "Temporal Dead Zone" ReferenceError by ensuring the function
+// is declared before any component hooks are executed.
+const getVersionName = (index: number, versionsArray: any[]) => {
+    if (index === 0) return 'Current Version';
+    return `Version ${versionsArray.length - 1 - index}`;
+};
+
+
 const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToEditor, onRestore }) => {
   const { versions, deleteVersions } = usePromptHistory(prompt.id);
   const [isCopied, setIsCopied] = useState(false);
@@ -58,12 +67,6 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
     listRef.current?.focus();
   }, []);
 
-  // Fix: Extracted getVersionName into a useCallback to prevent ReferenceError from bundler optimizations.
-  const getVersionName = useCallback((index: number) => {
-    if (index === 0) return 'Current Version';
-    return `Version ${versionsWithCurrent.length - 1 - index}`;
-  }, [versionsWithCurrent]);
-
   const { oldVersion, newVersion, diffHeaderText } = useMemo(() => {
     let newV, oldV;
     let headerText;
@@ -71,7 +74,7 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
     if (compareToCurrent) {
         newV = { content: prompt.content || '', createdAt: new Date().toISOString() };
         oldV = versionsWithCurrent[primarySelectedIndex];
-        headerText = <>Comparing <strong>Current Editor Content</strong> vs. <strong>{getVersionName(primarySelectedIndex)}</strong></>;
+        headerText = <>Comparing <strong>Current Editor Content</strong> vs. <strong>{getVersionName(primarySelectedIndex, versionsWithCurrent)}</strong></>;
     } else {
         newV = versionsWithCurrent[primarySelectedIndex];
         oldV = secondarySelectedIndex !== null 
@@ -79,9 +82,9 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
             : versionsWithCurrent[primarySelectedIndex + 1];
         
         if (secondarySelectedIndex !== null) {
-            headerText = <>Comparing <strong>{getVersionName(primarySelectedIndex)}</strong> vs. <strong>{getVersionName(secondarySelectedIndex)}</strong></>;
+            headerText = <>Comparing <strong>{getVersionName(primarySelectedIndex, versionsWithCurrent)}</strong> vs. <strong>{getVersionName(secondarySelectedIndex, versionsWithCurrent)}</strong></>;
         } else {
-            headerText = <>Changes in <strong>{getVersionName(primarySelectedIndex)}</strong></>;
+            headerText = <>Changes in <strong>{getVersionName(primarySelectedIndex, versionsWithCurrent)}</strong></>;
         }
     }
     
@@ -90,7 +93,7 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
         newVersion: newV,
         diffHeaderText
     };
-}, [primarySelectedIndex, secondarySelectedIndex, compareToCurrent, versionsWithCurrent, prompt.content, getVersionName]);
+}, [primarySelectedIndex, secondarySelectedIndex, compareToCurrent, versionsWithCurrent, prompt.content]);
 
 
   const handleCopy = async (content: string) => {

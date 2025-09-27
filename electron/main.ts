@@ -1,7 +1,6 @@
 // Fix: This file was previously a placeholder. This is the full implementation for the Electron main process.
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-// Fix: Import 'platform' from 'process' for type-safe access to the current OS identifier.
-import { platform } from 'process';
+// Fix: Removed 'platform' import to avoid potential type conflicts with the global `process` object.
 import path from 'path';
 import fs from 'fs/promises';
 import { autoUpdater } from 'electron-updater';
@@ -112,8 +111,8 @@ app.on('ready', () => {
 
 app.on('window-all-closed', () => {
   databaseService.close();
-  // Fix: Error on line 96 is resolved by importing 'platform' from 'process'.
-  if (platform !== 'darwin') {
+  // Fix: Use process.platform directly to avoid type conflicts that may arise from importing from the 'process' module.
+  if (process.platform !== 'darwin') {
     app.quit();
   }
 });
@@ -163,8 +162,8 @@ ipcMain.handle('fs:read-legacy-file', async (_, filename) => {
 
 // App Info & Updates
 ipcMain.handle('app:get-version', () => app.getVersion());
-// Fix: Error on line 145 is resolved by importing 'platform' from 'process'.
-ipcMain.handle('app:get-platform', () => platform);
+// Fix: Use process.platform directly to avoid type conflicts that may arise from importing from the 'process' module.
+ipcMain.handle('app:get-platform', () => process.platform);
 ipcMain.handle('app:get-log-path', () => log.transports.file.getFile().path);
 
 ipcMain.on('updater:set-allow-prerelease', (_, allow: boolean) => {
