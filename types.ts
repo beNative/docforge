@@ -13,6 +13,7 @@ declare global {
       readLegacyFile: (filename: string) => Promise<{ success: boolean, data?: string, error?: string }>;
       getAppVersion: () => Promise<string>;
       getPlatform: () => Promise<string>;
+      getLogPath: () => Promise<string>;
       updaterSetAllowPrerelease: (allow: boolean) => void;
       onUpdateDownloaded: (callback: (version: string) => void) => () => void;
       quitAndInstallUpdate: () => void;

@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // --- App Info & Updates ---
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   getPlatform: () => ipcRenderer.invoke('app:get-platform'),
+  getLogPath: () => ipcRenderer.invoke('app:get-log-path'),
   updaterSetAllowPrerelease: (allow: boolean) => ipcRenderer.send('updater:set-allow-prerelease', allow),
   onUpdateDownloaded: (callback: (version: string) => void) => {
     const handler = (_: IpcRendererEvent, version: string) => callback(version);

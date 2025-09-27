@@ -142,6 +142,7 @@ ipcMain.handle('fs:read-legacy-file', async (_, filename) => {
 // App Info & Updates
 ipcMain.handle('app:get-version', () => app.getVersion());
 ipcMain.handle('app:get-platform', () => process.platform);
+ipcMain.handle('app:get-log-path', () => log.transports.file.getFile().path);
 
 ipcMain.on('updater:set-allow-prerelease', (_, allow: boolean) => {
     autoUpdater.allowPrerelease = allow;
