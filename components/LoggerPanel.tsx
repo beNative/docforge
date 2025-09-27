@@ -76,10 +76,8 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
     >
       <div
         onMouseDown={onResizeStart}
-        className="w-full h-2 cursor-row-resize flex-shrink-0 group absolute top-0"
-      >
-        <div className="h-px w-8 bg-border-color rounded-full mx-auto mt-1 group-hover:bg-primary transition-colors"></div>
-      </div>
+        className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200 absolute top-0"
+      />
       <header className="flex items-center justify-between p-2 pt-3 border-b border-border-color flex-shrink-0">
         <h3 className="font-semibold text-text-main px-2">Application Logs</h3>
         <div className="flex items-center gap-1">

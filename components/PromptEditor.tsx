@@ -103,7 +103,7 @@ const PreviewPane: React.FC<{ renderedPreviewHtml: string }> = React.memo(({ ren
 
 const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCommitVersion, onDelete, settings, onShowHistory }) => {
   const [title, setTitle] = useState(document.title);
-  // FIX: Use `document.content` instead of `document.body`. The `DocumentOrFolder` type uses `content`.
+  // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' instead.
   const { state: content, setState: setContent, undo, redo, canUndo, canRedo } = useHistoryState(document.content || '');
   
   const [isRefining, setIsRefining] = useState(false);
@@ -121,11 +121,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
 
   // Reset content and view when the document ID or external content changes.
   useEffect(() => {
-    // FIX: Use `document.content` instead of `document.body`.
+    // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' instead.
     setContent(document.content || '', { history: 'replace' });
     setViewMode('edit');
     setSplitSize(50);
-    // FIX: Use `document.content` in dependency array.
+    // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' in dependency array.
   }, [document.id, document.content, setContent]);
 
   // Sync the title from props. This handles both new documents and external title changes (like AI generation)
@@ -136,9 +136,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
   
   // Effect to detect unsaved content changes
   useEffect(() => {
-    // FIX: Use `document.content` instead of `document.body` for dirty check.
+    // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' instead.
     setIsDirty(content !== document.content);
-    // FIX: Use `document.content` in dependency array.
+    // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' in dependency array.
   }, [content, document.content]);
 
   // Debounced auto-save for title only
