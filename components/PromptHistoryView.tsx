@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { DocumentOrFolder } from '../types';
 import { usePromptHistory } from '../hooks/usePromptHistory';
 import Button from './Button';
@@ -13,6 +13,12 @@ interface PromptHistoryViewProps {
   onBackToEditor: () => void;
   onRestore: (content: string) => void;
 }
+
+// Moved outside the component as it's a pure utility function
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleString();
+};
 
 const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToEditor, onRestore }) => {
   const { versions, deleteVersions } = usePromptHistory(prompt.id);
@@ -52,15 +58,16 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
     listRef.current?.focus();
   }, []);
 
+  // Fix: Extracted getVersionName into a useCallback to prevent ReferenceError from bundler optimizations.
+  const getVersionName = useCallback((index: number) => {
+    if (index === 0) return 'Current Version';
+    return `Version ${versionsWithCurrent.length - 1 - index}`;
+  }, [versionsWithCurrent]);
+
   const { oldVersion, newVersion, diffHeaderText } = useMemo(() => {
     let newV, oldV;
     let headerText;
-
-    const getVersionName = (index: number) => {
-      if (index === 0) return 'Current Version';
-      return `Version ${versionsWithCurrent.length - 1 - index}`;
-    };
-
+    
     if (compareToCurrent) {
         newV = { content: prompt.content || '', createdAt: new Date().toISOString() };
         oldV = versionsWithCurrent[primarySelectedIndex];
@@ -83,7 +90,7 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
         newVersion: newV,
         diffHeaderText
     };
-}, [primarySelectedIndex, secondarySelectedIndex, compareToCurrent, versionsWithCurrent, prompt.content]);
+}, [primarySelectedIndex, secondarySelectedIndex, compareToCurrent, versionsWithCurrent, prompt.content, getVersionName]);
 
 
   const handleCopy = async (content: string) => {
@@ -95,11 +102,6 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
     } catch (err) {
         console.error('Failed to copy content:', err);
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
   };
 
   const handleToggleVersionSelection = (versionId: number) => {
