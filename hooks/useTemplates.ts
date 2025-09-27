@@ -45,5 +45,11 @@ export const useTemplates = () => {
     await refreshTemplates();
   }, [addLog, refreshTemplates]);
 
-  return { templates, addTemplate, updateTemplate, deleteTemplate };
+  const deleteTemplates = useCallback(async (ids: string[]) => {
+    await repository.deleteTemplates(ids);
+    addLog('INFO', `Deleted ${ids.length} template(s).`);
+    await refreshTemplates();
+  }, [addLog, refreshTemplates]);
+
+  return { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates };
 };

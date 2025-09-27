@@ -8,12 +8,19 @@ import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, FolderDown
 import Button from './Button';
 import { PromptNode } from './PromptTreeItem';
 
+type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
+
 interface SidebarProps {
   prompts: DocumentOrFolder[];
+  promptTree: PromptNode[];
+  navigableItems: NavigableItem[];
   selectedIds: Set<string>;
+  setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  lastClickedId: string | null;
+  setLastClickedId: React.Dispatch<React.SetStateAction<string | null>>;
   activePromptId: string | null;
   onSelectPrompt: (id: string, e: React.MouseEvent) => void;
-  onDeletePrompt: (id: string) => void;
+  onDeleteSelection: () => void;
   onRenamePrompt: (id: string, newTitle: string) => void;
   onMovePrompt: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onNewPrompt: () => void;
@@ -23,6 +30,8 @@ interface SidebarProps {
   onCopyPromptContent: (id: string) => void;
   expandedFolderIds: Set<string>;
   onToggleExpand: (id: string) => void;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
 
   templates: PromptTemplate[];
   activeTemplateId: string | null;
@@ -32,8 +41,6 @@ interface SidebarProps {
   onNewTemplate: () => void;
   onNewFromTemplate: () => void;
 }
-
-type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
 
 // Helper function to find a node and its siblings in a tree structure
 const findNodeAndSiblings = (nodes: PromptNode[], id: string): {node: PromptNode, siblings: PromptNode[]} | null => {
@@ -50,76 +57,14 @@ const findNodeAndSiblings = (nodes: PromptNode[], id: string): {node: PromptNode
 };
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const [searchTerm, setSearchTerm] = useState('');
+  const { promptTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  
+  const activeNode = useMemo(() => {
+    return props.prompts.find(p => p.id === props.activePromptId) || null;
+  }, [props.prompts, props.activePromptId]);
 
-  const { promptTree, navigableItems, activeNode } = useMemo(() => {
-    const activeNode = props.prompts.find(p => p.id === props.activePromptId) || null;
-    // --- Build Prompt Tree ---
-    let itemsToBuildFrom = props.prompts;
-    if (searchTerm.trim()) {
-        const lowerCaseSearchTerm = searchTerm.toLowerCase();
-        const visibleIds = new Set<string>();
-        const originalItemsById: Map<string, DocumentOrFolder> = new Map(props.prompts.map(i => [i.id, i]));
-        const getAncestors = (itemId: string) => {
-            let current = originalItemsById.get(itemId);
-            while (current && current.parentId) {
-              visibleIds.add(current.parentId);
-              current = originalItemsById.get(current.parentId);
-            }
-        };
-        const getDescendantIds = (itemId: string): Set<string> => {
-            const descendantIds = new Set<string>();
-            const findChildren = (parentId: string) => {
-                props.prompts.forEach(p => { if (p.parentId === parentId) { descendantIds.add(p.id); if (p.type === 'folder') findChildren(p.id); } });
-            };
-            findChildren(itemId);
-            return descendantIds;
-        };
-        props.prompts.forEach(item => {
-            if (item.title.toLowerCase().includes(lowerCaseSearchTerm)) {
-                visibleIds.add(item.id);
-                getAncestors(item.id);
-                if (item.type === 'folder') getDescendantIds(item.id).forEach(id => visibleIds.add(id));
-            }
-        });
-        itemsToBuildFrom = props.prompts.filter(item => visibleIds.has(item.id));
-    }
-    const itemsById = new Map<string, PromptNode>(itemsToBuildFrom.map(p => [p.id, { ...p, children: [] }]));
-    const rootNodes: PromptNode[] = [];
-    for (const item of itemsToBuildFrom) {
-        const node = itemsById.get(item.id)!;
-        if (item.parentId && itemsById.has(item.parentId)) {
-            itemsById.get(item.parentId)!.children.push(node);
-        } else {
-            rootNodes.push(node);
-        }
-    }
-    
-    // The visual order should respect the array order from props, so we no longer sort here.
-    const finalTree = rootNodes;
-
-    // --- Flatten for Navigation ---
-    const displayExpandedIds = searchTerm.trim() 
-        ? new Set(itemsToBuildFrom.filter(i => i.type === 'folder').map(i => i.id)) 
-        : props.expandedFolderIds;
-
-    const flatList: NavigableItem[] = [];
-    const flatten = (nodes: PromptNode[]) => {
-      for (const node of nodes) {
-        // Fix: PromptNode extends DocumentOrFolder, so it has id, type, and parentId.
-        flatList.push({ id: node.id, type: node.type, parentId: node.parentId });
-        if (node.type === 'folder' && displayExpandedIds.has(node.id)) {
-          flatten(node.children);
-        }
-      }
-    };
-    flatten(finalTree);
-    props.templates.forEach(t => flatList.push({ id: t.template_id, type: 'template', parentId: null }));
-
-    return { promptTree: finalTree, navigableItems: flatList, activeNode };
-  }, [props.prompts, props.templates, searchTerm, props.expandedFolderIds, props.activePromptId]);
 
   // Effect to manage focus state
   useEffect(() => {
@@ -170,6 +115,22 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (navigableItems.length === 0) return;
     const key = e.key;
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const isCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+    if (isCtrl && (key === 'a' || key === 'A')) {
+      e.preventDefault();
+      setSelectedIds(new Set(navigableItems.map(i => i.id)));
+      return;
+    }
+
+    if (key === 'Delete' || (key === 'Backspace' && !isMac)) {
+      e.preventDefault();
+      if (props.selectedIds.size > 0) {
+        props.onDeleteSelection();
+      }
+      return;
+    }
 
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(key)) {
         return;
@@ -192,24 +153,37 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         if (item.type === 'template') {
             props.onSelectTemplate(item.id);
         } else {
-            // Pass a fake event that won't trigger multi-select.
-            props.onSelectPrompt(item.id, {} as React.MouseEvent);
+            props.onSelectPrompt(item.id, { ctrlKey: isCtrl } as React.MouseEvent);
         }
     };
 
     switch (key) {
-      case 'ArrowUp': {
-        const prevIndex = Math.max(0, currentIndex - 1);
-        const newItem = navigableItems[prevIndex];
-        setFocusedItemId(newItem.id);
-        selectItem(newItem);
-        break;
-      }
+      case 'ArrowUp':
       case 'ArrowDown': {
-        const nextIndex = Math.min(navigableItems.length - 1, currentIndex + 1);
+        const direction = key === 'ArrowUp' ? -1 : 1;
+        const nextIndex = Math.max(0, Math.min(navigableItems.length - 1, currentIndex + direction));
         const newItem = navigableItems[nextIndex];
+        
+        if (e.shiftKey) {
+          const anchorId = lastClickedId || focusedItemId;
+          const anchorIndex = navigableItems.findIndex(i => i.id === anchorId);
+          if (anchorIndex !== -1) {
+            const start = Math.min(anchorIndex, nextIndex);
+            const end = Math.max(anchorIndex, nextIndex);
+            const rangeIds = navigableItems.slice(start, end + 1).map(i => i.id);
+            setSelectedIds(new Set(rangeIds));
+          }
+        } else {
+          setSelectedIds(new Set([newItem.id]));
+          setLastClickedId(newItem.id);
+        }
+        
         setFocusedItemId(newItem.id);
-        selectItem(newItem);
+        if (newItem.type === 'template') {
+          props.onSelectTemplate(newItem.id);
+        } else {
+          props.onSelectPrompt(newItem.id, { } as React.MouseEvent);
+        }
         break;
       }
       case 'ArrowRight': {
@@ -277,7 +251,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
             selectedIds={props.selectedIds}
             focusedItemId={focusedItemId}
             onSelectNode={props.onSelectPrompt}
-            onDeleteNode={props.onDeletePrompt}
+            onDeleteNode={props.onDeleteSelection}
             onRenameNode={props.onRenamePrompt}
             onMoveNode={props.onMovePrompt}
             onCopyNodeContent={props.onCopyPromptContent}

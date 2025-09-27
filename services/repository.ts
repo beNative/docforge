@@ -283,6 +283,12 @@ export const repository = {
         await window.electronAPI!.dbRun(`DELETE FROM nodes WHERE node_id = ?`, [nodeId]);
     },
 
+    async deleteNodes(nodeIds: string[]) {
+        if (nodeIds.length === 0) return;
+        const placeholders = nodeIds.map(() => '?').join(',');
+        await window.electronAPI!.dbRun(`DELETE FROM nodes WHERE node_id IN (${placeholders})`, nodeIds);
+    },
+
     async duplicateNodes(nodeIds: string[]) {
         if (!window.electronAPI?.dbDuplicateNodes) return;
         const result = await window.electronAPI.dbDuplicateNodes(nodeIds);
@@ -397,6 +403,12 @@ export const repository = {
     
     async deleteTemplate(templateId: string) {
         await window.electronAPI!.dbRun(`DELETE FROM templates WHERE template_id = ?`, [templateId]);
+    },
+
+    async deleteTemplates(templateIds: string[]) {
+        if (templateIds.length === 0) return;
+        const placeholders = templateIds.map(() => '?').join(',');
+        await window.electronAPI!.dbRun(`DELETE FROM templates WHERE template_id IN (${placeholders})`, templateIds);
     },
 
     async getAllSettings(): Promise<Settings> {

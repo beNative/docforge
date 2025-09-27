@@ -37,6 +37,7 @@ import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { LOCAL_STORAGE_KEYS } from './constants';
 import { repository } from './services/repository';
+import { PromptNode } from './components/PromptTreeItem';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -46,6 +47,8 @@ const MIN_LOGGER_HEIGHT = 100;
 
 // Fix: Use optional chaining which is now type-safe with the global declaration.
 const isElectron = !!window.electronAPI;
+
+type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
 
 const App: React.FC = () => {
     const { addLog } = useLogger();
@@ -91,12 +94,13 @@ const App: React.FC = () => {
 const MainApp: React.FC = () => {
     // State Hooks
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, moveItems, getDescendantIds, duplicateItems } = useDocuments();
-    const { templates, addTemplate, updateTemplate, deleteTemplate } = useTemplates();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems } = useDocuments();
+    const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     
     // Active Item State
     const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState(new Set<string>());
+    const [lastClickedId, setLastClickedId] = useState<string | null>(null);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
     const [expandedFolderIds, setExpandedFolderIds] = useState(new Set<string>());
 
@@ -115,6 +119,8 @@ const MainApp: React.FC = () => {
     const [appVersion, setAppVersion] = useState('');
     const [updateInfo, setUpdateInfo] = useState<{ ready: boolean; version: string | null }>({ ready: false, version: null });
     const [confirmAction, setConfirmAction] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; } | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+
 
     const isSidebarResizing = useRef(false);
     const isLoggerResizing = useRef(false);
@@ -144,6 +150,68 @@ const MainApp: React.FC = () => {
     const activeDocument = useMemo(() => {
         return activeNode?.type === 'document' ? activeNode : null;
     }, [activeNode]);
+
+    const { promptTree, navigableItems } = useMemo(() => {
+        let itemsToBuildFrom = items;
+        if (searchTerm.trim()) {
+            const lowerCaseSearchTerm = searchTerm.toLowerCase();
+            const visibleIds = new Set<string>();
+            const originalItemsById: Map<string, DocumentOrFolder> = new Map(items.map(i => [i.id, i]));
+            const getAncestors = (itemId: string) => {
+                let current = originalItemsById.get(itemId);
+                while (current && current.parentId) {
+                visibleIds.add(current.parentId);
+                current = originalItemsById.get(current.parentId);
+                }
+            };
+            const getDescendantIdsRecursive = (itemId: string): Set<string> => {
+                const descendantIds = new Set<string>();
+                const findChildren = (parentId: string) => {
+                    items.forEach(p => { if (p.parentId === parentId) { descendantIds.add(p.id); if (p.type === 'folder') findChildren(p.id); } });
+                };
+                findChildren(itemId);
+                return descendantIds;
+            };
+            items.forEach(item => {
+                if (item.title.toLowerCase().includes(lowerCaseSearchTerm)) {
+                    visibleIds.add(item.id);
+                    getAncestors(item.id);
+                    if (item.type === 'folder') getDescendantIdsRecursive(item.id).forEach(id => visibleIds.add(id));
+                }
+            });
+            itemsToBuildFrom = items.filter(item => visibleIds.has(item.id));
+        }
+        const itemsById = new Map<string, PromptNode>(itemsToBuildFrom.map(p => [p.id, { ...p, children: [] }]));
+        const rootNodes: PromptNode[] = [];
+        for (const item of itemsToBuildFrom) {
+            const node = itemsById.get(item.id)!;
+            if (item.parentId && itemsById.has(item.parentId)) {
+                itemsById.get(item.parentId)!.children.push(node);
+            } else {
+                rootNodes.push(node);
+            }
+        }
+        
+        const finalTree = rootNodes;
+
+        const displayExpandedIds = searchTerm.trim() 
+            ? new Set(itemsToBuildFrom.filter(i => i.type === 'folder').map(i => i.id)) 
+            : expandedFolderIds;
+
+        const flatList: NavigableItem[] = [];
+        const flatten = (nodes: PromptNode[]) => {
+        for (const node of nodes) {
+            flatList.push({ id: node.id, type: node.type, parentId: node.parentId });
+            if (node.type === 'folder' && displayExpandedIds.has(node.id)) {
+            flatten(node.children);
+            }
+        }
+        };
+        flatten(finalTree);
+        templates.forEach(t => flatList.push({ id: t.template_id, type: 'template', parentId: null }));
+
+        return { promptTree: finalTree, navigableItems: flatList };
+    }, [items, templates, searchTerm, expandedFolderIds]);
 
     // Get app version
     useEffect(() => {
@@ -267,6 +335,7 @@ const MainApp: React.FC = () => {
         const newDoc = await addDocument({ parentId });
         setActiveNodeId(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
+        setLastClickedId(newDoc.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
@@ -276,6 +345,7 @@ const MainApp: React.FC = () => {
         const newFolder = await addFolder(null);
         setActiveNodeId(newFolder.id);
         setSelectedIds(new Set([newFolder.id]));
+        setLastClickedId(newFolder.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
@@ -286,6 +356,7 @@ const MainApp: React.FC = () => {
             const newFolder = await addFolder(activeNode.id, 'New Folder');
             setActiveNodeId(newFolder.id);
             setSelectedIds(new Set([newFolder.id]));
+            setLastClickedId(newFolder.id);
             setExpandedFolderIds(prev => new Set(prev).add(activeNode.id));
         }
     }, [addFolder, activeNode]);
@@ -299,6 +370,7 @@ const MainApp: React.FC = () => {
     const handleNewTemplate = useCallback(async () => {
         const newTemplate = await addTemplate();
         setActiveTemplateId(newTemplate.template_id);
+        setLastClickedId(newTemplate.template_id);
         setActiveNodeId(null);
         setSelectedIds(new Set());
         setView('editor');
@@ -308,19 +380,31 @@ const MainApp: React.FC = () => {
         const newDoc = await addDocument({ parentId: null, title, content });
         setActiveNodeId(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
+        setLastClickedId(newDoc.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
     }, [addDocument]);
 
-    const handleSelectNode = (id: string, e: React.MouseEvent) => {
+    const handleSelectNode = useCallback((id: string, e: React.MouseEvent) => {
         if (activeNodeId !== id) {
             setDocumentView('editor');
         }
         
+        const isShift = e.shiftKey;
         const isCtrl = e.ctrlKey || e.metaKey;
-        
-        if (isCtrl) {
+
+        if (isShift && lastClickedId && navigableItems.length > 0) {
+            const lastIndex = navigableItems.findIndex(i => i.id === lastClickedId);
+            const currentIndex = navigableItems.findIndex(i => i.id === id);
+
+            if (lastIndex !== -1 && currentIndex !== -1) {
+                const start = Math.min(lastIndex, currentIndex);
+                const end = Math.max(lastIndex, currentIndex);
+                const rangeIds = navigableItems.slice(start, end + 1).map(i => i.id);
+                setSelectedIds(new Set(rangeIds));
+            }
+        } else if (isCtrl) {
             setSelectedIds(prev => {
                 const newSet = new Set(prev);
                 if (newSet.has(id)) {
@@ -330,19 +414,22 @@ const MainApp: React.FC = () => {
                 }
                 return newSet;
             });
+            setLastClickedId(id);
         } else {
             setSelectedIds(new Set([id]));
+            setLastClickedId(id);
         }
 
         setActiveNodeId(id);
         setActiveTemplateId(null);
         setView('editor');
-    };
+    }, [activeNodeId, lastClickedId, navigableItems]);
     
     const handleSelectTemplate = (id: string) => {
         setActiveTemplateId(id);
         setActiveNodeId(null);
-        setSelectedIds(new Set());
+        setSelectedIds(new Set([id]));
+        setLastClickedId(id);
         setView('editor');
     };
     
@@ -414,78 +501,66 @@ const MainApp: React.FC = () => {
         }
     }, [discoveredServices, settings, saveSettings, addLog]);
 
-    const handleDeleteNode = useCallback((id: string) => {
-        const itemToDelete = items.find(p => p.id === id);
-        if (!itemToDelete) return;
-
+    const handleDeleteSelection = useCallback(async () => {
+        if (selectedIds.size === 0) return;
+    
+        const topLevelNodeIds = [...selectedIds].filter(id => {
+            const node = items.find(i => i.id === id);
+            return node && (!node.parentId || !selectedIds.has(node.parentId));
+        });
+    
+        const templateIdsToDelete = [...selectedIds].filter(id => templates.some(t => t.template_id === id));
+    
+        const totalItems = topLevelNodeIds.length + templateIdsToDelete.length;
+        if (totalItems === 0) return;
+    
         const performDelete = async () => {
-            let nextNodeToSelect: DocumentOrFolder | null = null;
-            const currentItemIndex = items.findIndex(p => p.id === id);
-
-            if (currentItemIndex > -1) {
-                if (currentItemIndex > 0) {
-                    nextNodeToSelect = items[currentItemIndex - 1];
-                } else if (items.length > 1) {
-                    nextNodeToSelect = items[1];
-                }
+            if (topLevelNodeIds.length > 0) {
+                await deleteItems(topLevelNodeIds);
             }
+            if (templateIdsToDelete.length > 0) {
+                await deleteTemplates(templateIdsToDelete);
+            }
+    
+            // Clear selection
+            setSelectedIds(new Set());
+            setLastClickedId(null);
             
-            await deleteItem(id);
-
-            if (activeNodeId === id) {
-                const newActiveId = nextNodeToSelect ? nextNodeToSelect.id : (items.length > 1 ? items[0].id : null);
-                setActiveNodeId(newActiveId);
-                setSelectedIds(newActiveId ? new Set([newActiveId]) : new Set());
-            } else {
-                setSelectedIds(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(id);
-                    return newSet;
-                });
+            // If the active item was deleted, clear it
+            if (activeNodeId && selectedIds.has(activeNodeId)) {
+                setActiveNodeId(null);
+            }
+            if (activeTemplateId && selectedIds.has(activeTemplateId)) {
+                setActiveTemplateId(null);
             }
         };
-
-        let title = 'Confirm Deletion';
-        let message: React.ReactNode = '';
-
-        if (itemToDelete.type === 'folder') {
-            title = 'Delete Folder';
-            const descendantCount = getDescendantIds(id).size;
-            message = descendantCount > 0 
-                ? <>Are you sure you want to delete the folder <strong>"{itemToDelete.title}"</strong> and its {descendantCount} contents? This action cannot be undone.</>
-                : <>Are you sure you want to delete the empty folder <strong>"{itemToDelete.title}"</strong>?</>;
-        } else {
-            title = 'Delete Document';
-            message = <>Are you sure you want to delete the document <strong>"{itemToDelete.title}"</strong>? This action cannot be undone.</>;
-        }
-
+    
         setConfirmAction({
-            title,
-            message,
+            title: `Delete ${totalItems} item(s)`,
+            message: <>Are you sure you want to permanently delete {totalItems} selected item(s)? This action cannot be undone.</>,
             onConfirm: () => {
                 performDelete();
                 setConfirmAction(null);
             }
         });
+    }, [selectedIds, items, templates, deleteItems, deleteTemplates, activeNodeId, activeTemplateId]);
 
-    }, [items, deleteItem, activeNodeId, getDescendantIds]);
+    const handleDeleteNode = useCallback((id: string) => {
+        const itemToDelete = items.find(p => p.id === id);
+        if (!itemToDelete) return;
+        
+        setSelectedIds(new Set([id]));
+        // Trigger the general delete handler
+        handleDeleteSelection();
+
+    }, [items, handleDeleteSelection]);
 
     const handleDeleteTemplate = useCallback((id: string) => {
         const templateToDelete = templates.find(t => t.template_id === id);
         if (!templateToDelete) return;
-
-        setConfirmAction({
-            title: 'Delete Template',
-            message: <>Are you sure you want to delete the template <strong>"{templateToDelete.title}"</strong>? This action cannot be undone.</>,
-            onConfirm: async () => {
-                await deleteTemplate(id);
-                if (activeTemplateId === id) {
-                    setActiveTemplateId(null);
-                }
-                setConfirmAction(null);
-            }
-        });
-    }, [deleteTemplate, activeTemplateId, templates]);
+        setSelectedIds(new Set([id]));
+        handleDeleteSelection();
+    }, [templates, handleDeleteSelection]);
 
     const handleToggleExpand = (id: string) => {
         setExpandedFolderIds(prev => {
@@ -626,15 +701,12 @@ const MainApp: React.FC = () => {
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
         { id: 'new-from-template', name: 'New Document from Template...', action: () => setCreateFromTemplateOpen(true), category: 'File', icon: PlusIcon, keywords: 'add create file instance' },
         { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: DocumentDuplicateIcon, keywords: 'copy clone' },
-        { id: 'delete-item', name: 'Delete Current Item', action: () => {
-            if (activeTemplateId) handleDeleteTemplate(activeTemplateId);
-            else if (activeNodeId) handleDeleteNode(activeNodeId);
-        }, category: 'File', icon: TrashIcon, keywords: 'remove discard' },
+        { id: 'delete-item', name: 'Delete Selection', action: handleDeleteSelection, category: 'File', icon: TrashIcon, keywords: 'remove discard' },
         { id: 'toggle-editor', name: 'Switch to Editor View', action: () => setView('editor'), category: 'View', icon: PencilIcon, keywords: 'main document' },
         { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
         { id: 'toggle-info', name: 'Toggle Info View', action: () => setView(v => v === 'info' ? 'editor' : 'info'), category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => setIsLoggerVisible(v => !v), category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [activeNodeId, activeTemplateId, handleNewDocument, handleNewRootFolder, handleDeleteNode, handleDeleteTemplate, handleNewTemplate, toggleSettingsView, handleDuplicateSelection]);
+    ], [handleNewDocument, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection]);
 
     const getSupportedIconSet = (iconSet: Settings['iconSet']): 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material' => {
         const supportedSets: Array<Settings['iconSet']> = ['heroicons', 'lucide', 'feather', 'tabler', 'material'];
@@ -722,10 +794,15 @@ const MainApp: React.FC = () => {
                             >
                                 <Sidebar 
                                     prompts={items}
+                                    promptTree={promptTree}
+                                    navigableItems={navigableItems}
                                     selectedIds={selectedIds}
+                                    setSelectedIds={setSelectedIds}
+                                    lastClickedId={lastClickedId}
+                                    setLastClickedId={setLastClickedId}
                                     activePromptId={activeNodeId}
                                     onSelectPrompt={handleSelectNode}
-                                    onDeletePrompt={handleDeleteNode}
+                                    onDeleteSelection={handleDeleteSelection}
                                     onRenamePrompt={handleRenameNode}
                                     onMovePrompt={moveItems}
                                     onNewPrompt={handleNewDocument}
@@ -735,6 +812,8 @@ const MainApp: React.FC = () => {
                                     onCopyPromptContent={handleCopyNodeContent}
                                     expandedFolderIds={expandedFolderIds}
                                     onToggleExpand={handleToggleExpand}
+                                    searchTerm={searchTerm}
+                                    setSearchTerm={setSearchTerm}
 
                                     templates={templates}
                                     activeTemplateId={activeTemplateId}

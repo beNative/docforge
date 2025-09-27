@@ -63,6 +63,13 @@ export const useNodes = () => {
     await refreshNodes();
   }, [addLog, refreshNodes]);
 
+  const deleteNodes = useCallback(async (nodeIds: string[]) => {
+    if (nodeIds.length === 0) return;
+    await repository.deleteNodes(nodeIds);
+    addLog('INFO', `Deleted ${nodeIds.length} node(s) and their descendants.`);
+    await refreshNodes();
+  }, [addLog, refreshNodes]);
+
   const duplicateNodes = useCallback(async (nodeIds: string[]) => {
     await repository.duplicateNodes(nodeIds);
     addLog('INFO', `Duplicated ${nodeIds.length} item(s).`);
@@ -80,5 +87,5 @@ export const useNodes = () => {
       addLog('DEBUG', `Content for node ${nodeId} saved.`);
   }, [addLog]);
 
-  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, moveNodes, updateDocumentContent, duplicateNodes };
+  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes };
 };

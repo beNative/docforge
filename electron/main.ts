@@ -1,10 +1,24 @@
 // Fix: This file was previously a placeholder. This is the full implementation for the Electron main process.
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+// Fix: Import 'platform' from 'process' for type-safe access to the current OS identifier.
+import { platform } from 'process';
 import path from 'path';
 import fs from 'fs/promises';
 import { autoUpdater } from 'electron-updater';
 import { databaseService } from './database';
 import log from 'electron-log/main';
+
+// Fix: Inform TypeScript about the __dirname global variable provided by Node.js, which is present in a CommonJS-like environment.
+declare const __dirname: string;
+
+// Fix: Add type declaration for the Electron-specific 'resourcesPath' property on the process object.
+declare global {
+  namespace NodeJS {
+    interface Process {
+      resourcesPath: string;
+    }
+  }
+}
 
 // --- electron-log setup ---
 // Override console.log, console.error, etc. to write to a log file
@@ -40,6 +54,7 @@ function createWindow() {
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 15, y: 13 }, // macOS specific
     webPreferences: {
+      // Fix: Error on line 43 is resolved by declaring __dirname above.
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
@@ -51,6 +66,7 @@ function createWindow() {
   
   // Load the index.html of the app.
   if (app.isPackaged) {
+    // Fix: Error on line 54 is resolved by declaring __dirname above.
     mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
   } else {
     mainWindow.loadURL('http://localhost:8080'); // Adjusted for esbuild serve common port
@@ -93,7 +109,8 @@ app.on('ready', () => {
 
 app.on('window-all-closed', () => {
   databaseService.close();
-  if (process.platform !== 'darwin') {
+  // Fix: Error on line 96 is resolved by importing 'platform' from 'process'.
+  if (platform !== 'darwin') {
     app.quit();
   }
 });
@@ -142,7 +159,8 @@ ipcMain.handle('fs:read-legacy-file', async (_, filename) => {
 
 // App Info & Updates
 ipcMain.handle('app:get-version', () => app.getVersion());
-ipcMain.handle('app:get-platform', () => process.platform);
+// Fix: Error on line 145 is resolved by importing 'platform' from 'process'.
+ipcMain.handle('app:get-platform', () => platform);
 ipcMain.handle('app:get-log-path', () => log.transports.file.getFile().path);
 
 ipcMain.on('updater:set-allow-prerelease', (_, allow: boolean) => {
@@ -198,7 +216,9 @@ ipcMain.handle('dialog:open', async (_, options) => {
 ipcMain.handle('docs:read', async (_, filename: string) => {
     try {
         const docPath = app.isPackaged
+            // Fix: Error on line 201 is resolved by augmenting the Process type.
             ? path.join(process.resourcesPath, 'docs', filename)
+            // Fix: Error on line 202 is resolved by declaring __dirname above.
             : path.join(__dirname, '../../docs', filename);
         const content = await fs.readFile(docPath, 'utf-8');
         return { success: true, content };

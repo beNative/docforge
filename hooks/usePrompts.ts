@@ -48,7 +48,7 @@ const getDescendantIdsRecursive = (nodeId: string, allNodes: Node[]): Set<string
  * This allows the UI to function without a full refactor of all components.
  */
 export const useDocuments = () => {
-  const { nodes, addNode, updateNode, deleteNode, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes } = useNodes();
+  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes } = useNodes();
 
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
@@ -90,6 +90,10 @@ export const useDocuments = () => {
       // The `useNodes` hook handles refreshing the state.
   }, [deleteNode]);
 
+  const deleteItems = useCallback(async (ids: string[]) => {
+    await deleteNodes(ids);
+  }, [deleteNodes]);
+
   const duplicateItems = useCallback(async (ids: string[]) => {
       await duplicateNodes(ids);
   }, [duplicateNodes]);
@@ -102,5 +106,5 @@ export const useDocuments = () => {
       return getDescendantIdsRecursive(nodeId, allNodesFlat);
   }, [allNodesFlat]);
 
-  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems };
+  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems };
 };

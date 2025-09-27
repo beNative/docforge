@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 // Fix: Import correct types. PromptVersion is an alias for DocVersion now.
 import type { DocumentOrFolder, PromptVersion as Version } from '../types';
 // Fix: Import the new standalone hook.
@@ -44,6 +44,12 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
   }, [prompt, versions]);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(0);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    listRef.current?.focus();
+  }, []);
 
   const selectedVersion = versionsWithCurrent[selectedIndex];
   const previousVersion = versionsWithCurrent[selectedIndex + 1];
@@ -64,6 +70,7 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
   };
 
   const handleToggleVersionSelection = (versionId: number) => {
+    if (versionId === -1) return;
     setSelectedVersionIds(prev => {
         const newSet = new Set(prev);
         if (newSet.has(versionId)) {
@@ -79,7 +86,68 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
     await deleteVersions(Array.from(selectedVersionIds));
     setSelectedVersionIds(new Set());
     setSelectedIndex(0); // Reset selection to current after delete
+    setLastSelectedIndex(0);
     setIsConfirmingDelete(false);
+  };
+
+  const handleVersionClick = (e: React.MouseEvent, index: number) => {
+    const versionId = versionsWithCurrent[index].version_id;
+    const isShift = e.shiftKey;
+    const isCtrl = e.ctrlKey || e.metaKey;
+
+    if (isShift && lastSelectedIndex !== null) {
+        const start = Math.min(lastSelectedIndex, index);
+        const end = Math.max(lastSelectedIndex, index);
+        const rangeIds = versionsWithCurrent.slice(start, end + 1)
+            .map(v => v.version_id)
+            .filter(id => id !== -1);
+        setSelectedVersionIds(new Set(rangeIds));
+    } else if (isCtrl) {
+        handleToggleVersionSelection(versionId);
+        setLastSelectedIndex(index);
+    } else {
+        setSelectedVersionIds(versionId !== -1 ? new Set([versionId]) : new Set());
+        setLastSelectedIndex(index);
+    }
+    setSelectedIndex(index);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const { key, shiftKey, metaKey, ctrlKey } = e;
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const isCtrlCmd = isMac ? metaKey : ctrlKey;
+
+    if (key === 'ArrowUp' || key === 'ArrowDown') {
+      e.preventDefault();
+      const newIndex = key === 'ArrowUp'
+        ? Math.max(0, selectedIndex - 1)
+        : Math.min(versionsWithCurrent.length - 1, selectedIndex + 1);
+
+      if (shiftKey) {
+        const anchor = lastSelectedIndex === null ? selectedIndex : lastSelectedIndex;
+        const start = Math.min(anchor, newIndex);
+        const end = Math.max(anchor, newIndex);
+        const rangeIds = versionsWithCurrent.slice(start, end + 1)
+          .map(v => v.version_id).filter(id => id !== -1);
+        setSelectedVersionIds(new Set(rangeIds));
+      } else {
+        setSelectedVersionIds(new Set());
+        setLastSelectedIndex(newIndex);
+      }
+      setSelectedIndex(newIndex);
+    } else if (key === ' ') {
+      e.preventDefault();
+      handleToggleVersionSelection(versionsWithCurrent[selectedIndex].version_id);
+    } else if (isCtrlCmd && (key === 'a' || key === 'A')) {
+      e.preventDefault();
+      const allIds = versionsWithCurrent.map(v => v.version_id).filter(id => id !== -1);
+      setSelectedVersionIds(new Set(allIds));
+    } else if (key === 'Delete' || key === 'Backspace') {
+      e.preventDefault();
+      if (selectedVersionIds.size > 0) {
+        setIsConfirmingDelete(true);
+      }
+    }
   };
 
   return (
@@ -102,40 +170,37 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
             <aside className="w-1/3 max-w-xs border-r border-border-color pr-6 flex flex-col">
                 <div className="flex justify-between items-center mb-3">
                     <h3 className="text-lg font-semibold">Versions</h3>
-                    {/* Fix: Removed invalid 'size' prop from Button component. */}
                     <Button 
                         variant="destructive" 
                         disabled={selectedVersionIds.size === 0}
                         onClick={() => setIsConfirmingDelete(true)}
                     >
                        <TrashIcon className="w-4 h-4 mr-2" />
-                       Delete Selected
+                       Delete ({selectedVersionIds.size})
                     </Button>
                 </div>
-                <ul className="space-y-1 overflow-y-auto">
-                    {versionsWithCurrent.map((version, index) => (
-                    <li key={version.id} className="flex items-center gap-2">
-                        {index > 0 && (
-                            <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                checked={selectedVersionIds.has(version.version_id)}
-                                onChange={() => handleToggleVersionSelection(version.version_id)}
-                            />
-                        )}
-                        <button
-                        onClick={() => setSelectedIndex(index)}
-                        className={`w-full text-left p-2 rounded-md text-sm transition-colors ${index === 0 ? 'ml-6' : ''} ${
-                            selectedIndex === index
-                            ? 'bg-primary/10 text-primary font-semibold'
-                            : 'text-text-secondary hover:bg-border-color/50 hover:text-text-main'
-                        }`}
-                        >
-                        <span className="block">{formatDate(version.createdAt)}</span>
-                        <span className="text-xs opacity-80">{index === 0 ? '(Current Version)' : `Version ${versionsWithCurrent.length - 1 - index}`}</span>
-                        </button>
-                    </li>
-                    ))}
+                <ul ref={listRef} onKeyDown={handleKeyDown} tabIndex={0} className="space-y-1 overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary rounded-md">
+                    {versionsWithCurrent.map((version, index) => {
+                        const isFocused = selectedIndex === index;
+                        const isSelected = selectedVersionIds.has(version.version_id);
+                        return (
+                            <li key={version.id}>
+                                <button
+                                    onClick={(e) => handleVersionClick(e, index)}
+                                    className={`w-full text-left p-2 rounded-md text-sm transition-colors ${
+                                        isFocused
+                                        ? 'bg-primary/10 text-primary font-semibold'
+                                        : isSelected
+                                        ? 'bg-border-color'
+                                        : 'text-text-secondary hover:bg-border-color/50 hover:text-text-main'
+                                    }`}
+                                >
+                                    <span className="block">{formatDate(version.createdAt)}</span>
+                                    <span className="text-xs opacity-80">{index === 0 ? '(Current Version)' : `Version ${versionsWithCurrent.length - 1 - index}`}</span>
+                                </button>
+                            </li>
+                        );
+                    })}
                      {versionsWithCurrent.length <= 1 && (
                         <li className="text-sm text-text-secondary p-2 text-center">No history found.</li>
                     )}
