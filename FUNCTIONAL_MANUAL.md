@@ -10,7 +10,7 @@ This manual provides a detailed overview of the features and functionality of th
     -   [The Main Content Area](#the-main-content-area)
     -   [The Status Bar](#the-status-bar)
 2.  [Core Features](#core-features)
-    -   [Creating Documents and Folders](#creating-documents-and-folders)
+    -   [Creating and Managing Documents and Folders](#creating-and-managing-documents-and-folders)
     -   [Editing Documents](#editing-documents)
     -   [Organizing with Drag and Drop](#organizing-with-drag-and-drop)
     -   [AI-Powered Refinement](#ai-powered-refinement)
@@ -80,23 +80,26 @@ The bar at the bottom of the window provides at-a-glance information about the a
 
 ## 2. Core Features
 
-### Creating Documents and Folders
+### Creating and Managing Documents and Folders
 
-- **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut. A new, untitled document will be created and opened in the editor.
-- **New Folder:** Click the folder icon with a `+` to create a new folder at the root of your document list.
+- **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut.
+- **New Root Folder:** Click the folder icon with a `+` to create a new folder at the root of your document list.
+- **New Subfolder:** Select an existing folder and click the "New Subfolder" icon to create a folder inside it.
+- **Duplicate Selection:** Select one or more items and click the "Duplicate" icon to create a deep copy.
 
 ### Editing Documents
 
 The document editor is a powerful Markdown-aware text editor.
 
 - **Title:** The title of the document can be edited directly at the top of the editor.
-- **Auto-Naming:** If you create an "Untitled Document" and start writing, the application will automatically generate a title for you based on the content after you've typed a sufficient amount.
+- **Auto-Naming:** If the title is blank, the application can generate a title for you based on the content using your configured LLM.
 - **Content:** The main text area supports Markdown syntax.
 - **View Modes:**
     - **Editor Only:** The default text editing view.
     - **Preview Only:** A rendered view of your Markdown content.
     - **Split Vertical/Horizontal:** A side-by-side or top-and-bottom view of the editor and the live preview.
 - **Toolbar Actions:**
+    - **Save Version:** Manually save the current content as a new version in the document's history. The button icon will be highlighted when there are unsaved changes.
     - **Undo/Redo:** Step backward or forward through your changes.
     - **Version History:** Open a view to see all saved versions of the document.
     - **Copy:** Copy the document's content to the clipboard.
@@ -125,10 +128,13 @@ Templates are useful for prompts you create often.
 
 ### Version History
 
-DocForge automatically saves a snapshot of your document's content every time you make a significant change.
-- Click the **History** icon in the editor toolbar to open the history view.
-- Here, you can select any previous version and see a "diff" comparing it to the version before it.
-- You can copy content from an old version or restore the entire document to that state.
+DocForge allows you to maintain a complete history of your document's content.
+- **Saving a Version:** A new version is created only when you click the **Save Version** (disk) icon in the editor's toolbar. This gives you full control over when a snapshot is recorded.
+- **Viewing History:** Click the **History** icon in the editor toolbar to open the history view.
+- **Managing History:**
+    - In the history view, you can select any previous version to see a "diff" comparing it to the version before it.
+    - You can copy content from an old version or restore the entire document to that state.
+    - You can select one or more old versions using the checkboxes and delete them permanently.
 
 ---
 

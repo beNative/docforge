@@ -1,5 +1,27 @@
 # Version Log
 
+## v0.2.0 - The Workflow Update
+
+This version introduces significant workflow enhancements, giving users more explicit control over versioning and document organization.
+
+### ✨ New Features & Major Improvements
+
+-   **Manual Version Control:**
+    -   **"Save Version" Button:** Replaced the automatic versioning system with a dedicated "Save Version" button in the editor. A new version is now created only when the user explicitly saves, preventing history clutter.
+    -   **Version Deletion:** Users can now select and delete one or more old versions from the history view, providing full control over the document's timeline.
+-   **Enhanced Node Management:**
+    -   **New Subfolder:** A "New Subfolder" button has been added, allowing for the creation of nested folders directly within the selected folder.
+    -   **Duplicate Selection:** A "Duplicate" button allows for the deep copying of one or more selected documents or folders, including all content and sub-items.
+-   **UI & Terminology Polish:**
+    -   **"Document" Terminology:** The application has been updated to use the term "document" instead of "prompt" throughout the UI and documentation, better reflecting its purpose.
+    -   **Sticky Sidebar Toolbar:** The "Documents" action toolbar is now sticky, remaining visible and accessible when scrolling through a long list of items.
+
+### 🐛 Bug Fixes
+
+-   **Editor Stability:** Fixed a critical bug that made the editor unresponsive after a state management refactor.
+-   **Node Reordering:** Corrected a bug where the "Move Up" button for a node in the sidebar did not work.
+-   **AI Title Generation:** Fixed an issue where generating a title with AI would clear any unsaved text in the editor.
+
 ## v0.1.0 - Initial Release
 
 This is the first public release of DocForge, a complete redesign and rebranding of the project. This version consolidates all previous features into a stable, modern, and efficient desktop application for managing and refining LLM prompts.

@@ -10,8 +10,8 @@ This manual provides a detailed overview of the features and functionality of th
     -   [The Main Content Area](#the-main-content-area)
     -   [The Status Bar](#the-status-bar)
 2.  [Core Features](#core-features)
-    -   [Creating Prompts and Folders](#creating-prompts-and-folders)
-    -   [Editing Prompts](#editing-prompts)
+    -   [Creating and Managing Documents and Folders](#creating-and-managing-documents-and-folders)
+    -   [Editing Documents](#editing-documents)
     -   [Organizing with Drag and Drop](#organizing-with-drag-and-drop)
     -   [AI-Powered Refinement](#ai-powered-refinement)
     -   [Using Templates](#using-templates)
@@ -45,24 +45,24 @@ The top-most bar of the application provides global controls and information.
 
 The resizable left panel is your main navigation and organization area.
 
-- **Search:** A search bar at the top allows you to filter your prompts and folders by title.
-- **Prompts List:** A hierarchical tree view of all your prompts and folders.
+- **Search:** A search bar at the top allows you to filter your documents and folders by title.
+- **Documents List:** A hierarchical tree view of all your documents and folders.
     - **Folders:** Can be expanded or collapsed. You can create new folders at the root level.
-    - **Prompts:** Individual prompt files. Selecting a prompt opens it in the Main Content Area.
-- **Templates List:** A separate list below your prompts for managing reusable templates.
+    - **Documents:** Individual document files. Selecting a document opens it in the Main Content Area.
+- **Templates List:** A separate list below your documents for managing reusable templates.
 - **Action Buttons:**
-    - **New Folder/New Prompt:** Buttons at the top of the prompts list to create new items.
+    - **New Folder/New Document:** Buttons at the top of the documents list to create new items.
     - **New Template:** A button at the top of the templates list.
-    - **New from Template...:** A button at the very bottom of the sidebar to create a new prompt using an existing template.
+    - **New from Template...:** A button at the very bottom of the sidebar to create a new document using an existing template.
 
-The entire list of prompts and templates can be navigated using your keyboard's arrow keys. Use `Up`/`Down` to move between items, `Right` to expand a folder, `Left` to collapse a folder (or move to its parent), and `Enter` to open the selected item.
+The entire list of documents and templates can be navigated using your keyboard's arrow keys. Use `Up`/`Down` to move between items, `Right` to expand a folder, `Left` to collapse a folder (or move to its parent), and `Enter` to open the selected item.
 
 ### The Main Content Area
 
 This is the largest part of the application and displays the active content.
 
-- **Welcome Screen:** Shown when no prompt is selected or when a folder is selected.
-- **Prompt Editor:** The primary interface for writing and editing a prompt's content and title.
+- **Welcome Screen:** Shown when no document is selected or when a folder is selected.
+- **Document Editor:** The primary interface for writing and editing a document's content and title.
 - **Template Editor:** A similar editor for creating and modifying prompt templates.
 - **Settings View:** A dedicated screen for configuring the application.
 - **Info View:** Displays documentation like the README and this manual.
@@ -73,39 +73,42 @@ The bar at the bottom of the window provides at-a-glance information about the a
 
 - **LLM Connection Status:** A colored dot (green for connected, red for error) and text indicating the connection status to your local AI provider.
 - **Provider & Model Selection:** Dropdown menus to see the currently configured LLM provider and model, and to quickly switch between other detected services and their available models.
-- **Statistics:** Shows the total number of prompts and the last save time for the active prompt.
+- **Statistics:** Shows the total number of documents and the last save time for the active document.
 - **App Version:** Displays the current version of DocForge.
 
 ---
 
 ## 2. Core Features
 
-### Creating Prompts and Folders
+### Creating and Managing Documents and Folders
 
-- **New Prompt:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut. A new, untitled prompt will be created and opened in the editor.
-- **New Folder:** Click the folder icon with a `+` to create a new folder at the root of your prompt list.
+- **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut.
+- **New Root Folder:** Click the folder icon with a `+` to create a new folder at the root of your document list.
+- **New Subfolder:** Select an existing folder and click the "New Subfolder" icon to create a folder inside it.
+- **Duplicate Selection:** Select one or more items and click the "Duplicate" icon to create a deep copy.
 
-### Editing Prompts
+### Editing Documents
 
-The prompt editor is a powerful Markdown-aware text editor.
+The document editor is a powerful Markdown-aware text editor.
 
-- **Title:** The title of the prompt can be edited directly at the top of the editor.
-- **Auto-Naming:** If you create an "Untitled Prompt" and start writing, the application will automatically generate a title for you based on the content after you've typed a sufficient amount.
+- **Title:** The title of the document can be edited directly at the top of the editor.
+- **Auto-Naming:** If the title is blank, the application can generate a title for you based on the content using your configured LLM.
 - **Content:** The main text area supports Markdown syntax.
 - **View Modes:**
     - **Editor Only:** The default text editing view.
     - **Preview Only:** A rendered view of your Markdown content.
     - **Split Vertical/Horizontal:** A side-by-side or top-and-bottom view of the editor and the live preview.
 - **Toolbar Actions:**
+    - **Save Version:** Manually save the current content as a new version in the document's history. The button icon will be highlighted when there are unsaved changes.
     - **Undo/Redo:** Step backward or forward through your changes.
-    - **Version History:** Open a view to see all saved versions of the prompt.
-    - **Copy:** Copy the prompt's content to the clipboard.
-    - **Refine with AI:** Send the prompt to your configured LLM to get an improved version.
-    - **Delete:** Delete the current prompt.
+    - **Version History:** Open a view to see all saved versions of the document.
+    - **Copy:** Copy the document's content to the clipboard.
+    - **Refine with AI:** Send the document's content to your configured LLM to get an improved version.
+    - **Delete:** Delete the current document.
 
 ### Organizing with Drag and Drop
 
-You can organize your prompts and folders by dragging and dropping them in the sidebar. You can select multiple items using `Ctrl+Click` (or `Cmd+Click` on macOS) and drag them all at once.
+You can organize your documents and folders by dragging and dropping them in the sidebar. You can select multiple items using `Ctrl+Click` (or `Cmd+Click` on macOS) and drag them all at once.
 
 You can drop an item (or a group of items):
 - **Before** another item to place it above.
@@ -114,21 +117,24 @@ You can drop an item (or a group of items):
 
 ### AI-Powered Refinement
 
-Clicking the **Refine with AI** (sparkles) button in the editor toolbar sends your current prompt to your configured local LLM. The AI's task is not to *answer* the prompt, but to *improve* it. A modal will appear with the suggested refinement, which you can then accept or discard.
+Clicking the **Refine with AI** (sparkles) button in the editor toolbar sends your current document content to your configured local LLM. The AI's task is not to *answer* the prompt, but to *improve* it. A modal will appear with the suggested refinement, which you can then accept or discard.
 
 ### Using Templates
 
 Templates are useful for prompts you create often.
 
 - **Create a Template:** Use the "New Template" button in the sidebar. In the template editor, use `{{variable_name}}` syntax to define placeholders.
-- **Create from Template:** Click the "New from Template..." button at the bottom of the sidebar. A modal will appear allowing you to select a template and fill in the values for its variables. This will generate a new prompt with the content filled in.
+- **Create from Template:** Click the "New from Template..." button at the bottom of the sidebar. A modal will appear allowing you to select a template and fill in the values for its variables. This will generate a new document with the content filled in.
 
 ### Version History
 
-DocForge automatically saves a snapshot of your prompt's content every time you make a significant change.
-- Click the **History** icon in the editor toolbar to open the history view.
-- Here, you can select any previous version and see a "diff" comparing it to the version before it.
-- You can copy content from an old version or restore the entire prompt to that state.
+DocForge allows you to maintain a complete history of your document's content.
+- **Saving a Version:** A new version is created only when you click the **Save Version** (disk) icon in the editor's toolbar. This gives you full control over when a snapshot is recorded.
+- **Viewing History:** Click the **History** icon in the editor toolbar to open the history view.
+- **Managing History:**
+    - In the history view, you can select any previous version to see a "diff" comparing it to the version before it.
+    - You can copy content from an old version or restore the entire document to that state.
+    - You can select one or more old versions using the checkboxes and delete them permanently.
 
 ---
 

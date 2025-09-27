@@ -65,6 +65,7 @@ The main process is responsible for managing the application lifecycle, database
 -   **Database Management (`database.ts`):** This service is the single owner of the SQLite database file. It uses `better-sqlite3` to open the connection, run schema migrations on startup, and execute queries. All database access must go through this service.
 -   **IPC (Inter-Process Communication):** It sets up IPC handlers to listen for events from the renderer process. The UI communicates with the database *exclusively* through these channels. Key handlers include:
     -   `db:query`, `db:run`: Generic handlers to execute SQL against the database.
+    -   `db:duplicate-nodes`: A handler to perform a deep, transactional copy of selected nodes.
     -   `db:migrate-from-json`: A special handler for the one-time migration of data from old JSON files.
     -   Window Controls: Handlers for `window:minimize`, `window:maximize`, etc.
 -   **Security:** The `preload.ts` script uses Electron's `contextBridge` to securely expose specific IPC functions to the renderer process under the `window.electronAPI` object, maintaining context isolation.
@@ -91,7 +92,7 @@ The renderer process is responsible for the entire user interface.
 This is the core data persistence layer, replacing the old JSON file system.
 
 -   **`electron/database.ts` (Main Process):** Manages the physical database file and connection using `better-sqlite3`. It handles schema creation and versioning by executing SQL scripts embedded directly within the application's source code (`electron/schema.ts`). This removes the need for external `.sql` files and simplifies packaging.
--   **`services/repository.ts` (Renderer Process):** The data access layer for the UI. It acts as an abstraction over the IPC communication. It contains all the application's SQL queries and provides clear, async methods (e.g., `getNodeTree()`, `updateDocumentContent()`) for the React hooks to use. It does *not* access the database directly.
+-   **`services/repository.ts` (Renderer Process):** The data access layer for the UI. It acts as an abstraction over the IPC communication. It contains all the application's SQL queries and provides clear, async methods (e.g., `getNodeTree()`, `updateDocumentContent()`, `deleteDocVersions()`, `duplicateNodes()`) for the React hooks to use. It does *not* access the database directly.
 -   **Schema:** The database uses a highly normalized schema with tables for `nodes` (hierarchy), `documents`, `content_store` (for content-addressable storage and deduplication), and `doc_versions`.
 -   **One-Time Migration:** The repository contains logic to detect if it's the first run with the new database. If old JSON files are found, it reads them and sends the data to the main process to be migrated into the SQLite database in a single, safe transaction.
 
