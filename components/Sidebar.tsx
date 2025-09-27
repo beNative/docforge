@@ -1,112 +1,320 @@
-import React, { useState, useEffect } from 'react';
-import type { DocumentOrFolder, PromptTemplate } from '../types';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import PromptList from './PromptList';
 import TemplateList from './TemplateList';
-import { PlusIcon, FolderPlusIcon, FileIcon } from './Icons';
+// Fix: Correctly import the DocumentOrFolder type.
+import type { DocumentOrFolder, PromptTemplate } from '../types';
 import IconButton from './IconButton';
-import { storageService } from '../services/storageService';
-import { LOCAL_STORAGE_KEYS } from '../constants';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, FolderDownIcon } from './Icons';
+import Button from './Button';
+import { PromptNode } from './PromptTreeItem';
 
 interface SidebarProps {
-  width: number;
-  onResizeStart: (e: React.MouseEvent) => void;
-  items: DocumentOrFolder[];
-  templates: PromptTemplate[];
+  prompts: DocumentOrFolder[];
   selectedIds: Set<string>;
-  focusedItemId: string | null;
-  setFocusedItemId: (id: string | null) => void;
-  activeTemplateId: string | null;
+  activePromptId: string | null;
   onSelectPrompt: (id: string, e: React.MouseEvent) => void;
+  onDeletePrompt: (id: string) => void;
+  onRenamePrompt: (id: string, newTitle: string) => void;
+  onMovePrompt: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onNewPrompt: () => void;
+  onNewRootFolder: () => void;
+  onNewSubfolder: () => void;
+  onDuplicateSelection: () => void;
+  onCopyPromptContent: (id: string) => void;
+  expandedFolderIds: Set<string>;
+  onToggleExpand: (id: string) => void;
+
+  templates: PromptTemplate[];
+  activeTemplateId: string | null;
   onSelectTemplate: (id: string) => void;
-  onNewDocument: () => void;
-  onNewFolder: () => void;
-  onNewTemplate: () => void;
-  onRenameItem: (id: string, newTitle: string) => void;
-  onDeleteItem: (id: string) => void;
   onDeleteTemplate: (id: string) => void;
-  onMoveItems: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
-  onDuplicateItems: (ids: string[]) => void;
-  onOpenTemplateModal: () => void;
+  onRenameTemplate: (id: string, newTitle: string) => void;
+  onNewTemplate: () => void;
+  onNewFromTemplate: () => void;
 }
 
+type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
+
+// Helper function to find a node and its siblings in a tree structure
+const findNodeAndSiblings = (nodes: PromptNode[], id: string): {node: PromptNode, siblings: PromptNode[]} | null => {
+    for (const node of nodes) {
+        if (node.id === id) {
+            return { node, siblings: nodes };
+        }
+        if (node.type === 'folder' && node.children.length > 0) {
+            const found = findNodeAndSiblings(node.children, id);
+            if (found) return found;
+        }
+    }
+    return null;
+};
+
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
+  const { promptTree, navigableItems, activeNode } = useMemo(() => {
+    const activeNode = props.prompts.find(p => p.id === props.activePromptId) || null;
+    // --- Build Prompt Tree ---
+    let itemsToBuildFrom = props.prompts;
+    if (searchTerm.trim()) {
+        const lowerCaseSearchTerm = searchTerm.toLowerCase();
+        const visibleIds = new Set<string>();
+        const originalItemsById: Map<string, DocumentOrFolder> = new Map(props.prompts.map(i => [i.id, i]));
+        const getAncestors = (itemId: string) => {
+            let current = originalItemsById.get(itemId);
+            while (current && current.parentId) {
+              visibleIds.add(current.parentId);
+              current = originalItemsById.get(current.parentId);
+            }
+        };
+        const getDescendantIds = (itemId: string): Set<string> => {
+            const descendantIds = new Set<string>();
+            const findChildren = (parentId: string) => {
+                props.prompts.forEach(p => { if (p.parentId === parentId) { descendantIds.add(p.id); if (p.type === 'folder') findChildren(p.id); } });
+            };
+            findChildren(itemId);
+            return descendantIds;
+        };
+        props.prompts.forEach(item => {
+            if (item.title.toLowerCase().includes(lowerCaseSearchTerm)) {
+                visibleIds.add(item.id);
+                getAncestors(item.id);
+                if (item.type === 'folder') getDescendantIds(item.id).forEach(id => visibleIds.add(id));
+            }
+        });
+        itemsToBuildFrom = props.prompts.filter(item => visibleIds.has(item.id));
+    }
+    const itemsById = new Map<string, PromptNode>(itemsToBuildFrom.map(p => [p.id, { ...p, children: [] }]));
+    const rootNodes: PromptNode[] = [];
+    for (const item of itemsToBuildFrom) {
+        const node = itemsById.get(item.id)!;
+        if (item.parentId && itemsById.has(item.parentId)) {
+            itemsById.get(item.parentId)!.children.push(node);
+        } else {
+            rootNodes.push(node);
+        }
+    }
+    
+    // The visual order should respect the array order from props, so we no longer sort here.
+    const finalTree = rootNodes;
+
+    // --- Flatten for Navigation ---
+    const displayExpandedIds = searchTerm.trim() 
+        ? new Set(itemsToBuildFrom.filter(i => i.type === 'folder').map(i => i.id)) 
+        : props.expandedFolderIds;
+
+    const flatList: NavigableItem[] = [];
+    const flatten = (nodes: PromptNode[]) => {
+      for (const node of nodes) {
+        // Fix: PromptNode extends DocumentOrFolder, so it has id, type, and parentId.
+        flatList.push({ id: node.id, type: node.type, parentId: node.parentId });
+        if (node.type === 'folder' && displayExpandedIds.has(node.id)) {
+          flatten(node.children);
+        }
+      }
+    };
+    flatten(finalTree);
+    props.templates.forEach(t => flatList.push({ id: t.template_id, type: 'template', parentId: null }));
+
+    return { promptTree: finalTree, navigableItems: flatList, activeNode };
+  }, [props.prompts, props.templates, searchTerm, props.expandedFolderIds, props.activePromptId]);
+
+  // Effect to manage focus state
   useEffect(() => {
-    storageService.load<string[]>(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, []).then(ids => {
-        setExpandedFolders(new Set(ids));
-    });
-  }, []);
+    if (!focusedItemId || !navigableItems.some(item => item.id === focusedItemId)) {
+      const activeItem = props.activePromptId || props.activeTemplateId;
+      if (activeItem && navigableItems.some(item => item.id === activeItem)) {
+        setFocusedItemId(activeItem);
+      } else {
+        setFocusedItemId(navigableItems[0]?.id || null);
+      }
+    }
+  }, [navigableItems, focusedItemId, props.activePromptId, props.activeTemplateId]);
 
-  const handleSetExpandedFolders = (updater: React.SetStateAction<Set<string>>) => {
-    setExpandedFolders(currentExpanded => {
-        const newSet = typeof updater === 'function' ? updater(currentExpanded) : updater;
-        storageService.save(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, Array.from(newSet));
-        return newSet;
-    });
+  // Effect to scroll focused item into view
+  useEffect(() => {
+    if (focusedItemId && sidebarRef.current) {
+        const element = sidebarRef.current.querySelector(`[data-item-id='${focusedItemId}']`);
+        element?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [focusedItemId]);
+
+  const handleMoveUp = useCallback((id: string) => {
+      const result = findNodeAndSiblings(promptTree, id);
+      if (!result) return;
+      
+      const { siblings } = result;
+      const index = siblings.findIndex(s => s.id === id);
+      
+      if (index > 0) {
+          const targetSiblingId = siblings[index - 1].id;
+          props.onMovePrompt([id], targetSiblingId, 'before');
+      }
+  }, [promptTree, props.onMovePrompt]);
+  
+  const handleMoveDown = useCallback((id: string) => {
+      const result = findNodeAndSiblings(promptTree, id);
+      if (!result) return;
+      
+      const { siblings } = result;
+      const index = siblings.findIndex(s => s.id === id);
+      
+      if (index < siblings.length - 1) {
+          const targetSiblingId = siblings[index + 1].id;
+          props.onMovePrompt([id], targetSiblingId, 'after');
+      }
+  }, [promptTree, props.onMovePrompt]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (navigableItems.length === 0) return;
+    const key = e.key;
+
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(key)) {
+        return;
+    }
+    
+    e.preventDefault();
+
+    const currentItem = navigableItems.find(item => item.id === focusedItemId);
+
+    if (!currentItem) {
+      if (navigableItems.length > 0) {
+        setFocusedItemId(navigableItems[0].id);
+      }
+      return;
+    }
+
+    const currentIndex = navigableItems.indexOf(currentItem);
+
+    const selectItem = (item: NavigableItem) => {
+        if (item.type === 'template') {
+            props.onSelectTemplate(item.id);
+        } else {
+            // Pass a fake event that won't trigger multi-select.
+            props.onSelectPrompt(item.id, {} as React.MouseEvent);
+        }
+    };
+
+    switch (key) {
+      case 'ArrowUp': {
+        const prevIndex = Math.max(0, currentIndex - 1);
+        const newItem = navigableItems[prevIndex];
+        setFocusedItemId(newItem.id);
+        selectItem(newItem);
+        break;
+      }
+      case 'ArrowDown': {
+        const nextIndex = Math.min(navigableItems.length - 1, currentIndex + 1);
+        const newItem = navigableItems[nextIndex];
+        setFocusedItemId(newItem.id);
+        selectItem(newItem);
+        break;
+      }
+      case 'ArrowRight': {
+        if (currentItem.type === 'folder' && !props.expandedFolderIds.has(currentItem.id)) {
+          props.onToggleExpand(currentItem.id);
+        }
+        break;
+      }
+      case 'ArrowLeft': {
+        if (currentItem.type === 'folder' && props.expandedFolderIds.has(currentItem.id)) {
+          props.onToggleExpand(currentItem.id);
+        } else if (currentItem.parentId) {
+          const parentItem = navigableItems.find(item => item.id === currentItem.parentId);
+          if (parentItem) {
+            setFocusedItemId(parentItem.id);
+            selectItem(parentItem);
+          }
+        }
+        break;
+      }
+      case 'Enter': {
+        selectItem(currentItem);
+        break;
+      }
+    }
   };
 
+
   return (
-    <aside
-      className="flex-shrink-0 h-full flex bg-secondary border-r border-border-color"
-      style={{ width: `${props.width}px` }}
-    >
-      <div className="flex-1 flex flex-col overflow-y-auto min-w-0">
-        <div className="flex-1 p-2 space-y-4 flex flex-col">
-          <div className="flex flex-col flex-grow min-h-0">
-            <header className="flex justify-between items-center mb-1 px-2 flex-shrink-0">
-              <h2 className="text-xs font-bold uppercase text-text-secondary tracking-wider">Documents</h2>
-              <div className="flex items-center">
-                <IconButton onClick={props.onNewFolder} tooltip="New Folder" size="sm" variant="ghost">
-                  <FolderPlusIcon className="w-5 h-5" />
-                </IconButton>
-                <IconButton onClick={props.onNewDocument} tooltip="New Document (Ctrl+N)" size="sm" variant="ghost">
-                  <PlusIcon className="w-5 h-5" />
-                </IconButton>
-              </div>
-            </header>
-            <PromptList
-              items={props.items}
-              selectedIds={props.selectedIds}
-              focusedItemId={props.focusedItemId}
-              setFocusedItemId={props.setFocusedItemId}
-              expandedIds={expandedFolders}
-              setExpandedIds={handleSetExpandedFolders}
-              onSelect={props.onSelectPrompt}
-              onRename={props.onRenameItem}
-              onDelete={props.onDeleteItem}
-              onMove={props.onMoveItems}
-              onDuplicate={props.onDuplicateItems}
+    <div ref={sidebarRef} onKeyDown={handleKeyDown} tabIndex={0} className="h-full flex flex-col focus:outline-none">
+      <div className="px-2 pt-2 pb-2 flex-shrink-0 border-b border-border-color">
+        <div className="relative">
+            <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
+            <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-background border border-border-color rounded-md pl-9 pr-3 py-1.5 text-sm text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
             />
-          </div>
-          <div className="flex-shrink-0">
-            <header className="flex justify-between items-center mb-1 px-2">
-              <h2 className="text-xs font-bold uppercase text-text-secondary tracking-wider">Templates</h2>
-               <div className="flex items-center">
-                <IconButton onClick={props.onOpenTemplateModal} tooltip="Create from Template" size="sm" variant="ghost">
-                  <FileIcon className="w-5 h-5" />
-                </IconButton>
-                <IconButton onClick={props.onNewTemplate} tooltip="New Template" size="sm" variant="ghost">
-                  <PlusIcon className="w-5 h-5" />
-                </IconButton>
-              </div>
-            </header>
-            <TemplateList 
-              templates={props.templates}
-              activeTemplateId={props.activeTemplateId}
-              focusedItemId={props.focusedItemId}
-              onSelectTemplate={props.onSelectTemplate}
-              onDeleteTemplate={props.onDeleteTemplate}
-              onRenameTemplate={props.onRenameItem}
-            />
-          </div>
         </div>
       </div>
-      <div
-        onMouseDown={props.onResizeStart}
-        className="w-1.5 h-full cursor-col-resize hover:bg-primary/50 transition-colors flex-shrink-0"
-      />
-    </aside>
+      <div className="flex-1 overflow-y-auto">
+        {/* --- Prompts Section --- */}
+        <header className="flex items-center justify-between p-2 flex-shrink-0 sticky top-0 bg-secondary z-10">
+            <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
+            <div className="flex items-center gap-1">
+            <IconButton onClick={props.onNewPrompt} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
+                <PlusIcon />
+            </IconButton>
+            <IconButton onClick={props.onNewRootFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
+                <FolderPlusIcon />
+            </IconButton>
+            <IconButton onClick={props.onNewSubfolder} disabled={!activeNode || activeNode.type !== 'folder'} tooltip="New Subfolder" size="sm" tooltipPosition="bottom">
+                <FolderDownIcon />
+            </IconButton>
+            <IconButton onClick={props.onDuplicateSelection} disabled={props.selectedIds.size === 0} tooltip="Duplicate Selection" size="sm" tooltipPosition="bottom">
+                <DocumentDuplicateIcon />
+            </IconButton>
+            </div>
+        </header>
+        <PromptList 
+            tree={promptTree}
+            prompts={props.prompts}
+            selectedIds={props.selectedIds}
+            focusedItemId={focusedItemId}
+            onSelectNode={props.onSelectPrompt}
+            onDeleteNode={props.onDeletePrompt}
+            onRenameNode={props.onRenamePrompt}
+            onMoveNode={props.onMovePrompt}
+            onCopyNodeContent={props.onCopyPromptContent}
+            searchTerm={searchTerm}
+            expandedIds={props.expandedFolderIds}
+            onToggleExpand={props.onToggleExpand}
+            onMoveUp={handleMoveUp}
+            onMoveDown={handleMoveDown}
+        />
+
+        {/* --- Templates Section --- */}
+        <header className="flex items-center justify-between p-2 mt-4 pt-4 border-t border-border-color flex-shrink-0">
+            <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Templates</h2>
+            <div className="flex items-center gap-1">
+                <IconButton onClick={props.onNewTemplate} tooltip="New Template" size="sm" tooltipPosition="bottom">
+                    <DocumentDuplicateIcon />
+                </IconButton>
+            </div>
+        </header>
+        <div className="px-2">
+            <TemplateList 
+                templates={props.templates}
+                activeTemplateId={props.activeTemplateId}
+                focusedItemId={focusedItemId}
+                onSelectTemplate={props.onSelectTemplate}
+                onDeleteTemplate={props.onDeleteTemplate}
+                onRenameTemplate={props.onRenameTemplate}
+            />
+        </div>
+      </div>
+       <div className="p-2 border-t border-border-color">
+            <Button onClick={props.onNewFromTemplate} variant="secondary" className="w-full">
+                <PlusIcon className="w-4 h-4 mr-2" />
+                New from Template...
+            </Button>
+        </div>
+    </div>
   );
 };
 
