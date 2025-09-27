@@ -4,7 +4,7 @@ import TemplateList from './TemplateList';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DocumentTemplate } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, FolderDownIcon, ChevronDownIcon, ChevronRightIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, FolderDownIcon, ChevronDownIcon, ChevronRightIcon, CopyIcon } from './Icons';
 import Button from './Button';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
@@ -316,6 +316,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
               <IconButton onClick={props.onNewDocument} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
                   <PlusIcon />
               </IconButton>
+              <IconButton onClick={props.onNewFromTemplate} tooltip="New from Template..." size="sm" tooltipPosition="bottom">
+                  <DocumentDuplicateIcon />
+              </IconButton>
               <IconButton onClick={props.onNewRootFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
                   <FolderPlusIcon />
               </IconButton>
@@ -323,7 +326,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                   <FolderDownIcon />
               </IconButton>
               <IconButton onClick={props.onDuplicateSelection} disabled={props.selectedIds.size === 0} tooltip="Duplicate Selection" size="sm" tooltipPosition="bottom">
-                  <DocumentDuplicateIcon />
+                  <CopyIcon />
               </IconButton>
               </div>
           </header>
@@ -385,13 +388,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
           )}
         </div>
       </div>
-      
-       <div className="p-2 border-t border-border-color">
-            <Button onClick={props.onNewFromTemplate} variant="secondary" className="w-full">
-                <PlusIcon className="w-4 h-4 mr-2" />
-                New from Template...
-            </Button>
-        </div>
     </div>
   );
 };
