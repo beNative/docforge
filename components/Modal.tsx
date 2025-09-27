@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import { XIcon } from './Icons';
+import IconButton from './IconButton';
 
 interface ModalProps {
   onClose: () => void;
@@ -31,6 +33,8 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
     const focusableElements = modalNode.querySelectorAll<HTMLElement>(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
+    if (focusableElements.length === 0) return;
+
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
 
@@ -39,12 +43,12 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
     // Focus the element with autoFocus, otherwise fall back to the first focusable element.
     if (autoFocusElement) {
       autoFocusElement.focus();
-    } else if (firstElement) {
+    } else {
         firstElement.focus();
     }
 
     const handleTabKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab' || !lastElement || !firstElement) return;
+      if (e.key !== 'Tab') return;
 
       if (e.shiftKey) { // Shift + Tab
         if (document.activeElement === firstElement) {
@@ -67,7 +71,7 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
             modalNode.removeEventListener('keydown', handleTabKey);
         }
     };
-  }, []); // Empty array ensures this runs once when the modal mounts
+  }, [children]); // Dependency on children ensures this runs when content is ready
 
   const modalContent = (
     <div
@@ -83,7 +87,9 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
       >
         <div className="flex justify-between items-center px-6 py-4 border-b border-border-color">
           <h2 className="text-lg font-semibold text-text-main">{title}</h2>
-          <button onClick={onClose} className="text-text-secondary hover:text-text-main text-2xl leading-none">&times;</button>
+          <IconButton onClick={onClose} tooltip="Close" size="sm" variant="ghost" className="-mr-2">
+            <XIcon className="w-5 h-5" />
+          </IconButton>
         </div>
         {children}
       </div>
