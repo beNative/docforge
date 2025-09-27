@@ -34,8 +34,12 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
     const firstElement = focusableElements[0];
     const lastElement = focusableElements[focusableElements.length - 1];
 
-    // Focus the first element when the modal opens
-    if (firstElement) {
+    const autoFocusElement = modalNode.querySelector<HTMLElement>('[autoFocus]');
+
+    // Focus the element with autoFocus, otherwise fall back to the first focusable element.
+    if (autoFocusElement) {
+      autoFocusElement.focus();
+    } else if (firstElement) {
         firstElement.focus();
     }
 
