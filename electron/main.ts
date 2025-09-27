@@ -4,6 +4,21 @@ import path from 'path';
 import fs from 'fs/promises';
 import { autoUpdater } from 'electron-updater';
 import { databaseService } from './database';
+import log from 'electron-log/main';
+
+// --- electron-log setup ---
+// Override console.log, console.error, etc. to write to a log file
+log.transports.file.resolvePathFn = () => path.join(app.getPath('userData'), 'logs', 'main.log');
+Object.assign(console, log.functions);
+// Catch unhandled exceptions
+log.catchErrors({
+  showDialog: false, // We'll handle fatal errors in the renderer
+  onError(error) {
+    console.error('Unhandled exception:', error);
+  }
+});
+
+console.log(`Log file will be written to: ${log.transports.file.getFile().path}`);
 
 let mainWindow: BrowserWindow | null;
 
@@ -62,7 +77,15 @@ function createWindow() {
 }
 
 app.on('ready', () => {
-  databaseService.init();
+  try {
+    databaseService.init();
+    console.log('Database initialized successfully.');
+  } catch (error) {
+    console.error('FATAL: Failed to initialize database.', error);
+    // The renderer process will detect the failure when it tries to communicate
+    // via IPC and will display the fatal error screen. We still create the window.
+  }
+  
   createWindow();
   // Check for updates after window is created
   setTimeout(() => autoUpdater.checkForUpdatesAndNotify(), 3000);

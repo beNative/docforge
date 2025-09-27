@@ -25,6 +25,7 @@ import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, 
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
+import FatalError from './components/FatalError';
 // Types
 // Fix: Correctly import PromptOrFolder which is now defined in types.ts
 import type { PromptOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, PromptTemplate } from './types';
@@ -60,15 +61,24 @@ const App: React.FC = () => {
                 setIsInitialized(true);
             } catch (error) {
                 const message = `Fatal: Application initialization failed. ${error instanceof Error ? error.message : String(error)}`;
+                // Log to the in-memory React logger
                 addLog('ERROR', message);
-                setInitError('Could not initialize the application database. Please check logs for details or try reinstalling.');
+                // The main process will have already logged this to a file.
+                // We just need to trigger the UI error state.
+                setInitError(message);
             }
         };
         initializeApp();
     }, [addLog]);
 
     if (initError) {
-        return <div className="w-screen h-screen flex items-center justify-center bg-background p-8"><p className="text-destructive-text text-center">{initError}</p></div>;
+        return (
+            <FatalError
+                title="Error"
+                header="Database Error"
+                details="Could not open the application database. See logs for details. The application will now close."
+            />
+        );
     }
 
     if (!isInitialized) {
