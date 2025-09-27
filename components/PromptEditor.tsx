@@ -163,18 +163,23 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
   const handleSplitterMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
-    document.body.style.userSelect = 'none';
+    // Fix: Use window.document to avoid conflict with the 'document' prop.
+    window.document.body.style.userSelect = 'none';
     if (viewMode === 'split-vertical') {
-        document.body.style.cursor = 'col-resize';
+        // Fix: Use window.document to avoid conflict with the 'document' prop.
+        window.document.body.style.cursor = 'col-resize';
     } else {
-        document.body.style.cursor = 'row-resize';
+        // Fix: Use window.document to avoid conflict with the 'document' prop.
+        window.document.body.style.cursor = 'row-resize';
     }
   };
 
   const handleGlobalMouseUp = useCallback(() => {
     isResizing.current = false;
-    document.body.style.userSelect = 'auto';
-    document.body.style.cursor = 'default';
+    // Fix: Use window.document to avoid conflict with the 'document' prop.
+    window.document.body.style.userSelect = 'auto';
+    // Fix: Use window.document to avoid conflict with the 'document' prop.
+    window.document.body.style.cursor = 'default';
   }, []);
 
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
