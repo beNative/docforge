@@ -421,5 +421,30 @@ export const repository = {
                 [key, JSON.stringify(value)]
             );
         }
+    },
+
+    async getDbPath(): Promise<string> {
+        if (!window.electronAPI?.dbGetPath) throw new Error("getDbPath not supported.");
+        return window.electronAPI.dbGetPath();
+    },
+
+    async backupDatabase() {
+        if (!window.electronAPI?.dbBackup) throw new Error("Backup not supported.");
+        return window.electronAPI.dbBackup();
+    },
+
+    async runIntegrityCheck() {
+        if (!window.electronAPI?.dbIntegrityCheck) throw new Error("Integrity check not supported.");
+        return window.electronAPI.dbIntegrityCheck();
+    },
+
+    async runVacuum() {
+        if (!window.electronAPI?.dbVacuum) throw new Error("Vacuum not supported.");
+        return window.electronAPI.dbVacuum();
+    },
+
+    async getDatabaseStats() {
+        if (!window.electronAPI?.dbGetStats) throw new Error("DB stats not supported.");
+        return window.electronAPI.dbGetStats();
     }
 };

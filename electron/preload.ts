@@ -9,6 +9,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbMigrateFromJson: (data: any) => ipcRenderer.invoke('db:migrate-from-json', data),
   dbDuplicateNodes: (nodeIds: string[]) => ipcRenderer.invoke('db:duplicate-nodes', nodeIds),
   dbDeleteVersions: (documentId: number, versionIds: number[]) => ipcRenderer.invoke('db:delete-versions', documentId, versionIds),
+  dbBackup: () => ipcRenderer.invoke('db:backup'),
+  dbIntegrityCheck: () => ipcRenderer.invoke('db:integrity-check'),
+  dbVacuum: () => ipcRenderer.invoke('db:vacuum'),
+  dbGetStats: () => ipcRenderer.invoke('db:get-stats'),
+  dbGetPath: () => ipcRenderer.invoke('db:get-path'),
 
   // --- Migration-related FS access ---
   legacyFileExists: (filename: string) => ipcRenderer.invoke('fs:legacy-file-exists', filename),

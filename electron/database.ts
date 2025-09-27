@@ -1,12 +1,12 @@
 // Fix: This file was previously a placeholder. This is the full implementation for the database service.
 import { app } from 'electron';
 import path from 'path';
-import fs from 'fs';
+import fs, { statSync } from 'fs';
 import Database from 'better-sqlite3';
 import { INITIAL_SCHEMA } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 // Fix: Import types to use for casting
-import type { Node, Document, DocVersion } from '../types';
+import type { Node, Document, DocVersion, DatabaseStats } from '../types';
 
 let db: Database.Database;
 
@@ -286,6 +286,54 @@ export const databaseService = {
       console.error('Delete versions transaction failed:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
+  },
+
+  getDbPath(): string {
+    return DB_PATH;
+  },
+
+  async backupDatabase(filePath: string): Promise<void> {
+    await db.backup(filePath).run();
+  },
+
+  runIntegrityCheck(): string {
+    const results = db.pragma('integrity_check');
+    if (Array.isArray(results) && results.length === 1 && (results[0] as any).integrity_check === 'ok') {
+        return 'ok';
+    }
+    return JSON.stringify(results, null, 2);
+  },
+
+  runVacuum(): void {
+    db.exec('VACUUM;');
+  },
+
+  getDatabaseStats(): DatabaseStats {
+    const fileSize = statSync(DB_PATH).size;
+    const pageSize = db.pragma('page_size', { simple: true }) as number;
+    const pageCount = db.pragma('page_count', { simple: true }) as number;
+    const schemaVersion = db.pragma('schema_version', { simple: true }) as number;
+
+    const tableNames = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`).all() as {name: string}[];
+
+    const tables = tableNames.map(({ name }) => {
+        const rowCountResult = db.prepare(`SELECT COUNT(*) as count FROM "${name}"`).get() as { count: number };
+        const indexes = db.prepare(`PRAGMA index_list("${name}")`).all() as {name: string}[];
+
+        return {
+            name,
+            rowCount: rowCountResult.count,
+            indexes: indexes.map(i => i.name)
+        };
+    });
+
+    return {
+      fileSize: `${(fileSize / 1024).toFixed(2)} KB`,
+      pageSize,
+      pageCount,
+      schemaVersion,
+      tables,
+    };
   },
 
   close() {

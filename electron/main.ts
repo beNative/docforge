@@ -135,6 +135,59 @@ ipcMain.handle('db:is-new', () => databaseService.isNew());
 ipcMain.handle('db:migrate-from-json', (_, data) => databaseService.migrateFromJson(data));
 ipcMain.handle('db:duplicate-nodes', (_, nodeIds) => databaseService.duplicateNodes(nodeIds));
 ipcMain.handle('db:delete-versions', (_, documentId, versionIds) => databaseService.deleteVersions(documentId, versionIds));
+ipcMain.handle('db:get-path', () => databaseService.getDbPath());
+
+ipcMain.handle('db:backup', async () => {
+    if (!mainWindow) return { success: false, error: 'Main window not available' };
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Save Database Backup',
+        defaultPath: `docforge_backup_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.db`,
+        filters: [{ name: 'Database Files', extensions: ['db'] }, { name: 'All Files', extensions: ['*'] }]
+    });
+
+    if (canceled || !filePath) {
+        return { success: true, message: 'Backup canceled by user.' };
+    }
+
+    try {
+        await databaseService.backupDatabase(filePath);
+        console.log(`Database successfully backed up to ${filePath}`);
+        return { success: true, message: `Backup saved to ${filePath}` };
+    } catch (error) {
+        console.error('Database backup failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to save backup.' };
+    }
+});
+
+ipcMain.handle('db:integrity-check', async () => {
+    try {
+        const results = databaseService.runIntegrityCheck();
+        return { success: true, results };
+    } catch (error) {
+        console.error('Integrity check failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to run integrity check.' };
+    }
+});
+
+ipcMain.handle('db:vacuum', async () => {
+    try {
+        databaseService.runVacuum();
+        return { success: true };
+    } catch (error) {
+        console.error('Vacuum failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to run vacuum.' };
+    }
+});
+
+ipcMain.handle('db:get-stats', async () => {
+    try {
+        const stats = databaseService.getDatabaseStats();
+        return { success: true, stats };
+    } catch (error) {
+        console.error('Failed to get DB stats:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to retrieve database statistics.' };
+    }
+});
 
 
 // Legacy FS for migration

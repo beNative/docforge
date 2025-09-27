@@ -12,6 +12,11 @@ declare global {
       dbMigrateFromJson: (data: any) => Promise<{ success: boolean, error?: string }>;
       dbDuplicateNodes: (nodeIds: string[]) => Promise<{ success: boolean; error?: string }>;
       dbDeleteVersions: (documentId: number, versionIds: number[]) => Promise<{ success: boolean; error?: string }>;
+      dbBackup: () => Promise<{ success: boolean; message?: string; error?: string }>;
+      dbIntegrityCheck: () => Promise<{ success: boolean; results?: string; error?: string }>;
+      dbVacuum: () => Promise<{ success: boolean; error?: string }>;
+      dbGetStats: () => Promise<{ success: boolean; stats?: DatabaseStats; error?: string }>;
+      dbGetPath: () => Promise<string>;
       legacyFileExists: (filename: string) => Promise<boolean>;
       readLegacyFile: (filename: string) => Promise<{ success: boolean, data?: string, error?: string }>;
       getAppVersion: () => Promise<string>;
@@ -163,4 +168,16 @@ export interface DiscoveredLLMService {
 export interface DiscoveredLLMModel {
   id: string;
   name: string;
+}
+
+export interface DatabaseStats {
+  fileSize: string;
+  pageSize: number;
+  pageCount: number;
+  schemaVersion: number;
+  tables: {
+    name: string;
+    rowCount: number;
+    indexes: string[];
+  }[];
 }
