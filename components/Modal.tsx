@@ -1,5 +1,4 @@
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 
 interface ModalProps {
@@ -9,6 +8,8 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -21,6 +22,49 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
     };
   }, [onClose]);
 
+  // Effect for focus trapping
+  useEffect(() => {
+    const modalNode = modalRef.current;
+    if (!modalNode) return;
+
+    // Find all focusable elements within the modal
+    const focusableElements = modalNode.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    // Focus the first element when the modal opens
+    if (firstElement) {
+        firstElement.focus();
+    }
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !lastElement || !firstElement) return;
+
+      if (e.shiftKey) { // Shift + Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        }
+      } else { // Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+    
+    // We attach the listener to the modal node itself. It will catch bubbling keydown events.
+    modalNode.addEventListener('keydown', handleTabKey);
+
+    return () => {
+        if (modalNode) {
+            modalNode.removeEventListener('keydown', handleTabKey);
+        }
+    };
+  }, []); // Empty array ensures this runs once when the modal mounts
+
   const modalContent = (
     <div
       className="fixed inset-0 bg-modal-backdrop flex items-center justify-center z-40"
@@ -29,6 +73,7 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title }) => {
       role="dialog"
     >
       <div
+        ref={modalRef}
         className="bg-secondary rounded-lg shadow-xl w-full max-w-xl mx-4 border border-border-color"
         onClick={(e) => e.stopPropagation()}
       >
