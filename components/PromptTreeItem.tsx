@@ -15,7 +15,7 @@ interface DocumentTreeItemProps {
   focusedItemId: string | null;
   expandedIds: Set<string>;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
-  onDeleteNode: (id: string) => void;
+  onDeleteNode: (id: string, shiftKey: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onToggleExpand: (id: string) => void;
@@ -218,7 +218,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                             <CopyIcon className="w-4 h-4" />
                         </IconButton>
                     )}
-                    <IconButton onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id); }} tooltip="Delete" size="sm" variant="destructive">
+                    <IconButton onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id, e.shiftKey); }} tooltip="Delete" size="sm" variant="destructive">
                         <TrashIcon className="w-4 h-4" />
                     </IconButton>
                 </div>

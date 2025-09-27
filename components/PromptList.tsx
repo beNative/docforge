@@ -9,7 +9,7 @@ interface DocumentListProps {
   selectedIds: Set<string>;
   focusedItemId: string | null;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
-  onDeleteNode: (id: string) => void;
+  onDeleteNode: (id: string, shiftKey?: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onCopyNodeContent: (id: string) => void;

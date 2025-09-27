@@ -501,15 +501,18 @@ const MainApp: React.FC = () => {
         }
     }, [discoveredServices, settings, saveSettings, addLog]);
 
-    const handleDeleteSelection = useCallback(async () => {
-        if (selectedIds.size === 0) return;
+    const handleDeleteSelection = useCallback(async (idsToDelete: Set<string>, options?: { force?: boolean }) => {
+        const force = options?.force || false;
     
-        const topLevelNodeIds = [...selectedIds].filter(id => {
-            const node = items.find(i => i.id === id);
-            return node && (!node.parentId || !selectedIds.has(node.parentId));
+        if (idsToDelete.size === 0) return;
+    
+        const allItemsById = new Map(items.map(i => [i.id, i]));
+        const topLevelNodeIds = [...idsToDelete].filter(id => {
+            const node = allItemsById.get(id);
+            return node && (!node.parentId || !idsToDelete.has(node.parentId));
         });
     
-        const templateIdsToDelete = [...selectedIds].filter(id => templates.some(t => t.template_id === id));
+        const templateIdsToDelete = [...idsToDelete].filter(id => templates.some(t => t.template_id === id));
     
         const totalItems = topLevelNodeIds.length + templateIdsToDelete.length;
         if (totalItems === 0) return;
@@ -522,45 +525,54 @@ const MainApp: React.FC = () => {
                 await deleteTemplates(templateIdsToDelete);
             }
     
-            // Clear selection
-            setSelectedIds(new Set());
-            setLastClickedId(null);
+            setSelectedIds(prev => {
+                const newSet = new Set(prev);
+                idsToDelete.forEach(id => newSet.delete(id));
+                return newSet;
+            });
+            if (lastClickedId && idsToDelete.has(lastClickedId)) {
+                setLastClickedId(null);
+            }
             
-            // If the active item was deleted, clear it
-            if (activeNodeId && selectedIds.has(activeNodeId)) {
+            if (activeNodeId && idsToDelete.has(activeNodeId)) {
                 setActiveNodeId(null);
             }
-            if (activeTemplateId && selectedIds.has(activeTemplateId)) {
+            if (activeTemplateId && idsToDelete.has(activeTemplateId)) {
                 setActiveTemplateId(null);
             }
         };
     
-        setConfirmAction({
-            title: `Delete ${totalItems} item(s)`,
-            message: <>Are you sure you want to permanently delete {totalItems} selected item(s)? This action cannot be undone.</>,
-            onConfirm: () => {
-                performDelete();
-                setConfirmAction(null);
-            }
-        });
-    }, [selectedIds, items, templates, deleteItems, deleteTemplates, activeNodeId, activeTemplateId]);
+        if (force) {
+            await performDelete();
+        } else {
+            setConfirmAction({
+                title: `Delete ${totalItems} item(s)`,
+                message: <>Are you sure you want to permanently delete {totalItems} selected item(s)? This action cannot be undone.</>,
+                onConfirm: () => {
+                    performDelete();
+                    setConfirmAction(null);
+                }
+            });
+        }
+    }, [items, templates, deleteItems, deleteTemplates, activeNodeId, activeTemplateId, lastClickedId]);
 
-    const handleDeleteNode = useCallback((id: string) => {
+    const handleDeleteNode = useCallback((id: string, shiftKey: boolean = false) => {
         const itemToDelete = items.find(p => p.id === id);
         if (!itemToDelete) return;
+
+        const idsToDelete = selectedIds.has(id) ? selectedIds : new Set([id]);
         
-        setSelectedIds(new Set([id]));
-        // Trigger the general delete handler
-        handleDeleteSelection();
+        handleDeleteSelection(idsToDelete, { force: shiftKey });
+    }, [items, selectedIds, handleDeleteSelection]);
 
-    }, [items, handleDeleteSelection]);
-
-    const handleDeleteTemplate = useCallback((id: string) => {
+    const handleDeleteTemplate = useCallback((id: string, shiftKey: boolean = false) => {
         const templateToDelete = templates.find(t => t.template_id === id);
         if (!templateToDelete) return;
-        setSelectedIds(new Set([id]));
-        handleDeleteSelection();
-    }, [templates, handleDeleteSelection]);
+
+        const idsToDelete = selectedIds.has(id) ? selectedIds : new Set([id]);
+
+        handleDeleteSelection(idsToDelete, { force: shiftKey });
+    }, [templates, selectedIds, handleDeleteSelection]);
 
     const handleToggleExpand = (id: string) => {
         setExpandedFolderIds(prev => {
@@ -701,12 +713,12 @@ const MainApp: React.FC = () => {
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
         { id: 'new-from-template', name: 'New Document from Template...', action: () => setCreateFromTemplateOpen(true), category: 'File', icon: PlusIcon, keywords: 'add create file instance' },
         { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: DocumentDuplicateIcon, keywords: 'copy clone' },
-        { id: 'delete-item', name: 'Delete Selection', action: handleDeleteSelection, category: 'File', icon: TrashIcon, keywords: 'remove discard' },
+        { id: 'delete-item', name: 'Delete Selection', action: () => handleDeleteSelection(selectedIds), category: 'File', icon: TrashIcon, keywords: 'remove discard' },
         { id: 'toggle-editor', name: 'Switch to Editor View', action: () => setView('editor'), category: 'View', icon: PencilIcon, keywords: 'main document' },
         { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
         { id: 'toggle-info', name: 'Toggle Info View', action: () => setView(v => v === 'info' ? 'editor' : 'info'), category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => setIsLoggerVisible(v => !v), category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection]);
+    ], [handleNewDocument, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds]);
 
     const getSupportedIconSet = (iconSet: Settings['iconSet']): 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material' => {
         const supportedSets: Array<Settings['iconSet']> = ['heroicons', 'lucide', 'feather', 'tabler', 'material'];
@@ -803,6 +815,7 @@ const MainApp: React.FC = () => {
                                     activeNodeId={activeNodeId}
                                     onSelectNode={handleSelectNode}
                                     onDeleteSelection={handleDeleteSelection}
+                                    onDeleteNode={handleDeleteNode}
                                     onRenameNode={handleRenameNode}
                                     onMoveNode={moveItems}
                                     onNewDocument={handleNewDocument}

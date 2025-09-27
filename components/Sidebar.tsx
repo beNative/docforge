@@ -22,7 +22,8 @@ interface SidebarProps {
   setLastClickedId: React.Dispatch<React.SetStateAction<string | null>>;
   activeNodeId: string | null;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
-  onDeleteSelection: () => void;
+  onDeleteSelection: (ids: Set<string>, options?: { force?: boolean }) => void;
+  onDeleteNode: (id: string, shiftKey?: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onNewDocument: () => void;
@@ -38,7 +39,7 @@ interface SidebarProps {
   templates: DocumentTemplate[];
   activeTemplateId: string | null;
   onSelectTemplate: (id: string) => void;
-  onDeleteTemplate: (id: string) => void;
+  onDeleteTemplate: (id: string, shiftKey?: boolean) => void;
   onRenameTemplate: (id: string, newTitle: string) => void;
   onNewTemplate: () => void;
   onNewFromTemplate: () => void;
@@ -203,7 +204,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     if (key === 'Delete' || (key === 'Backspace' && !isMac)) {
       e.preventDefault();
       if (props.selectedIds.size > 0) {
-        props.onDeleteSelection();
+        props.onDeleteSelection(props.selectedIds, { force: e.shiftKey });
       }
       return;
     }
@@ -333,7 +334,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 selectedIds={props.selectedIds}
                 focusedItemId={focusedItemId}
                 onSelectNode={props.onSelectNode}
-                onDeleteNode={props.onDeleteSelection}
+                onDeleteNode={props.onDeleteNode}
                 onRenameNode={props.onRenameNode}
                 onMoveNode={props.onMoveNode}
                 onCopyNodeContent={props.onCopyNodeContent}

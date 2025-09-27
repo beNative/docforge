@@ -8,7 +8,7 @@ interface TemplateListProps {
   activeTemplateId: string | null;
   focusedItemId: string | null;
   onSelectTemplate: (id: string) => void;
-  onDeleteTemplate: (id: string) => void;
+  onDeleteTemplate: (id: string, shiftKey: boolean) => void;
   onRenameTemplate: (id: string, newTitle: string) => void;
 }
 
@@ -45,7 +45,7 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, activeTemplateId
   
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    onDeleteTemplate(id);
+    onDeleteTemplate(id, e.shiftKey);
   };
 
   return (
