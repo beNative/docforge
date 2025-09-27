@@ -21,6 +21,7 @@ This version introduces significant workflow enhancements, giving users more exp
 -   **Editor Stability:** Fixed a critical bug that made the editor unresponsive after a state management refactor.
 -   **Node Reordering:** Corrected a bug where the "Move Up" button for a node in the sidebar did not work.
 -   **AI Title Generation:** Fixed an issue where generating a title with AI would clear any unsaved text in the editor.
+-   **Dialog Accessibility:** Confirmation dialogs (e.g., when deleting items) can now be confirmed by pressing the Enter key, improving keyboard workflow.
 
 ## v0.1.0 - Initial Release
 

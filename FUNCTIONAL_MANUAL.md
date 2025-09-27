@@ -104,7 +104,7 @@ The document editor is a powerful Markdown-aware text editor.
     - **Version History:** Open a view to see all saved versions of the document.
     - **Copy:** Copy the document's content to the clipboard.
     - **Refine with AI:** Send the document's content to your configured LLM to get an improved version.
-    - **Delete:** Delete the current document.
+    - **Delete:** Delete the current document. A confirmation is required, where pressing `Enter` will confirm the action.
 
 ### Organizing with Drag and Drop
 
@@ -134,7 +134,7 @@ DocForge allows you to maintain a complete history of your document's content.
 - **Managing History:**
     - In the history view, you can select any previous version to see a "diff" comparing it to the version before it.
     - You can copy content from an old version or restore the entire document to that state.
-    - You can select one or more old versions using the checkboxes and delete them permanently.
+    - You can select one or more old versions using the checkboxes and delete them permanently. This action requires confirmation, which can be accepted by pressing the `Enter` key.
 
 ---
 

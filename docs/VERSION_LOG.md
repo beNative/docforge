@@ -21,17 +21,18 @@ This version introduces significant workflow enhancements, giving users more exp
 -   **Editor Stability:** Fixed a critical bug that made the editor unresponsive after a state management refactor.
 -   **Node Reordering:** Corrected a bug where the "Move Up" button for a node in the sidebar did not work.
 -   **AI Title Generation:** Fixed an issue where generating a title with AI would clear any unsaved text in the editor.
+-   **Dialog Accessibility:** Confirmation dialogs (e.g., when deleting items) can now be confirmed by pressing the Enter key, improving keyboard workflow.
 
 ## v0.1.0 - Initial Release
 
-This is the first public release of DocForge, a complete redesign and rebranding of the project. This version consolidates all previous features into a stable, modern, and efficient desktop application for managing and refining LLM prompts.
+This is the first public release of DocForge, a complete redesign and rebranding of the project. This version consolidates all previous features into a stable, modern, and efficient desktop application for managing and refining documents.
 
 ### ✨ Key Features
 
 -   **Core Functionality:**
     -   **Hierarchical Document Organization:** Organize documents and ideas in a familiar folder structure with full drag-and-drop support (including multi-select).
-    -   **AI-Powered Refinement & Titling:** Leverage a connected local LLM (like Ollama) to automatically refine prompt content and generate titles.
-    -   **Prompt Templating:** Create reusable templates with `{{variables}}` to streamline the creation of new documents for recurring tasks.
+    -   **AI-Powered Refinement & Titling:** Leverage a connected local LLM (like Ollama) to automatically refine document content and generate titles.
+    -   **Document Templating:** Create reusable templates with `{{variables}}` to streamline the creation of new documents for recurring tasks.
     -   **Full Version History:** Every significant change to a document is saved. View a complete history, see visual diffs between versions, and restore to any point in time.
     -   **Robust Local Database:** All data is stored in a local SQLite database, ensuring fast, reliable, and offline-first access. The application can automatically migrate data from older file-based versions.
 
