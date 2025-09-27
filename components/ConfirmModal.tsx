@@ -22,26 +22,34 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   cancelText = 'Cancel',
   confirmVariant = 'destructive',
 }) => {
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onConfirm();
+  };
+
   return (
     <Modal onClose={onCancel} title={title}>
-      <div className="p-6">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-10 h-10 bg-warning/10 text-warning rounded-full flex items-center justify-center">
-            <WarningIcon className="w-6 h-6" />
-          </div>
-          <div className="text-sm text-text-secondary pt-1">
-            {message}
+      <form onSubmit={handleSubmit}>
+        <div className="p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0 w-10 h-10 bg-warning/10 text-warning rounded-full flex items-center justify-center">
+              <WarningIcon className="w-6 h-6" />
+            </div>
+            <div className="text-sm text-text-secondary pt-1">
+              {message}
+            </div>
           </div>
         </div>
-        <div className="flex justify-end gap-3 mt-6">
-          <Button onClick={onCancel} variant="secondary">
+        <div className="flex justify-end gap-3 px-6 py-4 bg-background/50 border-t border-border-color rounded-b-lg">
+          <Button onClick={onCancel} variant="secondary" type="button">
             {cancelText}
           </Button>
-          <Button onClick={onConfirm} variant={confirmVariant}>
+          <Button type="submit" variant={confirmVariant} autoFocus>
             {confirmText}
           </Button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 };
