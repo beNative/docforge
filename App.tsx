@@ -1,819 +1,524 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import ReactDOM from 'react-dom';
-// Hooks
-// Fix: Import the correct, implemented hook `useNodes` instead of the empty `usePrompts`.
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useDocuments } from './hooks/usePrompts';
 import { useTemplates } from './hooks/useTemplates';
 import { useSettings } from './hooks/useSettings';
-import { useLLMStatus } from './hooks/useLLMStatus';
 import { useLogger } from './hooks/useLogger';
-// Components
+import { useLLMStatus } from './hooks/useLLMStatus';
+import { llmDiscoveryService } from './services/llmDiscoveryService';
+import { storageService } from './services/storageService';
+import { repository } from './services/repository';
+
 import Sidebar from './components/Sidebar';
 import PromptEditor from './components/PromptEditor';
 import TemplateEditor from './components/TemplateEditor';
-import { WelcomeScreen } from './components/WelcomeScreen';
-// Fix: Add default import for SettingsView
 import SettingsView from './components/SettingsView';
+import InfoView from './components/InfoView';
+import { WelcomeScreen } from './components/WelcomeScreen';
 import StatusBar from './components/StatusBar';
 import LoggerPanel from './components/LoggerPanel';
-import CommandPalette from './components/CommandPalette';
-import InfoView from './components/InfoView';
-import UpdateNotification from './components/UpdateNotification';
-import CreateFromTemplateModal from './components/CreateFromTemplateModal';
-import PromptHistoryView from './components/PromptHistoryView';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon } from './components/Icons';
-import Header from './components/Header';
-import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
+import CreateFromTemplateModal from './components/CreateFromTemplateModal';
+import PromptHistoryModal from './components/PromptHistoryModal';
+import CustomTitleBar from './components/CustomTitleBar';
+import UpdateNotification from './components/UpdateNotification';
+import CommandPalette from './components/CommandPalette';
 import FatalError from './components/FatalError';
-// Types
-// Fix: Correctly import DocumentOrFolder which is now defined in types.ts
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, PromptTemplate } from './types';
-// Context
-import { IconProvider } from './contexts/IconContext';
-// Services & Constants
-// Fix: Correct import for storageService
-import { storageService } from './services/storageService';
-import { llmDiscoveryService } from './services/llmDiscoveryService';
+
 import { LOCAL_STORAGE_KEYS } from './constants';
-import { repository } from './services/repository';
+import type { Command, DiscoveredLLMModel, DiscoveredLLMService, Settings } from './types';
+import { DatabaseIcon, FileIcon, FolderPlusIcon, GearIcon, HistoryIcon, InfoIcon, PlusIcon, SunIcon, TerminalIcon, TrashIcon, DocumentDuplicateIcon } from './components/Icons';
+import { useTheme } from './hooks/useTheme';
 
-const DEFAULT_SIDEBAR_WIDTH = 288;
+type View = 'editor' | 'settings' | 'info';
+type EditorPane = 'prompt' | 'template';
+type DeletionTarget = { type: 'document' | 'template'; id: string };
+
 const MIN_SIDEBAR_WIDTH = 200;
+const MAX_SIDEBAR_WIDTH = 600;
+const DEFAULT_SIDEBAR_WIDTH = 280;
 
-const DEFAULT_LOGGER_HEIGHT = 288;
-const MIN_LOGGER_HEIGHT = 100;
+const MIN_LOGGER_HEIGHT = 40;
+const MAX_LOGGER_HEIGHT = 500;
+const DEFAULT_LOGGER_HEIGHT = 200;
 
-// Fix: Use optional chaining which is now type-safe with the global declaration.
-const isElectron = !!window.electronAPI;
+function App() {
+  // Initialization and Error Handling
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [initError, setInitError] = useState<Error | null>(null);
+  const { addLog } = useLogger();
+  const { toggleTheme } = useTheme();
 
-const App: React.FC = () => {
-    const { addLog } = useLogger();
-    const [isInitialized, setIsInitialized] = useState(false);
-    const [initError, setInitError] = useState<string | null>(null);
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        await repository.init();
+        addLog('INFO', 'Repository initialized successfully.');
+        setIsInitialized(true);
+      } catch (error) {
+        const err = error as Error;
+        console.error("Initialization failed:", err);
+        addLog('ERROR', `Fatal initialization error: ${err.message}`);
+        setInitError(err);
+      }
+    };
+    initializeApp();
+  }, [addLog]);
 
-    // Effect for initializing the repository and migrating data
-    useEffect(() => {
-        const initializeApp = async () => {
+  // Hooks
+  const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
+  const { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, moveItems, getDescendantIds, refresh: refreshItems, duplicateItems } = useDocuments();
+  const { templates, addTemplate, updateTemplate, deleteTemplate } = useTemplates();
+  
+  // View & Selection State
+  const [activeView, setActiveView] = useState<View>('editor');
+  const [editorPane, setEditorPane] = useState<EditorPane>('prompt');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+
+  // UI State
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [loggerHeight, setLoggerHeight] = useState(DEFAULT_LOGGER_HEIGHT);
+  const [isLoggerVisible, setIsLoggerVisible] = useState(false);
+  const [isResizingLogger, setIsResizingLogger] = useState(false);
+
+  // Modal State
+  const [deletionTarget, setDeletionTarget] = useState<DeletionTarget | null>(null);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [historyPromptId, setHistoryPromptId] = useState<string | null>(null);
+  
+  // Update Notification State
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState('');
+
+  // LLM Discovery State
+  const [discoveredServices, setDiscoveredServices] = useState<DiscoveredLLMService[]>([]);
+  const [availableModels, setAvailableModels] = useState<DiscoveredLLMModel[]>([]);
+  const [isDetectingServices, setIsDetectingServices] = useState(false);
+  const llmStatus = useLLMStatus(settings.llmProviderUrl);
+  
+  // Command Palette State
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [commandPaletteSearch, setCommandPaletteSearch] = useState('');
+  const commandPaletteTargetRef = useRef<HTMLDivElement>(null);
+  const commandPaletteInputRef = useRef<HTMLInputElement>(null);
+
+  // Memos for derived state
+  const lastSelectedItem = useMemo(() => {
+    const lastId = Array.from(selectedIds).pop();
+    return items.find(i => i.id === lastId);
+  }, [items, selectedIds]);
+
+  const activeTemplate = useMemo(() => {
+    return templates.find(t => t.template_id === activeTemplateId);
+  }, [templates, activeTemplateId]);
+  
+  const historyPrompt = useMemo(() => {
+      return historyPromptId ? items.find(p => p.id === historyPromptId) : null;
+  }, [historyPromptId, items]);
+
+  // Effects
+  // Load UI state from storage
+  useEffect(() => {
+    storageService.load(LOCAL_STORAGE_KEYS.SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH).then(setSidebarWidth);
+    storageService.load(LOCAL_STORAGE_KEYS.LOGGER_PANEL_HEIGHT, DEFAULT_LOGGER_HEIGHT).then(setLoggerHeight);
+    window.electronAPI?.getAppVersion().then(setAppVersion);
+  }, []);
+
+  // Apply UI scale from settings
+  useEffect(() => {
+    if (settingsLoaded) {
+      document.documentElement.style.zoom = `${settings.uiScale / 100}`;
+    }
+  }, [settings.uiScale, settingsLoaded]);
+  
+  // Update listener
+  useEffect(() => {
+    if (window.electronAPI?.onUpdateDownloaded) {
+      const cleanup = window.electronAPI.onUpdateDownloaded((version) => {
+        addLog('INFO', `Update version ${version} downloaded.`);
+        setUpdateVersion(version);
+      });
+      return cleanup;
+    }
+  }, [addLog]);
+
+  // Handlers
+  const handleSelectPrompt = useCallback((id: string, e: React.MouseEvent) => {
+    setActiveView('editor');
+    setEditorPane('prompt');
+    setFocusedItemId(id);
+    if (e.metaKey || e.ctrlKey) {
+      setSelectedIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
+        return newSet;
+      });
+    } else {
+      setSelectedIds(new Set([id]));
+    }
+  }, []);
+  
+  const handleSelectTemplate = useCallback((id: string) => {
+    setActiveView('editor');
+    setEditorPane('template');
+    setActiveTemplateId(id);
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleNewItem = useCallback(async (type: 'document' | 'folder' | 'template') => {
+    let parentId: string | null = null;
+    if (lastSelectedItem) {
+      parentId = lastSelectedItem.type === 'folder' ? lastSelectedItem.id : lastSelectedItem.parentId;
+    }
+
+    if (type === 'document') {
+      const newDoc = await addDocument({ parentId });
+      setSelectedIds(new Set([newDoc.id]));
+      setFocusedItemId(newDoc.id);
+      setEditorPane('prompt');
+      setActiveView('editor');
+    } else if (type === 'folder') {
+      const newFolder = await addFolder(parentId);
+      setSelectedIds(new Set([newFolder.id]));
+      setFocusedItemId(newFolder.id);
+      setEditorPane('prompt');
+      setActiveView('editor');
+    } else if (type === 'template') {
+      const newTpl = await addTemplate();
+      setActiveTemplateId(newTpl.template_id);
+      setEditorPane('template');
+      setActiveView('editor');
+    }
+  }, [addDocument, addFolder, addTemplate, lastSelectedItem]);
+
+  const handleConfirmDeletion = useCallback(async () => {
+    if (!deletionTarget) return;
+
+    if (deletionTarget.type === 'document') {
+        const idsToDelete = Array.from(selectedIds);
+        const descendantIds = new Set<string>();
+        idsToDelete.forEach(id => {
+            getDescendantIds(id).forEach(descId => descendantIds.add(descId));
+        });
+        const allIds = [...idsToDelete, ...Array.from(descendantIds)];
+        
+        for(const id of allIds) {
+            await deleteItem(id);
+        }
+        
+        setSelectedIds(new Set());
+        setFocusedItemId(null);
+    } else if (deletionTarget.type === 'template') {
+        await deleteTemplate(deletionTarget.id);
+        if (activeTemplateId === deletionTarget.id) {
+            setActiveTemplateId(null);
+        }
+    }
+    setDeletionTarget(null);
+  }, [deletionTarget, activeTemplateId, deleteItem, deleteTemplate, getDescendantIds, selectedIds]);
+
+  const handleCreateFromTemplate = useCallback(async (title: string, content: string) => {
+    let parentId: string | null = null;
+    if (lastSelectedItem) {
+        parentId = lastSelectedItem.type === 'folder' ? lastSelectedItem.id : lastSelectedItem.parentId;
+    }
+    const newDoc = await addDocument({ parentId, title, content });
+    setSelectedIds(new Set([newDoc.id]));
+    setFocusedItemId(newDoc.id);
+    setEditorPane('prompt');
+    setActiveView('editor');
+  }, [addDocument, lastSelectedItem]);
+  
+  // Resizing handlers...
+  const startResizeSidebar = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingSidebar(true);
+  }, []);
+
+  const startResizeLogger = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingLogger(true);
+  }, []);
+  
+  const stopResizing = useCallback(() => {
+    if(isResizingSidebar) {
+        storageService.save(LOCAL_STORAGE_KEYS.SIDEBAR_WIDTH, sidebarWidth);
+    }
+    if(isResizingLogger) {
+        storageService.save(LOCAL_STORAGE_KEYS.LOGGER_PANEL_HEIGHT, loggerHeight);
+    }
+    setIsResizingSidebar(false);
+    setIsResizingLogger(false);
+  }, [isResizingSidebar, isResizingLogger, sidebarWidth, loggerHeight]);
+
+  const handleResize = useCallback((e: MouseEvent) => {
+    if (isResizingSidebar) {
+      const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(e.clientX, MAX_SIDEBAR_WIDTH));
+      setSidebarWidth(newWidth);
+    }
+    if (isResizingLogger) {
+      const newHeight = Math.max(MIN_LOGGER_HEIGHT, Math.min(window.innerHeight - e.clientY, MAX_LOGGER_HEIGHT));
+      setLoggerHeight(newHeight);
+    }
+  }, [isResizingSidebar, isResizingLogger]);
+
+  useEffect(() => {
+    if (isResizingSidebar || isResizingLogger) {
+      window.addEventListener('mousemove', handleResize);
+      window.addEventListener('mouseup', stopResizing);
+      return () => {
+        window.removeEventListener('mousemove', handleResize);
+        window.removeEventListener('mouseup', stopResizing);
+      };
+    }
+  }, [isResizingSidebar, isResizingLogger, handleResize, stopResizing]);
+
+  const handleDetectServices = useCallback(async () => {
+    setIsDetectingServices(true);
+    addLog('INFO', 'Detecting local LLM services...');
+    try {
+      const services = await llmDiscoveryService.discoverServices();
+      setDiscoveredServices(services);
+      addLog('INFO', `Found ${services.length} services.`);
+      if(services.length > 0 && !services.find(s => s.generateUrl === settings.llmProviderUrl)) {
+          const firstService = services[0];
+          const newSettings: Settings = {...settings, llmProviderUrl: firstService.generateUrl, llmProviderName: firstService.name, apiType: firstService.apiType, llmModelName: ''};
+          await saveSettings(newSettings);
+          addLog('INFO', `Auto-selected first discovered service: ${firstService.name}`);
+      }
+    } catch(error) {
+      addLog('ERROR', `Error detecting LLM services: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsDetectingServices(false);
+    }
+  }, [addLog, saveSettings, settings]);
+
+  const handleProviderChange = async (serviceId: string) => {
+    const service = discoveredServices.find(s => s.id === serviceId);
+    if(service) {
+      await saveSettings({...settings, llmProviderUrl: service.generateUrl, llmProviderName: service.name, apiType: service.apiType, llmModelName: ''});
+    }
+  };
+
+  const handleModelChange = async (modelName: string) => {
+    await saveSettings({...settings, llmModelName: modelName});
+  };
+
+  useEffect(() => {
+    const fetchModelsForCurrentService = async () => {
+        const currentService = discoveredServices.find(s => s.generateUrl === settings.llmProviderUrl);
+        if (currentService) {
             try {
-                await repository.init();
-                addLog('INFO', 'Application repository initialized successfully.');
-                setIsInitialized(true);
+                const models = await llmDiscoveryService.fetchModels(currentService);
+                setAvailableModels(models);
             } catch (error) {
-                const message = `Fatal: Application initialization failed. ${error instanceof Error ? error.message : String(error)}`;
-                // Log to the in-memory React logger
-                addLog('ERROR', message);
-                // The main process will have already logged this to a file.
-                // We just need to trigger the UI error state.
-                setInitError(message);
-            }
-        };
-        initializeApp();
-    }, [addLog]);
-
-    if (initError) {
-        return (
-            <FatalError
-                title="Error"
-                header="Database Error"
-                details="Could not open the application database. See logs for details. The application will now close."
-            />
-        );
-    }
-
-    if (!isInitialized) {
-        return <div className="w-screen h-screen flex items-center justify-center bg-background"><p className="text-text-main">Initializing database...</p></div>;
-    }
-
-    return <MainApp />;
-};
-
-const MainApp: React.FC = () => {
-    // State Hooks
-    const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, moveItems, getDescendantIds, duplicateItems } = useDocuments();
-    const { templates, addTemplate, updateTemplate, deleteTemplate } = useTemplates();
-    
-    // Active Item State
-    const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
-    const [selectedIds, setSelectedIds] = useState(new Set<string>());
-    const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
-    const [expandedFolderIds, setExpandedFolderIds] = useState(new Set<string>());
-
-    // UI State
-    const [view, setView] = useState<'editor' | 'info' | 'settings'>('editor');
-    const [documentView, setDocumentView] = useState<'editor' | 'history'>('editor');
-    const [isLoggerVisible, setIsLoggerVisible] = useState(false);
-    const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-    const [commandPaletteSearch, setCommandPaletteSearch] = useState('');
-    const [isCreateFromTemplateOpen, setCreateFromTemplateOpen] = useState(false);
-    const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
-    const [loggerPanelHeight, setLoggerPanelHeight] = useState(DEFAULT_LOGGER_HEIGHT);
-    const [availableModels, setAvailableModels] = useState<DiscoveredLLMModel[]>([]);
-    const [discoveredServices, setDiscoveredServices] = useState<DiscoveredLLMService[]>([]);
-    const [isDetecting, setIsDetecting] = useState(false);
-    const [appVersion, setAppVersion] = useState('');
-    const [updateInfo, setUpdateInfo] = useState<{ ready: boolean; version: string | null }>({ ready: false, version: null });
-    const [confirmAction, setConfirmAction] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; } | null>(null);
-
-    const isSidebarResizing = useRef(false);
-    const isLoggerResizing = useRef(false);
-    const commandPaletteTargetRef = useRef<HTMLDivElement>(null);
-    const commandPaletteInputRef = useRef<HTMLInputElement>(null);
-
-    const llmStatus = useLLMStatus(settings.llmProviderUrl);
-    const { logs, addLog } = useLogger();
-    const lastLogRef = useRef<LogMessage | null>(null);
-
-    // Effect to apply UI scaling
-    useEffect(() => {
-        if (settingsLoaded) {
-            (document.documentElement.style as any).zoom = `${settings.uiScale / 100}`;
-        }
-    }, [settings.uiScale, settingsLoaded]);
-
-    // Derived State
-    const activeNode = useMemo(() => {
-        return items.find(p => p.id === activeNodeId) || null;
-    }, [items, activeNodeId]);
-
-    const activeTemplate = useMemo(() => {
-        return templates.find(t => t.template_id === activeTemplateId) || null;
-    }, [templates, activeTemplateId]);
-
-    const activeDocument = useMemo(() => {
-        return activeNode?.type === 'document' ? activeNode : null;
-    }, [activeNode]);
-
-    // Get app version
-    useEffect(() => {
-        if (window.electronAPI?.getAppVersion) {
-            window.electronAPI.getAppVersion().then(setAppVersion);
-        }
-    }, []);
-
-    // Listen for downloaded updates from the main process
-    useEffect(() => {
-        if (window.electronAPI?.onUpdateDownloaded) {
-            const cleanup = window.electronAPI.onUpdateDownloaded((version) => {
-                addLog('INFO', `Update version ${version} is ready to be installed.`);
-                setUpdateInfo({ ready: true, version });
-            });
-            return cleanup;
-        }
-    }, [addLog]);
-
-
-    // Load panel sizes and expanded folders from storage on initial render
-    useEffect(() => {
-        storageService.load(LOCAL_STORAGE_KEYS.SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH).then(width => {
-            if (typeof width === 'number') setSidebarWidth(width);
-        });
-        storageService.load(LOCAL_STORAGE_KEYS.LOGGER_PANEL_HEIGHT, DEFAULT_LOGGER_HEIGHT).then(height => {
-            if (typeof height === 'number') setLoggerPanelHeight(height);
-        });
-        storageService.load<string[]>(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, []).then(ids => {
-            setExpandedFolderIds(new Set(ids));
-        });
-    }, []);
-
-    // Save expanded IDs to storage whenever they change
-    useEffect(() => {
-        if (settingsLoaded) { 
-            storageService.save(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, Array.from(expandedFolderIds));
-        }
-    }, [expandedFolderIds, settingsLoaded]);
-
-    // Select the first item on load or when items change
-    useEffect(() => {
-        if (items.length > 0 && activeNodeId === null && activeTemplateId === null) {
-            const firstId = items[0].id;
-            setActiveNodeId(firstId);
-            setSelectedIds(new Set([firstId]));
-        } else if (items.length === 0 && activeNodeId) {
-            setActiveNodeId(null);
-            setSelectedIds(new Set());
-        }
-    }, [items, activeNodeId, activeTemplateId]);
-
-    // Service Discovery logic
-    const handleDetectServices = useCallback(async () => {
-        setIsDetecting(true);
-        try {
-            const services = await llmDiscoveryService.discoverServices();
-            setDiscoveredServices(services);
-        } catch (error) {
-            addLog('ERROR', `Failed to discover services: ${error instanceof Error ? error.message : String(error)}`);
-            setDiscoveredServices([]);
-        } finally {
-            setIsDetecting(false);
-        }
-    }, [addLog]);
-
-    useEffect(() => {
-        handleDetectServices();
-    }, [handleDetectServices]);
-
-
-    // Fetch available models for the status bar dropdown
-    useEffect(() => {
-        const fetchModels = async () => {
-            if (settings.apiType !== 'unknown' && settings.llmProviderUrl) {
-                try {
-                    const service = {
-                        id: '', name: '',
-                        apiType: settings.apiType,
-                        modelsUrl: settings.apiType === 'ollama' 
-                            ? new URL('/api/tags', settings.llmProviderUrl).href 
-                            : new URL('/v1/models', settings.llmProviderUrl).href,
-                        generateUrl: settings.llmProviderUrl
-                    };
-                    const models = await llmDiscoveryService.fetchModels(service);
-                    setAvailableModels(models);
-                } catch (error) {
-                    addLog('ERROR', `Failed to fetch models for status bar: ${error instanceof Error ? error.message : String(error)}`);
-                    setAvailableModels([]);
-                }
-            } else {
                 setAvailableModels([]);
             }
-        };
-        if (settingsLoaded) {
-            fetchModels();
-        }
-    }, [settings.llmProviderUrl, settings.apiType, settingsLoaded, addLog]);
-
-    // Effect for auto-saving logs
-    useEffect(() => {
-        if (settings.autoSaveLogs && logs.length > 0) {
-            const latestLog = logs[logs.length - 1];
-            if (latestLog !== lastLogRef.current) {
-                lastLogRef.current = latestLog;
-                const logContent = `[${latestLog.timestamp}] [${latestLog.level}] ${latestLog.message}\n`;
-                storageService.appendLogToFile(logContent);
-            }
-        }
-    }, [logs, settings.autoSaveLogs]);
-
-
-    // Handlers
-    const getParentIdForNewItem = useCallback(() => {
-        if (!activeNode) return null;
-        return activeNode.type === 'folder' ? activeNode.id : activeNode.parentId;
-    }, [activeNode]);
-
-    const handleNewDocument = useCallback(async () => {
-        const parentId = getParentIdForNewItem();
-        const newDoc = await addDocument({ parentId });
-        setActiveNodeId(newDoc.id);
-        setSelectedIds(new Set([newDoc.id]));
-        setActiveTemplateId(null);
-        setDocumentView('editor');
-        setView('editor');
-    }, [addDocument, getParentIdForNewItem]);
-    
-    const handleNewRootFolder = useCallback(async () => {
-        const newFolder = await addFolder(null);
-        setActiveNodeId(newFolder.id);
-        setSelectedIds(new Set([newFolder.id]));
-        setActiveTemplateId(null);
-        setDocumentView('editor');
-        setView('editor');
-    }, [addFolder]);
-
-    const handleNewSubfolder = useCallback(async () => {
-        if (activeNode?.type === 'folder') {
-            const newFolder = await addFolder(activeNode.id, 'New Folder');
-            setActiveNodeId(newFolder.id);
-            setSelectedIds(new Set([newFolder.id]));
-            setExpandedFolderIds(prev => new Set(prev).add(activeNode.id));
-        }
-    }, [addFolder, activeNode]);
-
-    const handleDuplicateSelection = useCallback(async () => {
-        if (selectedIds.size > 0) {
-            await duplicateItems(Array.from(selectedIds));
-        }
-    }, [selectedIds, duplicateItems]);
-
-    const handleNewTemplate = useCallback(async () => {
-        const newTemplate = await addTemplate();
-        setActiveTemplateId(newTemplate.template_id);
-        setActiveNodeId(null);
-        setSelectedIds(new Set());
-        setView('editor');
-    }, [addTemplate]);
-
-    const handleCreateFromTemplate = useCallback(async (title: string, content: string) => {
-        const newDoc = await addDocument({ parentId: null, title, content });
-        setActiveNodeId(newDoc.id);
-        setSelectedIds(new Set([newDoc.id]));
-        setActiveTemplateId(null);
-        setDocumentView('editor');
-        setView('editor');
-    }, [addDocument]);
-
-    const handleSelectNode = (id: string, e: React.MouseEvent) => {
-        if (activeNodeId !== id) {
-            setDocumentView('editor');
-        }
-        
-        const isCtrl = e.ctrlKey || e.metaKey;
-        
-        if (isCtrl) {
-            setSelectedIds(prev => {
-                const newSet = new Set(prev);
-                if (newSet.has(id)) {
-                    newSet.delete(id);
-                } else {
-                    newSet.add(id);
-                }
-                return newSet;
-            });
         } else {
-            setSelectedIds(new Set([id]));
+            setAvailableModels([]);
         }
-
-        setActiveNodeId(id);
-        setActiveTemplateId(null);
-        setView('editor');
-    };
-    
-    const handleSelectTemplate = (id: string) => {
-        setActiveTemplateId(id);
-        setActiveNodeId(null);
-        setSelectedIds(new Set());
-        setView('editor');
-    };
-    
-    const handleSaveDocumentTitle = (updatedDoc: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => {
-        if (activeNodeId) {
-            updateItem(activeNodeId, updatedDoc);
-        }
-    };
-
-    const handleCommitVersion = (content: string) => {
-        if (activeNodeId) {
-            commitVersion(activeNodeId, content);
-        }
-    };
-    
-    const handleSaveTemplate = (updatedTemplate: Partial<Omit<PromptTemplate, 'template_id'>>) => {
-        if (activeTemplateId) {
-            updateTemplate(activeTemplateId, updatedTemplate);
-        }
-    };
-    
-    const handleRenameNode = (id: string, title: string) => {
-        updateItem(id, { title });
-    };
-
-    const handleRenameTemplate = (id: string, title: string) => {
-        updateTemplate(id, { title });
-    };
-    
-    const handleCopyNodeContent = useCallback(async (nodeId: string) => {
-        const item = items.find(p => p.id === nodeId);
-        if (item && item.type === 'document' && item.content) {
-            try {
-                await navigator.clipboard.writeText(item.content);
-                addLog('INFO', `Content of document "${item.title}" copied to clipboard.`);
-            } catch (err) {
-                addLog('ERROR', `Failed to copy to clipboard: ${err instanceof Error ? err.message : 'Unknown error'}`);
-            }
-        } else if (item?.type === 'folder') {
-            addLog('WARNING', 'Cannot copy content of a folder.');
-        } else {
-            addLog('WARNING', 'Cannot copy content of an empty document.');
-        }
-    }, [items, addLog]);
-
-    const handleModelChange = (modelId: string) => {
-        saveSettings({ ...settings, llmModelName: modelId });
-    };
-    
-    const handleProviderChange = useCallback(async (serviceId: string) => {
-        const selectedService = discoveredServices.find(s => s.id === serviceId);
-        if (!selectedService) return;
-
-        try {
-            const models = await llmDiscoveryService.fetchModels(selectedService);
-            const newModelName = models.length > 0 ? models[0].id : '';
-            
-            saveSettings({
-                ...settings,
-                llmProviderUrl: selectedService.generateUrl,
-                llmProviderName: selectedService.name,
-                apiType: selectedService.apiType,
-                llmModelName: newModelName,
-            });
-            addLog('INFO', `Switched LLM provider to ${selectedService.name}.`);
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e);
-            addLog('ERROR', `Failed to switch provider: ${message}`);
-        }
-    }, [discoveredServices, settings, saveSettings, addLog]);
-
-    const handleDeleteNode = useCallback((id: string) => {
-        const itemToDelete = items.find(p => p.id === id);
-        if (!itemToDelete) return;
-
-        const performDelete = async () => {
-            let nextNodeToSelect: DocumentOrFolder | null = null;
-            const currentItemIndex = items.findIndex(p => p.id === id);
-
-            if (currentItemIndex > -1) {
-                if (currentItemIndex > 0) {
-                    nextNodeToSelect = items[currentItemIndex - 1];
-                } else if (items.length > 1) {
-                    nextNodeToSelect = items[1];
-                }
-            }
-            
-            await deleteItem(id);
-
-            if (activeNodeId === id) {
-                const newActiveId = nextNodeToSelect ? nextNodeToSelect.id : (items.length > 1 ? items[0].id : null);
-                setActiveNodeId(newActiveId);
-                setSelectedIds(newActiveId ? new Set([newActiveId]) : new Set());
-            } else {
-                setSelectedIds(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(id);
-                    return newSet;
-                });
-            }
-        };
-
-        let title = 'Confirm Deletion';
-        let message: React.ReactNode = '';
-
-        if (itemToDelete.type === 'folder') {
-            title = 'Delete Folder';
-            const descendantCount = getDescendantIds(id).size;
-            message = descendantCount > 0 
-                ? <>Are you sure you want to delete the folder <strong>"{itemToDelete.title}"</strong> and its {descendantCount} contents? This action cannot be undone.</>
-                : <>Are you sure you want to delete the empty folder <strong>"{itemToDelete.title}"</strong>?</>;
-        } else {
-            title = 'Delete Document';
-            message = <>Are you sure you want to delete the document <strong>"{itemToDelete.title}"</strong>? This action cannot be undone.</>;
-        }
-
-        setConfirmAction({
-            title,
-            message,
-            onConfirm: () => {
-                performDelete();
-                setConfirmAction(null);
-            }
-        });
-
-    }, [items, deleteItem, activeNodeId, getDescendantIds]);
-
-    const handleDeleteTemplate = useCallback((id: string) => {
-        const templateToDelete = templates.find(t => t.template_id === id);
-        if (!templateToDelete) return;
-
-        setConfirmAction({
-            title: 'Delete Template',
-            message: <>Are you sure you want to delete the template <strong>"{templateToDelete.title}"</strong>? This action cannot be undone.</>,
-            onConfirm: async () => {
-                await deleteTemplate(id);
-                if (activeTemplateId === id) {
-                    setActiveTemplateId(null);
-                }
-                setConfirmAction(null);
-            }
-        });
-    }, [deleteTemplate, activeTemplateId, templates]);
-
-    const handleToggleExpand = (id: string) => {
-        setExpandedFolderIds(prev => {
-          const newSet = new Set(prev);
-          if (newSet.has(id)) {
-            newSet.delete(id);
-          } else {
-            newSet.add(id);
-          }
-          return newSet;
-        });
-    };
-
-    const toggleSettingsView = () => {
-        setView(v => v === 'settings' ? 'editor' : 'settings')
     }
-
-    const handleRestoreDocumentVersion = useCallback((documentId: string, content: string) => {
-        const doc = items.find(p => p.id === documentId);
-        if (doc) {
-            commitVersion(documentId, content);
-            addLog('INFO', `Restored document "${doc.title}" to a previous version.`);
-            setDocumentView('editor');
-        }
-    }, [items, commitVersion, addLog]);
+    fetchModelsForCurrentService();
+  }, [discoveredServices, settings.llmProviderUrl]);
 
 
-    // --- Resizable Panels Logic ---
-    const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
-        isSidebarResizing.current = true;
-        document.body.style.cursor = 'col-resize';
-        document.body.style.userSelect = 'none';
-    }, []);
-
-    const handleLoggerMouseDown = useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
-        isLoggerResizing.current = true;
-        document.body.style.cursor = 'row-resize';
-        document.body.style.userSelect = 'none';
-    }, []);
-    
-    const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
-        const zoomFactor = settings.uiScale / 100;
-
-        if (isSidebarResizing.current) {
-            const mainContentMinWidth = 300;
-            const newWidth = e.clientX / zoomFactor;
-            const calculatedMaxWidth = (window.innerWidth / zoomFactor) - mainContentMinWidth;
-            
-            const clampedWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(newWidth, calculatedMaxWidth));
-            setSidebarWidth(clampedWidth);
-        }
-        if (isLoggerResizing.current) {
-            const mainContentMinHeight = 200;
-            const newHeight = (window.innerHeight - e.clientY) / zoomFactor;
-            const calculatedMaxHeight = (window.innerHeight / zoomFactor) - mainContentMinHeight;
-            
-            const clampedHeight = Math.max(MIN_LOGGER_HEIGHT, Math.min(newHeight, calculatedMaxHeight));
-            setLoggerPanelHeight(clampedHeight);
-        }
-    }, [settings.uiScale]);
-
-    const handleGlobalMouseUp = useCallback(() => {
-        if (isSidebarResizing.current) {
-            isSidebarResizing.current = false;
-            storageService.save(LOCAL_STORAGE_KEYS.SIDEBAR_WIDTH, sidebarWidth);
-        }
-        if (isLoggerResizing.current) {
-            isLoggerResizing.current = false;
-            storageService.save(LOCAL_STORAGE_KEYS.LOGGER_PANEL_HEIGHT, loggerPanelHeight);
-        }
-        
-        if (document.body.style.cursor !== 'default') {
-            document.body.style.cursor = 'default';
-            document.body.style.userSelect = 'auto';
-        }
-    }, [sidebarWidth, loggerPanelHeight]);
-    
-    useEffect(() => {
-        window.addEventListener('mousemove', handleGlobalMouseMove);
-        window.addEventListener('mouseup', handleGlobalMouseUp);
-        return () => {
-            window.removeEventListener('mousemove', handleGlobalMouseMove);
-            window.removeEventListener('mouseup', handleGlobalMouseUp);
-        };
-    }, [handleGlobalMouseMove, handleGlobalMouseUp]);
-    // --- End Resizable Panels Logic ---
-    
-    const handleOpenCommandPalette = useCallback(() => {
-        setIsCommandPaletteOpen(true);
-    }, []);
-
-    const handleCloseCommandPalette = useCallback(() => {
-        setIsCommandPaletteOpen(false);
-        setCommandPaletteSearch('');
-    }, []);
-    
-    const handleToggleCommandPalette = useCallback(() => {
-        setIsCommandPaletteOpen(prev => {
-            const isOpen = !prev;
-            if (isOpen) {
-                setTimeout(() => {
-                    commandPaletteInputRef.current?.focus();
-                    commandPaletteInputRef.current?.select();
-                }, 0);
-            } else {
-                commandPaletteInputRef.current?.blur();
-            }
-            return isOpen;
-        });
-    }, []);
-
-    // Keyboard shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-            const isCtrl = isMac ? e.metaKey : e.ctrlKey;
-
-            if (isCtrl && e.key === 'n') {
-                e.preventDefault();
-                handleNewDocument();
-            }
-            if (isCtrl && e.shiftKey && e.key === 'P') {
-                e.preventDefault();
-                handleToggleCommandPalette();
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleNewDocument, handleToggleCommandPalette]);
-    
-    // Command Palette Commands
-    const commands: Command[] = useMemo(() => [
-        { id: 'new-document', name: 'Create New Document', action: handleNewDocument, category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'], keywords: 'add create file' },
-        { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
-        { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
-        { id: 'new-from-template', name: 'New Document from Template...', action: () => setCreateFromTemplateOpen(true), category: 'File', icon: PlusIcon, keywords: 'add create file instance' },
-        { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: DocumentDuplicateIcon, keywords: 'copy clone' },
-        { id: 'delete-item', name: 'Delete Current Item', action: () => {
-            if (activeTemplateId) handleDeleteTemplate(activeTemplateId);
-            else if (activeNodeId) handleDeleteNode(activeNodeId);
-        }, category: 'File', icon: TrashIcon, keywords: 'remove discard' },
-        { id: 'toggle-editor', name: 'Switch to Editor View', action: () => setView('editor'), category: 'View', icon: PencilIcon, keywords: 'main document' },
-        { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
-        { id: 'toggle-info', name: 'Toggle Info View', action: () => setView(v => v === 'info' ? 'editor' : 'info'), category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
-        { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => setIsLoggerVisible(v => !v), category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [activeNodeId, activeTemplateId, handleNewDocument, handleNewRootFolder, handleDeleteNode, handleDeleteTemplate, handleNewTemplate, toggleSettingsView, handleDuplicateSelection]);
-
-    const getSupportedIconSet = (iconSet: Settings['iconSet']): 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material' => {
-        const supportedSets: Array<Settings['iconSet']> = ['heroicons', 'lucide', 'feather', 'tabler', 'material'];
-        if (supportedSets.includes(iconSet)) {
-            return iconSet;
-        }
-        return 'heroicons';
-    };
-
-    if (!settingsLoaded) {
-        return <div className="w-screen h-screen flex items-center justify-center bg-background"><p className="text-text-main">Loading application...</p></div>;
+  const openCommandPalette = () => {
+    if (!isCommandPaletteOpen) {
+      setCommandPaletteSearch('');
+      setIsCommandPaletteOpen(true);
     }
+  };
+  
+  const closeCommandPalette = () => {
+    setIsCommandPaletteOpen(false);
+    commandPaletteInputRef.current?.blur();
+  };
 
-    const renderMainContent = () => {
-        if (view === 'info') return <InfoView />;
-        if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} />;
-        
-        if (activeTemplate) {
-            return <TemplateEditor 
-                key={activeTemplate.template_id}
-                template={activeTemplate}
-                onSave={handleSaveTemplate}
-                onDelete={handleDeleteTemplate}
-            />
-        }
-        if (activeNode) {
-            if (activeNode.type === 'document') {
-                if (documentView === 'history') {
-                    return (
-                        <PromptHistoryView
-                            prompt={activeNode}
-                            onBackToEditor={() => setDocumentView('editor')}
-                            onRestore={(content) => handleRestoreDocumentVersion(activeNode.id, content)}
-                        />
-                    );
-                }
-                return (
-                    <PromptEditor 
-                        key={activeNode.id}
-                        prompt={activeNode}
-                        onSave={handleSaveDocumentTitle}
-                        onCommitVersion={handleCommitVersion}
-                        onDelete={handleDeleteNode}
-                        settings={settings}
-                        onShowHistory={() => setDocumentView('history')}
-                    />
-                );
-            }
-            return <WelcomeScreen onNewPrompt={handleNewDocument} />;
-        }
-        return <WelcomeScreen onNewPrompt={handleNewDocument} />;
-    };
+  const executeCommand = () => {
+    closeCommandPalette();
+  };
+  
+  const commands = useMemo<Command[]>(() => [
+    { id: 'new-doc', name: 'New Document', action: () => handleNewItem('document'), category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'] },
+    { id: 'new-folder', name: 'New Folder', action: () => handleNewItem('folder'), category: 'File', icon: FolderPlusIcon },
+    { id: 'new-template', name: 'New Template', action: () => handleNewItem('template'), category: 'File', icon: DocumentDuplicateIcon },
+    { id: 'create-from-template', name: 'Create from Template...', action: () => setIsTemplateModalOpen(true), category: 'File', icon: FileIcon, keywords: 'instance' },
+    { id: 'delete-item', name: 'Delete Selected Item(s)', action: () => { if(editorPane === 'prompt' && lastSelectedItem) { setDeletionTarget({ type: 'document', id: lastSelectedItem.id })} else if(editorPane === 'template' && activeTemplate) { setDeletionTarget({ type: 'template', id: activeTemplate.template_id }) } }, category: 'Edit', icon: TrashIcon, shortcut: ['Del'] },
+    { id: 'view-history', name: 'View History', action: () => lastSelectedItem && setHistoryPromptId(lastSelectedItem.id), category: 'View', icon: HistoryIcon },
+    { id: 'toggle-theme', name: 'Toggle Theme', action: toggleTheme, category: 'View', icon: SunIcon, keywords: 'dark light mode' },
+    { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => setIsLoggerVisible(v => !v), category: 'View', icon: TerminalIcon },
+    { id: 'show-settings', name: 'Open Settings', action: () => setActiveView('settings'), category: 'Application', icon: GearIcon },
+    { id: 'show-info', name: 'Show Application Info', action: () => setActiveView('info'), category: 'Application', icon: InfoIcon },
+    { id: 'force-reload', name: 'Force Reload Data', action: () => { refreshItems(); }, category: 'Application', icon: DatabaseIcon },
+  ], [handleNewItem, editorPane, lastSelectedItem, activeTemplate, refreshItems, toggleTheme]);
 
-    const headerProps = {
-        onToggleSettingsView: toggleSettingsView,
-        onToggleInfoView: () => setView(v => v === 'info' ? 'editor' : 'info'),
-        onShowEditorView: () => setView('editor'),
-        onToggleLogger: () => setIsLoggerVisible(v => !v),
-        onOpenCommandPalette: handleOpenCommandPalette,
-        isInfoViewActive: view === 'info',
-        isSettingsViewActive: view === 'settings',
-        isEditorViewActive: view === 'editor',
-    };
+  const renderMainContent = () => {
+    if (activeView === 'settings') {
+      return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetectingServices} />;
+    }
+    if (activeView === 'info') {
+      return <InfoView />;
+    }
+    // 'editor' view
+    if (editorPane === 'prompt') {
+      if (lastSelectedItem && lastSelectedItem.type === 'document') {
+        return <PromptEditor 
+          key={lastSelectedItem.id}
+          prompt={lastSelectedItem} 
+          settings={settings}
+          onSave={updates => updateItem(lastSelectedItem.id, updates)}
+          onCommitVersion={(content) => commitVersion(lastSelectedItem.id, content)}
+          onDelete={() => setDeletionTarget({ type: 'document', id: lastSelectedItem.id })}
+          onShowHistory={() => setHistoryPromptId(lastSelectedItem.id)}
+        />;
+      }
+      return <WelcomeScreen onNewPrompt={() => handleNewItem('document')} />;
+    }
+    if (editorPane === 'template') {
+      if (activeTemplate) {
+        return <TemplateEditor 
+          key={activeTemplate.template_id}
+          template={activeTemplate}
+          onSave={(updates) => updateTemplate(activeTemplate.template_id, updates)}
+          onDelete={() => setDeletionTarget({ type: 'template', id: activeTemplate.template_id })}
+        />
+      }
+      return <WelcomeScreen onNewPrompt={() => handleNewItem('template')} />; // A bit of a misnomer, but fine for placeholder
+    }
+  };
 
+  // Fatal Error handling
+  if (initError) {
     return (
-        <IconProvider value={{ iconSet: getSupportedIconSet(settings.iconSet) }}>
-            <div className="flex flex-col h-full font-sans bg-background text-text-main antialiased">
-                {isElectron ? (
-                    <CustomTitleBar
-                        {...headerProps}
-                        commandPaletteTargetRef={commandPaletteTargetRef}
-                        searchTerm={commandPaletteSearch}
-                        onSearchTermChange={setCommandPaletteSearch}
-                        commandPaletteInputRef={commandPaletteInputRef}
-                    />
-                ) : (
-                    <Header {...headerProps} />
-                )}
-                <main className="flex-1 flex overflow-hidden">
-                    {view === 'editor' && (
-                        <>
-                             <aside 
-                                style={{ width: `${sidebarWidth}px` }} 
-                                className="bg-secondary border-r border-border-color flex flex-col flex-shrink-0"
-                            >
-                                <Sidebar 
-                                    prompts={items}
-                                    selectedIds={selectedIds}
-                                    activePromptId={activeNodeId}
-                                    onSelectPrompt={handleSelectNode}
-                                    onDeletePrompt={handleDeleteNode}
-                                    onRenamePrompt={handleRenameNode}
-                                    onMovePrompt={moveItems}
-                                    onNewPrompt={handleNewDocument}
-                                    onNewRootFolder={handleNewRootFolder}
-                                    onNewSubfolder={handleNewSubfolder}
-                                    onDuplicateSelection={handleDuplicateSelection}
-                                    onCopyPromptContent={handleCopyNodeContent}
-                                    expandedFolderIds={expandedFolderIds}
-                                    onToggleExpand={handleToggleExpand}
-
-                                    templates={templates}
-                                    activeTemplateId={activeTemplateId}
-                                    onSelectTemplate={handleSelectTemplate}
-                                    onDeleteTemplate={handleDeleteTemplate}
-                                    onRenameTemplate={handleRenameTemplate}
-                                    onNewTemplate={handleNewTemplate}
-                                    onNewFromTemplate={() => setCreateFromTemplateOpen(true)}
-                                />
-                            </aside>
-                            <div 
-                                onMouseDown={handleSidebarMouseDown}
-                                className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
-                            />
-                        </>
-                    )}
-                    <section className="flex-1 flex flex-col overflow-y-auto bg-background">
-                        {renderMainContent()}
-                    </section>
-                </main>
-                <StatusBar 
-                    status={llmStatus}
-                    modelName={settings.llmModelName}
-                    llmProviderName={settings.llmProviderName}
-                    llmProviderUrl={settings.llmProviderUrl}
-                    promptCount={items.filter(i => i.type === 'document').length}
-                    lastSaved={activeDocument?.updatedAt}
-                    availableModels={availableModels}
-                    onModelChange={handleModelChange}
-                    discoveredServices={discoveredServices}
-                    onProviderChange={handleProviderChange}
-                    appVersion={appVersion}
-                />
-            </div>
-            
-            <LoggerPanel 
-                isVisible={isLoggerVisible} 
-                onToggleVisibility={() => setIsLoggerVisible(v => !v)}
-                height={loggerPanelHeight}
-                onResizeStart={handleLoggerMouseDown}
-            />
-            <CommandPalette 
-                isOpen={isCommandPaletteOpen} 
-                onClose={handleCloseCommandPalette}
-                commands={commands}
-                targetRef={commandPaletteTargetRef}
-                searchTerm={commandPaletteSearch}
-                onExecute={() => {
-                    setIsCommandPaletteOpen(false);
-                    setCommandPaletteSearch('');
-                }}
-            />
-
-            {isCreateFromTemplateOpen && (
-                <CreateFromTemplateModal
-                    templates={templates}
-                    onClose={() => setCreateFromTemplateOpen(false)}
-                    onCreate={handleCreateFromTemplate}
-                />
-            )}
-
-            {updateInfo.ready && window.electronAPI?.quitAndInstallUpdate && (
-                <UpdateNotification
-                    version={updateInfo.version!}
-                    onInstall={() => window.electronAPI!.quitAndInstallUpdate!()}
-                    onClose={() => setUpdateInfo({ ready: false, version: null })}
-                />
-            )}
-
-            {confirmAction && (
-                <ConfirmModal
-                    title={confirmAction.title}
-                    message={confirmAction.message}
-                    onConfirm={confirmAction.onConfirm}
-                    onCancel={() => setConfirmAction(null)}
-                />
-            )}
-        </IconProvider>
+      <FatalError
+        title="Application Failed to Start"
+        header="A critical error occurred during initialization."
+        details={`The application could not start correctly. This usually happens if the database file is corrupted or inaccessible. Please check the logs for more details. Error: ${initError.message}`}
+      />
     );
-};
+  }
+
+  if (!isInitialized) {
+    return null; // Could return a loading spinner here
+  }
+
+  return (
+    <div className="flex flex-col h-screen bg-background font-sans antialiased overflow-hidden">
+        <CustomTitleBar
+          onToggleSettingsView={() => setActiveView(v => v === 'settings' ? 'editor' : 'settings')}
+          onToggleInfoView={() => setActiveView(v => v === 'info' ? 'editor' : 'info')}
+          onShowEditorView={() => setActiveView('editor')}
+          onToggleLogger={() => setIsLoggerVisible(v => !v)}
+          onOpenCommandPalette={openCommandPalette}
+          isInfoViewActive={activeView === 'info'}
+          isSettingsViewActive={activeView === 'settings'}
+          isEditorViewActive={activeView === 'editor'}
+          commandPaletteTargetRef={commandPaletteTargetRef}
+          commandPaletteInputRef={commandPaletteInputRef}
+          searchTerm={commandPaletteSearch}
+          onSearchTermChange={setCommandPaletteSearch}
+        />
+        <div className="flex-1 flex overflow-hidden">
+            <Sidebar
+                width={sidebarWidth}
+                onResizeStart={startResizeSidebar}
+                items={items}
+                templates={templates}
+                selectedIds={selectedIds}
+                focusedItemId={focusedItemId}
+                setFocusedItemId={setFocusedItemId}
+                activeTemplateId={activeTemplateId}
+                onSelectPrompt={handleSelectPrompt}
+                onSelectTemplate={handleSelectTemplate}
+                onNewDocument={() => handleNewItem('document')}
+                onNewFolder={() => handleNewItem('folder')}
+                onNewTemplate={() => handleNewItem('template')}
+                onRenameItem={(id, title) => updateItem(id, { title })}
+                onDeleteItem={(id) => setDeletionTarget({type: 'document', id})}
+                onDeleteTemplate={(id) => setDeletionTarget({type: 'template', id})}
+                onMoveItems={moveItems}
+                onDuplicateItems={duplicateItems}
+                onOpenTemplateModal={() => setIsTemplateModalOpen(true)}
+            />
+            <main className="flex-1 flex flex-col min-w-0">
+                {renderMainContent()}
+            </main>
+        </div>
+        <StatusBar
+          status={llmStatus}
+          modelName={settings.llmModelName}
+          llmProviderName={settings.llmProviderName}
+          llmProviderUrl={settings.llmProviderUrl}
+          promptCount={items.filter(i => i.type === 'document').length}
+          lastSaved={lastSelectedItem?.updatedAt}
+          availableModels={availableModels}
+          onModelChange={handleModelChange}
+          discoveredServices={discoveredServices}
+          onProviderChange={handleProviderChange}
+          appVersion={appVersion}
+        />
+
+        <LoggerPanel
+          isVisible={isLoggerVisible}
+          onToggleVisibility={() => setIsLoggerVisible(false)}
+          height={loggerHeight}
+          onResizeStart={startResizeLogger}
+        />
+        
+        {/* Modals */}
+        {deletionTarget && (
+            <ConfirmModal
+                title={`Delete ${deletionTarget.type === 'document' ? `${selectedIds.size} item(s)` : 'Template'}`}
+                message={
+                  <>
+                    <p className="font-semibold text-text-main mb-2">Are you sure you want to proceed?</p>
+                    {deletionTarget.type === 'document' && <p>This will permanently delete the selected item(s) and all their contents. This action cannot be undone.</p>}
+                    {deletionTarget.type === 'template' && <p>This will permanently delete the template. This action cannot be undone.</p>}
+                  </>
+                }
+                onConfirm={handleConfirmDeletion}
+                onCancel={() => setDeletionTarget(null)}
+                confirmText="Delete"
+                confirmVariant="destructive"
+            />
+        )}
+        {isTemplateModalOpen && (
+            <CreateFromTemplateModal
+                templates={templates}
+                onClose={() => setIsTemplateModalOpen(false)}
+                onCreate={handleCreateFromTemplate}
+            />
+        )}
+        {historyPrompt && (
+          <PromptHistoryModal
+            prompt={historyPrompt}
+            onClose={() => setHistoryPromptId(null)}
+            onRestore={(content) => {
+              commitVersion(historyPrompt.id, content);
+              setHistoryPromptId(null);
+            }}
+          />
+        )}
+        {updateVersion && (
+          <UpdateNotification
+            version={updateVersion}
+            onInstall={() => window.electronAPI?.quitAndInstallUpdate()}
+            onClose={() => setUpdateVersion(null)}
+          />
+        )}
+        <CommandPalette
+          isOpen={isCommandPaletteOpen}
+          onClose={closeCommandPalette}
+          commands={commands}
+          targetRef={commandPaletteTargetRef}
+          searchTerm={commandPaletteSearch}
+          onExecute={executeCommand}
+        />
+    </div>
+  );
+}
 
 export default App;

@@ -1,116 +1,209 @@
-
-
-
-
-import React, { useState } from 'react';
-// Fix: Correctly import the DocumentOrFolder type.
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { DocumentOrFolder } from '../types';
 import PromptTreeItem, { PromptNode } from './PromptTreeItem';
+import { SearchIcon } from './Icons';
 
 interface PromptListProps {
-  tree: PromptNode[];
-  prompts: DocumentOrFolder[]; // needed for the empty state check
+  items: DocumentOrFolder[];
   selectedIds: Set<string>;
   focusedItemId: string | null;
-  onSelectNode: (id: string, e: React.MouseEvent) => void;
-  onDeleteNode: (id: string) => void;
-  onRenameNode: (id: string, newTitle: string) => void;
-  onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
-  onCopyNodeContent: (id: string) => void;
-  searchTerm: string;
+  setFocusedItemId: (id: string | null) => void;
   expandedIds: Set<string>;
-  onToggleExpand: (id: string) => void;
-  onMoveUp: (id: string) => void;
-  onMoveDown: (id: string) => void;
+  setExpandedIds: (updater: React.SetStateAction<Set<string>>) => void;
+  onSelect: (id: string, e: React.MouseEvent) => void;
+  onRename: (id: string, newTitle: string) => void;
+  onDelete: (id: string) => void;
+  onMove: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onDuplicate: (ids: string[]) => void;
 }
 
-const PromptList: React.FC<PromptListProps> = ({ 
-  tree, prompts, selectedIds, focusedItemId, onSelectNode, onDeleteNode, onRenameNode, onMoveNode, onCopyNodeContent, searchTerm, expandedIds, onToggleExpand, onMoveUp, onMoveDown
-}) => {
-  const [isRootDropping, setIsRootDropping] = useState(false);
+const buildTree = (items: DocumentOrFolder[], parentId: string | null = null): PromptNode[] => {
+  return items
+    .filter(item => item.parentId === parentId)
+    .map(item => ({
+      ...item,
+      children: buildTree(items, item.id),
+    }));
+};
+
+const filterTree = (nodes: PromptNode[], searchTerm: string, expandedIds: Set<string>, setExpandedIds: (updater: React.SetStateAction<Set<string>>) => void): { filtered: PromptNode[], found: boolean } => {
+  if (!searchTerm) return { filtered: nodes, found: true };
+  const lowercasedTerm = searchTerm.toLowerCase();
   
-  const handleRootDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsRootDropping(false);
+  const newExpandedIds = new Set<string>();
+
+  const filter = (node: PromptNode): PromptNode | null => {
+    const childrenResult = node.children.map(filter).filter((n): n is PromptNode => n !== null);
     
-    // Ensure we don't handle drops that were meant for a child item.
-    const target = e.target as HTMLElement;
-    if (target.closest('li[draggable="true"]')) {
-      return;
+    const isMatch = node.title.toLowerCase().includes(lowercasedTerm);
+    
+    if (isMatch || childrenResult.length > 0) {
+        if(childrenResult.length > 0) {
+            newExpandedIds.add(node.id);
+        }
+        return { ...node, children: childrenResult };
     }
     
+    return null;
+  };
+  
+  const filtered = nodes.map(filter).filter((n): n is PromptNode => n !== null);
+  
+  useEffect(() => {
+    if(searchTerm){
+        setExpandedIds(newExpandedIds);
+    }
+  }, [searchTerm, setExpandedIds]);
+
+
+  return { filtered, found: filtered.length > 0 };
+};
+
+const flattenTreeForNav = (nodes: PromptNode[]): string[] => {
+    const result: string[] = [];
+    const traverse = (node: PromptNode) => {
+        result.push(node.id);
+        if (node.children) {
+            node.children.forEach(traverse);
+        }
+    };
+    nodes.forEach(traverse);
+    return result;
+};
+
+
+const PromptList: React.FC<PromptListProps> = (props) => {
+  const { items, selectedIds, onSelect, onDelete, onRename, onMove, onDuplicate, expandedIds, setExpandedIds, focusedItemId, setFocusedItemId } = props;
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dropTarget, setDropTarget] = useState<'root' | null>(null);
+
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const tree = useMemo(() => buildTree(items), [items]);
+  
+  const { filtered, found } = useMemo(() => filterTree(tree, searchTerm, expandedIds, setExpandedIds), [tree, searchTerm, expandedIds, setExpandedIds]);
+  
+  const visibleItemIds = useMemo(() => flattenTreeForNav(filtered), [filtered]);
+
+  const handleToggleExpand = useCallback((id: string) => {
+    setExpandedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  }, [setExpandedIds]);
+  
+  const handleKeyboardNav = useCallback((e: React.KeyboardEvent) => {
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Delete', 'F2', ' '].includes(e.key)) return;
+    
+    if (!focusedItemId && visibleItemIds.length > 0) {
+        setFocusedItemId(visibleItemIds[0]);
+        return;
+    }
+
+    const currentIndex = visibleItemIds.findIndex(id => id === focusedItemId);
+    if (currentIndex === -1) return;
+
+    e.preventDefault();
+
+    switch (e.key) {
+      case 'ArrowUp': {
+        const nextIndex = Math.max(0, currentIndex - 1);
+        setFocusedItemId(visibleItemIds[nextIndex]);
+        break;
+      }
+      case 'ArrowDown': {
+        const nextIndex = Math.min(visibleItemIds.length - 1, currentIndex + 1);
+        setFocusedItemId(visibleItemIds[nextIndex]);
+        break;
+      }
+      case 'ArrowRight': {
+        const focusedItem = items.find(i => i.id === focusedItemId);
+        if (focusedItem?.type === 'folder' && !expandedIds.has(focusedItemId!)) {
+            handleToggleExpand(focusedItemId!);
+        }
+        break;
+      }
+      case 'ArrowLeft': {
+        const focusedItem = items.find(i => i.id === focusedItemId);
+        if (focusedItem?.type === 'folder' && expandedIds.has(focusedItemId!)) {
+            handleToggleExpand(focusedItemId!);
+        }
+        break;
+      }
+    }
+  }, [focusedItemId, visibleItemIds, setFocusedItemId, items, expandedIds, handleToggleExpand]);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDropTarget('root');
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
     const draggedIdsJSON = e.dataTransfer.getData('application/json');
     if (draggedIdsJSON) {
-        const draggedIds = JSON.parse(draggedIdsJSON);
-        // Dropping in the root area means targetId is null and position is 'inside' the root.
-        onMoveNode(draggedIds, null, 'inside');
+      const draggedIds = JSON.parse(draggedIdsJSON);
+      onMove(draggedIds, null, 'inside');
     }
+    setDropTarget(null);
   };
-
-  const handleRootDragOver = (e: React.DragEvent) => {
-      e.preventDefault();
-      const target = e.target as HTMLElement;
-      if (!target.closest('li[draggable="true"]')) {
-        e.dataTransfer.dropEffect = 'move';
-        setIsRootDropping(true);
-      }
-  };
-
-  const handleRootDragLeave = () => {
-    setIsRootDropping(false);
-  };
-
-
-  const displayExpandedIds = searchTerm.trim() 
-      ? new Set(prompts.filter(i => i.type === 'folder').map(i => i.id)) 
-      : expandedIds;
-
+  
   return (
-    <div 
-        className="relative flex-1"
-        onDrop={handleRootDrop}
-        onDragOver={handleRootDragOver}
-        onDragLeave={handleRootDragLeave}
-    >
-        <ul className="space-y-0.5 p-2">
-        {tree.map((node, index) => (
+    <div className="flex-1 flex flex-col" onKeyDown={handleKeyboardNav} tabIndex={-1}>
+        <div className="px-1 mb-2">
+            <div className="relative">
+                <SearchIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+                <input
+                    type="text"
+                    placeholder="Filter..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full bg-background border border-border-color rounded-md pl-7 pr-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+            </div>
+        </div>
+      <div 
+        className="flex-1 overflow-y-auto px-1"
+        onDragOver={handleDragOver}
+        onDragLeave={() => setDropTarget(null)}
+        onDrop={handleDrop}
+      >
+        <ul ref={listRef} className={`relative h-full ${dropTarget === 'root' ? 'bg-primary/10' : ''}`}>
+            {filtered.map((node, index) => (
             <PromptTreeItem
                 key={node.id}
                 node={node}
                 level={0}
                 selectedIds={selectedIds}
                 focusedItemId={focusedItemId}
-                expandedIds={displayExpandedIds}
-                onSelectNode={onSelectNode}
-                onDeleteNode={onDeleteNode}
-                onRenameNode={onRenameNode}
-                onMoveNode={onMoveNode}
-                onToggleExpand={onToggleExpand}
-                onCopyNodeContent={onCopyNodeContent}
+                expandedIds={expandedIds}
+                onSelectNode={onSelect}
+                onDeleteNode={onDelete}
+                onRenameNode={onRename}
+                onMoveNode={onMove}
+                onToggleExpand={handleToggleExpand}
+                onCopyNodeContent={() => navigator.clipboard.writeText(node.content || '')}
                 searchTerm={searchTerm}
-                onMoveUp={onMoveUp}
-                onMoveDown={onMoveDown}
+                onMoveUp={() => { /* Placeholder */ }}
+                onMoveDown={() => { /* Placeholder */ }}
                 canMoveUp={index > 0}
-                canMoveDown={index < tree.length - 1}
+                canMoveDown={index < filtered.length - 1}
             />
-        ))}
-        {prompts.length === 0 && (
-            <li className="text-center text-text-secondary p-4 text-sm">
-                No documents or folders yet.
-            </li>
-        )}
-        {prompts.length > 0 && tree.length === 0 && (
-            <li className="text-center text-text-secondary p-4 text-sm">
-                No results found for "{searchTerm}".
-            </li>
-        )}
+            ))}
+            {items.length === 0 && (
+                <li className="text-center text-text-secondary p-4 text-sm">
+                    No documents yet.
+                </li>
+            )}
+            {items.length > 0 && searchTerm && !found && (
+                <li className="text-center text-text-secondary p-4 text-sm">
+                    No matching documents.
+                </li>
+            )}
         </ul>
-        {isRootDropping && (
-          <div className="absolute inset-2 bg-primary/10 border-2 border-dashed border-primary rounded-md pointer-events-none flex items-center justify-center">
-             <span className="text-sm font-semibold text-primary">Move to Root</span>
-          </div>
-        )}
+      </div>
     </div>
   );
 };
