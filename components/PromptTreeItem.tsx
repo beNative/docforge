@@ -168,6 +168,12 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     setDropPosition(null);
   };
   
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onContextMenu(e, node.id);
+  }
+
   return (
     <li
       ref={itemRef}
@@ -176,7 +182,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onContextMenu={(e) => onContextMenu(e, node.id)}
+      onContextMenu={handleContextMenu}
       style={{ paddingLeft: `${level * 16}px` }}
       className="relative"
       data-item-id={node.id}

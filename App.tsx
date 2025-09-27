@@ -26,6 +26,7 @@ import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
+import ContextMenu, { MenuItem } from './components/ContextMenu';
 // Types
 // Fix: Correctly import DocumentOrFolder which is now defined in types.ts
 import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate } from './types';
@@ -103,6 +104,7 @@ const MainApp: React.FC = () => {
     const [lastClickedId, setLastClickedId] = useState<string | null>(null);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
     const [expandedFolderIds, setExpandedFolderIds] = useState(new Set<string>());
+    const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
 
     // UI State
     const [view, setView] = useState<'editor' | 'info' | 'settings'>('editor');
@@ -120,6 +122,7 @@ const MainApp: React.FC = () => {
     const [updateInfo, setUpdateInfo] = useState<{ ready: boolean; version: string | null }>({ ready: false, version: null });
     const [confirmAction, setConfirmAction] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; position: { x: number, y: number }, items: MenuItem[] }>({ isOpen: false, position: { x: 0, y: 0 }, items: [] });
 
 
     const isSidebarResizing = useRef(false);
@@ -330,9 +333,9 @@ const MainApp: React.FC = () => {
         return activeNode.type === 'folder' ? activeNode.id : activeNode.parentId;
     }, [activeNode]);
 
-    const handleNewDocument = useCallback(async () => {
-        const parentId = getParentIdForNewItem();
-        const newDoc = await addDocument({ parentId });
+    const handleNewDocument = useCallback(async (parentId?: string | null) => {
+        const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
+        const newDoc = await addDocument({ parentId: effectiveParentId });
         setActiveNodeId(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
         setLastClickedId(newDoc.id);
@@ -341,25 +344,27 @@ const MainApp: React.FC = () => {
         setView('editor');
     }, [addDocument, getParentIdForNewItem]);
     
-    const handleNewRootFolder = useCallback(async () => {
-        const newFolder = await addFolder(null);
+    const handleNewFolder = useCallback(async (parentId?: string | null) => {
+        const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
+        const newFolder = await addFolder(effectiveParentId);
         setActiveNodeId(newFolder.id);
         setSelectedIds(new Set([newFolder.id]));
         setLastClickedId(newFolder.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addFolder]);
+    }, [addFolder, getParentIdForNewItem]);
+
+    const handleNewRootFolder = useCallback(async () => {
+        await handleNewFolder(null);
+    }, [handleNewFolder]);
 
     const handleNewSubfolder = useCallback(async () => {
         if (activeNode?.type === 'folder') {
-            const newFolder = await addFolder(activeNode.id, 'New Folder');
-            setActiveNodeId(newFolder.id);
-            setSelectedIds(new Set([newFolder.id]));
-            setLastClickedId(newFolder.id);
+            await handleNewFolder(activeNode.id);
             setExpandedFolderIds(prev => new Set(prev).add(activeNode.id));
         }
-    }, [addFolder, activeNode]);
+    }, [handleNewFolder, activeNode]);
 
     const handleDuplicateSelection = useCallback(async () => {
         if (selectedIds.size > 0) {
@@ -586,6 +591,15 @@ const MainApp: React.FC = () => {
         });
     };
 
+    const handleExpandAll = () => {
+        const allFolderIds = items.filter(item => item.type === 'folder').map(item => item.id);
+        setExpandedFolderIds(new Set(allFolderIds));
+    };
+
+    const handleCollapseAll = () => {
+        setExpandedFolderIds(new Set());
+    };
+
     const toggleSettingsView = () => {
         setView(v => v === 'settings' ? 'editor' : 'settings')
     }
@@ -599,6 +613,50 @@ const MainApp: React.FC = () => {
         }
     }, [items, commitVersion, addLog]);
 
+    const handleContextMenu = useCallback((e: React.MouseEvent, nodeId: string | null) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        let currentSelection = selectedIds;
+        if (nodeId && !selectedIds.has(nodeId)) {
+            // If right-clicking on an unselected item, make it the only selected item.
+            const newSelection = new Set([nodeId]);
+            setSelectedIds(newSelection);
+            setLastClickedId(nodeId);
+            currentSelection = newSelection;
+        }
+
+        const menuItems: MenuItem[] = [];
+        const selectedNodes = items.filter(item => currentSelection.has(item.id));
+        const hasDocuments = selectedNodes.some(n => n.type === 'document');
+        const firstSelectedNode = nodeId ? items.find(i => i.id === nodeId) : null;
+        const parentIdForNewItem = firstSelectedNode?.type === 'folder' ? firstSelectedNode.id : firstSelectedNode?.parentId ?? null;
+        
+        if (nodeId) { // Clicked on an item
+            menuItems.push(
+                { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem) },
+                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem) },
+                { type: 'separator' },
+                { label: 'Rename', icon: PencilIcon, action: () => setRenamingNodeId(nodeId), disabled: currentSelection.size !== 1 },
+                { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0 },
+                { type: 'separator' },
+                { label: 'Copy Content', icon: CopyIcon, action: () => hasDocuments && handleCopyNodeContent(selectedNodes.find(n => n.type === 'document')!.id), disabled: !hasDocuments},
+                { type: 'separator' },
+                { label: 'Delete', icon: TrashIcon, action: () => handleDeleteSelection(currentSelection), disabled: currentSelection.size === 0 }
+            );
+        } else { // Clicked on empty space
+             menuItems.push(
+                { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null) },
+                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null) }
+            );
+        }
+
+        setContextMenu({
+            isOpen: true,
+            position: { x: e.clientX, y: e.clientY },
+            items: menuItems
+        });
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent]);
 
     // --- Resizable Panels Logic ---
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -708,7 +766,7 @@ const MainApp: React.FC = () => {
     
     // Command Palette Commands
     const commands: Command[] = useMemo(() => [
-        { id: 'new-document', name: 'Create New Document', action: handleNewDocument, category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'], keywords: 'add create file' },
+        { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'], keywords: 'add create file' },
         { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
         { id: 'new-from-template', name: 'New Document from Template...', action: () => setCreateFromTemplateOpen(true), category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create file instance' },
@@ -767,9 +825,9 @@ const MainApp: React.FC = () => {
                     />
                 );
             }
-            return <WelcomeScreen onNewDocument={handleNewDocument} />;
+            return <WelcomeScreen onNewDocument={() => handleNewDocument()} />;
         }
-        return <WelcomeScreen onNewDocument={handleNewDocument} />;
+        return <WelcomeScreen onNewDocument={() => handleNewDocument()} />;
     };
 
     const headerProps = {
@@ -818,15 +876,20 @@ const MainApp: React.FC = () => {
                                     onDeleteNode={handleDeleteNode}
                                     onRenameNode={handleRenameNode}
                                     onMoveNode={moveItems}
-                                    onNewDocument={handleNewDocument}
+                                    onNewDocument={() => handleNewDocument()}
                                     onNewRootFolder={handleNewRootFolder}
                                     onNewSubfolder={handleNewSubfolder}
                                     onDuplicateSelection={handleDuplicateSelection}
                                     onCopyNodeContent={handleCopyNodeContent}
                                     expandedFolderIds={expandedFolderIds}
                                     onToggleExpand={handleToggleExpand}
+                                    onExpandAll={handleExpandAll}
+                                    onCollapseAll={handleCollapseAll}
                                     searchTerm={searchTerm}
                                     setSearchTerm={setSearchTerm}
+                                    onContextMenu={handleContextMenu}
+                                    renamingNodeId={renamingNodeId}
+                                    onRenameComplete={() => setRenamingNodeId(null)}
 
                                     templates={templates}
                                     activeTemplateId={activeTemplateId}
@@ -879,6 +942,7 @@ const MainApp: React.FC = () => {
                     setCommandPaletteSearch('');
                 }}
             />
+             <ContextMenu {...contextMenu} onClose={() => setContextMenu(prev => ({ ...prev, isOpen: false }))} />
 
             {isCreateFromTemplateOpen && (
                 <CreateFromTemplateModal

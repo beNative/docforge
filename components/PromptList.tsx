@@ -26,6 +26,7 @@ interface DocumentListProps {
 const DocumentList: React.FC<DocumentListProps> = ({ 
   tree, documents, selectedIds, focusedItemId, onSelectNode, onDeleteNode, onRenameNode, onMoveNode, onCopyNodeContent, searchTerm, expandedIds, onToggleExpand, onMoveUp, onMoveDown, onContextMenu, renamingNodeId, onRenameComplete
 }) => {
+  // Fix: Corrected useState declaration syntax from `=>` to `=`. This resolves all subsequent "cannot find name" errors.
   const [isRootDropping, setIsRootDropping] = useState(false);
   
   const handleRootDrop = (e: React.DragEvent) => {
@@ -62,9 +63,11 @@ const DocumentList: React.FC<DocumentListProps> = ({
   
   const handleRootContextMenu = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
+    // Prevent root context menu if clicking on a draggable item
     if (target.closest('li[draggable="true"]')) {
       return;
     }
+    e.preventDefault();
     onContextMenu(e, null);
   };
 

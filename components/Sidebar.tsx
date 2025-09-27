@@ -4,7 +4,7 @@ import TemplateList from './TemplateList';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DocumentTemplate } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, FolderDownIcon, ChevronDownIcon, ChevronRightIcon, CopyIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, FolderDownIcon, ChevronDownIcon, ChevronRightIcon, CopyIcon, ExpandAllIcon, CollapseAllIcon } from './Icons';
 import Button from './Button';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
@@ -33,8 +33,13 @@ interface SidebarProps {
   onCopyNodeContent: (id: string) => void;
   expandedFolderIds: Set<string>;
   onToggleExpand: (id: string) => void;
+  onExpandAll: () => void;
+  onCollapseAll: () => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
+  onContextMenu: (e: React.MouseEvent, nodeId: string | null) => void;
+  renamingNodeId: string | null;
+  onRenameComplete: () => void;
 
   templates: DocumentTemplate[];
   activeTemplateId: string | null;
@@ -63,7 +68,7 @@ const DEFAULT_DOCS_PANEL_HEIGHT_PERCENT = 60;
 const MIN_PANEL_HEIGHT = 100;
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId } = props;
+  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [docsPanelHeight, setDocsPanelHeight] = useState<number | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
@@ -313,20 +318,18 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
           <header className="flex items-center justify-between p-2 flex-shrink-0 sticky top-0 bg-secondary z-10">
               <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
               <div className="flex items-center gap-1">
+              <IconButton onClick={onExpandAll} tooltip="Expand All" size="sm" tooltipPosition="bottom">
+                  <ExpandAllIcon />
+              </IconButton>
+              <IconButton onClick={onCollapseAll} tooltip="Collapse All" size="sm" tooltipPosition="bottom">
+                  <CollapseAllIcon />
+              </IconButton>
+              <div className="h-5 w-px bg-border-color mx-1"></div>
               <IconButton onClick={props.onNewDocument} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
                   <PlusIcon />
               </IconButton>
-              <IconButton onClick={props.onNewFromTemplate} tooltip="New from Template..." size="sm" tooltipPosition="bottom">
-                  <DocumentDuplicateIcon />
-              </IconButton>
               <IconButton onClick={props.onNewRootFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
                   <FolderPlusIcon />
-              </IconButton>
-              <IconButton onClick={props.onNewSubfolder} disabled={!activeNode || activeNode.type !== 'folder'} tooltip="New Subfolder" size="sm" tooltipPosition="bottom">
-                  <FolderDownIcon />
-              </IconButton>
-              <IconButton onClick={props.onDuplicateSelection} disabled={props.selectedIds.size === 0} tooltip="Duplicate Selection" size="sm" tooltipPosition="bottom">
-                  <CopyIcon />
               </IconButton>
               </div>
           </header>
@@ -346,6 +349,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 onToggleExpand={props.onToggleExpand}
                 onMoveUp={handleMoveUp}
                 onMoveDown={handleMoveDown}
+                onContextMenu={onContextMenu}
+                renamingNodeId={renamingNodeId}
+                onRenameComplete={onRenameComplete}
             />
           </div>
         </div>
@@ -387,6 +393,12 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
             </div>
           )}
         </div>
+      </div>
+      <div className="p-2 border-t border-border-color">
+        <Button onClick={props.onNewFromTemplate} variant="ghost" className="w-full">
+            <DocumentDuplicateIcon className="w-4 h-4 mr-2" />
+            New from Template...
+        </Button>
       </div>
     </div>
   );
