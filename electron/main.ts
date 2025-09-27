@@ -220,9 +220,7 @@ ipcMain.handle('dialog:open', async (_, options) => {
 // Read packaged doc files
 ipcMain.handle('docs:read', async (_, filename: string) => {
     try {
-        const docPath = app.isPackaged
-            ? path.join(process.resourcesPath, 'docs', filename)
-            : path.join(__dirname, '../../docs', filename);
+        const docPath = path.join(app.getAppPath(), 'docs', filename);
         const content = await fs.readFile(docPath, 'utf-8');
         return { success: true, content };
     } catch (error) {
