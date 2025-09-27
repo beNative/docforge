@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import ReactDOM from 'react-dom';
 // Hooks
 // Fix: Import the correct, implemented hook `useNodes` instead of the empty `usePrompts`.
-import { usePrompts } from './hooks/usePrompts';
+import { useDocuments } from './hooks/usePrompts';
 import { useTemplates } from './hooks/useTemplates';
 import { useSettings } from './hooks/useSettings';
 import { useLLMStatus } from './hooks/useLLMStatus';
@@ -27,8 +27,8 @@ import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 // Types
-// Fix: Correctly import PromptOrFolder which is now defined in types.ts
-import type { PromptOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, PromptTemplate } from './types';
+// Fix: Correctly import DocumentOrFolder which is now defined in types.ts
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, PromptTemplate } from './types';
 // Context
 import { IconProvider } from './contexts/IconContext';
 // Services & Constants
@@ -91,7 +91,7 @@ const App: React.FC = () => {
 const MainApp: React.FC = () => {
     // State Hooks
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addPrompt, addFolder, updateItem, deleteItem, moveItems, getDescendantIds } = usePrompts();
+    const { items, addDocument, addFolder, updateItem, deleteItem, moveItems, getDescendantIds } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate } = useTemplates();
     
     // Active Item State
@@ -102,7 +102,7 @@ const MainApp: React.FC = () => {
 
     // UI State
     const [view, setView] = useState<'editor' | 'info' | 'settings'>('editor');
-    const [promptView, setPromptView] = useState<'editor' | 'history'>('editor');
+    const [documentView, setDocumentView] = useState<'editor' | 'history'>('editor');
     const [isLoggerVisible, setIsLoggerVisible] = useState(false);
     const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
     const [commandPaletteSearch, setCommandPaletteSearch] = useState('');
@@ -141,8 +141,8 @@ const MainApp: React.FC = () => {
         return templates.find(t => t.template_id === activeTemplateId) || null;
     }, [templates, activeTemplateId]);
 
-    const activePrompt = useMemo(() => {
-        return activeNode?.type === 'prompt' ? activeNode : null;
+    const activeDocument = useMemo(() => {
+        return activeNode?.type === 'document' ? activeNode : null;
     }, [activeNode]);
 
     // Get app version
@@ -262,22 +262,22 @@ const MainApp: React.FC = () => {
         return activeNode.type === 'folder' ? activeNode.id : activeNode.parentId;
     }, [activeNode]);
 
-    const handleNewPrompt = useCallback(async () => {
+    const handleNewDocument = useCallback(async () => {
         const parentId = getParentIdForNewItem();
-        const newPrompt = await addPrompt({ parentId });
-        setActiveNodeId(newPrompt.id);
-        setSelectedIds(new Set([newPrompt.id]));
+        const newDoc = await addDocument({ parentId });
+        setActiveNodeId(newDoc.id);
+        setSelectedIds(new Set([newDoc.id]));
         setActiveTemplateId(null);
-        setPromptView('editor');
+        setDocumentView('editor');
         setView('editor');
-    }, [addPrompt, getParentIdForNewItem]);
+    }, [addDocument, getParentIdForNewItem]);
     
     const handleNewFolder = useCallback(async () => {
         const newFolder = await addFolder(null);
         setActiveNodeId(newFolder.id);
         setSelectedIds(new Set([newFolder.id]));
         setActiveTemplateId(null);
-        setPromptView('editor');
+        setDocumentView('editor');
         setView('editor');
     }, [addFolder]);
 
@@ -290,17 +290,17 @@ const MainApp: React.FC = () => {
     }, [addTemplate]);
 
     const handleCreateFromTemplate = useCallback(async (title: string, content: string) => {
-        const newPrompt = await addPrompt({ parentId: null, title, content });
-        setActiveNodeId(newPrompt.id);
-        setSelectedIds(new Set([newPrompt.id]));
+        const newDoc = await addDocument({ parentId: null, title, content });
+        setActiveNodeId(newDoc.id);
+        setSelectedIds(new Set([newDoc.id]));
         setActiveTemplateId(null);
-        setPromptView('editor');
+        setDocumentView('editor');
         setView('editor');
-    }, [addPrompt]);
+    }, [addDocument]);
 
     const handleSelectNode = (id: string, e: React.MouseEvent) => {
         if (activeNodeId !== id) {
-            setPromptView('editor');
+            setDocumentView('editor');
         }
         
         const isCtrl = e.ctrlKey || e.metaKey;
@@ -331,9 +331,9 @@ const MainApp: React.FC = () => {
         setView('editor');
     };
 
-    const handleSavePrompt = (updatedPrompt: Partial<Omit<PromptOrFolder, 'id'>>) => {
+    const handleSaveDocument = (updatedDoc: Partial<Omit<DocumentOrFolder, 'id'>>) => {
         if (activeNodeId) {
-            updateItem(activeNodeId, updatedPrompt);
+            updateItem(activeNodeId, updatedDoc);
         }
     };
     
@@ -353,17 +353,17 @@ const MainApp: React.FC = () => {
     
     const handleCopyNodeContent = useCallback(async (nodeId: string) => {
         const item = items.find(p => p.id === nodeId);
-        if (item && item.type === 'prompt' && item.content) {
+        if (item && item.type === 'document' && item.content) {
             try {
                 await navigator.clipboard.writeText(item.content);
-                addLog('INFO', `Content of prompt "${item.title}" copied to clipboard.`);
+                addLog('INFO', `Content of document "${item.title}" copied to clipboard.`);
             } catch (err) {
                 addLog('ERROR', `Failed to copy to clipboard: ${err instanceof Error ? err.message : 'Unknown error'}`);
             }
         } else if (item?.type === 'folder') {
             addLog('WARNING', 'Cannot copy content of a folder.');
         } else {
-            addLog('WARNING', 'Cannot copy content of an empty prompt.');
+            addLog('WARNING', 'Cannot copy content of an empty document.');
         }
     }, [items, addLog]);
 
@@ -398,7 +398,7 @@ const MainApp: React.FC = () => {
         if (!itemToDelete) return;
 
         const performDelete = async () => {
-            let nextNodeToSelect: PromptOrFolder | null = null;
+            let nextNodeToSelect: DocumentOrFolder | null = null;
             const currentItemIndex = items.findIndex(p => p.id === id);
 
             if (currentItemIndex > -1) {
@@ -434,8 +434,8 @@ const MainApp: React.FC = () => {
                 ? <>Are you sure you want to delete the folder <strong>"{itemToDelete.title}"</strong> and its {descendantCount} contents? This action cannot be undone.</>
                 : <>Are you sure you want to delete the empty folder <strong>"{itemToDelete.title}"</strong>?</>;
         } else {
-            title = 'Delete Prompt';
-            message = <>Are you sure you want to delete the prompt <strong>"{itemToDelete.title}"</strong>? This action cannot be undone.</>;
+            title = 'Delete Document';
+            message = <>Are you sure you want to delete the document <strong>"{itemToDelete.title}"</strong>? This action cannot be undone.</>;
         }
 
         setConfirmAction({
@@ -482,12 +482,12 @@ const MainApp: React.FC = () => {
         setView(v => v === 'settings' ? 'editor' : 'settings')
     }
 
-    const handleRestorePromptVersion = useCallback((promptId: string, content: string) => {
-        const prompt = items.find(p => p.id === promptId);
-        if (prompt) {
-            updateItem(promptId, { content });
-            addLog('INFO', `Restored prompt "${prompt.title}" to a previous version.`);
-            setPromptView('editor');
+    const handleRestoreDocumentVersion = useCallback((documentId: string, content: string) => {
+        const doc = items.find(p => p.id === documentId);
+        if (doc) {
+            updateItem(documentId, { content });
+            addLog('INFO', `Restored document "${doc.title}" to a previous version.`);
+            setDocumentView('editor');
         }
     }, [items, updateItem, addLog]);
 
@@ -586,7 +586,7 @@ const MainApp: React.FC = () => {
 
             if (isCtrl && e.key === 'n') {
                 e.preventDefault();
-                handleNewPrompt();
+                handleNewDocument();
             }
             if (isCtrl && e.shiftKey && e.key === 'P') {
                 e.preventDefault();
@@ -596,23 +596,23 @@ const MainApp: React.FC = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleNewPrompt, handleToggleCommandPalette]);
+    }, [handleNewDocument, handleToggleCommandPalette]);
     
     // Command Palette Commands
     const commands: Command[] = useMemo(() => [
-        { id: 'new-prompt', name: 'Create New Prompt', action: handleNewPrompt, category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'], keywords: 'add create file' },
+        { id: 'new-document', name: 'Create New Document', action: handleNewDocument, category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'], keywords: 'add create file' },
         { id: 'new-folder', name: 'Create New Folder', action: handleNewFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
-        { id: 'new-from-template', name: 'New Prompt from Template...', action: () => setCreateFromTemplateOpen(true), category: 'File', icon: PlusIcon, keywords: 'add create file instance' },
+        { id: 'new-from-template', name: 'New Document from Template...', action: () => setCreateFromTemplateOpen(true), category: 'File', icon: PlusIcon, keywords: 'add create file instance' },
         { id: 'delete-item', name: 'Delete Current Item', action: () => {
             if (activeTemplateId) handleDeleteTemplate(activeTemplateId);
             else if (activeNodeId) handleDeleteNode(activeNodeId);
         }, category: 'File', icon: TrashIcon, keywords: 'remove discard' },
-        { id: 'toggle-editor', name: 'Switch to Editor View', action: () => setView('editor'), category: 'View', icon: PencilIcon, keywords: 'main prompt' },
+        { id: 'toggle-editor', name: 'Switch to Editor View', action: () => setView('editor'), category: 'View', icon: PencilIcon, keywords: 'main document' },
         { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
         { id: 'toggle-info', name: 'Toggle Info View', action: () => setView(v => v === 'info' ? 'editor' : 'info'), category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => setIsLoggerVisible(v => !v), category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [activeNodeId, activeTemplateId, handleNewPrompt, handleNewFolder, handleDeleteNode, handleDeleteTemplate, handleNewTemplate, toggleSettingsView]);
+    ], [activeNodeId, activeTemplateId, handleNewDocument, handleNewFolder, handleDeleteNode, handleDeleteTemplate, handleNewTemplate, toggleSettingsView]);
 
     const getSupportedIconSet = (iconSet: Settings['iconSet']): 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material' => {
         const supportedSets: Array<Settings['iconSet']> = ['heroicons', 'lucide', 'feather', 'tabler', 'material'];
@@ -639,13 +639,13 @@ const MainApp: React.FC = () => {
             />
         }
         if (activeNode) {
-            if (activeNode.type === 'prompt') {
-                if (promptView === 'history') {
+            if (activeNode.type === 'document') {
+                if (documentView === 'history') {
                     return (
                         <PromptHistoryView
                             prompt={activeNode}
-                            onBackToEditor={() => setPromptView('editor')}
-                            onRestore={(content) => handleRestorePromptVersion(activeNode.id, content)}
+                            onBackToEditor={() => setDocumentView('editor')}
+                            onRestore={(content) => handleRestoreDocumentVersion(activeNode.id, content)}
                         />
                     );
                 }
@@ -653,16 +653,16 @@ const MainApp: React.FC = () => {
                     <PromptEditor 
                         key={activeNode.id}
                         prompt={activeNode}
-                        onSave={handleSavePrompt}
+                        onSave={handleSaveDocument}
                         onDelete={handleDeleteNode}
                         settings={settings}
-                        onShowHistory={() => setPromptView('history')}
+                        onShowHistory={() => setDocumentView('history')}
                     />
                 );
             }
-            return <WelcomeScreen onNewPrompt={handleNewPrompt} />;
+            return <WelcomeScreen onNewPrompt={handleNewDocument} />;
         }
-        return <WelcomeScreen onNewPrompt={handleNewPrompt} />;
+        return <WelcomeScreen onNewPrompt={handleNewDocument} />;
     };
 
     const headerProps = {
@@ -705,7 +705,7 @@ const MainApp: React.FC = () => {
                                     onDeletePrompt={handleDeleteNode}
                                     onRenamePrompt={handleRenameNode}
                                     onMovePrompt={moveItems}
-                                    onNewPrompt={handleNewPrompt}
+                                    onNewPrompt={handleNewDocument}
                                     onNewFolder={handleNewFolder}
                                     onCopyPromptContent={handleCopyNodeContent}
                                     expandedFolderIds={expandedFolderIds}
@@ -735,8 +735,8 @@ const MainApp: React.FC = () => {
                     modelName={settings.llmModelName}
                     llmProviderName={settings.llmProviderName}
                     llmProviderUrl={settings.llmProviderUrl}
-                    promptCount={items.filter(i => i.type === 'prompt').length}
-                    lastSaved={activePrompt?.updatedAt}
+                    promptCount={items.filter(i => i.type === 'document').length}
+                    lastSaved={activeDocument?.updatedAt}
                     availableModels={availableModels}
                     onModelChange={handleModelChange}
                     discoveredServices={discoveredServices}

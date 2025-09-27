@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import Modal from './Modal';
 import Button from './Button';
@@ -43,14 +44,14 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
     for (const key in variables) {
       finalContent = finalContent.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'), variables[key]);
     }
-    onCreate(promptTitle.trim() || 'Untitled Prompt', finalContent);
+    onCreate(promptTitle.trim() || 'Untitled Document', finalContent);
     onClose();
   };
   
   const isFormValid = promptTitle.trim() !== '' && templateVariables.every(key => (variables[key] || '').trim() !== '');
 
   return (
-    <Modal onClose={onClose} title="Create Prompt from Template">
+    <Modal onClose={onClose} title="Create Document from Template">
       <div className="p-6 text-text-main space-y-4">
         <div>
           <label htmlFor="template-select" className="block text-sm font-medium text-text-secondary mb-1">
@@ -73,7 +74,7 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
           <>
             <div>
               <label htmlFor="prompt-title" className="block text-sm font-medium text-text-secondary mb-1">
-                New Prompt Title
+                New Document Title
               </label>
               <input
                 id="prompt-title"
@@ -116,7 +117,7 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
           Cancel
         </Button>
         <Button onClick={handleCreate} variant="primary" disabled={!selectedTemplate || !isFormValid}>
-          Create Prompt
+          Create Document
         </Button>
       </div>
     </Modal>

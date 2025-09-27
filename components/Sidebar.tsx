@@ -1,15 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import PromptList from './PromptList';
 import TemplateList from './TemplateList';
-// Fix: Correctly import the PromptOrFolder type.
-import type { PromptOrFolder, PromptTemplate } from '../types';
+// Fix: Correctly import the DocumentOrFolder type.
+import type { DocumentOrFolder, PromptTemplate } from '../types';
 import IconButton from './IconButton';
 import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon } from './Icons';
 import Button from './Button';
 import { PromptNode } from './PromptTreeItem';
 
 interface SidebarProps {
-  prompts: PromptOrFolder[];
+  prompts: DocumentOrFolder[];
   selectedIds: Set<string>;
   activePromptId: string | null;
   onSelectPrompt: (id: string, e: React.MouseEvent) => void;
@@ -31,7 +31,7 @@ interface SidebarProps {
   onNewFromTemplate: () => void;
 }
 
-type NavigableItem = { id: string; type: 'prompt' | 'folder' | 'template'; parentId: string | null; };
+type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
 
 // Helper function to find a node and its siblings in a tree structure
 const findNodeAndSiblings = (nodes: PromptNode[], id: string): {node: PromptNode, siblings: PromptNode[]} | null => {
@@ -58,7 +58,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     if (searchTerm.trim()) {
         const lowerCaseSearchTerm = searchTerm.toLowerCase();
         const visibleIds = new Set<string>();
-        const originalItemsById: Map<string, PromptOrFolder> = new Map(props.prompts.map(i => [i.id, i]));
+        const originalItemsById: Map<string, DocumentOrFolder> = new Map(props.prompts.map(i => [i.id, i]));
         const getAncestors = (itemId: string) => {
             let current = originalItemsById.get(itemId);
             while (current && current.parentId) {
@@ -105,7 +105,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     const flatList: NavigableItem[] = [];
     const flatten = (nodes: PromptNode[]) => {
       for (const node of nodes) {
-        // Fix: PromptNode extends PromptOrFolder, so it has id, type, and parentId.
+        // Fix: PromptNode extends DocumentOrFolder, so it has id, type, and parentId.
         flatList.push({ id: node.id, type: node.type, parentId: node.parentId });
         if (node.type === 'folder' && displayExpandedIds.has(node.id)) {
           flatten(node.children);
@@ -242,7 +242,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
             <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
             <input
                 type="text"
-                placeholder="Search prompts..."
+                placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-background border border-border-color rounded-md pl-9 pr-3 py-1.5 text-sm text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
@@ -252,12 +252,12 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       <div className="flex-1 overflow-y-auto">
         {/* --- Prompts Section --- */}
         <header className="flex items-center justify-between p-2 flex-shrink-0">
-            <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Prompts</h2>
+            <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
             <div className="flex items-center gap-1">
             <IconButton onClick={props.onNewFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
                 <FolderPlusIcon />
             </IconButton>
-            <IconButton onClick={props.onNewPrompt} tooltip="New Prompt (Ctrl+N)" size="sm" tooltipPosition="bottom">
+            <IconButton onClick={props.onNewPrompt} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
                 <PlusIcon />
             </IconButton>
             </div>

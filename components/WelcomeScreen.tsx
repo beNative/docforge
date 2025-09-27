@@ -14,7 +14,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNewPrompt }) => 
                 <FileIcon className="w-16 h-16 text-primary mx-auto mb-6" />
                 <h2 className="text-2xl font-semibold text-text-main mb-2">Welcome to DocForge</h2>
                 <p className="max-w-md mb-8 text-base">
-                    Your creative space for crafting, refining, and managing LLM prompts. Let's get started.
+                    Your creative space for crafting, refining, and managing documents. Let's get started.
                 </p>
                 <Button
                     onClick={onNewPrompt}
@@ -22,7 +22,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNewPrompt }) => 
                     className="px-6 py-3 text-base"
                 >
                     <PlusIcon className="w-5 h-5 mr-2" />
-                    Create New Prompt
+                    Create New Document
                 </Button>
             </div>
         </div>

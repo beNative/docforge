@@ -1,14 +1,15 @@
 
 
 
+
 import React, { useState } from 'react';
-// Fix: Correctly import the PromptOrFolder type.
-import type { PromptOrFolder } from '../types';
+// Fix: Correctly import the DocumentOrFolder type.
+import type { DocumentOrFolder } from '../types';
 import PromptTreeItem, { PromptNode } from './PromptTreeItem';
 
 interface PromptListProps {
   tree: PromptNode[];
-  prompts: PromptOrFolder[]; // needed for the empty state check
+  prompts: DocumentOrFolder[]; // needed for the empty state check
   selectedIds: Set<string>;
   focusedItemId: string | null;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
@@ -96,7 +97,7 @@ const PromptList: React.FC<PromptListProps> = ({
         ))}
         {prompts.length === 0 && (
             <li className="text-center text-text-secondary p-4 text-sm">
-                No prompts or folders yet.
+                No documents or folders yet.
             </li>
         )}
         {prompts.length > 0 && tree.length === 0 && (

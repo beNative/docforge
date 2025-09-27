@@ -7,16 +7,16 @@ This is the first public release of DocForge, a complete redesign and rebranding
 ### ✨ Key Features
 
 -   **Core Functionality:**
-    -   **Hierarchical Prompt Organization:** Organize prompts and ideas in a familiar folder structure with full drag-and-drop support (including multi-select).
+    -   **Hierarchical Document Organization:** Organize documents and ideas in a familiar folder structure with full drag-and-drop support (including multi-select).
     -   **AI-Powered Refinement & Titling:** Leverage a connected local LLM (like Ollama) to automatically refine prompt content and generate titles.
-    -   **Prompt Templating:** Create reusable templates with `{{variables}}` to streamline the creation of new prompts for recurring tasks.
-    -   **Full Version History:** Every significant change to a prompt is saved. View a complete history, see visual diffs between versions, and restore to any point in time.
+    -   **Prompt Templating:** Create reusable templates with `{{variables}}` to streamline the creation of new documents for recurring tasks.
+    -   **Full Version History:** Every significant change to a document is saved. View a complete history, see visual diffs between versions, and restore to any point in time.
     -   **Robust Local Database:** All data is stored in a local SQLite database, ensuring fast, reliable, and offline-first access. The application can automatically migrate data from older file-based versions.
 
 -   **Modern User Experience:**
     -   **Custom Title Bar & Command Palette:** A sleek, VS Code-style title bar integrates a powerful command palette (`Ctrl+Shift+P`) for quick access to all application functions.
-    -   **Advanced Markdown Editor:** Write prompts in Markdown with a live, side-by-side preview (vertical or horizontal split), syntax highlighting, and undo/redo support.
-    -   **Full Keyboard Navigation:** Navigate the entire sidebar, including prompts, folders, and templates, using only the keyboard.
+    -   **Advanced Markdown Editor:** Write documents in Markdown with a live, side-by-side preview (vertical or horizontal split), syntax highlighting, and undo/redo support.
+    -   **Full Keyboard Navigation:** Navigate the entire sidebar, including documents, folders, and templates, using only the keyboard.
     -   **Highly Customizable UI:**
         -   Switch between light and dark themes.
         -   Adjust the global UI scale to your preference.

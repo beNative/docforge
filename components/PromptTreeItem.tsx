@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-// Fix: Correctly import the PromptOrFolder type.
-import type { PromptOrFolder } from '../types';
+// Fix: Correctly import the DocumentOrFolder type.
+import type { DocumentOrFolder } from '../types';
 import IconButton from './IconButton';
 import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon } from './Icons';
 
-export interface PromptNode extends PromptOrFolder {
+export interface PromptNode extends DocumentOrFolder {
   children: PromptNode[];
 }
 

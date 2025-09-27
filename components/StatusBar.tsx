@@ -106,7 +106,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <span>Prompts: <span className="font-semibold text-text-main">{promptCount}</span></span>
+        <span>Documents: <span className="font-semibold text-text-main">{promptCount}</span></span>
         <div className="h-4 w-px bg-border-color"></div>
         <span>Last Saved: <span className="font-semibold text-text-main">{formatTimestamp(lastSaved)}</span></span>
         {appVersion && <div className="h-4 w-px bg-border-color"></div>}

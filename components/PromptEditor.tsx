@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-// Fix: Correctly import the PromptOrFolder type.
-import type { PromptOrFolder, Settings } from '../types';
+// Fix: Correctly import the DocumentOrFolder type.
+import type { DocumentOrFolder, Settings } from '../types';
 import { llmService } from '../services/llmService';
 import { SparklesIcon, TrashIcon, UndoIcon, RedoIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon } from './Icons';
 import Spinner from './Spinner';
@@ -17,8 +17,8 @@ declare const marked: any;
 type ViewMode = 'edit' | 'preview' | 'split-vertical' | 'split-horizontal';
 
 interface PromptEditorProps {
-  prompt: PromptOrFolder;
-  onSave: (prompt: Partial<Omit<PromptOrFolder, 'id'>>) => void;
+  prompt: DocumentOrFolder;
+  onSave: (prompt: Partial<Omit<DocumentOrFolder, 'id'>>) => void;
   onDelete: (id: string) => void;
   settings: Settings;
   onShowHistory: () => void;
@@ -65,7 +65,7 @@ const EditorPane: React.FC<EditorPaneProps> = ({ content, setContent, undo, redo
     return (
         <div 
             className="editor-container relative w-full h-full focus-within:ring-2 focus-within:ring-primary"
-            data-placeholder={!content ? "Enter your prompt here..." : ""}
+            data-placeholder={!content ? "Enter your document content here..." : ""}
         >
             <textarea
                 ref={editorRef}
@@ -201,7 +201,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onDelete, s
   const handleRefine = async () => {
     setIsRefining(true);
     setError(null);
-    addLog('INFO', `Requesting AI refinement for prompt: "${title}"`);
+    addLog('INFO', `Requesting AI refinement for document: "${title}"`);
     try {
       const result = await llmService.refinePrompt(content, settings, addLog);
       setRefinedContent(result);
@@ -247,13 +247,13 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onDelete, s
   const acceptRefinement = () => {
     if (refinedContent) {
       setContent(refinedContent); // This pushes the new state to history
-      addLog('INFO', `AI refinement accepted for prompt: "${title}"`);
+      addLog('INFO', `AI refinement accepted for document: "${title}"`);
     }
     setRefinedContent(null);
   };
 
   const discardRefinement = () => {
-    addLog('INFO', `AI refinement discarded for prompt: "${title}"`);
+    addLog('INFO', `AI refinement discarded for document: "${title}"`);
     setRefinedContent(null);
   }
 
@@ -262,7 +262,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onDelete, s
     try {
         await navigator.clipboard.writeText(content);
         setIsCopied(true);
-        addLog('INFO', `Prompt content copied to clipboard.`);
+        addLog('INFO', `Document content copied to clipboard.`);
         setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
         addLog('ERROR', `Failed to copy to clipboard: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -327,7 +327,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onDelete, s
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={isGeneratingTitle ? "Generating title..." : "Prompt Title"}
+              placeholder={isGeneratingTitle ? "Generating title..." : "Document Title"}
               disabled={isGeneratingTitle}
               className="bg-transparent text-2xl font-semibold text-text-main focus:outline-none w-full truncate placeholder:text-text-secondary disabled:opacity-70"
             />
@@ -380,13 +380,13 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onDelete, s
             
             <div className="h-6 w-px bg-border-color mx-1"></div>
 
-            <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Prompt'} size="sm" variant="ghost">
+            <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="sm" variant="ghost">
               {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
             </IconButton>
             <IconButton onClick={handleRefine} disabled={!content.trim() || viewMode === 'preview' || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">
                 {isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}
             </IconButton>
-            <IconButton onClick={() => onDelete(prompt.id)} tooltip="Delete Prompt" size="sm" variant="destructive">
+            <IconButton onClick={() => onDelete(prompt.id)} tooltip="Delete Document" size="sm" variant="destructive">
               <TrashIcon className="w-5 h-5" />
             </IconButton>
         </div>

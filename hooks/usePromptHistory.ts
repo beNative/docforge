@@ -34,7 +34,7 @@ export const usePromptHistory = (nodeId: string | null) => {
             return versions;
         }
         // This case should ideally not happen if the hook is used correctly.
-        // It indicates the component might have a stale prompt ID.
+        // It indicates the component might have a stale document ID.
         console.warn(`getVersionsForPrompt called with a different ID (${id}) than the hook was initialized with (${nodeId}). Refetching is recommended.`);
         return [];
     };

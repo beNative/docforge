@@ -80,10 +80,10 @@ export interface DocVersion {
 // Legacy Types (for migration & UI compatibility)
 // =================================================================
 
-// Fix: Renamed LegacyPromptOrFolder to PromptOrFolder to match what UI components expect.
-export interface PromptOrFolder {
+// This is the shape UI components expect. It's an adaptation of the `Node` type.
+export interface DocumentOrFolder {
   id: string;
-  type: 'prompt' | 'folder';
+  type: 'document' | 'folder';
   title: string;
   content?: string;
   createdAt: string;

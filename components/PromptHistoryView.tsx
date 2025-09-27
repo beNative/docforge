@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 // Fix: Import correct types. PromptVersion is an alias for DocVersion now.
-import type { PromptOrFolder, PromptVersion as Version } from '../types';
+import type { DocumentOrFolder, PromptVersion as Version } from '../types';
 // Fix: Import the new standalone hook.
 import { usePromptHistory } from '../hooks/usePromptHistory';
 import Button from './Button';
@@ -9,7 +9,7 @@ import { CheckIcon, CopyIcon, UndoIcon, ArrowLeftIcon } from './Icons';
 import IconButton from './IconButton';
 
 interface PromptHistoryViewProps {
-  prompt: PromptOrFolder;
+  prompt: DocumentOrFolder;
   onBackToEditor: () => void;
   onRestore: (content: string) => void;
 }

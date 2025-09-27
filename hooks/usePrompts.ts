@@ -1,14 +1,14 @@
 import { useCallback, useMemo } from 'react';
-import type { Node, PromptOrFolder } from '../types';
+import type { Node, DocumentOrFolder } from '../types';
 import { useNodes } from './useNodes';
 
 /**
  * Adapter function to convert the new `Node` data structure
- * to the legacy `PromptOrFolder` structure that UI components still use.
+ * to the legacy `DocumentOrFolder` structure that UI components still use.
  */
-const nodeToPromptOrFolder = (node: Node): PromptOrFolder => ({
+const nodeToDocumentOrFolder = (node: Node): DocumentOrFolder => ({
   id: node.node_id,
-  type: node.node_type === 'document' ? 'prompt' : 'folder',
+  type: node.node_type,
   title: node.title,
   content: node.document?.content,
   createdAt: node.created_at,
@@ -47,20 +47,20 @@ const getDescendantIdsRecursive = (nodeId: string, allNodes: Node[]): Set<string
  * A hook that adapts the new `useNodes` hook to the legacy API expected by `App.tsx`.
  * This allows the UI to function without a full refactor of all components.
  */
-export const usePrompts = () => {
+export const useDocuments = () => {
   const { nodes, addNode, updateNode, deleteNode, moveNodes, updateDocumentContent, refreshNodes } = useNodes();
 
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
-  const items: PromptOrFolder[] = useMemo(() => allNodesFlat.map(nodeToPromptOrFolder), [allNodesFlat]);
+  const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
 
-  const addPrompt = useCallback(async ({ parentId, title = 'New Prompt', content = '' }: { parentId: string | null, title?: string, content?: string }) => {
+  const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '' }: { parentId: string | null, title?: string, content?: string }) => {
     const newNode = await addNode({
       parent_id: parentId,
       node_type: 'document',
       title,
       document: { content, doc_type: 'prompt' } as any,
     });
-    return nodeToPromptOrFolder(newNode);
+    return nodeToDocumentOrFolder(newNode);
   }, [addNode]);
 
   const addFolder = useCallback(async (parentId: string | null, title: string = 'New Folder') => {
@@ -69,10 +69,10 @@ export const usePrompts = () => {
       node_type: 'folder',
       title,
     });
-    return nodeToPromptOrFolder(newNode);
+    return nodeToDocumentOrFolder(newNode);
   }, [addNode]);
 
-  const updateItem = useCallback(async (id: string, updates: Partial<Omit<PromptOrFolder, 'id'>>) => {
+  const updateItem = useCallback(async (id: string, updates: Partial<Omit<DocumentOrFolder, 'id'>>) => {
     if (updates.title !== undefined || updates.parentId !== undefined) {
         await updateNode(id, { title: updates.title, parent_id: updates.parentId });
     }
@@ -96,5 +96,5 @@ export const usePrompts = () => {
       return getDescendantIdsRecursive(nodeId, allNodesFlat);
   }, [allNodesFlat]);
 
-  return { items, addPrompt, addFolder, updateItem, deleteItem, moveItems, getDescendantIds, refresh: refreshNodes };
+  return { items, addDocument, addFolder, updateItem, deleteItem, moveItems, getDescendantIds, refresh: refreshNodes };
 };

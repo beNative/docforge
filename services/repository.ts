@@ -1,13 +1,13 @@
-import type { Node, Document, DocVersion, PromptOrFolder, PromptVersion, PromptTemplate, Settings, ContentStore } from '../types';
+import type { Node, Document, DocVersion, DocumentOrFolder, PromptVersion, PromptTemplate, Settings, ContentStore } from '../types';
 import { cryptoService } from './cryptoService';
 import { EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Transforms legacy PromptOrFolder[] data into the new normalized database schema.
+ * Transforms legacy DocumentOrFolder[] data into the new normalized database schema.
  */
 const transformLegacyData = async (
-    legacyPrompts: PromptOrFolder[], 
+    legacyPrompts: DocumentOrFolder[], 
     // Fix: Correctly type legacy versions as `any[]` as their shape (camelCase) differs from the new `PromptVersion` type (snake_case).
     legacyVersions: any[], 
     legacyTemplates: PromptTemplate[],
@@ -34,7 +34,7 @@ const transformLegacyData = async (
         nodes.push({
             node_id: item.id,
             parent_id: item.parentId,
-            node_type: item.type === 'prompt' ? 'document' : 'folder',
+            node_type: item.type === 'document' ? 'document' : 'folder',
             title: item.title,
             sort_order: sortOrder,
             created_at: item.createdAt,
@@ -42,7 +42,7 @@ const transformLegacyData = async (
         });
         siblingSortOrder.set(parentKey, sortOrder + 1);
 
-        if (item.type === 'prompt') {
+        if (item.type === 'document') {
             documents.push({
                 document_id: 0, // placeholder
                 node_id: item.id,
@@ -133,7 +133,7 @@ export const repository = {
                 window.electronAPI!.readLegacyFile(LOCAL_STORAGE_KEYS.LEGACY_SETTINGS),
             ]);
 
-            const legacyPrompts = promptsRes.success ? JSON.parse(promptsRes.data!) as PromptOrFolder[] : [];
+            const legacyPrompts = promptsRes.success ? JSON.parse(promptsRes.data!) as DocumentOrFolder[] : [];
             // Fix: Remove incorrect cast to `PromptVersion[]`. Legacy data has a different shape.
             const legacyVersions = versionsRes.success ? JSON.parse(versionsRes.data!) : [];
             const legacyTemplates = templatesRes.success ? JSON.parse(templatesRes.data!) as PromptTemplate[] : [];
