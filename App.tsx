@@ -91,7 +91,7 @@ const App: React.FC = () => {
 const MainApp: React.FC = () => {
     // State Hooks
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, deleteItem, moveItems, getDescendantIds } = useDocuments();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, moveItems, getDescendantIds } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate } = useTemplates();
     
     // Active Item State
@@ -330,10 +330,16 @@ const MainApp: React.FC = () => {
         setSelectedIds(new Set());
         setView('editor');
     };
-
-    const handleSaveDocument = (updatedDoc: Partial<Omit<DocumentOrFolder, 'id'>>) => {
+    
+    const handleSaveDocumentTitle = (updatedDoc: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => {
         if (activeNodeId) {
             updateItem(activeNodeId, updatedDoc);
+        }
+    };
+
+    const handleCommitVersion = (content: string) => {
+        if (activeNodeId) {
+            commitVersion(activeNodeId, content);
         }
     };
     
@@ -485,11 +491,11 @@ const MainApp: React.FC = () => {
     const handleRestoreDocumentVersion = useCallback((documentId: string, content: string) => {
         const doc = items.find(p => p.id === documentId);
         if (doc) {
-            updateItem(documentId, { content });
+            commitVersion(documentId, content);
             addLog('INFO', `Restored document "${doc.title}" to a previous version.`);
             setDocumentView('editor');
         }
-    }, [items, updateItem, addLog]);
+    }, [items, commitVersion, addLog]);
 
 
     // --- Resizable Panels Logic ---
@@ -653,7 +659,8 @@ const MainApp: React.FC = () => {
                     <PromptEditor 
                         key={activeNode.id}
                         prompt={activeNode}
-                        onSave={handleSaveDocument}
+                        onSave={handleSaveDocumentTitle}
+                        onCommitVersion={handleCommitVersion}
                         onDelete={handleDeleteNode}
                         settings={settings}
                         onShowHistory={() => setDocumentView('history')}

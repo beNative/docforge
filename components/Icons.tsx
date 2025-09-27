@@ -431,3 +431,14 @@ export const DatabaseIcon: React.FC<IconProps> = (props) => {
         case 'heroicons': default: return <HeroIcons.DatabaseIcon {...props} />;
     }
 };
+
+export const SaveIcon: React.FC<IconProps> = (props) => {
+    const { iconSet } = useIconSet();
+    switch (iconSet) {
+        case 'lucide': return <LucideIcons.SaveIcon {...props} />;
+        case 'feather': return <FeatherIcons.SaveIcon {...props} />;
+        case 'tabler': return <TablerIcons.SaveIcon {...props} />;
+        case 'material': return <MaterialIcons.SaveIcon {...props} />;
+        case 'heroicons': default: return <HeroIcons.SaveIcon {...props} />;
+    }
+};

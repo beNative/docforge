@@ -342,6 +342,27 @@ export const repository = {
             ORDER BY dv.created_at DESC
         `, [nodeId]);
     },
+
+    async deleteDocVersions(versionIds: number[]): Promise<void> {
+        if (versionIds.length === 0) return;
+
+        const placeholders = versionIds.map(() => '?').join(',');
+        
+        // Safety check: ensure we are not deleting a version that is currently active for any document.
+        const activeCheck = await window.electronAPI!.dbQuery(
+            `SELECT 1 FROM documents WHERE current_version_id IN (${placeholders})`,
+            versionIds
+        );
+        if (activeCheck.length > 0) {
+            throw new Error("Cannot delete a version that is currently active.");
+        }
+
+        await window.electronAPI!.dbRun(
+            `DELETE FROM doc_versions WHERE version_id IN (${placeholders})`,
+            versionIds
+        );
+        // Note: This does not garbage collect from content_store, which is acceptable for now.
+    },
     
     async getAllTemplates(): Promise<PromptTemplate[]> {
         return window.electronAPI!.dbQuery(`SELECT * FROM templates ORDER BY title`);

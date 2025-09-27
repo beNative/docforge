@@ -26,6 +26,18 @@ export const usePromptHistory = (nodeId: string | null) => {
         fetchVersions();
     }, [fetchVersions]);
 
+    const deleteVersions = useCallback(async (versionIds: number[]) => {
+        try {
+            await repository.deleteDocVersions(versionIds);
+            addLog('INFO', `Deleted ${versionIds.length} version(s).`);
+            await fetchVersions(); // Refresh the list
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog('ERROR', `Failed to delete versions: ${message}`);
+            // Potentially show an error to the user here
+        }
+    }, [addLog, fetchVersions]);
+
     // The component that uses this seems to call this function.
     // While the state is already available, we provide this for API compatibility
     // with the existing component structure to minimize refactoring.
@@ -39,5 +51,5 @@ export const usePromptHistory = (nodeId: string | null) => {
         return [];
     };
 
-    return { versions, getVersionsForPrompt, refresh: fetchVersions };
+    return { versions, getVersionsForPrompt, refresh: fetchVersions, deleteVersions };
 };

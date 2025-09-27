@@ -72,16 +72,18 @@ export const useDocuments = () => {
     return nodeToDocumentOrFolder(newNode);
   }, [addNode]);
 
-  const updateItem = useCallback(async (id: string, updates: Partial<Omit<DocumentOrFolder, 'id'>>) => {
+  const updateItem = useCallback(async (id: string, updates: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => {
+    // This function now only handles metadata like title and parentId.
     if (updates.title !== undefined || updates.parentId !== undefined) {
         await updateNode(id, { title: updates.title, parent_id: updates.parentId });
     }
-    if (updates.content !== undefined) {
-        await updateDocumentContent(id, updates.content);
-    }
-    // No need to refresh here for title updates, as useNodes does an optimistic update.
-    // Full refresh is handled inside useNodes for structural changes.
-  }, [updateNode, updateDocumentContent]);
+  }, [updateNode]);
+
+  const commitVersion = useCallback(async (nodeId: string, content: string) => {
+      await updateDocumentContent(nodeId, content);
+      // After committing a new version, we need to refresh to get the new content.
+      await refreshNodes();
+  }, [updateDocumentContent, refreshNodes]);
 
   const deleteItem = useCallback(async (id: string) => {
       await deleteNode(id);
@@ -96,5 +98,5 @@ export const useDocuments = () => {
       return getDescendantIdsRecursive(nodeId, allNodesFlat);
   }, [allNodesFlat]);
 
-  return { items, addDocument, addFolder, updateItem, deleteItem, moveItems, getDescendantIds, refresh: refreshNodes };
+  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, moveItems, getDescendantIds, refresh: refreshNodes };
 };

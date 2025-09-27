@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, Settings } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, UndoIcon, RedoIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon } from './Icons';
+import { SparklesIcon, TrashIcon, UndoIcon, RedoIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
@@ -18,7 +18,8 @@ type ViewMode = 'edit' | 'preview' | 'split-vertical' | 'split-horizontal';
 
 interface PromptEditorProps {
   prompt: DocumentOrFolder;
-  onSave: (prompt: Partial<Omit<DocumentOrFolder, 'id'>>) => void;
+  onSave: (prompt: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => void;
+  onCommitVersion: (content: string) => void;
   onDelete: (id: string) => void;
   settings: Settings;
   onShowHistory: () => void;
@@ -100,7 +101,7 @@ const PreviewPane: React.FC<{ renderedPreviewHtml: string }> = React.memo(({ ren
 // Main PromptEditor Component
 // =================================================================================
 
-const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onDelete, settings, onShowHistory }) => {
+const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onCommitVersion, onDelete, settings, onShowHistory }) => {
   const [title, setTitle] = useState(prompt.title);
   const { state: content, setState: setContent, undo, redo, canUndo, canRedo } = useHistoryState(prompt.content || '');
   
@@ -117,30 +118,29 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onDelete, s
   const isResizing = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
-  // Switch back to edit mode and reset split if prompt changes
+  // Reset view and state when prompt changes
   useEffect(() => {
+    setTitle(prompt.title);
+    setContent(prompt.content || '');
     setViewMode('edit');
     setSplitSize(50);
-  }, [prompt.id]);
+  }, [prompt.id, prompt.title, prompt.content, setContent]);
   
-  // Effect to detect unsaved changes
+  // Effect to detect unsaved content changes
   useEffect(() => {
-    const hasUnsavedChanges = title !== prompt.title || content !== prompt.content;
-    setIsDirty(hasUnsavedChanges);
-  }, [title, content, prompt.title, prompt.content]);
+    setIsDirty(content !== prompt.content);
+  }, [content, prompt.content]);
 
-  // Consolidated and debounced auto-save effect
+  // Debounced auto-save for title only
   useEffect(() => {
-    if (!isDirty) {
+    if (title === prompt.title) {
       return;
     }
-
     const handler = setTimeout(() => {
-      onSave({ ...prompt, title, content });
-    }, 500); // 500ms debounce time
-
+      onSave({ title });
+    }, 500);
     return () => clearTimeout(handler);
-  }, [title, content, isDirty, onSave, prompt]);
+  }, [title, onSave, prompt.title]);
   
   const renderedPreviewHtml = useMemo(() => {
     if (typeof marked === 'undefined' || !content) {
@@ -198,6 +198,12 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onDelete, s
   }, [handleGlobalMouseMove, handleGlobalMouseUp]);
 
   // --- Action Handlers ---
+  const handleManualSave = () => {
+    if (isDirty) {
+      onCommitVersion(content);
+    }
+  };
+
   const handleRefine = async () => {
     setIsRefining(true);
     setError(null);
@@ -386,6 +392,10 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onDelete, s
             <IconButton onClick={handleRefine} disabled={!content.trim() || viewMode === 'preview' || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">
                 {isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}
             </IconButton>
+            <Button onClick={handleManualSave} disabled={!isDirty || isRefining} variant="primary">
+                <SaveIcon className="w-4 h-4 mr-2" />
+                Save Version
+            </Button>
             <IconButton onClick={() => onDelete(prompt.id)} tooltip="Delete Document" size="sm" variant="destructive">
               <TrashIcon className="w-5 h-5" />
             </IconButton>
