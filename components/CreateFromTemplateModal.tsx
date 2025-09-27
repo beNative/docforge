@@ -1,12 +1,10 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import Modal from './Modal';
 import Button from './Button';
-import type { PromptTemplate } from '../types';
+import type { DocumentTemplate } from '../types';
 
 interface CreateFromTemplateModalProps {
-  templates: PromptTemplate[];
+  templates: DocumentTemplate[];
   onCreate: (title: string, content: string) => void;
   onClose: () => void;
 }
@@ -14,7 +12,7 @@ interface CreateFromTemplateModalProps {
 const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templates, onCreate, onClose }) => {
   // Fix: Use template_id instead of id
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(templates[0]?.template_id || '');
-  const [promptTitle, setPromptTitle] = useState('');
+  const [documentTitle, setDocumentTitle] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
 
   const selectedTemplate = useMemo(() => {
@@ -32,7 +30,7 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
 
   useEffect(() => {
     if (selectedTemplate) {
-      setPromptTitle(`${selectedTemplate.title} - Instance`);
+      setDocumentTitle(`${selectedTemplate.title} - Instance`);
       // Reset variables when template changes
       setVariables(templateVariables.reduce((acc, key) => ({ ...acc, [key]: '' }), {}));
     }
@@ -44,11 +42,11 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
     for (const key in variables) {
       finalContent = finalContent.replace(new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g'), variables[key]);
     }
-    onCreate(promptTitle.trim() || 'Untitled Document', finalContent);
+    onCreate(documentTitle.trim() || 'Untitled Document', finalContent);
     onClose();
   };
   
-  const isFormValid = promptTitle.trim() !== '' && templateVariables.every(key => (variables[key] || '').trim() !== '');
+  const isFormValid = documentTitle.trim() !== '' && templateVariables.every(key => (variables[key] || '').trim() !== '');
 
   return (
     <Modal onClose={onClose} title="Create Document from Template">
@@ -79,8 +77,8 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
               <input
                 id="prompt-title"
                 type="text"
-                value={promptTitle}
-                onChange={(e) => setPromptTitle(e.target.value)}
+                value={documentTitle}
+                onChange={(e) => setDocumentTitle(e.target.value)}
                 className="w-full p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>

@@ -6,7 +6,7 @@ interface StatusBarProps {
   modelName: string;
   llmProviderName: string;
   llmProviderUrl: string;
-  promptCount: number;
+  documentCount: number;
   lastSaved?: string;
   availableModels: DiscoveredLLMModel[];
   onModelChange: (modelId: string) => void;
@@ -34,7 +34,7 @@ const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: st
 };
 
 const StatusBar: React.FC<StatusBarProps> = ({ 
-    status, modelName, llmProviderName, llmProviderUrl, promptCount, lastSaved, availableModels, onModelChange, discoveredServices, onProviderChange, appVersion
+    status, modelName, llmProviderName, llmProviderUrl, documentCount, lastSaved, availableModels, onModelChange, discoveredServices, onProviderChange, appVersion
 }) => {
   const { text, color, tooltip } = statusConfig[status];
   const selectedService = discoveredServices.find(s => s.generateUrl === llmProviderUrl);
@@ -106,7 +106,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
         </div>
       </div>
       <div className="flex items-center gap-4">
-        <span>Documents: <span className="font-semibold text-text-main">{promptCount}</span></span>
+        <span>Documents: <span className="font-semibold text-text-main">{documentCount}</span></span>
         <div className="h-4 w-px bg-border-color"></div>
         <span>Last Saved: <span className="font-semibold text-text-main">{formatTimestamp(lastSaved)}</span></span>
         {appVersion && <div className="h-4 w-px bg-border-color"></div>}

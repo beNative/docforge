@@ -1,22 +1,22 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-// Fix: Import correct types. PromptVersion is an alias for DocVersion now.
-import type { DocumentOrFolder, PromptVersion as Version } from '../types';
+// Fix: Import correct types. DocumentVersion is an alias for DocVersion now.
+import type { DocumentOrFolder, DocumentVersion as Version } from '../types';
 // Fix: Import the new standalone hook.
-import { usePromptHistory } from '../hooks/usePromptHistory';
+import { useDocumentHistory } from '../hooks/usePromptHistory';
 import Button from './Button';
 import DiffViewer from './DiffViewer';
 import { CheckIcon, CopyIcon, UndoIcon, ArrowLeftIcon, TrashIcon } from './Icons';
 import IconButton from './IconButton';
 import ConfirmModal from './ConfirmModal';
 
-interface PromptHistoryViewProps {
-  prompt: DocumentOrFolder;
+interface DocumentHistoryViewProps {
+  document: DocumentOrFolder;
   onBackToEditor: () => void;
   onRestore: (content: string) => void;
 }
 
-const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToEditor, onRestore }) => {
-  const { versions, deleteVersions } = usePromptHistory(prompt.id);
+const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onBackToEditor, onRestore }) => {
+  const { versions, deleteVersions } = useDocumentHistory(document.id);
   const [isCopied, setIsCopied] = useState(false);
   const [selectedVersionIds, setSelectedVersionIds] = useState<Set<number>>(new Set());
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -25,23 +25,23 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
     const historyVersions = versions.map(v => ({
       ...v,
       id: String(v.version_id), 
-      promptId: prompt.id, 
+      documentId: document.id, 
       createdAt: v.created_at 
     }));
 
     return [
       {
           id: 'current',
-          promptId: prompt.id,
-          content: prompt.content || '',
-          createdAt: prompt.updatedAt,
+          documentId: document.id,
+          content: document.content || '',
+          createdAt: document.updatedAt,
           version_id: -1,
           document_id: -1,
           content_id: -1,
       },
       ...historyVersions
     ];
-  }, [prompt, versions]);
+  }, [document, versions]);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(0);
@@ -155,7 +155,7 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
         <header className="flex justify-between items-center px-6 py-6 gap-4 flex-shrink-0 border-b border-border-color bg-secondary">
             <div className="flex items-center gap-3 flex-1 min-w-0">
                 <h1 className="text-2xl font-semibold text-text-main truncate">
-                    History for "{prompt.title}"
+                    History for "{document.title}"
                 </h1>
             </div>
             <div className="flex items-center gap-2">
@@ -244,4 +244,4 @@ const PromptHistoryView: React.FC<PromptHistoryViewProps> = ({ prompt, onBackToE
   );
 };
 
-export default PromptHistoryView;
+export default DocumentHistoryView;

@@ -3,7 +3,7 @@ import type { DocVersion } from '../types';
 import { repository } from '../services/repository';
 import { useLogger } from './useLogger';
 
-export const usePromptHistory = (nodeId: string | null) => {
+export const useDocumentHistory = (nodeId: string | null) => {
     const [versions, setVersions] = useState<DocVersion[]>([]);
     const { addLog } = useLogger();
 
@@ -43,15 +43,15 @@ export const usePromptHistory = (nodeId: string | null) => {
     // The component that uses this seems to call this function.
     // While the state is already available, we provide this for API compatibility
     // with the existing component structure to minimize refactoring.
-    const getVersionsForPrompt = (id: string) => {
+    const getVersionsForDocument = (id: string) => {
         if (id === nodeId) {
             return versions;
         }
         // This case should ideally not happen if the hook is used correctly.
         // It indicates the component might have a stale document ID.
-        console.warn(`getVersionsForPrompt called with a different ID (${id}) than the hook was initialized with (${nodeId}). Refetching is recommended.`);
+        console.warn(`getVersionsForDocument called with a different ID (${id}) than the hook was initialized with (${nodeId}). Refetching is recommended.`);
         return [];
     };
 
-    return { versions, getVersionsForPrompt, refresh: fetchVersions, deleteVersions };
+    return { versions, getVersionsForDocument, refresh: fetchVersions, deleteVersions };
 };

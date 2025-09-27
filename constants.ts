@@ -1,4 +1,4 @@
-import type { Settings, PromptTemplate } from './types';
+import type { Settings, DocumentTemplate } from './types';
 
 export const LOCAL_STORAGE_KEYS = {
   // UI state persistence:
@@ -25,7 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   uiScale: 100,
 };
 
-export const EXAMPLE_TEMPLATES: Omit<PromptTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [
+export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [
     {
         title: 'Creative Story Starter',
         content: 'Write the opening paragraph of a story about a {{character_type}} who discovers a mysterious {{object}} in a {{setting}}.',

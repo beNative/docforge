@@ -6,21 +6,21 @@ import type { DocVersion } from '../types';
 // A full implementation would require a Provider in App.tsx, which is a larger change.
 // For now, this lets the app compile and run.
 
-interface PromptHistoryContextType {
+interface DocumentHistoryContextType {
   versions: DocVersion[];
-  getVersionsForPrompt: (promptId: string) => DocVersion[];
+  getVersionsForDocument: (documentId: string) => DocVersion[];
 }
 
-export const PromptHistoryContext = createContext<PromptHistoryContextType | undefined>(
+export const DocumentHistoryContext = createContext<DocumentHistoryContextType | undefined>(
   undefined,
 );
 
-// This hook is now implemented in hooks/usePromptHistory.ts
+// This hook is now implemented in hooks/useDocumentHistory.ts
 // and doesn't require a context provider.
-export const usePromptHistoryContext = () => {
-    const context = useContext(PromptHistoryContext);
+export const useDocumentHistoryContext = () => {
+    const context = useContext(DocumentHistoryContext);
     if (context === undefined) {
-        throw new Error('usePromptHistoryContext must be used within a PromptHistoryProvider');
+        throw new Error('useDocumentHistoryContext must be used within a DocumentHistoryProvider');
     }
     return context;
 };

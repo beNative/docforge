@@ -1,4 +1,4 @@
-import type { Node, Document, DocVersion, DocumentOrFolder, PromptVersion, PromptTemplate, Settings, ContentStore } from '../types';
+import type { Node, Document, DocVersion, DocumentOrFolder, DocumentVersion, DocumentTemplate, Settings, ContentStore } from '../types';
 import { cryptoService } from './cryptoService';
 import { EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,10 +7,10 @@ import { v4 as uuidv4 } from 'uuid';
  * Transforms legacy DocumentOrFolder[] data into the new normalized database schema.
  */
 const transformLegacyData = async (
-    legacyPrompts: DocumentOrFolder[], 
-    // Fix: Correctly type legacy versions as `any[]` as their shape (camelCase) differs from the new `PromptVersion` type (snake_case).
+    legacyDocuments: DocumentOrFolder[], 
+    // Fix: Correctly type legacy versions as `any[]` as their shape (camelCase) differs from the new `DocumentVersion` type (snake_case).
     legacyVersions: any[], 
-    legacyTemplates: PromptTemplate[],
+    legacyTemplates: DocumentTemplate[],
     legacySettings: Settings
 ) => {
     const nodes: Omit<Node, 'children' | 'document'>[] = [];
@@ -18,8 +18,8 @@ const transformLegacyData = async (
     const docVersions: (Omit<DocVersion, 'content'> & { node_id: string, sha256_hex: string })[] = [];
     const contentStoreMap = new Map<string, string>(); // sha256 -> content
 
-    // Sort prompts to ensure parents are processed before children (for sorting)
-    const sortedPrompts = [...legacyPrompts].sort((a, b) => {
+    // Sort documents to ensure parents are processed before children (for sorting)
+    const sortedDocuments = [...legacyDocuments].sort((a, b) => {
         if (a.parentId === null && b.parentId !== null) return -1;
         if (a.parentId !== null && b.parentId === null) return 1;
         return 0;
@@ -27,7 +27,7 @@ const transformLegacyData = async (
     
     const siblingSortOrder = new Map<string, number>();
 
-    for (const item of sortedPrompts) {
+    for (const item of sortedDocuments) {
         const parentKey = item.parentId || 'root';
         const sortOrder = siblingSortOrder.get(parentKey) || 0;
         
@@ -133,13 +133,13 @@ export const repository = {
                 window.electronAPI!.readLegacyFile(LOCAL_STORAGE_KEYS.LEGACY_SETTINGS),
             ]);
 
-            const legacyPrompts = promptsRes.success ? JSON.parse(promptsRes.data!) as DocumentOrFolder[] : [];
-            // Fix: Remove incorrect cast to `PromptVersion[]`. Legacy data has a different shape.
+            const legacyDocuments = promptsRes.success ? JSON.parse(promptsRes.data!) as DocumentOrFolder[] : [];
+            // Fix: Remove incorrect cast to `DocumentVersion[]`. Legacy data has a different shape.
             const legacyVersions = versionsRes.success ? JSON.parse(versionsRes.data!) : [];
-            const legacyTemplates = templatesRes.success ? JSON.parse(templatesRes.data!) as PromptTemplate[] : [];
+            const legacyTemplates = templatesRes.success ? JSON.parse(templatesRes.data!) as DocumentTemplate[] : [];
             const legacySettings = settingsRes.success ? JSON.parse(settingsRes.data!) as Settings : {} as Settings;
 
-            const payload = await transformLegacyData(legacyPrompts, legacyVersions, legacyTemplates, legacySettings);
+            const payload = await transformLegacyData(legacyDocuments, legacyVersions, legacyTemplates, legacySettings);
             
             const result = await window.electronAPI!.dbMigrateFromJson(payload);
             if (!result.success) {
@@ -368,11 +368,11 @@ export const repository = {
         }
     },
     
-    async getAllTemplates(): Promise<PromptTemplate[]> {
+    async getAllTemplates(): Promise<DocumentTemplate[]> {
         return window.electronAPI!.dbQuery(`SELECT * FROM templates ORDER BY title`);
     },
     
-    async addTemplate(templateData: Omit<PromptTemplate, 'template_id' | 'created_at' | 'updated_at'>): Promise<PromptTemplate> {
+    async addTemplate(templateData: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>): Promise<DocumentTemplate> {
         const newId = uuidv4();
         const now = new Date().toISOString();
         await window.electronAPI!.dbRun(
@@ -382,7 +382,7 @@ export const repository = {
         return { ...templateData, template_id: newId, created_at: now, updated_at: now };
     },
     
-    async updateTemplate(templateId: string, updates: Partial<Omit<PromptTemplate, 'template_id'>>) {
+    async updateTemplate(templateId: string, updates: Partial<Omit<DocumentTemplate, 'template_id'>>) {
          const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
          if(fields.length === 0) return;
          await window.electronAPI!.dbRun(

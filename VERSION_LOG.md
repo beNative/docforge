@@ -24,14 +24,14 @@ This version introduces significant workflow enhancements, giving users more exp
 
 ## v0.1.0 - Initial Release
 
-This is the first public release of DocForge, a complete redesign and rebranding of the project. This version consolidates all previous features into a stable, modern, and efficient desktop application for managing and refining LLM prompts.
+This is the first public release of DocForge, a complete redesign and rebranding of the project. This version consolidates all previous features into a stable, modern, and efficient desktop application for managing and refining documents.
 
 ### ✨ Key Features
 
 -   **Core Functionality:**
     -   **Hierarchical Document Organization:** Organize documents and ideas in a familiar folder structure with full drag-and-drop support (including multi-select).
-    -   **AI-Powered Refinement & Titling:** Leverage a connected local LLM (like Ollama) to automatically refine prompt content and generate titles.
-    -   **Prompt Templating:** Create reusable templates with `{{variables}}` to streamline the creation of new documents for recurring tasks.
+    -   **AI-Powered Refinement & Titling:** Leverage a connected local LLM (like Ollama) to automatically refine document content and generate titles.
+    -   **Document Templating:** Create reusable templates with `{{variables}}` to streamline the creation of new documents for recurring tasks.
     -   **Full Version History:** Every significant change to a document is saved. View a complete history, see visual diffs between versions, and restore to any point in time.
     -   **Robust Local Database:** All data is stored in a local SQLite database, ensuring fast, reliable, and offline-first access. The application can automatically migrate data from older file-based versions.
 

@@ -1,39 +1,39 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import PromptList from './PromptList';
+import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
 // Fix: Correctly import the DocumentOrFolder type.
-import type { DocumentOrFolder, PromptTemplate } from '../types';
+import type { DocumentOrFolder, DocumentTemplate } from '../types';
 import IconButton from './IconButton';
 import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, FolderDownIcon } from './Icons';
 import Button from './Button';
-import { PromptNode } from './PromptTreeItem';
+import { DocumentNode } from './PromptTreeItem';
 
 type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
 
 interface SidebarProps {
-  prompts: DocumentOrFolder[];
-  promptTree: PromptNode[];
+  documents: DocumentOrFolder[];
+  documentTree: DocumentNode[];
   navigableItems: NavigableItem[];
   selectedIds: Set<string>;
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   lastClickedId: string | null;
   setLastClickedId: React.Dispatch<React.SetStateAction<string | null>>;
-  activePromptId: string | null;
-  onSelectPrompt: (id: string, e: React.MouseEvent) => void;
+  activeNodeId: string | null;
+  onSelectNode: (id: string, e: React.MouseEvent) => void;
   onDeleteSelection: () => void;
-  onRenamePrompt: (id: string, newTitle: string) => void;
-  onMovePrompt: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
-  onNewPrompt: () => void;
+  onRenameNode: (id: string, newTitle: string) => void;
+  onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onNewDocument: () => void;
   onNewRootFolder: () => void;
   onNewSubfolder: () => void;
   onDuplicateSelection: () => void;
-  onCopyPromptContent: (id: string) => void;
+  onCopyNodeContent: (id: string) => void;
   expandedFolderIds: Set<string>;
   onToggleExpand: (id: string) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
 
-  templates: PromptTemplate[];
+  templates: DocumentTemplate[];
   activeTemplateId: string | null;
   onSelectTemplate: (id: string) => void;
   onDeleteTemplate: (id: string) => void;
@@ -43,7 +43,7 @@ interface SidebarProps {
 }
 
 // Helper function to find a node and its siblings in a tree structure
-const findNodeAndSiblings = (nodes: PromptNode[], id: string): {node: PromptNode, siblings: PromptNode[]} | null => {
+const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: DocumentNode, siblings: DocumentNode[]} | null => {
     for (const node of nodes) {
         if (node.id === id) {
             return { node, siblings: nodes };
@@ -57,26 +57,26 @@ const findNodeAndSiblings = (nodes: PromptNode[], id: string): {node: PromptNode
 };
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const { promptTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId } = props;
+  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   
   const activeNode = useMemo(() => {
-    return props.prompts.find(p => p.id === props.activePromptId) || null;
-  }, [props.prompts, props.activePromptId]);
+    return props.documents.find(p => p.id === props.activeNodeId) || null;
+  }, [props.documents, props.activeNodeId]);
 
 
   // Effect to manage focus state
   useEffect(() => {
     if (!focusedItemId || !navigableItems.some(item => item.id === focusedItemId)) {
-      const activeItem = props.activePromptId || props.activeTemplateId;
+      const activeItem = props.activeNodeId || props.activeTemplateId;
       if (activeItem && navigableItems.some(item => item.id === activeItem)) {
         setFocusedItemId(activeItem);
       } else {
         setFocusedItemId(navigableItems[0]?.id || null);
       }
     }
-  }, [navigableItems, focusedItemId, props.activePromptId, props.activeTemplateId]);
+  }, [navigableItems, focusedItemId, props.activeNodeId, props.activeTemplateId]);
 
   // Effect to scroll focused item into view
   useEffect(() => {
@@ -87,7 +87,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   }, [focusedItemId]);
 
   const handleMoveUp = useCallback((id: string) => {
-      const result = findNodeAndSiblings(promptTree, id);
+      const result = findNodeAndSiblings(documentTree, id);
       if (!result) return;
       
       const { siblings } = result;
@@ -95,12 +95,12 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       
       if (index > 0) {
           const targetSiblingId = siblings[index - 1].id;
-          props.onMovePrompt([id], targetSiblingId, 'before');
+          props.onMoveNode([id], targetSiblingId, 'before');
       }
-  }, [promptTree, props.onMovePrompt]);
+  }, [documentTree, props.onMoveNode]);
   
   const handleMoveDown = useCallback((id: string) => {
-      const result = findNodeAndSiblings(promptTree, id);
+      const result = findNodeAndSiblings(documentTree, id);
       if (!result) return;
       
       const { siblings } = result;
@@ -108,9 +108,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       
       if (index < siblings.length - 1) {
           const targetSiblingId = siblings[index + 1].id;
-          props.onMovePrompt([id], targetSiblingId, 'after');
+          props.onMoveNode([id], targetSiblingId, 'after');
       }
-  }, [promptTree, props.onMovePrompt]);
+  }, [documentTree, props.onMoveNode]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (navigableItems.length === 0) return;
@@ -153,7 +153,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         if (item.type === 'template') {
             props.onSelectTemplate(item.id);
         } else {
-            props.onSelectPrompt(item.id, { ctrlKey: isCtrl } as React.MouseEvent);
+            props.onSelectNode(item.id, { ctrlKey: isCtrl } as React.MouseEvent);
         }
     };
 
@@ -182,7 +182,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         if (newItem.type === 'template') {
           props.onSelectTemplate(newItem.id);
         } else {
-          props.onSelectPrompt(newItem.id, { } as React.MouseEvent);
+          props.onSelectNode(newItem.id, { } as React.MouseEvent);
         }
         break;
       }
@@ -227,11 +227,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         </div>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {/* --- Prompts Section --- */}
+        {/* --- Documents Section --- */}
         <header className="flex items-center justify-between p-2 flex-shrink-0 sticky top-0 bg-secondary z-10">
             <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
             <div className="flex items-center gap-1">
-            <IconButton onClick={props.onNewPrompt} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
+            <IconButton onClick={props.onNewDocument} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
                 <PlusIcon />
             </IconButton>
             <IconButton onClick={props.onNewRootFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
@@ -245,16 +245,16 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
             </IconButton>
             </div>
         </header>
-        <PromptList 
-            tree={promptTree}
-            prompts={props.prompts}
+        <DocumentList 
+            tree={documentTree}
+            documents={props.documents}
             selectedIds={props.selectedIds}
             focusedItemId={focusedItemId}
-            onSelectNode={props.onSelectPrompt}
+            onSelectNode={props.onSelectNode}
             onDeleteNode={props.onDeleteSelection}
-            onRenameNode={props.onRenamePrompt}
-            onMoveNode={props.onMovePrompt}
-            onCopyNodeContent={props.onCopyPromptContent}
+            onRenameNode={props.onRenameNode}
+            onMoveNode={props.onMoveNode}
+            onCopyNodeContent={props.onCopyNodeContent}
             searchTerm={searchTerm}
             expandedIds={props.expandedFolderIds}
             onToggleExpand={props.onToggleExpand}

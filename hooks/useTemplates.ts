@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { PromptTemplate } from '../types';
+import type { DocumentTemplate } from '../types';
 import { repository } from '../services/repository';
 import { useLogger } from './useLogger';
 
 export const useTemplates = () => {
   const { addLog } = useLogger();
-  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
 
   const refreshTemplates = useCallback(async () => {
     try {
@@ -33,7 +33,7 @@ export const useTemplates = () => {
     return newTemplate;
   }, [addLog, refreshTemplates]);
 
-  const updateTemplate = useCallback(async (id: string, updatedTemplate: Partial<Omit<PromptTemplate, 'template_id'>>) => {
+  const updateTemplate = useCallback(async (id: string, updatedTemplate: Partial<Omit<DocumentTemplate, 'template_id'>>) => {
     await repository.updateTemplate(id, updatedTemplate);
     addLog('DEBUG', `Template updated with ID: ${id}`);
     await refreshTemplates();

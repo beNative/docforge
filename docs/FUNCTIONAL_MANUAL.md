@@ -63,7 +63,7 @@ This is the largest part of the application and displays the active content.
 
 - **Welcome Screen:** Shown when no document is selected or when a folder is selected.
 - **Document Editor:** The primary interface for writing and editing a document's content and title.
-- **Template Editor:** A similar editor for creating and modifying prompt templates.
+- **Template Editor:** A similar editor for creating and modifying document templates.
 - **Settings View:** A dedicated screen for configuring the application.
 - **Info View:** Displays documentation like the README and this manual.
 
@@ -117,11 +117,11 @@ You can drop an item (or a group of items):
 
 ### AI-Powered Refinement
 
-Clicking the **Refine with AI** (sparkles) button in the editor toolbar sends your current document content to your configured local LLM. The AI's task is not to *answer* the prompt, but to *improve* it. A modal will appear with the suggested refinement, which you can then accept or discard.
+Clicking the **Refine with AI** (sparkles) button in the editor toolbar sends your current document content to your configured local LLM. The AI's task is not to *answer* the document's request, but to *improve* the document itself. A modal will appear with the suggested refinement, which you can then accept or discard.
 
 ### Using Templates
 
-Templates are useful for prompts you create often.
+Templates are useful for documents you create often.
 
 - **Create a Template:** Use the "New Template" button in the sidebar. In the template editor, use `{{variable_name}}` syntax to define placeholders.
 - **Create from Template:** Click the "New from Template..." button at the bottom of the sidebar. A modal will appear allowing you to select a template and fill in the values for its variables. This will generate a new document with the content filled in.

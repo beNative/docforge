@@ -100,11 +100,11 @@ export interface DocumentOrFolder {
   parentId: string | null;
 }
 
-// Fix: Renamed LegacyPromptVersion to PromptVersion and aliased it to the new DocVersion type
+// Fix: Renamed LegacyPromptVersion to DocumentVersion and aliased it to the new DocVersion type
 // to ensure components using the old name continue to work.
-export type PromptVersion = DocVersion & {
+export type DocumentVersion = DocVersion & {
   id: string; // To match legacy structure if needed, though DocVersion uses version_id
-  promptId: string; // To match legacy structure
+  documentId: string; // To match legacy structure
 };
 
 
@@ -112,7 +112,7 @@ export type PromptVersion = DocVersion & {
 // Other Application Types (largely unchanged)
 // =================================================================
 
-export interface PromptTemplate {
+export interface DocumentTemplate {
   template_id: string;
   title: string;
   content: string;

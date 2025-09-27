@@ -106,6 +106,6 @@ This module handles all communication with the external Large Language Model. It
 
 -   **`App.tsx`:** The root component that orchestrates the entire application. It initializes the repository, triggers the data migration if needed, manages the main layout, and uses the data hooks (`useNodes`, `useSettings`, etc.).
 -   **`Sidebar.tsx`:** Manages the display of the `nodes` tree (documents and folders) and templates. It handles search/filtering, drag-and-drop, and keyboard navigation.
--   **`PromptEditor.tsx`:** The main editor. It now receives a `Node` object. When content is saved, it communicates with the repository to hash the content, create a new version, and update the database, leveraging the content-addressable storage system.
+-   **`DocumentEditor.tsx`:** The main editor. It now receives a `Node` object. When content is saved, it communicates with the repository to hash the content, create a new version, and update the database, leveraging the content-addressable storage system.
 -   **`SettingsView.tsx`:** Manages all application settings, which are now read from and saved to the `settings` table in the database.
--   **`PromptHistoryView.tsx`:** This view now fetches version history for a document directly from the database, providing a reliable timeline of changes.
+-   **`DocumentHistoryView.tsx`:** This view now fetches version history for a document directly from the database, providing a reliable timeline of changes.

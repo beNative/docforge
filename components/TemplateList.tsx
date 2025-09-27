@@ -1,13 +1,10 @@
-
-
-
 import React, { useState, useRef, useEffect } from 'react';
-import type { PromptTemplate } from '../types';
+import type { DocumentTemplate } from '../types';
 import IconButton from './IconButton';
 import { TrashIcon, DocumentDuplicateIcon } from './Icons';
 
 interface TemplateListProps {
-  templates: PromptTemplate[];
+  templates: DocumentTemplate[];
   activeTemplateId: string | null;
   focusedItemId: string | null;
   onSelectTemplate: (id: string) => void;
@@ -20,7 +17,7 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, activeTemplateId
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
 
-  const handleRenameStart = (e: React.MouseEvent, template: PromptTemplate) => {
+  const handleRenameStart = (e: React.MouseEvent, template: DocumentTemplate) => {
     e.stopPropagation();
     // Fix: Use template_id instead of id
     setRenamingId(template.template_id);

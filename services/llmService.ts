@@ -85,26 +85,26 @@ const makeLLMRequest = async (
 };
 
 export const llmService = {
-  refinePrompt: async (prompt: string, settings: Settings, addLog: (level: LogLevel, message: string) => void): Promise<string> => {
-    const metaPrompt = `You are a world-class prompt engineering assistant. Your task is to refine the following user-provided prompt to make it more effective, clear, and comprehensive for a large language model. Do not answer the prompt, but improve it. Return only the improved prompt text.
+  refineDocument: async (documentContent: string, settings: Settings, addLog: (level: LogLevel, message: string) => void): Promise<string> => {
+    const metaPrompt = `You are a world-class prompt engineering assistant. Your task is to refine the following user-provided document to make it more effective, clear, and comprehensive for a large language model. Do not answer the document's request, but improve it. Return only the improved document text.
 
-Original Prompt:
+Original Document:
 ---
-${prompt}
+${documentContent}
 ---
-Refined Prompt:`;
+Refined Document:`;
 
     const result = await makeLLMRequest(metaPrompt, settings, addLog);
-    addLog('INFO', 'Successfully received refined prompt from LLM provider.');
+    addLog('INFO', 'Successfully received refined document from LLM provider.');
     return result;
   },
 
-  generateTitle: async (promptContent: string, settings: Settings, addLog: (level: LogLevel, message: string) => void): Promise<string> => {
-    const metaPrompt = `Generate a concise, descriptive title for the following prompt. The title should be 5 words or less. Return ONLY the title text, without any quotation marks or labels like "Title:".
+  generateTitle: async (documentContent: string, settings: Settings, addLog: (level: LogLevel, message: string) => void): Promise<string> => {
+    const metaPrompt = `Generate a concise, descriptive title for the following document. The title should be 5 words or less. Return ONLY the title text, without any quotation marks or labels like "Title:".
 
-Prompt:
+Document:
 ---
-${promptContent}
+${documentContent}
 ---
 Title:`;
 

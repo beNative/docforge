@@ -4,10 +4,10 @@ import { PlusIcon, FileIcon } from './Icons';
 import Button from './Button';
 
 interface WelcomeScreenProps {
-  onNewPrompt: () => void;
+  onNewDocument: () => void;
 }
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNewPrompt }) => {
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNewDocument }) => {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center text-text-secondary p-8 bg-background">
             <div className="p-10 bg-secondary rounded-lg border border-border-color max-w-lg">
@@ -17,7 +17,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNewPrompt }) => 
                     Your creative space for crafting, refining, and managing documents. Let's get started.
                 </p>
                 <Button
-                    onClick={onNewPrompt}
+                    onClick={onNewDocument}
                     variant="primary"
                     className="px-6 py-3 text-base"
                 >

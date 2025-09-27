@@ -17,6 +17,9 @@ declare global {
   namespace NodeJS {
     interface Process {
       // The `resourcesPath` property is augmented in `types.ts`
+      // FIX: The augmentation from types.ts was not being picked up.
+      // Explicitly adding it here resolves the type error in this file.
+      resourcesPath: string;
     }
   }
 }

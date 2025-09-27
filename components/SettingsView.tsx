@@ -220,7 +220,7 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
                         ))}
                     </select>
                 </SettingRow>
-                <SettingRow label="Model Name" description="Select which model to use for generating titles and refining prompts.">
+                <SettingRow label="Model Name" description="Select which model to use for generating titles and refining documents.">
                      <div className="relative w-60">
                        <select
                             id="llmModelName"
@@ -322,7 +322,7 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
                  <SettingRow label="Database File" description="The application's data is stored in a local SQLite database file.">
                     <div className="text-sm text-text-main bg-background px-3 py-2 rounded-md border border-border-color w-full">
                         <p>Location: (managed by the application)</p>
-                        <p className="mt-1 text-xs text-text-secondary">This file contains all your prompts, folders, and history.</p>
+                        <p className="mt-1 text-xs text-text-secondary">This file contains all your documents, folders, and history.</p>
                     </div>
                 </SettingRow>
             </div>

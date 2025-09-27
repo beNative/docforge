@@ -1,15 +1,11 @@
-
-
-
-
 import React, { useState } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder } from '../types';
-import PromptTreeItem, { PromptNode } from './PromptTreeItem';
+import DocumentTreeItem, { DocumentNode } from './PromptTreeItem';
 
-interface PromptListProps {
-  tree: PromptNode[];
-  prompts: DocumentOrFolder[]; // needed for the empty state check
+interface DocumentListProps {
+  tree: DocumentNode[];
+  documents: DocumentOrFolder[]; // needed for the empty state check
   selectedIds: Set<string>;
   focusedItemId: string | null;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
@@ -24,8 +20,8 @@ interface PromptListProps {
   onMoveDown: (id: string) => void;
 }
 
-const PromptList: React.FC<PromptListProps> = ({ 
-  tree, prompts, selectedIds, focusedItemId, onSelectNode, onDeleteNode, onRenameNode, onMoveNode, onCopyNodeContent, searchTerm, expandedIds, onToggleExpand, onMoveUp, onMoveDown
+const DocumentList: React.FC<DocumentListProps> = ({ 
+  tree, documents, selectedIds, focusedItemId, onSelectNode, onDeleteNode, onRenameNode, onMoveNode, onCopyNodeContent, searchTerm, expandedIds, onToggleExpand, onMoveUp, onMoveDown
 }) => {
   const [isRootDropping, setIsRootDropping] = useState(false);
   
@@ -63,7 +59,7 @@ const PromptList: React.FC<PromptListProps> = ({
 
 
   const displayExpandedIds = searchTerm.trim() 
-      ? new Set(prompts.filter(i => i.type === 'folder').map(i => i.id)) 
+      ? new Set(documents.filter(i => i.type === 'folder').map(i => i.id)) 
       : expandedIds;
 
   return (
@@ -75,7 +71,7 @@ const PromptList: React.FC<PromptListProps> = ({
     >
         <ul className="space-y-0.5 p-2">
         {tree.map((node, index) => (
-            <PromptTreeItem
+            <DocumentTreeItem
                 key={node.id}
                 node={node}
                 level={0}
@@ -95,12 +91,12 @@ const PromptList: React.FC<PromptListProps> = ({
                 canMoveDown={index < tree.length - 1}
             />
         ))}
-        {prompts.length === 0 && (
+        {documents.length === 0 && (
             <li className="text-center text-text-secondary p-4 text-sm">
                 No documents or folders yet.
             </li>
         )}
-        {prompts.length > 0 && tree.length === 0 && (
+        {documents.length > 0 && tree.length === 0 && (
             <li className="text-center text-text-secondary p-4 text-sm">
                 No results found for "{searchTerm}".
             </li>
@@ -115,4 +111,4 @@ const PromptList: React.FC<PromptListProps> = ({
   );
 };
 
-export default PromptList;
+export default DocumentList;

@@ -9,7 +9,7 @@ import { useLLMStatus } from './hooks/useLLMStatus';
 import { useLogger } from './hooks/useLogger';
 // Components
 import Sidebar from './components/Sidebar';
-import PromptEditor from './components/PromptEditor';
+import DocumentEditor from './components/PromptEditor';
 import TemplateEditor from './components/TemplateEditor';
 import { WelcomeScreen } from './components/WelcomeScreen';
 // Fix: Add default import for SettingsView
@@ -20,7 +20,7 @@ import CommandPalette from './components/CommandPalette';
 import InfoView from './components/InfoView';
 import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
-import PromptHistoryView from './components/PromptHistoryView';
+import DocumentHistoryView from './components/PromptHistoryView';
 import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon } from './components/Icons';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -28,7 +28,7 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 // Types
 // Fix: Correctly import DocumentOrFolder which is now defined in types.ts
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, PromptTemplate } from './types';
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate } from './types';
 // Context
 import { IconProvider } from './contexts/IconContext';
 // Services & Constants
@@ -37,7 +37,7 @@ import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { LOCAL_STORAGE_KEYS } from './constants';
 import { repository } from './services/repository';
-import { PromptNode } from './components/PromptTreeItem';
+import { DocumentNode } from './components/PromptTreeItem';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -151,7 +151,7 @@ const MainApp: React.FC = () => {
         return activeNode?.type === 'document' ? activeNode : null;
     }, [activeNode]);
 
-    const { promptTree, navigableItems } = useMemo(() => {
+    const { documentTree, navigableItems } = useMemo(() => {
         let itemsToBuildFrom = items;
         if (searchTerm.trim()) {
             const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -181,8 +181,8 @@ const MainApp: React.FC = () => {
             });
             itemsToBuildFrom = items.filter(item => visibleIds.has(item.id));
         }
-        const itemsById = new Map<string, PromptNode>(itemsToBuildFrom.map(p => [p.id, { ...p, children: [] }]));
-        const rootNodes: PromptNode[] = [];
+        const itemsById = new Map<string, DocumentNode>(itemsToBuildFrom.map(p => [p.id, { ...p, children: [] }]));
+        const rootNodes: DocumentNode[] = [];
         for (const item of itemsToBuildFrom) {
             const node = itemsById.get(item.id)!;
             if (item.parentId && itemsById.has(item.parentId)) {
@@ -199,7 +199,7 @@ const MainApp: React.FC = () => {
             : expandedFolderIds;
 
         const flatList: NavigableItem[] = [];
-        const flatten = (nodes: PromptNode[]) => {
+        const flatten = (nodes: DocumentNode[]) => {
         for (const node of nodes) {
             flatList.push({ id: node.id, type: node.type, parentId: node.parentId });
             if (node.type === 'folder' && displayExpandedIds.has(node.id)) {
@@ -210,7 +210,7 @@ const MainApp: React.FC = () => {
         flatten(finalTree);
         templates.forEach(t => flatList.push({ id: t.template_id, type: 'template', parentId: null }));
 
-        return { promptTree: finalTree, navigableItems: flatList };
+        return { documentTree: finalTree, navigableItems: flatList };
     }, [items, templates, searchTerm, expandedFolderIds]);
 
     // Get app version
@@ -445,7 +445,7 @@ const MainApp: React.FC = () => {
         }
     };
     
-    const handleSaveTemplate = (updatedTemplate: Partial<Omit<PromptTemplate, 'template_id'>>) => {
+    const handleSaveTemplate = (updatedTemplate: Partial<Omit<DocumentTemplate, 'template_id'>>) => {
         if (activeTemplateId) {
             updateTemplate(activeTemplateId, updatedTemplate);
         }
@@ -736,17 +736,17 @@ const MainApp: React.FC = () => {
             if (activeNode.type === 'document') {
                 if (documentView === 'history') {
                     return (
-                        <PromptHistoryView
-                            prompt={activeNode}
+                        <DocumentHistoryView
+                            document={activeNode}
                             onBackToEditor={() => setDocumentView('editor')}
                             onRestore={(content) => handleRestoreDocumentVersion(activeNode.id, content)}
                         />
                     );
                 }
                 return (
-                    <PromptEditor 
+                    <DocumentEditor 
                         key={activeNode.id}
-                        prompt={activeNode}
+                        document={activeNode}
                         onSave={handleSaveDocumentTitle}
                         onCommitVersion={handleCommitVersion}
                         onDelete={handleDeleteNode}
@@ -755,9 +755,9 @@ const MainApp: React.FC = () => {
                     />
                 );
             }
-            return <WelcomeScreen onNewPrompt={handleNewDocument} />;
+            return <WelcomeScreen onNewDocument={handleNewDocument} />;
         }
-        return <WelcomeScreen onNewPrompt={handleNewDocument} />;
+        return <WelcomeScreen onNewDocument={handleNewDocument} />;
     };
 
     const headerProps = {
@@ -793,23 +793,23 @@ const MainApp: React.FC = () => {
                                 className="bg-secondary border-r border-border-color flex flex-col flex-shrink-0"
                             >
                                 <Sidebar 
-                                    prompts={items}
-                                    promptTree={promptTree}
+                                    documents={items}
+                                    documentTree={documentTree}
                                     navigableItems={navigableItems}
                                     selectedIds={selectedIds}
                                     setSelectedIds={setSelectedIds}
                                     lastClickedId={lastClickedId}
                                     setLastClickedId={setLastClickedId}
-                                    activePromptId={activeNodeId}
-                                    onSelectPrompt={handleSelectNode}
+                                    activeNodeId={activeNodeId}
+                                    onSelectNode={handleSelectNode}
                                     onDeleteSelection={handleDeleteSelection}
-                                    onRenamePrompt={handleRenameNode}
-                                    onMovePrompt={moveItems}
-                                    onNewPrompt={handleNewDocument}
+                                    onRenameNode={handleRenameNode}
+                                    onMoveNode={moveItems}
+                                    onNewDocument={handleNewDocument}
                                     onNewRootFolder={handleNewRootFolder}
                                     onNewSubfolder={handleNewSubfolder}
                                     onDuplicateSelection={handleDuplicateSelection}
-                                    onCopyPromptContent={handleCopyNodeContent}
+                                    onCopyNodeContent={handleCopyNodeContent}
                                     expandedFolderIds={expandedFolderIds}
                                     onToggleExpand={handleToggleExpand}
                                     searchTerm={searchTerm}
@@ -839,7 +839,7 @@ const MainApp: React.FC = () => {
                     modelName={settings.llmModelName}
                     llmProviderName={settings.llmProviderName}
                     llmProviderUrl={settings.llmProviderUrl}
-                    promptCount={items.filter(i => i.type === 'document').length}
+                    documentCount={items.filter(i => i.type === 'document').length}
                     lastSaved={activeDocument?.updatedAt}
                     availableModels={availableModels}
                     onModelChange={handleModelChange}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import type { PromptTemplate } from '../types';
+import type { DocumentTemplate } from '../types';
 import { TrashIcon } from './Icons';
 import { useHistoryState } from '../hooks/useHistoryState';
 import IconButton from './IconButton';
@@ -8,8 +8,8 @@ import Button from './Button';
 declare const Prism: any;
 
 interface TemplateEditorProps {
-  template: PromptTemplate;
-  onSave: (template: Partial<Omit<PromptTemplate, 'id'>>) => void;
+  template: DocumentTemplate;
+  onSave: (template: Partial<Omit<DocumentTemplate, 'id'>>) => void;
   onDelete: (id: string) => void;
 }
 

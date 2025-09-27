@@ -4,12 +4,12 @@ import type { DocumentOrFolder } from '../types';
 import IconButton from './IconButton';
 import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon } from './Icons';
 
-export interface PromptNode extends DocumentOrFolder {
-  children: PromptNode[];
+export interface DocumentNode extends DocumentOrFolder {
+  children: DocumentNode[];
 }
 
-interface PromptTreeItemProps {
-  node: PromptNode;
+interface DocumentTreeItemProps {
+  node: DocumentNode;
   level: number;
   selectedIds: Set<string>;
   focusedItemId: string | null;
@@ -52,7 +52,7 @@ const getDropPosition = (
 };
 
 
-const PromptTreeItem: React.FC<PromptTreeItemProps> = (props) => {
+const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const {
     node,
     level,
@@ -233,7 +233,7 @@ const PromptTreeItem: React.FC<PromptTreeItemProps> = (props) => {
         {isFolder && isExpanded && (
             <ul>
                 {node.children.map((childNode, index) => (
-                    <PromptTreeItem 
+                    <DocumentTreeItem 
                         key={childNode.id} 
                         {...props} 
                         node={childNode} 
@@ -248,4 +248,4 @@ const PromptTreeItem: React.FC<PromptTreeItemProps> = (props) => {
   );
 };
 
-export default PromptTreeItem;
+export default DocumentTreeItem;

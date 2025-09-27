@@ -16,8 +16,8 @@ declare const marked: any;
 
 type ViewMode = 'edit' | 'preview' | 'split-vertical' | 'split-horizontal';
 
-interface PromptEditorProps {
-  prompt: DocumentOrFolder;
+interface DocumentEditorProps {
+  document: DocumentOrFolder;
   onSave: (prompt: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => void;
   onCommitVersion: (content: string) => void;
   onDelete: (id: string) => void;
@@ -98,12 +98,12 @@ const PreviewPane: React.FC<{ renderedPreviewHtml: string }> = React.memo(({ ren
 ));
 
 // =================================================================================
-// Main PromptEditor Component
+// Main DocumentEditor Component
 // =================================================================================
 
-const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onCommitVersion, onDelete, settings, onShowHistory }) => {
-  const [title, setTitle] = useState(prompt.title);
-  const { state: content, setState: setContent, undo, redo, canUndo, canRedo } = useHistoryState(prompt.content || '');
+const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCommitVersion, onDelete, settings, onShowHistory }) => {
+  const [title, setTitle] = useState(document.title);
+  const { state: content, setState: setContent, undo, redo, canUndo, canRedo } = useHistoryState(document.content || '');
   
   const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,32 +120,32 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onCommitVer
 
   // Reset content and view when the document ID or external content changes.
   useEffect(() => {
-    setContent(prompt.content || '', { history: 'replace' });
+    setContent(document.content || '', { history: 'replace' });
     setViewMode('edit');
     setSplitSize(50);
-  }, [prompt.id, prompt.content, setContent]);
+  }, [document.id, document.content, setContent]);
 
   // Sync the title from props. This handles both new documents and external title changes (like AI generation)
   // without resetting the editor's content.
   useEffect(() => {
-    setTitle(prompt.title);
-  }, [prompt.id, prompt.title]);
+    setTitle(document.title);
+  }, [document.id, document.title]);
   
   // Effect to detect unsaved content changes
   useEffect(() => {
-    setIsDirty(content !== prompt.content);
-  }, [content, prompt.content]);
+    setIsDirty(content !== document.content);
+  }, [content, document.content]);
 
   // Debounced auto-save for title only
   useEffect(() => {
-    if (title === prompt.title) {
+    if (title === document.title) {
       return;
     }
     const handler = setTimeout(() => {
       onSave({ title });
     }, 500);
     return () => clearTimeout(handler);
-  }, [title, onSave, prompt.title]);
+  }, [title, onSave, document.title]);
   
   const renderedPreviewHtml = useMemo(() => {
     if (typeof marked === 'undefined' || !content) {
@@ -214,7 +214,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onCommitVer
     setError(null);
     addLog('INFO', `Requesting AI refinement for document: "${title}"`);
     try {
-      const result = await llmService.refinePrompt(content, settings, addLog);
+      const result = await llmService.refineDocument(content, settings, addLog);
       setRefinedContent(result);
     } catch (e) {
       if (e instanceof Error) {
@@ -400,7 +400,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onCommitVer
             <IconButton onClick={handleRefine} disabled={!content.trim() || viewMode === 'preview' || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">
                 {isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}
             </IconButton>
-            <IconButton onClick={() => onDelete(prompt.id)} tooltip="Delete Document" size="sm" variant="destructive">
+            <IconButton onClick={() => onDelete(document.id)} tooltip="Delete Document" size="sm" variant="destructive">
               <TrashIcon className="w-5 h-5" />
             </IconButton>
         </div>
@@ -433,4 +433,4 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onCommitVer
   );
 };
 
-export default PromptEditor;
+export default DocumentEditor;

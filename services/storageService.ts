@@ -51,7 +51,7 @@ export const storageService = {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `promptforge-log-${new Date().toISOString().split('T')[0]}.log`;
+      a.download = `docforge-log-${new Date().toISOString().split('T')[0]}.log`;
       a.click();
       URL.revokeObjectURL(url);
     }
