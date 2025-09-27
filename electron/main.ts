@@ -1,6 +1,7 @@
 // Fix: This file was previously a placeholder. This is the full implementation for the Electron main process.
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-// Fix: Removed 'platform' import to avoid potential type conflicts with the global `process` object.
+// Fix: Import 'platform' from 'process' for type-safe access to the current OS identifier.
+import { platform } from 'process';
 import path from 'path';
 import fs from 'fs/promises';
 import { autoUpdater } from 'electron-updater';
@@ -16,8 +17,6 @@ declare global {
   namespace NodeJS {
     interface Process {
       // The `resourcesPath` property is augmented in `types.ts`
-      // FIX: Add the type declaration here directly to resolve the build error for the main process.
-      resourcesPath: string;
     }
   }
 }
@@ -111,8 +110,8 @@ app.on('ready', () => {
 
 app.on('window-all-closed', () => {
   databaseService.close();
-  // Fix: Use process.platform directly to avoid type conflicts that may arise from importing from the 'process' module.
-  if (process.platform !== 'darwin') {
+  // Fix: Error on line 96 is resolved by importing 'platform' from 'process'.
+  if (platform !== 'darwin') {
     app.quit();
   }
 });
@@ -162,8 +161,8 @@ ipcMain.handle('fs:read-legacy-file', async (_, filename) => {
 
 // App Info & Updates
 ipcMain.handle('app:get-version', () => app.getVersion());
-// Fix: Use process.platform directly to avoid type conflicts that may arise from importing from the 'process' module.
-ipcMain.handle('app:get-platform', () => process.platform);
+// Fix: Error on line 145 is resolved by importing 'platform' from 'process'.
+ipcMain.handle('app:get-platform', () => platform);
 ipcMain.handle('app:get-log-path', () => log.transports.file.getFile().path);
 
 ipcMain.on('updater:set-allow-prerelease', (_, allow: boolean) => {
