@@ -121,7 +121,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onCommitVer
   // Reset view and state when prompt changes
   useEffect(() => {
     setTitle(prompt.title);
-    setContent(prompt.content || '');
+    setContent(prompt.content || '', { history: 'replace' });
     setViewMode('edit');
     setSplitSize(50);
   }, [prompt.id, prompt.title, prompt.content, setContent]);
@@ -385,17 +385,16 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onCommitVer
             </IconButton>
             
             <div className="h-6 w-px bg-border-color mx-1"></div>
-
+            
+            <IconButton onClick={handleManualSave} disabled={!isDirty || isRefining} tooltip="Save Version" size="sm" variant="ghost">
+                <SaveIcon className={`w-5 h-5 ${isDirty ? 'text-primary' : ''}`} />
+            </IconButton>
             <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="sm" variant="ghost">
               {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
             </IconButton>
             <IconButton onClick={handleRefine} disabled={!content.trim() || viewMode === 'preview' || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">
                 {isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}
             </IconButton>
-            <Button onClick={handleManualSave} disabled={!isDirty || isRefining} variant="primary">
-                <SaveIcon className="w-4 h-4 mr-2" />
-                Save Version
-            </Button>
             <IconButton onClick={() => onDelete(prompt.id)} tooltip="Delete Document" size="sm" variant="destructive">
               <TrashIcon className="w-5 h-5" />
             </IconButton>
