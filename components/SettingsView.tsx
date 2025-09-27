@@ -13,6 +13,7 @@ import JsonEditor from './JsonEditor';
 import { repository } from '../services/repository';
 import ToggleSwitch from './ToggleSwitch';
 import SettingRow from './SettingRow';
+import SettingsTreeEditor from './SettingsTreeEditor';
 
 interface SettingsViewProps {
   settings: Settings;
@@ -441,6 +442,7 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
 const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
     const [jsonString, setJsonString] = useState(() => JSON.stringify(settings, null, 2));
     const [jsonError, setJsonError] = useState<string | null>(null);
+    const [mode, setMode] = useState<'tree' | 'json'>('tree');
 
     useEffect(() => {
         setJsonString(JSON.stringify(settings, null, 2));
@@ -458,14 +460,50 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
         }
     };
     
+    const handleSettingChange = (path: (string | number)[], value: any) => {
+      setCurrentSettings(prevSettings => {
+          // A safe way to deep-clone and update nested properties
+          const newSettings = JSON.parse(JSON.stringify(prevSettings));
+          let current: any = newSettings;
+          for (let i = 0; i < path.length - 1; i++) {
+              const key = path[i];
+              if (current[key] === undefined || typeof current[key] !== 'object') {
+                  // This path is invalid, which shouldn't happen with the tree editor.
+                  // Return original state to be safe.
+                  return prevSettings;
+              }
+              current = current[key];
+          }
+          current[path[path.length - 1]] = value;
+          return newSettings;
+      });
+    };
+
     return (
          <div id="advanced" ref={sectionRef} className="py-10">
             <h2 className="text-xl font-semibold text-text-main mb-6">Advanced</h2>
             <div className="space-y-6">
-                 <SettingRow label="JSON Editor" description="Directly edit the settings object. Changes here will be reflected above and saved when you click 'Save Changes'.">
-                    <div>
-                        <JsonEditor value={jsonString} onChange={handleJsonChange} />
-                        {jsonError && <p className="text-sm text-destructive-text mt-2">{jsonError}</p>}
+                <SettingRow label="Settings Editor" description="Edit settings using an interactive tree or raw JSON for full control.">
+                    <div className="w-full">
+                        <div className="flex justify-end mb-2">
+                            <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
+                                <button onClick={() => setMode('tree')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'tree' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
+                                    Tree
+                                </button>
+                                <button onClick={() => setMode('json')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'json' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
+                                    JSON
+                                </button>
+                            </div>
+                        </div>
+
+                        {mode === 'tree' ? (
+                            <SettingsTreeEditor settings={settings} onSettingChange={handleSettingChange} />
+                        ) : (
+                            <div>
+                                <JsonEditor value={jsonString} onChange={handleJsonChange} />
+                                {jsonError && <p className="text-sm text-destructive-text mt-2">{jsonError}</p>}
+                            </div>
+                        )}
                     </div>
                 </SettingRow>
             </div>
