@@ -284,24 +284,50 @@ export const repository = {
     },
     
     async moveNodes(draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') {
-        const parentId = position === 'inside' ? targetId : (await window.electronAPI!.dbGet(`SELECT parent_id FROM nodes WHERE node_id = ?`, [targetId]))?.parent_id || null;
-        
+        const parentId = position === 'inside'
+            ? targetId
+            : (targetId ? (await window.electronAPI!.dbGet(`SELECT parent_id FROM nodes WHERE node_id = ?`, [targetId]))?.parent_id ?? null : null);
+    
         const siblings = await window.electronAPI!.dbQuery(
             `SELECT node_id, sort_order FROM nodes WHERE parent_id ${parentId ? '= ?' : 'IS NULL'} ORDER BY sort_order`,
             parentId ? [parentId] : []
         );
-
-        let targetIndex = siblings.findIndex(s => s.node_id === targetId);
-        if (position === 'after') targetIndex++;
-
-        siblings.splice(targetIndex, 0, ...draggedIds.map(id => ({ node_id: id, sort_order: -1 })));
+    
+        const draggedIdSet = new Set(draggedIds);
+        const siblingsWithoutDragged = siblings.filter(s => !draggedIdSet.has(s.node_id));
+    
+        let targetIndex;
+        if (position === 'inside') {
+            targetIndex = siblingsWithoutDragged.length;
+        } else if (targetId) {
+            targetIndex = siblingsWithoutDragged.findIndex(s => s.node_id === targetId);
+            if (targetIndex === -1) {
+                targetIndex = siblingsWithoutDragged.length;
+            } else if (position === 'after') {
+                targetIndex++;
+            }
+        } else {
+            targetIndex = siblingsWithoutDragged.length;
+        }
         
-        for (let i = 0; i < siblings.length; i++) {
-            const sibling = siblings[i];
-            if (draggedIds.includes(sibling.node_id)) {
-                await window.electronAPI!.dbRun(`UPDATE nodes SET parent_id = ?, sort_order = ? WHERE node_id = ?`, [parentId, i, sibling.node_id]);
+        const itemsToInsert = draggedIds.map(id => ({ node_id: id, sort_order: -1 }));
+        
+        const finalOrder = [...siblingsWithoutDragged];
+        finalOrder.splice(targetIndex, 0, ...itemsToInsert);
+    
+        for (let i = 0; i < finalOrder.length; i++) {
+            const item = finalOrder[i];
+            
+            if (draggedIdSet.has(item.node_id)) {
+                await window.electronAPI!.dbRun(
+                    `UPDATE nodes SET parent_id = ?, sort_order = ? WHERE node_id = ?`,
+                    [parentId, i, item.node_id]
+                );
             } else {
-                await window.electronAPI!.dbRun(`UPDATE nodes SET sort_order = ? WHERE node_id = ?`, [i, sibling.node_id]);
+                await window.electronAPI!.dbRun(
+                    `UPDATE nodes SET sort_order = ? WHERE node_id = ?`,
+                    [i, item.node_id]
+                );
             }
         }
     },
