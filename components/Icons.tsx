@@ -454,3 +454,25 @@ export const SaveIcon: React.FC<IconProps> = (props) => {
         case 'heroicons': default: return <HeroIcons.SaveIcon {...props} />;
     }
 };
+
+export const ExpandAllIcon: React.FC<IconProps> = (props) => {
+    const { iconSet } = useIconSet();
+    switch (iconSet) {
+        case 'lucide': return <LucideIcons.ExpandAllIcon {...props} />;
+        case 'feather': return <FeatherIcons.ExpandAllIcon {...props} />;
+        case 'tabler': return <TablerIcons.ExpandAllIcon {...props} />;
+        case 'material': return <MaterialIcons.ExpandAllIcon {...props} />;
+        case 'heroicons': default: return <HeroIcons.MaximizeIcon {...props} />;
+    }
+};
+
+export const CollapseAllIcon: React.FC<IconProps> = (props) => {
+    const { iconSet } = useIconSet();
+    switch (iconSet) {
+        case 'lucide': return <LucideIcons.CollapseAllIcon {...props} />;
+        case 'feather': return <FeatherIcons.CollapseAllIcon {...props} />;
+        case 'tabler': return <TablerIcons.CollapseAllIcon {...props} />;
+        case 'material': return <MaterialIcons.CollapseAllIcon {...props} />;
+        case 'heroicons': default: return <HeroIcons.RestoreIcon {...props} />;
+    }
+};

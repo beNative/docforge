@@ -25,6 +25,9 @@ interface DocumentTreeItemProps {
   onMoveDown: (id: string) => void;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  onContextMenu: (e: React.MouseEvent, nodeId: string | null) => void;
+  renamingNodeId: string | null;
+  onRenameComplete: () => void;
 }
 
 // Helper function to determine drop position based on mouse coordinates within an element
@@ -69,6 +72,9 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onMoveDown,
     canMoveUp,
     canMoveDown,
+    onContextMenu,
+    renamingNodeId,
+    onRenameComplete
   } = props;
   
   const [isRenaming, setIsRenaming] = useState(false);
@@ -82,6 +88,13 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isFocused = focusedItemId === node.id;
   const isExpanded = expandedIds.has(node.id);
   const isFolder = node.type === 'folder';
+  
+  useEffect(() => {
+    if (renamingNodeId === node.id) {
+      setIsRenaming(true);
+      onRenameComplete();
+    }
+  }, [renamingNodeId, node.id, onRenameComplete]);
 
   useEffect(() => {
     if (isRenaming) {
@@ -163,6 +176,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onContextMenu={(e) => onContextMenu(e, node.id)}
       style={{ paddingLeft: `${level * 16}px` }}
       className="relative"
       data-item-id={node.id}

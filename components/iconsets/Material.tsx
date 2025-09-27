@@ -131,3 +131,10 @@ export const DatabaseIcon: React.FC<IconProps> = ({ className }) => (
 export const SaveIcon: React.FC<IconProps> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
 );
+
+export const ExpandAllIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path d="M12 5.83L15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z"/></svg>
+);
+export const CollapseAllIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path d="M7.41 18.59L8.83 17.17 12 20.34l3.17-3.17 1.41 1.41L12 23l-4.59-4.59zM16.59 5.41L15.17 6.83 12 3.66 8.83 6.83 7.41 5.41 12 1l4.59 4.59z"/></svg>
+);

@@ -18,10 +18,13 @@ interface DocumentListProps {
   onToggleExpand: (id: string) => void;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
+  onContextMenu: (e: React.MouseEvent, nodeId: string | null) => void;
+  renamingNodeId: string | null;
+  onRenameComplete: () => void;
 }
 
 const DocumentList: React.FC<DocumentListProps> = ({ 
-  tree, documents, selectedIds, focusedItemId, onSelectNode, onDeleteNode, onRenameNode, onMoveNode, onCopyNodeContent, searchTerm, expandedIds, onToggleExpand, onMoveUp, onMoveDown
+  tree, documents, selectedIds, focusedItemId, onSelectNode, onDeleteNode, onRenameNode, onMoveNode, onCopyNodeContent, searchTerm, expandedIds, onToggleExpand, onMoveUp, onMoveDown, onContextMenu, renamingNodeId, onRenameComplete
 }) => {
   const [isRootDropping, setIsRootDropping] = useState(false);
   
@@ -56,6 +59,14 @@ const DocumentList: React.FC<DocumentListProps> = ({
   const handleRootDragLeave = () => {
     setIsRootDropping(false);
   };
+  
+  const handleRootContextMenu = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('li[draggable="true"]')) {
+      return;
+    }
+    onContextMenu(e, null);
+  };
 
 
   const displayExpandedIds = searchTerm.trim() 
@@ -68,6 +79,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
         onDrop={handleRootDrop}
         onDragOver={handleRootDragOver}
         onDragLeave={handleRootDragLeave}
+        onContextMenu={handleRootContextMenu}
     >
         <ul className="space-y-0.5 p-2">
         {tree.map((node, index) => (
@@ -89,6 +101,9 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onMoveDown={onMoveDown}
                 canMoveUp={index > 0}
                 canMoveDown={index < tree.length - 1}
+                onContextMenu={onContextMenu}
+                renamingNodeId={renamingNodeId}
+                onRenameComplete={onRenameComplete}
             />
         ))}
         {documents.length === 0 && (
