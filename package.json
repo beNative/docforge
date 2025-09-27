@@ -11,6 +11,10 @@
   },
   "author": "DocForge Team",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TimSirmov/prompt-forge.git"
+  },
   "dependencies": {
     "better-sqlite3": "^11.1.2",
     "electron-log": "^5.1.5",
