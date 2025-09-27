@@ -254,7 +254,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       </div>
       <div className="flex-1 overflow-y-auto">
         {/* --- Prompts Section --- */}
-        <header className="flex items-center justify-between p-2 flex-shrink-0">
+        <header className="flex items-center justify-between p-2 flex-shrink-0 sticky top-0 bg-secondary z-10">
             <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
             <div className="flex items-center gap-1">
             <IconButton onClick={props.onNewPrompt} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">

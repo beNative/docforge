@@ -118,13 +118,18 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ prompt, onSave, onCommitVer
   const isResizing = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
-  // Reset view and state when prompt changes
+  // Reset content and view when the document ID or external content changes.
   useEffect(() => {
-    setTitle(prompt.title);
     setContent(prompt.content || '', { history: 'replace' });
     setViewMode('edit');
     setSplitSize(50);
-  }, [prompt.id, prompt.title, prompt.content, setContent]);
+  }, [prompt.id, prompt.content, setContent]);
+
+  // Sync the title from props. This handles both new documents and external title changes (like AI generation)
+  // without resetting the editor's content.
+  useEffect(() => {
+    setTitle(prompt.title);
+  }, [prompt.id, prompt.title]);
   
   // Effect to detect unsaved content changes
   useEffect(() => {
