@@ -125,7 +125,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
 
     return filteredCommands.map((command, index) => {
       const categoryHeader = command.category !== lastCategory ? (
-          <li key={`category-${command.category}`} className="text-xs font-semibold text-text-secondary uppercase px-4 pt-4 pb-2 sticky top-0 bg-secondary">
+          <li key={`category-${command.category}`} className="text-xs font-semibold text-text-secondary uppercase px-2 pt-3 pb-1.5 sticky top-0 bg-secondary">
             {command.category}
           </li>
         ) : null;
@@ -142,7 +142,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
                 command.action();
                 onExecute();
             }}
-            className={`flex items-center justify-between px-3 py-2.5 mx-2 rounded-md cursor-pointer text-sm ${
+            className={`flex items-center justify-between px-2 py-1.5 mx-1 rounded-md cursor-pointer text-xs ${
                 isSelected ? 'bg-primary text-primary-text' : 'text-text-main hover:bg-border-color/50'
             }`}
             >

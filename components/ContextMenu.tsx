@@ -68,7 +68,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
                 <button
                   onClick={() => { if(!disabled) { action(); onClose(); } }}
                   disabled={disabled}
-                  className="w-full flex items-center justify-between text-left px-3 py-2 text-sm rounded-md transition-colors text-text-main disabled:text-text-secondary/50 disabled:cursor-not-allowed hover:bg-primary hover:text-primary-text focus:bg-primary focus:text-primary-text focus:outline-none"
+                  className="w-full flex items-center justify-between text-left px-2 py-1.5 text-xs rounded-md transition-colors text-text-main disabled:text-text-secondary/50 disabled:cursor-not-allowed hover:bg-primary hover:text-primary-text focus:bg-primary focus:text-primary-text focus:outline-none"
                 >
                   <div className="flex items-center gap-3">
                     {Icon && <Icon className="w-4 h-4" />}
