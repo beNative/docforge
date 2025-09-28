@@ -57,7 +57,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   };
   
   return (
-    <footer className="flex items-center justify-between px-4 h-5 bg-secondary border-t border-border-color text-xs text-text-secondary flex-shrink-0 z-30">
+    <footer className="flex items-center justify-between px-4 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30">
       <div className="flex items-center gap-4">
         <div className="relative group flex items-center gap-2 cursor-default">
           <div className={`w-2 h-2 rounded-full ${color}`}></div>

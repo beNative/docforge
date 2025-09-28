@@ -289,8 +289,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
   return (
     <div ref={sidebarRef} onKeyDown={handleKeyDown} tabIndex={0} className="h-full flex flex-col focus:outline-none">
-      <div className="px-2 pt-2 pb-2 flex-shrink-0 border-b border-border-color">
-        <div className="relative">
+      <div className="h-7 px-2 flex items-center flex-shrink-0 border-b border-border-color">
+        <div className="relative w-full">
             <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
             <input
                 type="text"
