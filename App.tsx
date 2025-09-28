@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
-// Hooks
-// Fix: Import the correct, implemented hook `useNodes` instead of the empty `usePrompts`.
 import { useDocuments } from './hooks/usePrompts';
 import { useTemplates } from './hooks/useTemplates';
 import { useSettings } from './hooks/useSettings';
 import { useLLMStatus } from './hooks/useLLMStatus';
 import { useLogger } from './hooks/useLogger';
-// Components
 import Sidebar from './components/Sidebar';
 import DocumentEditor from './components/PromptEditor';
 import TemplateEditor from './components/TemplateEditor';
 import { WelcomeScreen } from './components/WelcomeScreen';
-// Fix: Add default import for SettingsView
 import SettingsView from './components/SettingsView';
 import StatusBar from './components/StatusBar';
 import LoggerPanel from './components/LoggerPanel';
@@ -21,19 +17,15 @@ import InfoView from './components/InfoView';
 import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon } from './components/Icons';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
-// Types
-// Fix: Correctly import DocumentOrFolder which is now defined in types.ts
+import NewCodeFileModal from './components/NewCodeFileModal';
 import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate } from './types';
-// Context
 import { IconProvider } from './contexts/IconContext';
-// Services & Constants
-// Fix: Correct import for storageService
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { LOCAL_STORAGE_KEYS } from './constants';
@@ -47,7 +39,6 @@ const MIN_SIDEBAR_WIDTH = 200;
 const DEFAULT_LOGGER_HEIGHT = 288;
 const MIN_LOGGER_HEIGHT = 100;
 
-// Fix: Use optional chaining which is now type-safe with the global declaration.
 const isElectron = !!window.electronAPI;
 
 type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
@@ -57,7 +48,6 @@ const App: React.FC = () => {
     const [isInitialized, setIsInitialized] = useState(false);
     const [initError, setInitError] = useState<string | null>(null);
 
-    // Effect for initializing the repository and migrating data
     useEffect(() => {
         const initializeApp = async () => {
             try {
@@ -66,10 +56,7 @@ const App: React.FC = () => {
                 setIsInitialized(true);
             } catch (error) {
                 const message = `Fatal: Application initialization failed. ${error instanceof Error ? error.message : String(error)}`;
-                // Log to the in-memory React logger
                 addLog('ERROR', message);
-                // The main process will have already logged this to a file.
-                // We just need to trigger the UI error state.
                 setInitError(message);
             }
         };
@@ -94,12 +81,10 @@ const App: React.FC = () => {
 };
 
 const MainApp: React.FC = () => {
-    // State Hooks
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
     const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     
-    // Active Item State
     const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState(new Set<string>());
     const [lastClickedId, setLastClickedId] = useState<string | null>(null);
@@ -107,13 +92,13 @@ const MainApp: React.FC = () => {
     const [expandedFolderIds, setExpandedFolderIds] = useState(new Set<string>());
     const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
 
-    // UI State
     const [view, setView] = useState<'editor' | 'info' | 'settings'>('editor');
     const [documentView, setDocumentView] = useState<'editor' | 'history'>('editor');
     const [isLoggerVisible, setIsLoggerVisible] = useState(false);
     const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
     const [commandPaletteSearch, setCommandPaletteSearch] = useState('');
     const [isCreateFromTemplateOpen, setCreateFromTemplateOpen] = useState(false);
+    const [isNewCodeFileModalOpen, setIsNewCodeFileModalOpen] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
     const [loggerPanelHeight, setLoggerPanelHeight] = useState(DEFAULT_LOGGER_HEIGHT);
     const [availableModels, setAvailableModels] = useState<DiscoveredLLMModel[]>([]);
@@ -135,14 +120,12 @@ const MainApp: React.FC = () => {
     const { logs, addLog } = useLogger();
     const lastLogRef = useRef<LogMessage | null>(null);
 
-    // Effect to apply UI scaling
     useEffect(() => {
         if (settingsLoaded) {
             (document.documentElement.style as any).zoom = `${settings.uiScale / 100}`;
         }
     }, [settings.uiScale, settingsLoaded]);
 
-    // Derived State
     const activeNode = useMemo(() => {
         return items.find(p => p.id === activeNodeId) || null;
     }, [items, activeNodeId]);
@@ -217,14 +200,12 @@ const MainApp: React.FC = () => {
         return { documentTree: finalTree, navigableItems: flatList };
     }, [items, templates, searchTerm, expandedFolderIds]);
 
-    // Get app version
     useEffect(() => {
         if (window.electronAPI?.getAppVersion) {
             window.electronAPI.getAppVersion().then(setAppVersion);
         }
     }, []);
 
-    // Listen for downloaded updates from the main process
     useEffect(() => {
         if (window.electronAPI?.onUpdateDownloaded) {
             const cleanup = window.electronAPI.onUpdateDownloaded((version) => {
@@ -236,7 +217,6 @@ const MainApp: React.FC = () => {
     }, [addLog]);
 
 
-    // Load panel sizes and expanded folders from storage on initial render
     useEffect(() => {
         storageService.load(LOCAL_STORAGE_KEYS.SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH).then(width => {
             if (typeof width === 'number') setSidebarWidth(width);
@@ -249,14 +229,12 @@ const MainApp: React.FC = () => {
         });
     }, []);
 
-    // Save expanded IDs to storage whenever they change
     useEffect(() => {
         if (settingsLoaded) { 
             storageService.save(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, Array.from(expandedFolderIds));
         }
     }, [expandedFolderIds, settingsLoaded]);
 
-    // Select the first item on load or when items change
     useEffect(() => {
         if (items.length > 0 && activeNodeId === null && activeTemplateId === null) {
             const firstId = items[0].id;
@@ -269,7 +247,6 @@ const MainApp: React.FC = () => {
         }
     }, [items, activeNodeId, activeTemplateId]);
 
-    // Service Discovery logic
     const handleDetectServices = useCallback(async () => {
         addLog('INFO', 'User action: Detecting LLM services.');
         setIsDetecting(true);
@@ -289,7 +266,6 @@ const MainApp: React.FC = () => {
     }, [handleDetectServices]);
 
 
-    // Fetch available models for the status bar dropdown
     useEffect(() => {
         const fetchModels = async () => {
             if (settings.apiType !== 'unknown' && settings.llmProviderUrl) {
@@ -317,7 +293,6 @@ const MainApp: React.FC = () => {
         }
     }, [settings.llmProviderUrl, settings.apiType, settingsLoaded, addLog]);
 
-    // Effect for auto-saving logs
     useEffect(() => {
         if (settings.autoSaveLogs && logs.length > 0) {
             const latestLog = logs[logs.length - 1];
@@ -330,7 +305,6 @@ const MainApp: React.FC = () => {
     }, [logs, settings.autoSaveLogs]);
 
 
-    // Handlers
     const getParentIdForNewItem = useCallback(() => {
         if (!activeNode) return null;
         return activeNode.type === 'folder' ? activeNode.id : activeNode.parentId;
@@ -348,6 +322,24 @@ const MainApp: React.FC = () => {
         setView('editor');
     }, [addDocument, getParentIdForNewItem, addLog]);
     
+    const handleNewCodeFile = useCallback(async (filename: string) => {
+        addLog('INFO', `User action: Create New Code File with name "${filename}".`);
+        const languageHint = filename.split('.').pop() || null;
+        const newDoc = await addDocument({
+            parentId: getParentIdForNewItem(),
+            title: filename,
+            content: '',
+            doc_type: 'source_code',
+            language_hint: languageHint,
+        });
+        setActiveNodeId(newDoc.id);
+        setSelectedIds(new Set([newDoc.id]));
+        setLastClickedId(newDoc.id);
+        setActiveTemplateId(null);
+        setDocumentView('editor');
+        setView('editor');
+    }, [addDocument, getParentIdForNewItem, addLog]);
+
     const handleNewFolder = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Folder.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
@@ -660,9 +652,14 @@ const MainApp: React.FC = () => {
         });
     }, [addLog, isCommandPaletteOpen]);
     
-    // Command Palette Commands
+    const handleOpenNewCodeFileModal = useCallback(() => {
+        addLog('INFO', 'User action: Open "New Code File" modal.');
+        setIsNewCodeFileModalOpen(true);
+    }, [addLog]);
+
     const commands: Command[] = useMemo(() => [
         { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Control', 'N'], keywords: 'add create file' },
+        { id: 'new-code-file', name: 'Create New Code File', action: handleOpenNewCodeFileModal, category: 'File', icon: CodeIcon, shortcut: ['Control', 'Shift', 'N'], keywords: 'add create script' },
         { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
         { id: 'new-from-template', name: 'New Document from Template...', action: () => { addLog('INFO', 'Command: New Document from Template.'); setCreateFromTemplateOpen(true); }, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create file instance' },
@@ -673,7 +670,7 @@ const MainApp: React.FC = () => {
         { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog, handleToggleCommandPalette]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog, handleToggleCommandPalette]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -693,7 +690,6 @@ const MainApp: React.FC = () => {
 
         let currentSelection = selectedIds;
         if (nodeId && !selectedIds.has(nodeId)) {
-            // If right-clicking on an unselected item, make it the only selected item.
             const newSelection = new Set([nodeId]);
             setSelectedIds(newSelection);
             setLastClickedId(nodeId);
@@ -716,6 +712,7 @@ const MainApp: React.FC = () => {
         if (nodeId) { // Clicked on an item
             menuItems.push(
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem), shortcut: getCommand('new-document')?.shortcutString },
+                { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem), shortcut: getCommand('new-folder')?.shortcutString },
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
                 { type: 'separator' },
@@ -729,6 +726,7 @@ const MainApp: React.FC = () => {
         } else { // Clicked on empty space
              menuItems.push(
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null), shortcut: getCommand('new-document')?.shortcutString },
+                { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null), shortcut: getCommand('new-folder')?.shortcutString },
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString }
             );
@@ -739,10 +737,9 @@ const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal]);
 
 
-    // --- Resizable Panels Logic ---
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
         e.preventDefault();
         isSidebarResizing.current = true;
@@ -802,14 +799,11 @@ const MainApp: React.FC = () => {
             window.removeEventListener('mouseup', handleGlobalMouseUp);
         };
     }, [handleGlobalMouseMove, handleGlobalMouseUp]);
-    // --- End Resizable Panels Logic ---
     
-     // Keyboard shortcuts
-    useEffect(() => {
+     useEffect(() => {
         const shortcutMap = getShortcutMap(commands, settings.customShortcuts);
         
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignore shortcuts if an input-like element is focused, unless it's the command palette
             const activeEl = document.activeElement;
             if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName) && activeEl !== commandPaletteInputRef.current) {
                 return;
@@ -931,6 +925,7 @@ const MainApp: React.FC = () => {
                                         onNewDocument={() => handleNewDocument()}
                                         onNewRootFolder={handleNewRootFolder}
                                         onNewSubfolder={handleNewSubfolder}
+                                        onNewCodeFile={handleOpenNewCodeFileModal}
                                         onDuplicateSelection={handleDuplicateSelection}
                                         onCopyNodeContent={handleCopyNodeContent}
                                         expandedFolderIds={expandedFolderIds}
@@ -1006,6 +1001,13 @@ const MainApp: React.FC = () => {
                     templates={templates}
                     onClose={() => setCreateFromTemplateOpen(false)}
                     onCreate={handleCreateFromTemplate}
+                />
+            )}
+            
+            {isNewCodeFileModalOpen && (
+                <NewCodeFileModal
+                    onClose={() => setIsNewCodeFileModalOpen(false)}
+                    onCreate={handleNewCodeFile}
                 />
             )}
 

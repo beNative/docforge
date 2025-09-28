@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-// Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, Settings } from '../types';
 import { llmService } from '../services/llmService';
 import { SparklesIcon, TrashIcon, UndoIcon, RedoIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon } from './Icons';
@@ -9,6 +8,7 @@ import { useLogger } from '../hooks/useLogger';
 import { useHistoryState } from '../hooks/useHistoryState';
 import IconButton from './IconButton';
 import Button from './Button';
+import CodeEditor from './CodeEditor';
 
 // Let TypeScript know Prism and marked are available on the window
 declare const Prism: any;
@@ -103,7 +103,6 @@ const PreviewPane: React.FC<{ renderedPreviewHtml: string }> = React.memo(({ ren
 
 const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCommitVersion, onDelete, settings, onShowHistory }) => {
   const [title, setTitle] = useState(document.title);
-  // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' instead.
   const { state: content, setState: setContent, undo, redo, canUndo, canRedo } = useHistoryState(document.content || '');
   
   const [isRefining, setIsRefining] = useState(false);
@@ -120,13 +119,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
 
+  const isCodeFile = document.doc_type === 'source_code';
+
   // Reset content and view when the document ID or external content changes.
   useEffect(() => {
-    // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' instead.
     setContent(document.content || '', { history: 'replace' });
     setViewMode('edit');
     setSplitSize(50);
-    // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' in dependency array.
   }, [document.id, document.content, setContent]);
 
   // Sync the title from props. This handles both new documents and external title changes (like AI generation)
@@ -137,9 +136,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
   
   // Effect to detect unsaved content changes
   useEffect(() => {
-    // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' instead.
     setIsDirty(content !== document.content);
-    // Fix: Property 'body' does not exist on type 'DocumentOrFolder'. Used 'content' in dependency array.
   }, [content, document.content]);
 
   // Debounced auto-save for title only
@@ -164,22 +161,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
   const handleSplitterMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
-    // Fix: Use window.document to avoid conflict with the 'document' prop.
     window.document.body.style.userSelect = 'none';
     if (viewMode === 'split-vertical') {
-        // Fix: Use window.document to avoid conflict with the 'document' prop.
         window.document.body.style.cursor = 'col-resize';
     } else {
-        // Fix: Use window.document to avoid conflict with the 'document' prop.
         window.document.body.style.cursor = 'row-resize';
     }
   };
 
   const handleGlobalMouseUp = useCallback(() => {
     isResizing.current = false;
-    // Fix: Use window.document to avoid conflict with the 'document' prop.
     window.document.body.style.userSelect = 'auto';
-    // Fix: Use window.document to avoid conflict with the 'document' prop.
     window.document.body.style.cursor = 'default';
   }, []);
 
@@ -298,6 +290,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
   };
   
   const renderContent = () => {
+    if (isCodeFile) {
+        return <CodeEditor content={content} language={document.language_hint || null} onChange={setContent} />;
+    }
+
     const editorPaneProps = { content, setContent, undo, redo };
     const previewPaneProps = { renderedPreviewHtml };
     
@@ -359,16 +355,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
               disabled={isGeneratingTitle}
               className="bg-transparent text-2xl font-semibold text-text-main focus:outline-none w-full truncate placeholder:text-text-secondary disabled:opacity-70"
             />
-            <IconButton
-              onClick={handleGenerateTitle}
-              disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl || !settings.llmModelName}
-              tooltip="Regenerate Title with AI"
-              size="sm"
-              variant="ghost"
-              className="flex-shrink-0"
-            >
-              {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-5 h-5 text-primary" />}
-            </IconButton>
+            {!isCodeFile && (
+              <IconButton
+                onClick={handleGenerateTitle}
+                disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl || !settings.llmModelName}
+                tooltip="Regenerate Title with AI"
+                size="sm"
+                variant="ghost"
+                className="flex-shrink-0"
+              >
+                {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-5 h-5 text-primary" />}
+              </IconButton>
+            )}
             {isDirty && !isGeneratingTitle && (
                 <div className="relative group flex-shrink-0">
                     <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
@@ -379,29 +377,32 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
             )}
         </div>
         <div className="flex items-center gap-1">
-            <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
-                <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "edit".'); setViewMode('edit'); }} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : 'text-text-secondary'}`} >
-                    <PencilIcon className="w-5 h-5" />
+            {!isCodeFile && (
+              <>
+                <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
+                    <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "edit".'); setViewMode('edit'); }} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : 'text-text-secondary'}`} >
+                        <PencilIcon className="w-5 h-5" />
+                    </IconButton>
+                    <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "preview".'); setViewMode('preview'); }} tooltip="Preview Only" size="sm" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
+                        <EyeIcon className="w-5 h-5" />
+                    </IconButton>
+                    <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "split-vertical".'); setViewMode('split-vertical'); }} tooltip="Split Vertical" size="sm" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
+                        <LayoutVerticalIcon className="w-5 h-5" />
+                    </IconButton>
+                    <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "split-horizontal".'); setViewMode('split-horizontal'); }} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
+                        <LayoutHorizontalIcon className="w-5 h-5" />
+                    </IconButton>
+                </div>
+                <div className="h-6 w-px bg-border-color mx-1"></div>
+                <IconButton onClick={undo} disabled={!canUndo || viewMode === 'preview'} tooltip="Undo (Ctrl+Z)" size="sm" variant="ghost">
+                    <UndoIcon className="w-5 h-5" />
                 </IconButton>
-                <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "preview".'); setViewMode('preview'); }} tooltip="Preview Only" size="sm" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
-                    <EyeIcon className="w-5 h-5" />
+                <IconButton onClick={redo} disabled={!canRedo || viewMode === 'preview'} tooltip="Redo (Ctrl+Y)" size="sm" variant="ghost">
+                    <RedoIcon className="w-5 h-5" />
                 </IconButton>
-                 <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "split-vertical".'); setViewMode('split-vertical'); }} tooltip="Split Vertical" size="sm" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
-                    <LayoutVerticalIcon className="w-5 h-5" />
-                </IconButton>
-                 <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "split-horizontal".'); setViewMode('split-horizontal'); }} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
-                    <LayoutHorizontalIcon className="w-5 h-5" />
-                </IconButton>
-            </div>
-
-            <div className="h-6 w-px bg-border-color mx-1"></div>
-
-            <IconButton onClick={undo} disabled={!canUndo || viewMode === 'preview'} tooltip="Undo (Ctrl+Z)" size="sm" variant="ghost">
-                <UndoIcon className="w-5 h-5" />
-            </IconButton>
-            <IconButton onClick={redo} disabled={!canRedo || viewMode === 'preview'} tooltip="Redo (Ctrl+Y)" size="sm" variant="ghost">
-                <RedoIcon className="w-5 h-5" />
-            </IconButton>
+              </>
+            )}
+            
             <IconButton onClick={() => { addLog('INFO', `User action: View version history for document "${document.title}".`); onShowHistory(); }} tooltip="View Version History" size="sm" variant="ghost">
               <HistoryIcon className="w-5 h-5" />
             </IconButton>
@@ -414,9 +415,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
             <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="sm" variant="ghost">
               {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
             </IconButton>
-            <IconButton onClick={handleRefine} disabled={!content.trim() || viewMode === 'preview' || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">
-                {isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}
-            </IconButton>
+            {!isCodeFile && (
+              <IconButton onClick={handleRefine} disabled={!content.trim() || viewMode === 'preview' || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">
+                  {isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}
+              </IconButton>
+            )}
             <IconButton onClick={() => onDelete(document.id)} tooltip="Delete Document" size="sm" variant="destructive">
               <TrashIcon className="w-5 h-5" />
             </IconButton>

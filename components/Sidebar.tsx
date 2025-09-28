@@ -1,10 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
-// Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DocumentTemplate, Command } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
@@ -29,6 +28,7 @@ interface SidebarProps {
   onNewDocument: () => void;
   onNewRootFolder: () => void;
   onNewSubfolder: () => void;
+  onNewCodeFile: () => void;
   onDuplicateSelection: () => void;
   onCopyNodeContent: (id: string) => void;
   expandedFolderIds: Set<string>;
@@ -319,6 +319,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     </IconButton>
                     <IconButton onClick={props.onNewDocument} tooltip={getTooltip('new-document', 'New Document')} size="sm" tooltipPosition="bottom">
                         <PlusIcon />
+                    </IconButton>
+                    <IconButton onClick={props.onNewCodeFile} tooltip={getTooltip('new-code-file', 'New Code File')} size="sm" tooltipPosition="bottom">
+                        <CodeIcon />
                     </IconButton>
                     <IconButton onClick={props.onNewRootFolder} tooltip={getTooltip('new-folder', 'New Root Folder')} size="sm" tooltipPosition="bottom">
                         <FolderPlusIcon />
