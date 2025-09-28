@@ -2,26 +2,6 @@
 
 This manual provides a detailed overview of the features and functionality of the DocForge application.
 
-## Table of Contents
-
-1.  [The Main Window](#the-main-window)
-    -   [The Custom Title Bar](#the-custom-title-bar)
-    -   [The Sidebar](#the-sidebar)
-    -   [The Main Content Area](#the-main-content-area)
-    -   [The Status Bar](#the-status-bar)
-2.  [Core Features](#core-features)
-    -   [Creating and Managing Documents and Folders](#creating-and-managing-documents-and-folders)
-    -   [Editing Documents](#editing-documents)
-    -   [Organizing with Drag and Drop](#organizing-with-drag-and-drop)
-    -   [AI-Powered Refinement](#ai-powered-refinement)
-    -   [Using Templates](#using-templates)
-    -   [Version History](#version-history)
-3.  [Views and Panels](#views-and-panels)
-    -   [Command Palette](#command-palette)
-    -   [Settings View](#settings-view)
-    -   [Info View](#info-view)
-    -   [Logger Panel](#logger-panel)
-
 ---
 
 ## 1. The Main Window

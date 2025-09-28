@@ -26,7 +26,8 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
 
         // Fix: Explicitly type the accumulator in `reduce` to ensure the final object's type is correctly inferred.
         // This resolves an issue where the grouped object's value type was `unknown`, causing a compile error on `.map`.
-        return filtered.reduce((acc: Record<string, Command[]>, command) => {
+        // FIX: Add a generic type to the `reduce` call to correctly type the accumulator and the return value.
+        return filtered.reduce<Record<string, Command[]>>((acc, command) => {
             const category = command.category;
             if (!acc[category]) {
                 acc[category] = [];

@@ -2,20 +2,6 @@
 
 This document provides a technical overview of the DocForge application's architecture, components, and key systems.
 
-## Table of Contents
-
-1.  [Technology Stack](#technology-stack)
-2.  [Project Structure](#project-structure)
-3.  [Application Architecture](#application-architecture)
-    -   [Electron Main Process](#electron-main-process)
-    -   [Renderer Process (React)](#renderer-process-react)
-    -   [State Management](#state-management)
-4.  [Key Systems](#key-systems)
-    -   [Database & Repository Service](#database--repository-service)
-    -   [Universal Editor & Preview System](#universal-editor--preview-system)
-    -   [LLM Service](#llm-service)
-    -   [Component Breakdown](#component-breakdown)
-
 ---
 
 ## 1. Technology Stack
