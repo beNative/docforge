@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoSaveLogs: false,
   allowPrerelease: false,
   uiScale: 100,
+  customShortcuts: {},
 };
 
 export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [

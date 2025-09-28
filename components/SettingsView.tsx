@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Settings, DiscoveredLLMService, DiscoveredLLMModel, DatabaseStats } from '../types';
+import type { Settings, DiscoveredLLMService, DiscoveredLLMModel, DatabaseStats, Command } from '../types';
 import { llmDiscoveryService } from '../services/llmDiscoveryService';
-import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon } from './Icons';
+import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon } from './Icons';
 import * as HeroIcons from './iconsets/Heroicons';
 import * as LucideIcons from './iconsets/Lucide';
 import * as FeatherIcons from './iconsets/Feather';
@@ -15,6 +15,7 @@ import ToggleSwitch from './ToggleSwitch';
 import SettingRow from './SettingRow';
 import SettingsTreeEditor from './SettingsTreeEditor';
 import { useLogger } from '../hooks/useLogger';
+import KeyboardShortcutsSection from './KeyboardShortcutsSection';
 
 interface SettingsViewProps {
   settings: Settings;
@@ -22,19 +23,21 @@ interface SettingsViewProps {
   discoveredServices: DiscoveredLLMService[];
   onDetectServices: () => void;
   isDetecting: boolean;
+  commands: Command[];
 }
 
-type SettingsCategory = 'provider' | 'appearance' | 'general' | 'database' | 'advanced';
+type SettingsCategory = 'provider' | 'appearance' | 'shortcuts' | 'general' | 'database' | 'advanced';
 
 const categories: { id: SettingsCategory; label: string; icon: React.FC<{className?: string}> }[] = [
   { id: 'provider', label: 'LLM Provider', icon: SparklesIcon },
   { id: 'appearance', label: 'Appearance', icon: SunIcon },
+  { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: KeyboardIcon },
   { id: 'general', label: 'General', icon: GearIcon },
   { id: 'database', label: 'Database', icon: DatabaseIcon },
   { id: 'advanced', label: 'Advanced', icon: FileIcon },
 ];
 
-const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discoveredServices, onDetectServices, isDetecting }) => {
+const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discoveredServices, onDetectServices, isDetecting, commands }) => {
   const [currentSettings, setCurrentSettings] = useState<Settings>(settings);
   const [isDirty, setIsDirty] = useState(false);
   const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
@@ -125,6 +128,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discovere
           <div className="max-w-4xl mx-auto px-12 divide-y divide-border-color/50">
             <ProviderSettingsSection {...{ settings: currentSettings, setCurrentSettings, discoveredServices, onDetectServices, isDetecting, sectionRef: el => sectionRefs.current.provider = el }} />
             <AppearanceSettingsSection {...{ settings: currentSettings, setCurrentSettings, sectionRef: el => sectionRefs.current.appearance = el }} />
+            <KeyboardShortcutsSection {...{ settings: currentSettings, setCurrentSettings, commands, sectionRef: el => sectionRefs.current.shortcuts = el }} />
             <GeneralSettingsSection {...{ settings: currentSettings, setCurrentSettings, sectionRef: el => sectionRefs.current.general = el }} />
             <DatabaseSettingsSection {...{ sectionRef: el => sectionRefs.current.database = el }} />
             <AdvancedSettingsSection {...{ settings: currentSettings, setCurrentSettings, sectionRef: el => sectionRefs.current.advanced = el }} />

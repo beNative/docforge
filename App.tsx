@@ -39,6 +39,7 @@ import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { LOCAL_STORAGE_KEYS } from './constants';
 import { repository } from './services/repository';
 import { DocumentNode } from './components/PromptTreeItem';
+import { formatShortcut, getShortcutMap } from './services/shortcutService';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -773,26 +774,6 @@ const MainApp: React.FC = () => {
             return isOpen;
         });
     }, [addLog, isCommandPaletteOpen]);
-
-    // Keyboard shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-            const isCtrl = isMac ? e.metaKey : e.ctrlKey;
-
-            if (isCtrl && e.key === 'n') {
-                e.preventDefault();
-                handleNewDocument();
-            }
-            if (isCtrl && e.shiftKey && e.key === 'P') {
-                e.preventDefault();
-                handleToggleCommandPalette();
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleNewDocument, handleToggleCommandPalette]);
     
     // Command Palette Commands
     const commands: Command[] = useMemo(() => [
@@ -808,6 +789,30 @@ const MainApp: React.FC = () => {
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
     ], [handleNewDocument, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog]);
 
+     // Keyboard shortcuts
+    useEffect(() => {
+        const shortcutMap = getShortcutMap(commands, settings.customShortcuts);
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore shortcuts if an input-like element is focused, unless it's the command palette
+            const activeEl = document.activeElement;
+            if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName) && activeEl !== commandPaletteInputRef.current) {
+                return;
+            }
+
+            const shortcut = formatShortcut(e);
+            const command = shortcutMap.get(shortcut);
+            
+            if (command) {
+                e.preventDefault();
+                command.action();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [commands, settings.customShortcuts]);
+
     const getSupportedIconSet = (iconSet: Settings['iconSet']): 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material' => {
         const supportedSets: Array<Settings['iconSet']> = ['heroicons', 'lucide', 'feather', 'tabler', 'material'];
         if (supportedSets.includes(iconSet)) {
@@ -822,7 +827,7 @@ const MainApp: React.FC = () => {
 
     const renderMainContent = () => {
         if (view === 'info') return <InfoView />;
-        if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} />;
+        if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} commands={commands} />;
         
         if (activeTemplate) {
             return <TemplateEditor 

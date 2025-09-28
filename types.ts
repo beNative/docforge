@@ -134,6 +134,7 @@ export interface Settings {
   autoSaveLogs: boolean;
   allowPrerelease: boolean;
   uiScale: number;
+  customShortcuts: Record<string, string[]>;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
