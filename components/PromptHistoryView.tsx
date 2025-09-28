@@ -29,6 +29,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const [selectionAnchor, setSelectionAnchor] = useState<number | null>(null);
   const [versionsPanelWidth, setVersionsPanelWidth] = useState(DEFAULT_VERSIONS_PANEL_WIDTH);
   const isResizing = useRef(false);
+  const resizeStartInfo = useRef<{ startX: number; startWidth: number } | null>(null);
   
   const versionsWithCurrent = useMemo(() => {
     const historyVersions = versions.map(v => ({
@@ -62,16 +63,20 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
-    // Fix: Explicitly use `window.document` to avoid shadowing by the `document` prop.
+    resizeStartInfo.current = {
+        startX: e.clientX,
+        startWidth: versionsPanelWidth,
+    };
     window.document.body.style.cursor = 'col-resize';
-    // Fix: Explicitly use `window.document` to avoid shadowing by the `document` prop.
     window.document.body.style.userSelect = 'none';
-  }, []);
+  }, [versionsPanelWidth]);
 
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
-      if (!isResizing.current) return;
+      if (!isResizing.current || !resizeStartInfo.current) return;
 
-      const newWidth = e.clientX;
+      const deltaX = e.clientX - resizeStartInfo.current.startX;
+      const newWidth = resizeStartInfo.current.startWidth + deltaX;
+      
       const maxWidth = window.innerWidth - MIN_COMPARISON_PANEL_WIDTH;
       const clampedWidth = Math.max(MIN_VERSIONS_PANEL_WIDTH, Math.min(newWidth, maxWidth));
       setVersionsPanelWidth(clampedWidth);
@@ -80,9 +85,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const handleGlobalMouseUp = useCallback(() => {
       if (isResizing.current) {
           isResizing.current = false;
-          // Fix: Explicitly use `window.document` to avoid shadowing by the `document` prop.
+          resizeStartInfo.current = null;
           window.document.body.style.cursor = 'default';
-          // Fix: Explicitly use `window.document` to avoid shadowing by the `document` prop.
           window.document.body.style.userSelect = 'auto';
       }
   }, []);
@@ -223,24 +227,24 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
         </header>
 
         <div className="flex-1 flex overflow-hidden bg-secondary">
-            <aside style={{ width: `${versionsPanelWidth}px` }} className="flex flex-col flex-shrink-0">
-                <div className="p-4 flex flex-col flex-1 overflow-hidden h-full">
-                    <div className="flex justify-between items-center mb-1.5 flex-shrink-0 h-7">
-                        <h3 className="text-xs font-semibold px-1.5">Versions</h3>
-                        <Button 
-                            variant="destructive"
-                            className="px-1.5 py-0.5 text-[11px]"
-                            disabled={selectedVersionIds.size === 0}
-                            onClick={() => {
-                                addLog('INFO', `User action: Delete ${selectedVersionIds.size} version(s) for document "${document.title}".`);
-                                setIsConfirmingDelete(true);
-                            }}
-                        >
-                        <TrashIcon className="w-3 h-3 mr-1" />
-                        Delete ({selectedVersionIds.size})
-                        </Button>
-                    </div>
-                    <ul ref={listRef} onKeyDown={handleKeyDown} tabIndex={0} className="space-y-1 overflow-y-auto -mr-2 pr-2 focus:outline-none flex-1">
+            <aside style={{ width: `${versionsPanelWidth}px` }} className="flex flex-col flex-shrink-0 border-r border-border-color">
+                <div className="flex justify-between items-center flex-shrink-0 h-7 px-4 border-b border-border-color">
+                    <h3 className="text-xs font-semibold">Versions</h3>
+                    <Button 
+                        variant="destructive"
+                        className="px-1.5 py-0.5 text-[11px]"
+                        disabled={selectedVersionIds.size === 0}
+                        onClick={() => {
+                            addLog('INFO', `User action: Delete ${selectedVersionIds.size} version(s) for document "${document.title}".`);
+                            setIsConfirmingDelete(true);
+                        }}
+                    >
+                    <TrashIcon className="w-3 h-3 mr-1" />
+                    Delete ({selectedVersionIds.size})
+                    </Button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2">
+                    <ul ref={listRef} onKeyDown={handleKeyDown} tabIndex={0} className="space-y-1 focus:outline-none">
                         {versionsWithCurrent.map((version, index) => {
                             const isA = compareAIndex === index;
                             const isB = compareBIndex === index;
@@ -294,7 +298,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
             </aside>
             <div onMouseDown={handleMouseDown} className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200" />
             <main className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex justify-between items-center flex-shrink-0 h-7 px-4">
+                <div className="flex justify-between items-center flex-shrink-0 h-7 px-4 border-b border-border-color">
                     <div>
                         <h3 className="text-xs font-semibold">Comparison</h3>
                         <p className="text-[11px] text-text-secondary">
