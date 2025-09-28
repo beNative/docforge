@@ -32,9 +32,14 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
         case 'rb': return 'ruby';
         case 'php': return 'php';
         case 'sql': return 'sql';
+        case 'xml': return 'xml';
         case 'yml': case 'yaml': return 'yaml';
         case 'pas': return 'pascal';
-        case 'dfm': case 'ini': return 'ini';
+        case 'dfm':
+        case 'lfm':
+        case 'fmx':
+        case 'ini':
+            return 'ini';
         default: return 'plaintext';
     }
 };

@@ -17,6 +17,7 @@ export const SUPPORTED_LANGUAGES = [
     { id: 'ruby', label: 'Ruby' },
     { id: 'php', label: 'PHP' },
     { id: 'sql', label: 'SQL' },
+    { id: 'xml', label: 'XML' },
     { id: 'yaml', label: 'YAML' },
     { id: 'pascal', label: 'Pascal' },
     { id: 'ini', label: 'INI' },
@@ -62,12 +63,16 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
             return 'php';
         case 'sql':
             return 'sql';
+        case 'xml':
+            return 'xml';
         case 'yml':
         case 'yaml':
             return 'yaml';
         case 'pas':
             return 'pascal';
         case 'dfm':
+        case 'lfm':
+        case 'fmx':
         case 'ini':
              return 'ini';
         default:
