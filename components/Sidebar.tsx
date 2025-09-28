@@ -50,6 +50,9 @@ interface SidebarProps {
   onNewFromTemplate: () => void;
 }
 
+const DEFAULT_TEMPLATES_PANEL_HEIGHT = 160;
+const MIN_TEMPLATES_PANEL_HEIGHT = 80;
+
 // Helper function to find a node and its siblings in a tree structure
 const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: DocumentNode, siblings: DocumentNode[]} | null => {
     for (const node of nodes) {
@@ -68,8 +71,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
+  const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
+
 
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const isResizingTemplates = useRef(false);
   
   const activeNode = useMemo(() => {
     return props.documents.find(p => p.id === props.activeNodeId) || null;
@@ -98,9 +104,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
   // --- Load initial layout state from storage ---
   useEffect(() => {
-    storageService.load<boolean>(LOCAL_STORAGE_KEYS.SIDEBAR_TEMPLATES_COLLAPSED, false).then(collapsed => {
-        setIsTemplatesCollapsed(collapsed);
-    });
+    storageService.load<boolean>(LOCAL_STORAGE_KEYS.SIDEBAR_TEMPLATES_COLLAPSED, false).then(setIsTemplatesCollapsed);
+    storageService.load<number>(LOCAL_STORAGE_KEYS.SIDEBAR_TEMPLATES_PANEL_HEIGHT, DEFAULT_TEMPLATES_PANEL_HEIGHT).then(setTemplatesPanelHeight);
   }, []);
 
   // --- Collapse/Expand Logic ---
@@ -110,6 +115,48 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     storageService.save(LOCAL_STORAGE_KEYS.SIDEBAR_TEMPLATES_COLLAPSED, newCollapsedState);
   };
   
+  // --- Resizing Logic for Templates Panel ---
+  const handleTemplatesResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingTemplates.current = true;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizingTemplates.current || !sidebarRef.current) return;
+    
+    const sidebarRect = sidebarRef.current.getBoundingClientRect();
+    const newHeight = sidebarRect.bottom - e.clientY;
+    const maxTemplatesPanelHeight = sidebarRect.height - 200; // Ensure docs panel has at least 200px
+    
+    const clampedHeight = Math.max(MIN_TEMPLATES_PANEL_HEIGHT, Math.min(newHeight, maxTemplatesPanelHeight));
+    setTemplatesPanelHeight(clampedHeight);
+  }, []);
+
+  const handleGlobalMouseUp = useCallback(() => {
+    if (isResizingTemplates.current) {
+      isResizingTemplates.current = false;
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+      // Use a function for setState to get the latest value for saving
+      setTemplatesPanelHeight(currentHeight => {
+        storageService.save(LOCAL_STORAGE_KEYS.SIDEBAR_TEMPLATES_PANEL_HEIGHT, currentHeight);
+        return currentHeight;
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [handleGlobalMouseMove, handleGlobalMouseUp]);
+
+
   const handleMoveUp = useCallback((id: string) => {
       const result = findNodeAndSiblings(documentTree, id);
       if (!result) return;
@@ -251,85 +298,91 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         </div>
       </div>
 
-      {/* Documents Panel */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="flex items-center justify-between p-2 flex-shrink-0 sticky top-0 bg-secondary z-10">
-            <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
-            <div className="flex items-center gap-1">
-            <IconButton onClick={onExpandAll} tooltip="Expand All" size="sm" tooltipPosition="bottom">
-                <ExpandAllIcon />
-            </IconButton>
-            <IconButton onClick={onCollapseAll} tooltip="Collapse All" size="sm" tooltipPosition="bottom">
-                <CollapseAllIcon />
-            </IconButton>
-            <div className="h-5 w-px bg-border-color mx-1"></div>
-            <IconButton onClick={props.onNewDocument} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
-                <PlusIcon />
-            </IconButton>
-            <IconButton onClick={props.onNewRootFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
-                <FolderPlusIcon />
-            </IconButton>
+        <div className="flex-1 flex flex-col overflow-y-hidden">
+            {/* Documents Panel */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <header className="flex items-center justify-between p-2 flex-shrink-0 sticky top-0 bg-secondary z-10">
+                    <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
+                    <div className="flex items-center gap-1">
+                    <IconButton onClick={onExpandAll} tooltip="Expand All" size="sm" tooltipPosition="bottom">
+                        <ExpandAllIcon />
+                    </IconButton>
+                    <IconButton onClick={onCollapseAll} tooltip="Collapse All" size="sm" tooltipPosition="bottom">
+                        <CollapseAllIcon />
+                    </IconButton>
+                    <div className="h-5 w-px bg-border-color mx-1"></div>
+                     <IconButton onClick={props.onNewFromTemplate} tooltip="New from Template" size="sm" tooltipPosition="bottom">
+                        <DocumentDuplicateIcon />
+                    </IconButton>
+                    <IconButton onClick={props.onNewDocument} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
+                        <PlusIcon />
+                    </IconButton>
+                    <IconButton onClick={props.onNewRootFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
+                        <FolderPlusIcon />
+                    </IconButton>
+                    </div>
+                </header>
+                <div className="flex-1 overflow-y-auto">
+                <DocumentList 
+                    tree={documentTree}
+                    documents={props.documents}
+                    selectedIds={props.selectedIds}
+                    focusedItemId={focusedItemId}
+                    onSelectNode={props.onSelectNode}
+                    onDeleteNode={props.onDeleteNode}
+                    onRenameNode={props.onRenameNode}
+                    onMoveNode={props.onMoveNode}
+                    onCopyNodeContent={props.onCopyNodeContent}
+                    searchTerm={searchTerm}
+                    expandedIds={props.expandedFolderIds}
+                    onToggleExpand={props.onToggleExpand}
+                    onMoveUp={handleMoveUp}
+                    onMoveDown={handleMoveDown}
+                    onContextMenu={onContextMenu}
+                    renamingNodeId={renamingNodeId}
+                    onRenameComplete={onRenameComplete}
+                />
+                </div>
             </div>
-        </header>
-        <div className="flex-1 overflow-y-auto">
-          <DocumentList 
-              tree={documentTree}
-              documents={props.documents}
-              selectedIds={props.selectedIds}
-              focusedItemId={focusedItemId}
-              onSelectNode={props.onSelectNode}
-              onDeleteNode={props.onDeleteNode}
-              onRenameNode={props.onRenameNode}
-              onMoveNode={props.onMoveNode}
-              onCopyNodeContent={props.onCopyNodeContent}
-              searchTerm={searchTerm}
-              expandedIds={props.expandedFolderIds}
-              onToggleExpand={props.onToggleExpand}
-              onMoveUp={handleMoveUp}
-              onMoveDown={handleMoveDown}
-              onContextMenu={onContextMenu}
-              renamingNodeId={renamingNodeId}
-              onRenameComplete={onRenameComplete}
-          />
-        </div>
-      </div>
-      
-      {/* Templates Panel */}
-      <div className="flex-shrink-0 border-t border-border-color">
-        <header className={`flex items-center justify-between p-2 flex-shrink-0`}>
-            <div className="flex items-center gap-1">
-                <IconButton onClick={handleToggleCollapse} tooltip={isTemplatesCollapsed ? "Show Templates" : "Hide Templates"} size="sm">
-                    {isTemplatesCollapsed ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
-                </IconButton>
-                <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Templates</h2>
-            </div>
+            
             {!isTemplatesCollapsed && (
-              <div className="flex items-center gap-1">
-                  <IconButton onClick={props.onNewTemplate} tooltip="New Template" size="sm" tooltipPosition="bottom">
-                      <DocumentDuplicateIcon />
-                  </IconButton>
-              </div>
+                <div
+                    onMouseDown={handleTemplatesResizeStart}
+                    className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200 z-10"
+                />
             )}
-        </header>
-        {!isTemplatesCollapsed && (
-          <div className="overflow-y-auto px-2 max-h-48">
-              <TemplateList 
-                  templates={props.templates}
-                  activeTemplateId={props.activeTemplateId}
-                  focusedItemId={focusedItemId}
-                  onSelectTemplate={props.onSelectTemplate}
-                  onDeleteTemplate={props.onDeleteTemplate}
-                  onRenameTemplate={props.onRenameTemplate}
-              />
-          </div>
-        )}
-      </div>
-      <div className="p-2 border-t border-border-color flex-shrink-0">
-        <Button onClick={props.onNewFromTemplate} variant="ghost" className="w-full">
-            <DocumentDuplicateIcon className="w-4 h-4 mr-2" />
-            New from Template...
-        </Button>
-      </div>
+
+            {/* Templates Panel */}
+            <div className="flex-shrink-0 border-t border-border-color">
+                <header className={`flex items-center justify-between p-2 flex-shrink-0`}>
+                    <div className="flex items-center gap-1">
+                        <IconButton onClick={handleToggleCollapse} tooltip={isTemplatesCollapsed ? "Show Templates" : "Hide Templates"} size="sm">
+                            {isTemplatesCollapsed ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+                        </IconButton>
+                        <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Templates</h2>
+                    </div>
+                    {!isTemplatesCollapsed && (
+                    <div className="flex items-center gap-1">
+                        <IconButton onClick={props.onNewTemplate} tooltip="New Template" size="sm" tooltipPosition="bottom">
+                            <PlusIcon />
+                        </IconButton>
+                    </div>
+                    )}
+                </header>
+                {!isTemplatesCollapsed && (
+                <div style={{ height: `${templatesPanelHeight}px` }} className="overflow-y-auto px-2">
+                    <TemplateList 
+                        templates={props.templates}
+                        activeTemplateId={props.activeTemplateId}
+                        focusedItemId={focusedItemId}
+                        onSelectTemplate={props.onSelectTemplate}
+                        onDeleteTemplate={props.onDeleteTemplate}
+                        onRenameTemplate={props.onRenameTemplate}
+                    />
+                </div>
+                )}
+            </div>
+        </div>
     </div>
   );
 };

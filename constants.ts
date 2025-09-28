@@ -6,6 +6,7 @@ export const LOCAL_STORAGE_KEYS = {
   LOGGER_PANEL_HEIGHT: 'docforge_logger_panel_height',
   EXPANDED_FOLDERS: 'docforge_expanded_folders',
   SIDEBAR_TEMPLATES_COLLAPSED: 'docforge_sidebar_templates_collapsed',
+  SIDEBAR_TEMPLATES_PANEL_HEIGHT: 'docforge_sidebar_templates_panel_height',
 
   // Legacy keys used for migration check:
   LEGACY_PROMPTS: 'promptforge_prompts',
