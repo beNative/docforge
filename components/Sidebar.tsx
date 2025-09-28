@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
 // Fix: Correctly import the DocumentOrFolder type.
-import type { DocumentOrFolder, DocumentTemplate } from '../types';
+import type { DocumentOrFolder, DocumentTemplate, Command } from '../types';
 import IconButton from './IconButton';
 import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
@@ -40,6 +40,7 @@ interface SidebarProps {
   onContextMenu: (e: React.MouseEvent, nodeId: string | null) => void;
   renamingNodeId: string | null;
   onRenameComplete: () => void;
+  commands: Command[];
 
   templates: DocumentTemplate[];
   activeTemplateId: string | null;
@@ -68,7 +69,7 @@ const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: Document
 };
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll } = props;
+  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
@@ -278,6 +279,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       }
     }
   };
+  
+  const getTooltip = (commandId: string, baseText: string) => {
+    const command = commands.find(c => c.id === commandId);
+    return command?.shortcutString ? `${baseText} (${command.shortcutString})` : baseText;
+  };
 
 
   return (
@@ -308,13 +314,13 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                         <CollapseAllIcon />
                     </IconButton>
                     <div className="h-5 w-px bg-border-color mx-1"></div>
-                     <IconButton onClick={props.onNewFromTemplate} tooltip="New from Template" size="sm" tooltipPosition="bottom">
+                     <IconButton onClick={props.onNewFromTemplate} tooltip={getTooltip('new-from-template', 'New from Template')} size="sm" tooltipPosition="bottom">
                         <DocumentDuplicateIcon />
                     </IconButton>
-                    <IconButton onClick={props.onNewDocument} tooltip="New Document (Ctrl+N)" size="sm" tooltipPosition="bottom">
+                    <IconButton onClick={props.onNewDocument} tooltip={getTooltip('new-document', 'New Document')} size="sm" tooltipPosition="bottom">
                         <PlusIcon />
                     </IconButton>
-                    <IconButton onClick={props.onNewRootFolder} tooltip="New Root Folder" size="sm" tooltipPosition="bottom">
+                    <IconButton onClick={props.onNewRootFolder} tooltip={getTooltip('new-folder', 'New Root Folder')} size="sm" tooltipPosition="bottom">
                         <FolderPlusIcon />
                     </IconButton>
                     </div>
@@ -360,7 +366,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     </div>
                     {!isTemplatesCollapsed && (
                     <div className="flex items-center gap-1">
-                        <IconButton onClick={props.onNewTemplate} tooltip="New Template" size="sm" tooltipPosition="bottom">
+                        <IconButton onClick={props.onNewTemplate} tooltip={getTooltip('new-template', 'New Template')} size="sm" tooltipPosition="bottom">
                             <PlusIcon />
                         </IconButton>
                     </div>

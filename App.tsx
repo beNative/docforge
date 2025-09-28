@@ -21,7 +21,7 @@ import InfoView from './components/InfoView';
 import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon } from './components/Icons';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
@@ -39,7 +39,7 @@ import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { LOCAL_STORAGE_KEYS } from './constants';
 import { repository } from './services/repository';
 import { DocumentNode } from './components/PromptTreeItem';
-import { formatShortcut, getShortcutMap } from './services/shortcutService';
+import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './services/shortcutService';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -634,6 +634,58 @@ const MainApp: React.FC = () => {
         }
     }, [items, commitVersion, addLog]);
 
+    const handleOpenCommandPalette = useCallback(() => {
+        addLog('INFO', 'User action: Opened command palette.');
+        setIsCommandPaletteOpen(true);
+    }, [addLog]);
+
+    const handleCloseCommandPalette = useCallback(() => {
+        setIsCommandPaletteOpen(false);
+        setCommandPaletteSearch('');
+    }, []);
+    
+    const handleToggleCommandPalette = useCallback(() => {
+        addLog('INFO', `User action: Toggled command palette ${isCommandPaletteOpen ? 'off' : 'on'}.`);
+        setIsCommandPaletteOpen(prev => {
+            const isOpen = !prev;
+            if (isOpen) {
+                setTimeout(() => {
+                    commandPaletteInputRef.current?.focus();
+                    commandPaletteInputRef.current?.select();
+                }, 0);
+            } else {
+                commandPaletteInputRef.current?.blur();
+            }
+            return isOpen;
+        });
+    }, [addLog, isCommandPaletteOpen]);
+    
+    // Command Palette Commands
+    const commands: Command[] = useMemo(() => [
+        { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Control', 'N'], keywords: 'add create file' },
+        { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
+        { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
+        { id: 'new-from-template', name: 'New Document from Template...', action: () => { addLog('INFO', 'Command: New Document from Template.'); setCreateFromTemplateOpen(true); }, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create file instance' },
+        { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: CopyIcon, keywords: 'copy clone' },
+        { id: 'delete-item', name: 'Delete Selection', action: () => handleDeleteSelection(selectedIds), category: 'File', icon: TrashIcon, keywords: 'remove discard' },
+        { id: 'toggle-command-palette', name: 'Toggle Command Palette', action: handleToggleCommandPalette, category: 'View', icon: CommandIcon, shortcut: ['Control', 'Shift', 'P'], keywords: 'find action go to' },
+        { id: 'toggle-editor', name: 'Switch to Editor View', action: () => { addLog('INFO', 'Command: Switch to Editor View.'); setView('editor'); }, category: 'View', icon: PencilIcon, keywords: 'main document' },
+        { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
+        { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
+        { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
+    ], [handleNewDocument, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog, handleToggleCommandPalette]);
+
+    const enrichedCommands = useMemo(() => {
+      return commands.map(command => {
+          const custom = settings.customShortcuts[command.id];
+          const effectiveShortcut = custom !== undefined ? custom : command.shortcut;
+          return {
+              ...command,
+              shortcutString: effectiveShortcut ? formatShortcutForDisplay(effectiveShortcut) : undefined,
+          };
+      });
+    }, [commands, settings.customShortcuts]);
+
     const handleContextMenu = useCallback((e: React.MouseEvent, nodeId: string | null) => {
         e.preventDefault();
         e.stopPropagation();
@@ -654,6 +706,8 @@ const MainApp: React.FC = () => {
         const firstSelectedNode = nodeId ? items.find(i => i.id === nodeId) : null;
         const parentIdForNewItem = firstSelectedNode?.type === 'folder' ? firstSelectedNode.id : firstSelectedNode?.parentId ?? null;
         
+        const getCommand = (id: string) => enrichedCommands.find(c => c.id === id);
+
         const newFromTemplateAction = () => {
             addLog('INFO', 'Context Menu: New Document from Template.');
             setCreateFromTemplateOpen(true);
@@ -661,22 +715,22 @@ const MainApp: React.FC = () => {
 
         if (nodeId) { // Clicked on an item
             menuItems.push(
-                { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem) },
-                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem) },
-                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction },
+                { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem), shortcut: getCommand('new-document')?.shortcutString },
+                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem), shortcut: getCommand('new-folder')?.shortcutString },
+                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Rename', icon: PencilIcon, action: () => setRenamingNodeId(nodeId), disabled: currentSelection.size !== 1 },
-                { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0 },
+                { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0, shortcut: getCommand('duplicate-item')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Copy Content', icon: CopyIcon, action: () => hasDocuments && handleCopyNodeContent(selectedNodes.find(n => n.type === 'document')!.id), disabled: !hasDocuments},
                 { type: 'separator' },
-                { label: 'Delete', icon: TrashIcon, action: () => handleDeleteSelection(currentSelection), disabled: currentSelection.size === 0 }
+                { label: 'Delete', icon: TrashIcon, action: () => handleDeleteSelection(currentSelection), disabled: currentSelection.size === 0, shortcut: getCommand('delete-item')?.shortcutString }
             );
         } else { // Clicked on empty space
              menuItems.push(
-                { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null) },
-                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null) },
-                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction }
+                { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null), shortcut: getCommand('new-document')?.shortcutString },
+                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null), shortcut: getCommand('new-folder')?.shortcutString },
+                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString }
             );
         }
 
@@ -685,7 +739,8 @@ const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands]);
+
 
     // --- Resizable Panels Logic ---
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -749,46 +804,6 @@ const MainApp: React.FC = () => {
     }, [handleGlobalMouseMove, handleGlobalMouseUp]);
     // --- End Resizable Panels Logic ---
     
-    const handleOpenCommandPalette = useCallback(() => {
-        addLog('INFO', 'User action: Opened command palette.');
-        setIsCommandPaletteOpen(true);
-    }, [addLog]);
-
-    const handleCloseCommandPalette = useCallback(() => {
-        setIsCommandPaletteOpen(false);
-        setCommandPaletteSearch('');
-    }, []);
-    
-    const handleToggleCommandPalette = useCallback(() => {
-        addLog('INFO', `User action: Toggled command palette ${isCommandPaletteOpen ? 'off' : 'on'}.`);
-        setIsCommandPaletteOpen(prev => {
-            const isOpen = !prev;
-            if (isOpen) {
-                setTimeout(() => {
-                    commandPaletteInputRef.current?.focus();
-                    commandPaletteInputRef.current?.select();
-                }, 0);
-            } else {
-                commandPaletteInputRef.current?.blur();
-            }
-            return isOpen;
-        });
-    }, [addLog, isCommandPaletteOpen]);
-    
-    // Command Palette Commands
-    const commands: Command[] = useMemo(() => [
-        { id: 'new-document', name: 'Create New Document', action: handleNewDocument, category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'], keywords: 'add create file' },
-        { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
-        { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
-        { id: 'new-from-template', name: 'New Document from Template...', action: () => { addLog('INFO', 'Command: New Document from Template.'); setCreateFromTemplateOpen(true); }, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create file instance' },
-        { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: CopyIcon, keywords: 'copy clone' },
-        { id: 'delete-item', name: 'Delete Selection', action: () => handleDeleteSelection(selectedIds), category: 'File', icon: TrashIcon, keywords: 'remove discard' },
-        { id: 'toggle-editor', name: 'Switch to Editor View', action: () => { addLog('INFO', 'Command: Switch to Editor View.'); setView('editor'); }, category: 'View', icon: PencilIcon, keywords: 'main document' },
-        { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
-        { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
-        { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog]);
-
      // Keyboard shortcuts
     useEffect(() => {
         const shortcutMap = getShortcutMap(commands, settings.customShortcuts);
@@ -827,7 +842,7 @@ const MainApp: React.FC = () => {
 
     const renderMainContent = () => {
         if (view === 'info') return <InfoView />;
-        if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} commands={commands} />;
+        if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} commands={enrichedCommands} />;
         
         if (activeTemplate) {
             return <TemplateEditor 
@@ -874,6 +889,7 @@ const MainApp: React.FC = () => {
         isInfoViewActive: view === 'info',
         isSettingsViewActive: view === 'settings',
         isEditorViewActive: view === 'editor',
+        commands: enrichedCommands,
     };
 
     return (
@@ -926,7 +942,7 @@ const MainApp: React.FC = () => {
                                         onContextMenu={handleContextMenu}
                                         renamingNodeId={renamingNodeId}
                                         onRenameComplete={() => setRenamingNodeId(null)}
-
+                                        commands={enrichedCommands}
                                         templates={templates}
                                         activeTemplateId={activeTemplateId}
                                         onSelectTemplate={handleSelectTemplate}
@@ -975,7 +991,7 @@ const MainApp: React.FC = () => {
             <CommandPalette 
                 isOpen={isCommandPaletteOpen} 
                 onClose={handleCloseCommandPalette}
-                commands={commands}
+                commands={enrichedCommands}
                 targetRef={commandPaletteTargetRef}
                 searchTerm={commandPaletteSearch}
                 onExecute={() => {

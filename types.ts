@@ -156,6 +156,7 @@ export interface Command {
   category: string;
   icon: React.FC<{ className?: string }>;
   shortcut?: string[];
+  shortcutString?: string;
 }
 
 export interface DiscoveredLLMService {

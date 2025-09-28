@@ -150,14 +150,10 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
                 <command.icon className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-primary-text/90' : 'text-text-secondary'}`} />
                 <span className="truncate">{command.name}</span>
             </div>
-            {command.shortcut && (
-                <div className="flex items-center gap-1">
-                {command.shortcut.map(key => (
-                    <kbd key={key} className={`px-1.5 py-0.5 text-xs rounded font-sans transition-colors ${isSelected ? 'bg-primary/80 text-primary-text' : 'bg-border-color text-text-secondary'}`}>
-                        {key}
-                    </kbd>
-                ))}
-                </div>
+            {command.shortcutString && (
+              <kbd className={`px-1.5 py-0.5 text-xs rounded font-sans transition-colors ${isSelected ? 'bg-primary/80 text-primary-text' : 'bg-border-color text-text-secondary'}`}>
+                {command.shortcutString}
+              </kbd>
             )}
             </li>
         </React.Fragment>

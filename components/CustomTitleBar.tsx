@@ -3,8 +3,7 @@ import IconButton from './IconButton';
 import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, SearchIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, PencilIcon } from './Icons';
 import ThemeToggleButton from './ThemeToggleButton';
 import { useLogger } from '../hooks/useLogger';
-
-// info
+import type { Command } from '../types';
 
 interface CustomTitleBarProps {
   onToggleSettingsView: () => void;
@@ -19,6 +18,7 @@ interface CustomTitleBarProps {
   commandPaletteInputRef: React.RefObject<HTMLInputElement>;
   searchTerm: string;
   onSearchTermChange: (term: string) => void;
+  commands: Command[];
 }
 
 interface CommandPaletteSearchProps {
@@ -27,10 +27,11 @@ interface CommandPaletteSearchProps {
     searchTerm: string;
     onSearchTermChange: (term: string) => void;
     onOpenCommandPalette: () => void;
+    shortcutString?: string;
 }
 
 const CommandPaletteSearch: React.FC<CommandPaletteSearchProps> = ({ 
-    commandPaletteTargetRef, inputRef, searchTerm, onSearchTermChange, onOpenCommandPalette 
+    commandPaletteTargetRef, inputRef, searchTerm, onSearchTermChange, onOpenCommandPalette, shortcutString
 }) => (
     <div 
         ref={commandPaletteTargetRef}
@@ -46,7 +47,9 @@ const CommandPaletteSearch: React.FC<CommandPaletteSearchProps> = ({
             onFocus={onOpenCommandPalette}
             className="w-full bg-transparent text-sm text-text-main placeholder:text-text-secondary focus:outline-none"
         />
-        <span className="text-xs text-text-secondary bg-border-color/50 px-1.5 py-0.5 rounded">Ctrl+Shift+P</span>
+        {shortcutString && (
+          <span className="text-xs text-text-secondary bg-border-color/50 px-1.5 py-0.5 rounded font-sans">{shortcutString}</span>
+        )}
     </div>
 );
 
@@ -78,7 +81,7 @@ const WindowControls: React.FC<{ platform: string, isMaximized: boolean }> = ({ 
 
 const CustomTitleBar: React.FC<CustomTitleBarProps> = ({ 
     onToggleSettingsView, onToggleInfoView, onShowEditorView, onToggleLogger, onOpenCommandPalette, 
-    isInfoViewActive, isSettingsViewActive, isEditorViewActive, commandPaletteTargetRef, commandPaletteInputRef, searchTerm, onSearchTermChange
+    isInfoViewActive, isSettingsViewActive, isEditorViewActive, commandPaletteTargetRef, commandPaletteInputRef, searchTerm, onSearchTermChange, commands
 }) => {
     const [platform, setPlatform] = useState('');
     const [isMaximized, setIsMaximized] = useState(false);
@@ -93,6 +96,11 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
             return cleanup;
         }
     }, []);
+
+    const getTooltip = (commandId: string, baseText: string) => {
+      const command = commands.find(c => c.id === commandId);
+      return command?.shortcutString ? `${baseText} (${command.shortcutString})` : baseText;
+    };
     
     return (
         <header className="draggable flex items-center justify-between h-10 flex-shrink-0 bg-secondary border-b border-border-color z-30 text-text-main">
@@ -108,21 +116,22 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
                     searchTerm={searchTerm}
                     onSearchTermChange={onSearchTermChange}
                     onOpenCommandPalette={onOpenCommandPalette}
+                    shortcutString={commands.find(c => c.id === 'toggle-command-palette')?.shortcutString}
                 />
             </div>
 
             <div className="flex items-center gap-1 flex-1 justify-end">
-                <IconButton onClick={onShowEditorView} tooltip="Editor" size="sm" className={`not-draggable ${isEditorViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
+                <IconButton onClick={onShowEditorView} tooltip={getTooltip('toggle-editor', 'Editor')} size="sm" className={`not-draggable ${isEditorViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
                     <PencilIcon className="w-5 h-5" />
                 </IconButton>
-                <IconButton onClick={onToggleInfoView} tooltip="Info" size="sm" className={`not-draggable ${isInfoViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
+                <IconButton onClick={onToggleInfoView} tooltip={getTooltip('toggle-info', 'Info')} size="sm" className={`not-draggable ${isInfoViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
                     <InfoIcon className="w-5 h-5" />
                 </IconButton>
-                <IconButton onClick={onToggleLogger} tooltip="Logs" size="sm" className="not-draggable" tooltipPosition="bottom">
+                <IconButton onClick={onToggleLogger} tooltip={getTooltip('toggle-logs', 'Logs')} size="sm" className="not-draggable" tooltipPosition="bottom">
                     <TerminalIcon className="w-5 h-5" />
                 </IconButton>
                 <ThemeToggleButton size="sm" tooltipPosition="bottom" className="not-draggable" />
-                <IconButton onClick={onToggleSettingsView} tooltip="Settings" size="sm" className={`not-draggable ${isSettingsViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
+                <IconButton onClick={onToggleSettingsView} tooltip={getTooltip('toggle-settings', 'Settings')} size="sm" className={`not-draggable ${isSettingsViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
                     <GearIcon className="w-5 h-5" />
                 </IconButton>
             </div>

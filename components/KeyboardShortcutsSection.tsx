@@ -24,17 +24,17 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
             return command.name.toLowerCase().includes(lowercasedTerm) || shortcutString.includes(lowercasedTerm);
         });
 
-        // Fix: Correctly type the initial value for the 'reduce' method to ensure correct type inference.
-        // This resolves both the "Untyped function calls may not accept type arguments" error
-        // and the downstream "Property 'map' does not exist on type 'unknown'" error.
-        return filtered.reduce((acc, command) => {
+        // Fix: By providing a generic type argument to `reduce`, we ensure TypeScript correctly infers
+        // the return type as `Record<string, Command[]>`, which resolves the downstream error
+        // where `cmds.map` was failing because `cmds` was of type `unknown`.
+        return filtered.reduce<Record<string, Command[]>>((acc, command) => {
             const category = command.category;
             if (!acc[category]) {
                 acc[category] = [];
             }
             acc[category].push(command);
             return acc;
-        }, {} as Record<string, Command[]>);
+        }, {});
     }, [commands, searchTerm, settings.customShortcuts]);
 
     return (
