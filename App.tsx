@@ -261,6 +261,7 @@ const MainApp: React.FC = () => {
             const firstId = items[0].id;
             setActiveNodeId(firstId);
             setSelectedIds(new Set([firstId]));
+            setLastClickedId(firstId);
         } else if (items.length === 0 && activeNodeId) {
             setActiveNodeId(null);
             setSelectedIds(new Set());
@@ -879,9 +880,9 @@ const MainApp: React.FC = () => {
                 )}
                 <div className="flex-1 flex flex-col overflow-hidden">
                     <main className="flex-1 flex overflow-hidden">
-                        {view === 'editor' && (
+                        {view === 'editor' ? (
                             <>
-                                 <aside 
+                                <aside 
                                     style={{ width: `${sidebarWidth}px` }} 
                                     className="bg-secondary border-r border-border-color flex flex-col flex-shrink-0"
                                 >
@@ -927,13 +928,13 @@ const MainApp: React.FC = () => {
                                     onMouseDown={handleSidebarMouseDown}
                                     className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
                                 />
+                                <section className="flex-1 flex flex-col overflow-hidden bg-background">
+                                    {renderMainContent()}
+                                </section>
                             </>
+                        ) : (
+                            renderMainContent()
                         )}
-                        <section className="flex-1 flex flex-col overflow-hidden bg-background">
-                            <div className="flex-1 overflow-hidden relative">
-                                {renderMainContent()}
-                            </div>
-                        </section>
                     </main>
                     <LoggerPanel 
                         isVisible={isLoggerVisible} 
