@@ -17,6 +17,7 @@ const nodeToDocumentOrFolder = (node: Node): DocumentOrFolder => ({
   parentId: node.parent_id,
   doc_type: node.document?.doc_type,
   language_hint: node.document?.language_hint,
+  default_view_mode: node.document?.default_view_mode,
 });
 
 /**
@@ -80,6 +81,7 @@ export const useDocuments = () => {
     if (updates.title !== undefined) nodeUpdates.title = updates.title;
     if (updates.parentId !== undefined) nodeUpdates.parent_id = updates.parentId;
     if (updates.language_hint !== undefined) nodeUpdates.language_hint = updates.language_hint;
+    if (updates.default_view_mode !== undefined) nodeUpdates.default_view_mode = updates.default_view_mode;
 
     if (Object.keys(nodeUpdates).length > 0) {
         await updateNode(id, nodeUpdates);

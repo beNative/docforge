@@ -24,7 +24,7 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate } from './types';
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
@@ -453,6 +453,13 @@ const MainApp: React.FC = () => {
         }
     }, [activeNodeId, activeNode, updateItem, addLog]);
 
+    const handleViewModeChange = useCallback((mode: ViewMode) => {
+        if (activeNodeId && activeNode?.type === 'document') {
+            addLog('INFO', `User action: Set default view for document "${activeNode?.title}" to "${mode}".`);
+            updateItem(activeNodeId, { default_view_mode: mode });
+        }
+    }, [activeNodeId, activeNode, updateItem, addLog]);
+
     const handleCommitVersion = (content: string) => {
         if (activeNodeId) {
             commitVersion(activeNodeId, content);
@@ -874,6 +881,7 @@ const MainApp: React.FC = () => {
                         settings={settings}
                         onShowHistory={() => setDocumentView('history')}
                         onLanguageChange={handleLanguageChange}
+                        onViewModeChange={handleViewModeChange}
                     />
                 );
             }

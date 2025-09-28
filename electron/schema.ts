@@ -2,7 +2,7 @@
 // removing the need for external .sql files which can complicate the build process.
 
 export const INITIAL_SCHEMA = `
--- PRAGMA statements are executed by the database service, not in the schema file.
+-- PRAGMA user_version is set to 1 by the database service for this schema.
 
 -- =================================================================
 --  CORE HIERARCHY & METADATA
@@ -27,6 +27,7 @@ CREATE TABLE documents (
   node_id             TEXT NOT NULL UNIQUE REFERENCES nodes(node_id) ON DELETE CASCADE,
   doc_type            TEXT NOT NULL,
   language_hint       TEXT,
+  default_view_mode   TEXT,
   current_version_id  INTEGER REFERENCES doc_versions(version_id) DEFERRABLE INITIALLY DEFERRED
 );
 CREATE INDEX idx_document_node_id ON documents(node_id);

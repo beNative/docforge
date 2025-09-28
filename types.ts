@@ -70,6 +70,7 @@ export interface Document {
   node_id: string;
   doc_type: DocType;
   language_hint: string | null;
+  default_view_mode: ViewMode | null;
   current_version_id: number | null;
   // Client-side property, holds content of current version
   content?: string;
@@ -107,6 +108,7 @@ export interface DocumentOrFolder {
   // Document-specific properties for the UI adapter
   doc_type?: DocType;
   language_hint?: string | null;
+  default_view_mode?: ViewMode | null;
 }
 
 // Fix: Renamed LegacyPromptVersion to DocumentVersion and aliased it to the new DocVersion type

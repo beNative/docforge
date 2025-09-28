@@ -19,9 +19,10 @@ interface DocumentEditorProps {
   settings: Settings;
   onShowHistory: () => void;
   onLanguageChange: (language: string) => void;
+  onViewModeChange: (mode: ViewMode) => void;
 }
 
-const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange }) => {
+const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange, onViewModeChange }) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
   
@@ -31,7 +32,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const [isDirty, setIsDirty] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('edit');
+  const [viewMode, setViewMode] = useState<ViewMode>(documentNode.default_view_mode || 'edit');
   const [splitSize, setSplitSize] = useState(50);
   const { addLog } = useLogger();
   
@@ -40,13 +41,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
   const isContentInitialized = useRef(false);
 
-  // Reset content and view when the document ID changes.
+  // Reset content and view when the document changes.
   useEffect(() => {
     setContent(documentNode.content || '');
-    setViewMode('edit');
+    setViewMode(documentNode.default_view_mode || 'edit');
     setSplitSize(50);
     isContentInitialized.current = true;
-  }, [documentNode.id]);
+  }, [documentNode.id, documentNode.default_view_mode]);
 
   useEffect(() => {
     setTitle(documentNode.title);
@@ -113,6 +114,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     if (isDirty) {
       onCommitVersion(content);
     }
+  };
+
+  const handleViewModeButton = (newMode: ViewMode) => {
+    setViewMode(newMode);
+    onViewModeChange(newMode);
   };
 
   const handleRefine = async () => {
@@ -211,10 +217,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             <div className="h-6 w-px bg-border-color mx-1"></div>
             {supportsPreview && (
               <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
-                  <IconButton onClick={() => setViewMode('edit')} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : ''}`}><PencilIcon className="w-5 h-5" /></IconButton>
-                  <IconButton onClick={() => setViewMode('preview')} tooltip="Preview Only" size="sm" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : ''}`}><EyeIcon className="w-5 h-5" /></IconButton>
-                  <IconButton onClick={() => setViewMode('split-vertical')} tooltip="Split Vertical" size="sm" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : ''}`}><LayoutVerticalIcon className="w-5 h-5" /></IconButton>
-                  <IconButton onClick={() => setViewMode('split-horizontal')} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-5 h-5" /></IconButton>
+                  <IconButton onClick={() => handleViewModeButton('edit')} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : ''}`}><PencilIcon className="w-5 h-5" /></IconButton>
+                  <IconButton onClick={() => handleViewModeButton('preview')} tooltip="Preview Only" size="sm" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : ''}`}><EyeIcon className="w-5 h-5" /></IconButton>
+                  <IconButton onClick={() => handleViewModeButton('split-vertical')} tooltip="Split Vertical" size="sm" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : ''}`}><LayoutVerticalIcon className="w-5 h-5" /></IconButton>
+                  <IconButton onClick={() => handleViewModeButton('split-horizontal')} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-5 h-5" /></IconButton>
               </div>
             )}
             <div className="h-6 w-px bg-border-color mx-1"></div>

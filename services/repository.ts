@@ -1,4 +1,4 @@
-import type { Node, Document, DocVersion, DocumentOrFolder, DocumentVersion, DocumentTemplate, Settings, ContentStore } from '../types';
+import type { Node, Document, DocVersion, DocumentOrFolder, DocumentVersion, DocumentTemplate, Settings, ContentStore, ViewMode } from '../types';
 import { cryptoService } from './cryptoService';
 import { EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,6 +48,7 @@ const transformLegacyData = async (
                 node_id: item.id,
                 doc_type: 'prompt',
                 language_hint: null,
+                default_view_mode: null,
                 current_version_id: null, // placeholder
             });
 
@@ -164,7 +165,7 @@ export const repository = {
         const flatNodes = await window.electronAPI.dbQuery(`
             SELECT 
                 n.*, 
-                d.document_id, d.doc_type, d.language_hint, d.current_version_id,
+                d.document_id, d.doc_type, d.language_hint, d.default_view_mode, d.current_version_id,
                 cs.text_content as content
             FROM nodes n
             LEFT JOIN documents d ON n.node_id = d.node_id
@@ -191,6 +192,7 @@ export const repository = {
                     node_id: record.node_id,
                     doc_type: record.doc_type,
                     language_hint: record.language_hint,
+                    default_view_mode: record.default_view_mode,
                     current_version_id: record.current_version_id,
                     content: record.content,
                 } : undefined,
@@ -239,7 +241,7 @@ export const repository = {
         return createdNode as Node;
     },
     
-    async updateNode(nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null }>) {
+    async updateNode(nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null; default_view_mode?: ViewMode | null }>) {
         const nodeUpdates: Partial<Pick<Node, 'title' | 'parent_id'>> = {};
         if (updates.title !== undefined) nodeUpdates.title = updates.title;
         if (updates.parent_id !== undefined) nodeUpdates.parent_id = updates.parent_id;
@@ -260,7 +262,14 @@ export const repository = {
                 `UPDATE documents SET language_hint = ? WHERE node_id = ?`,
                 [updates.language_hint, nodeId]
             );
-            // Also update the updated_at on the node for consistency
+            await window.electronAPI!.dbRun(`UPDATE nodes SET updated_at = ? WHERE node_id = ?`, [now, nodeId]);
+        }
+        
+        if (updates.default_view_mode !== undefined) {
+            await window.electronAPI!.dbRun(
+                `UPDATE documents SET default_view_mode = ? WHERE node_id = ?`,
+                [updates.default_view_mode, nodeId]
+            );
             await window.electronAPI!.dbRun(`UPDATE nodes SET updated_at = ? WHERE node_id = ?`, [now, nodeId]);
         }
     },

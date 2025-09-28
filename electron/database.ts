@@ -1,4 +1,3 @@
-// Fix: This file was previously a placeholder. This is the full implementation for the database service.
 import { app } from 'electron';
 import path from 'path';
 import fs, { statSync } from 'fs';
@@ -22,6 +21,7 @@ export const databaseService = {
       console.log('Database does not exist, creating new one...');
       db.exec(INITIAL_SCHEMA);
       // Set PRAGMAs for a new database
+      db.pragma('user_version = 1');
       db.exec('PRAGMA journal_mode = WAL;');
       db.exec('PRAGMA foreign_keys = ON;');
       console.log('Database created and schema applied.');
@@ -30,6 +30,26 @@ export const databaseService = {
       // Ensure PRAGMAs are set for existing databases too
       db.exec('PRAGMA journal_mode = WAL;');
       db.exec('PRAGMA foreign_keys = ON;');
+      
+      // Run migrations
+      const currentVersion = db.pragma('user_version', { simple: true }) as number;
+      if (currentVersion < 1) {
+        console.log(`Migrating schema from version ${currentVersion} to 1...`);
+        try {
+          const transaction = db.transaction(() => {
+            const columns = db.prepare("PRAGMA table_info(documents)").all() as {name: string}[];
+            const hasColumn = columns.some(col => col.name === 'default_view_mode');
+            if (!hasColumn) {
+              db.exec('ALTER TABLE documents ADD COLUMN default_view_mode TEXT');
+            }
+            db.pragma('user_version = 1');
+          });
+          transaction();
+          console.log('Migration to version 1 complete.');
+        } catch (e) {
+          console.error('Fatal: Failed to migrate database to version 1:', e);
+        }
+      }
     }
   },
 
