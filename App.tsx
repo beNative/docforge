@@ -316,7 +316,7 @@ const MainApp: React.FC = () => {
             // Global drop is only handled if not caught by a more specific target
             if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
                  const target = e.target as HTMLElement;
-                 if (!target.closest('[data-item-id]')) { // Prevent double handling
+                 if (!target.closest('[data-item-id]') && !target.closest('[data-sidebar-drop-root]')) {
                     addLog('INFO', `${e.dataTransfer.files.length} file(s) dropped on the application window (root).`);
                     handleDropFiles(e.dataTransfer.files, null);
                 }

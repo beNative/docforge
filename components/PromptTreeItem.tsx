@@ -154,7 +154,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
+    // e.stopPropagation(); // Removed to allow event to bubble to App.tsx to reset drag state
 
     const finalDropPosition = getDropPosition(e, isFolder, itemRef.current);
     setDropPosition(null);

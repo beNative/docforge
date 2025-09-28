@@ -32,7 +32,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
   
   const handleRootDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
+    // e.stopPropagation(); // Removed to allow event to bubble to App.tsx to reset drag state
     setIsRootDropping(false);
     
     // Ensure we don't handle drops that were meant for a child item.
@@ -88,6 +88,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
 
   return (
     <div 
+        data-sidebar-drop-root
         className="relative flex-1"
         onDrop={handleRootDrop}
         onDragOver={handleRootDragOver}
