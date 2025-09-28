@@ -94,8 +94,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discovere
 
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
-      <header className="flex justify-between items-center p-6 border-b border-border-color flex-shrink-0">
-        <h1 className="text-2xl font-semibold text-text-main">Settings</h1>
+      <header className="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0">
+        <h1 className="text-xl font-semibold text-text-main">Settings</h1>
         <Button
             onClick={handleSave}
             disabled={!isDirty}
@@ -105,19 +105,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discovere
         </Button>
       </header>
       <div className="flex-1 flex overflow-hidden">
-        <nav className="w-56 p-4 border-r border-border-color bg-secondary/50">
+        <nav className="w-48 p-4 border-r border-border-color bg-secondary/50">
           <ul className="space-y-1">
             {categories.map(({ id, label, icon: Icon }) => (
               <li key={id}>
                 <button
                   onClick={() => handleNavClick(id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  className={`w-full flex items-center gap-3 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
                     visibleCategory === id
                       ? 'bg-primary/10 text-primary'
                       : 'text-text-secondary hover:bg-border-color/50 hover:text-text-main'
                   }`}
                 >
-                  <Icon className="w-5 h-5" />
+                  <Icon className="w-4 h-4" />
                   <span>{label}</span>
                 </button>
               </li>
@@ -125,7 +125,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discovere
           </ul>
         </nav>
         <main ref={mainPanelRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-12 divide-y divide-border-color/50">
+          <div className="max-w-4xl mx-auto px-8 divide-y divide-border-color/50">
             <ProviderSettingsSection {...{ settings: currentSettings, setCurrentSettings, discoveredServices, onDetectServices, isDetecting, sectionRef: el => sectionRefs.current.provider = el }} />
             <AppearanceSettingsSection {...{ settings: currentSettings, setCurrentSettings, sectionRef: el => sectionRefs.current.appearance = el }} />
             <KeyboardShortcutsSection {...{ settings: currentSettings, setCurrentSettings, commands, sectionRef: el => sectionRefs.current.shortcuts = el }} />
@@ -203,8 +203,8 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
     const selectedService = discoveredServices.find(s => s.generateUrl === settings.llmProviderUrl);
 
     return (
-        <div id="provider" ref={sectionRef} className="py-10">
-            <h2 className="text-xl font-semibold text-text-main mb-6">LLM Provider</h2>
+        <div id="provider" ref={sectionRef} className="py-6">
+            <h2 className="text-lg font-semibold text-text-main mb-4">LLM Provider</h2>
             <div className="space-y-6">
                 <SettingRow label="Detect Services" description="Scan for locally running LLM services like Ollama and LM Studio.">
                     <div className="w-60">
@@ -220,7 +220,7 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
                         value={selectedService?.id || ''}
                         onChange={(e) => handleServiceChange(e.target.value)}
                         disabled={discoveredServices.length === 0}
-                        className="w-60 p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+                        className="w-60 p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
                     >
                         <option value="" disabled>{discoveredServices.length > 0 ? 'Select a service' : 'No services detected'}</option>
                         {discoveredServices.map(service => (
@@ -235,7 +235,7 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
                             value={settings.llmModelName}
                             onChange={(e) => setCurrentSettings(prev => ({ ...prev, llmModelName: e.target.value }))}
                             disabled={!selectedService || availableModels.length === 0}
-                            className="w-full p-2 rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+                            className="w-full p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
                         >
                             <option value="" disabled>{!selectedService ? 'Select service first' : 'Select a model'}</option>
                             {availableModels.map(model => (
@@ -259,13 +259,13 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
             <div className="flex items-center justify-around text-text-secondary p-2 bg-background rounded-md mb-2">
                 {children}
             </div>
-            <h4 className="font-semibold text-text-main text-sm">{name}</h4>
+            <h4 className="font-semibold text-text-main text-xs">{name}</h4>
         </button>
     );
 
     return (
-        <div id="appearance" ref={sectionRef} className="py-10">
-            <h2 className="text-xl font-semibold text-text-main mb-6">Appearance</h2>
+        <div id="appearance" ref={sectionRef} className="py-6">
+            <h2 className="text-lg font-semibold text-text-main mb-4">Appearance</h2>
             <div className="space-y-6">
                 <SettingRow label="Interface Scale" description="Adjust the size of all UI elements in the application.">
                     <div className="flex items-center gap-4 w-60">
@@ -279,7 +279,7 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                             onChange={(e) => setCurrentSettings(prev => ({ ...prev, uiScale: Number(e.target.value) }))}
                             className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
                         />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right">{settings.uiScale}%</span>
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.uiScale}%</span>
                     </div>
                 </SettingRow>
                 <SettingRow label="Icon Set" description="Customize the look of icons throughout the application.">
@@ -308,8 +308,8 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
 
 const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
     return (
-         <div id="general" ref={sectionRef} className="py-10">
-            <h2 className="text-xl font-semibold text-text-main mb-6">General</h2>
+         <div id="general" ref={sectionRef} className="py-6">
+            <h2 className="text-lg font-semibold text-text-main mb-4">General</h2>
             <div className="space-y-6">
                  <SettingRow htmlFor="allowPrerelease" label="Receive Pre-releases" description="Get notified about new beta versions and test features early.">
                     <ToggleSwitch id="allowPrerelease" checked={settings.allowPrerelease} onChange={(val) => setCurrentSettings(s => ({...s, allowPrerelease: val}))} />
@@ -393,8 +393,8 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
     };
     
     return (
-         <div id="database" ref={sectionRef} className="py-10">
-            <h2 className="text-xl font-semibold text-text-main mb-6">Database Management</h2>
+         <div id="database" ref={sectionRef} className="py-6">
+            <h2 className="text-lg font-semibold text-text-main mb-4">Database Management</h2>
             <div className="space-y-6">
                  <SettingRow label="Database File" description="This file contains all your documents, folders, and history.">
                     <div className="text-sm text-text-main bg-background px-3 py-2 rounded-md border border-border-color w-full font-mono text-xs select-all break-all">
@@ -491,8 +491,8 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
     };
 
     return (
-         <div id="advanced" ref={sectionRef} className="py-10">
-            <h2 className="text-xl font-semibold text-text-main mb-6">Advanced</h2>
+         <div id="advanced" ref={sectionRef} className="py-6">
+            <h2 className="text-lg font-semibold text-text-main mb-4">Advanced</h2>
             <div className="space-y-6">
                 <SettingRow label="Settings Editor" description="Edit settings using an interactive tree or raw JSON for full control.">
                     <div className="w-full">

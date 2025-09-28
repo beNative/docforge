@@ -5,7 +5,7 @@ interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
   children: React.ReactNode;
   tooltip: string;
   variant?: 'primary' | 'ghost' | 'destructive';
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
   tooltipPosition?: 'top' | 'bottom';
 }
 
@@ -126,8 +126,9 @@ const IconButton: React.FC<IconButtonProps> = ({ children, tooltip, className, v
     };
 
     const sizeClasses = {
-        sm: 'w-8 h-8',
-        md: 'w-10 h-10'
+        xs: 'w-6 h-6',
+        sm: 'w-7 h-7',
+        md: 'w-8 h-8'
     };
   
   return (

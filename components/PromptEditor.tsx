@@ -202,9 +202,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
-      <div className="flex justify-between items-center px-6 py-6 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
+      <div className="flex justify-between items-center px-4 py-3 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-2xl font-semibold text-text-main focus:outline-none w-full truncate"/>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-lg font-semibold text-text-main focus:outline-none w-full truncate"/>
             {supportsAiTools && (
               <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl} tooltip="Regenerate Title with AI" size="sm" variant="ghost" className="flex-shrink-0">
                 {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-5 h-5 text-primary" />}
@@ -213,8 +213,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             {isDirty && <div className="relative group flex-shrink-0"><div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div><span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-md opacity-0 group-hover:opacity-100">Unsaved changes</span></div>}
         </div>
         <div className="flex items-center gap-2">
-            <div className="flex items-center"><label htmlFor="language-select" className="text-sm font-medium text-text-secondary mr-2">Language:</label><select id="language-select" value={language} onChange={(e) => onLanguageChange(e.target.value)} className="bg-background text-text-main text-sm rounded-md py-1 pl-2 pr-7 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none" style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a3a3a3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.2rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.2em 1.2em' }}>{SUPPORTED_LANGUAGES.map(lang => (<option key={lang.id} value={lang.id}>{lang.label}</option>))}</select></div>
-            <div className="h-6 w-px bg-border-color mx-1"></div>
+            <div className="flex items-center"><label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">Language:</label><select id="language-select" value={language} onChange={(e) => onLanguageChange(e.target.value)} className="bg-background text-text-main text-xs rounded-md py-0.5 pl-2 pr-6 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none" style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a3a3a3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.2em 1.2em' }}>{SUPPORTED_LANGUAGES.map(lang => (<option key={lang.id} value={lang.id}>{lang.label}</option>))}</select></div>
+            <div className="h-5 w-px bg-border-color mx-1"></div>
             {supportsPreview && (
               <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
                   <IconButton onClick={() => handleViewModeButton('edit')} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : ''}`}><PencilIcon className="w-5 h-5" /></IconButton>
@@ -223,9 +223,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
                   <IconButton onClick={() => handleViewModeButton('split-horizontal')} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-5 h-5" /></IconButton>
               </div>
             )}
-            <div className="h-6 w-px bg-border-color mx-1"></div>
+            <div className="h-5 w-px bg-border-color mx-1"></div>
             <IconButton onClick={onShowHistory} tooltip="View Version History" size="sm" variant="ghost"><HistoryIcon className="w-5 h-5" /></IconButton>
-            <div className="h-6 w-px bg-border-color mx-1"></div>
+            <div className="h-5 w-px bg-border-color mx-1"></div>
             <IconButton onClick={handleManualSave} disabled={!isDirty || isRefining} tooltip="Save Version" size="sm" variant="ghost"><SaveIcon className={`w-5 h-5 ${isDirty ? 'text-primary' : ''}`} /></IconButton>
             <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="sm" variant="ghost">{isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}</IconButton>
             {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}</IconButton>)}

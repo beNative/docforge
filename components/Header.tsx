@@ -33,10 +33,10 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="flex items-center justify-between px-3 h-14 flex-shrink-0 bg-secondary border-b border-border-color z-30">
+    <header className="flex items-center justify-between px-3 h-11 flex-shrink-0 bg-secondary border-b border-border-color z-30">
       <div className="flex items-center gap-3">
         <TerminalIcon className="w-6 h-6 text-primary"/>
-        <h1 className="text-lg font-semibold text-text-main tracking-wide">DocForge</h1>
+        <h1 className="text-base font-semibold text-text-main tracking-wide">DocForge</h1>
       </div>
       <div className="flex items-center gap-1">
         <IconButton onClick={onOpenCommandPalette} tooltip={getTooltip('toggle-command-palette', 'Command Palette')} tooltipPosition="bottom">

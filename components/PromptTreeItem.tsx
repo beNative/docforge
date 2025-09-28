@@ -200,23 +200,23 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         <div
             onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
             onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
-            className={`w-full text-left p-1.5 rounded-md group flex justify-between items-center transition-colors duration-150 text-sm relative focus:outline-none ${
+            className={`w-full text-left p-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
                 isSelected ? 'bg-background text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
             } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
         >
-            <div className="flex items-center gap-2 flex-1 truncate">
+            <div className="flex items-center gap-1.5 flex-1 truncate">
                 {isFolder && node.children.length > 0 ? (
                     <button onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }} className="-ml-1 p-0.5 rounded hover:bg-border-color">
-                        {isExpanded ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
+                        {isExpanded ? <ChevronDownIcon className="w-3.5 h-3.5" /> : <ChevronRightIcon className="w-3.5 h-3.5" />}
                     </button>
                 ) : (
-                    <div className="w-5" /> // Spacer for alignment
+                    <div className="w-4" /> // Spacer for alignment
                 )}
 
                 {isFolder ? (
-                    isExpanded ? <FolderOpenIcon className="w-4 h-4 flex-shrink-0" /> : <FolderIcon className="w-4 h-4 flex-shrink-0" />
+                    isExpanded ? <FolderOpenIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FolderIcon className="w-3.5 h-3.5 flex-shrink-0" />
                 ) : (
-                    isCodeFile ? <CodeIcon className="w-4 h-4 flex-shrink-0" /> : <FileIcon className="w-4 h-4 flex-shrink-0" />
+                    isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
                 )}
 
                 {isRenaming ? (
@@ -228,7 +228,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={handleRenameSubmit}
                         onKeyDown={handleRenameKeyDown}
-                        className="w-full text-left text-sm px-1 rounded bg-background text-text-main ring-1 ring-primary focus:outline-none"
+                        className="w-full text-left text-xs px-1 rounded bg-background text-text-main ring-1 ring-primary focus:outline-none"
                     />
                 ) : (
                     <span className="truncate flex-1 px-1">{node.title}</span>
@@ -237,19 +237,19 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
 
             {!isRenaming && (
                 <div className={`transition-opacity pr-1 flex items-center ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                    <IconButton onClick={(e) => { e.stopPropagation(); onMoveUp(node.id); }} tooltip="Move Up" size="sm" variant="ghost" disabled={!canMoveUp}>
-                        <ArrowUpIcon className="w-4 h-4" />
+                    <IconButton onClick={(e) => { e.stopPropagation(); onMoveUp(node.id); }} tooltip="Move Up" size="xs" variant="ghost" disabled={!canMoveUp}>
+                        <ArrowUpIcon className="w-3.5 h-3.5" />
                     </IconButton>
-                    <IconButton onClick={(e) => { e.stopPropagation(); onMoveDown(node.id); }} tooltip="Move Down" size="sm" variant="ghost" disabled={!canMoveDown}>
-                        <ArrowDownIcon className="w-4 h-4" />
+                    <IconButton onClick={(e) => { e.stopPropagation(); onMoveDown(node.id); }} tooltip="Move Down" size="xs" variant="ghost" disabled={!canMoveDown}>
+                        <ArrowDownIcon className="w-3.5 h-3.5" />
                     </IconButton>
                     {!isFolder && (
-                        <IconButton onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }} tooltip="Copy Content" size="sm" variant="ghost">
-                            <CopyIcon className="w-4 h-4" />
+                        <IconButton onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }} tooltip="Copy Content" size="xs" variant="ghost">
+                            <CopyIcon className="w-3.5 h-3.5" />
                         </IconButton>
                     )}
-                    <IconButton onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id, e.shiftKey); }} tooltip="Delete" size="sm" variant="destructive">
-                        <TrashIcon className="w-4 h-4" />
+                    <IconButton onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id, e.shiftKey); }} tooltip="Delete" size="xs" variant="destructive">
+                        <TrashIcon className="w-3.5 h-3.5" />
                     </IconButton>
                 </div>
             )}

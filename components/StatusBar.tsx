@@ -57,7 +57,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   };
   
   return (
-    <footer className="flex items-center justify-between px-4 h-8 bg-secondary border-t border-border-color text-xs text-text-secondary flex-shrink-0 z-30">
+    <footer className="flex items-center justify-between px-4 h-7 bg-secondary border-t border-border-color text-xs text-text-secondary flex-shrink-0 z-30">
       <div className="flex items-center gap-4">
         <div className="relative group flex items-center gap-2 cursor-default">
           <div className={`w-2 h-2 rounded-full ${color}`}></div>
@@ -74,7 +74,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             value={selectedService?.id || ''}
             onChange={(e) => onProviderChange(e.target.value)}
             disabled={discoveredServices.length === 0}
-            className="bg-transparent font-semibold text-text-main rounded-md p-1 -m-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-5"
+            className="bg-transparent font-semibold text-text-main rounded-md py-0.5 px-1 -my-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-5"
             style={selectStyles}
           >
             {llmProviderName && !selectedService && <option value="" disabled>{llmProviderName}</option>}
@@ -92,7 +92,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             value={modelName}
             onChange={(e) => onModelChange(e.target.value)}
             disabled={availableModels.length === 0}
-            className="bg-transparent font-semibold text-text-main rounded-md p-1 -m-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-5"
+            className="bg-transparent font-semibold text-text-main rounded-md py-0.5 px-1 -my-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-5"
             style={selectStyles}
           >
             {availableModels.length > 0 ? (

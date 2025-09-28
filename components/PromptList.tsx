@@ -95,7 +95,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
         onDragLeave={handleRootDragLeave}
         onContextMenu={handleRootContextMenu}
     >
-        <ul className="space-y-0.5 p-2">
+        <ul className="space-y-0 p-1">
         {tree.map((node, index) => (
             <DocumentTreeItem
                 key={node.id}
@@ -122,19 +122,19 @@ const DocumentList: React.FC<DocumentListProps> = ({
             />
         ))}
         {documents.length === 0 && (
-            <li className="text-center text-text-secondary p-4 text-sm">
+            <li className="text-center text-text-secondary p-4 text-xs">
                 No documents or folders yet.
             </li>
         )}
         {documents.length > 0 && tree.length === 0 && (
-            <li className="text-center text-text-secondary p-4 text-sm">
+            <li className="text-center text-text-secondary p-4 text-xs">
                 No results found for "{searchTerm}".
             </li>
         )}
         </ul>
         {isRootDropping && (
           <div className="absolute inset-2 bg-primary/10 border-2 border-dashed border-primary rounded-md pointer-events-none flex items-center justify-center">
-             <span className="text-sm font-semibold text-primary">Move to Root</span>
+             <span className="text-xs font-semibold text-primary">Move to Root</span>
           </div>
         )}
     </div>

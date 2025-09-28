@@ -35,7 +35,7 @@ const CommandPaletteSearch: React.FC<CommandPaletteSearchProps> = ({
 }) => (
     <div 
         ref={commandPaletteTargetRef}
-        className="not-draggable flex-1 max-w-lg mx-auto h-8 px-3 rounded-md bg-background border border-border-color hover:border-primary/50 flex items-center gap-2 relative"
+        className="not-draggable flex-1 max-w-lg mx-auto h-7 px-3 rounded-md bg-background border border-border-color hover:border-primary/50 flex items-center gap-2 relative"
     >
         <SearchIcon className="w-4 h-4 text-text-secondary" />
         <input
@@ -45,7 +45,7 @@ const CommandPaletteSearch: React.FC<CommandPaletteSearchProps> = ({
             value={searchTerm}
             onChange={(e) => onSearchTermChange(e.target.value)}
             onFocus={onOpenCommandPalette}
-            className="w-full bg-transparent text-sm text-text-main placeholder:text-text-secondary focus:outline-none"
+            className="w-full bg-transparent text-xs text-text-main placeholder:text-text-secondary focus:outline-none"
         />
         {shortcutString && (
           <span className="text-xs text-text-secondary bg-border-color/50 px-1.5 py-0.5 rounded font-sans">{shortcutString}</span>
@@ -103,10 +103,10 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
     };
     
     return (
-        <header className="draggable flex items-center justify-between h-10 flex-shrink-0 bg-secondary border-b border-border-color z-30 text-text-main">
+        <header className="draggable flex items-center justify-between h-9 flex-shrink-0 bg-secondary border-b border-border-color z-30 text-text-main">
             <div className={`flex items-center flex-1 ${platform === 'darwin' ? 'pl-20' : 'pl-2'}`}>
                 <TerminalIcon className="w-5 h-5 text-primary mr-2" />
-                <span className="font-semibold text-sm">DocForge</span>
+                <span className="font-semibold text-xs">DocForge</span>
             </div>
 
             <div className="flex-1 flex justify-center">

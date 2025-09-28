@@ -49,7 +49,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ content, language, onChange }) 
                         language: language || 'plaintext',
                         theme: theme === 'dark' ? 'vs-dark' : 'vs',
                         automaticLayout: true,
-                        fontSize: 14,
+                        fontSize: 12,
                         fontFamily: 'JetBrains Mono, monospace',
                         minimap: {
                             enabled: true,

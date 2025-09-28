@@ -297,7 +297,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-background border border-border-color rounded-md pl-9 pr-3 py-1.5 text-sm text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
+                className="w-full bg-background border border-border-color rounded-md pl-9 pr-3 py-1 text-xs text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
             />
         </div>
       </div>
@@ -305,9 +305,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         <div className="flex-1 flex flex-col overflow-y-hidden">
             {/* Documents Panel */}
             <div className="flex-1 flex flex-col overflow-hidden">
-                <header className="flex items-center justify-between p-2 flex-shrink-0 sticky top-0 bg-secondary z-10">
-                    <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
-                    <div className="flex items-center gap-1">
+                <header className="flex items-center justify-between p-1 flex-shrink-0 sticky top-0 bg-secondary z-10">
+                    <h2 className="text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
+                    <div className="flex items-center gap-0.5">
                     <IconButton onClick={onExpandAll} tooltip="Expand All" size="sm" tooltipPosition="bottom">
                         <ExpandAllIcon />
                     </IconButton>
@@ -362,12 +362,12 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
             {/* Templates Panel */}
             <div className="flex-shrink-0 border-t border-border-color">
-                <header className={`flex items-center justify-between p-2 flex-shrink-0`}>
+                <header className={`flex items-center justify-between p-1 flex-shrink-0`}>
                     <div className="flex items-center gap-1">
                         <IconButton onClick={handleToggleCollapse} tooltip={isTemplatesCollapsed ? "Show Templates" : "Hide Templates"} size="sm">
                             {isTemplatesCollapsed ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
                         </IconButton>
-                        <h2 className="text-sm font-semibold text-text-secondary px-2 tracking-wider uppercase">Templates</h2>
+                        <h2 className="text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase">Templates</h2>
                     </div>
                     {!isTemplatesCollapsed && (
                     <div className="flex items-center gap-1">

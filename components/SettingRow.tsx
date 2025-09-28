@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface SettingRowProps {
@@ -15,7 +14,7 @@ const SettingRow: React.FC<SettingRowProps> = ({ label, description, children, h
         <label htmlFor={htmlFor} className="font-semibold text-text-main leading-tight cursor-pointer">
           {label}
         </label>
-        <p className="text-sm text-text-secondary mt-1">{description}</p>
+        <p className="text-xs text-text-secondary mt-1">{description}</p>
       </div>
       <div className="md:col-span-2 flex justify-start md:justify-end items-center w-full">
         {children}

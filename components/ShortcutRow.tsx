@@ -59,7 +59,7 @@ export const ShortcutRow: React.FC<ShortcutRowProps> = ({ command, commands, set
   
   return (
     <div className={`flex items-center justify-between p-2 rounded-md transition-colors ${isEditing ? 'bg-primary/5' : 'hover:bg-border-color/30'}`}>
-      <span className="text-sm text-text-main flex-1">{command.name}</span>
+      <span className="text-xs text-text-main flex-1">{command.name}</span>
       <div className="flex items-center gap-2">
         {isEditing ? (
           <KeybindingInput

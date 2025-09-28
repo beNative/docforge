@@ -95,8 +95,8 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef
         className="bg-secondary rounded-lg shadow-xl w-full max-w-xl mx-4 border border-border-color"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center px-6 py-4 border-b border-border-color">
-          <h2 className="text-lg font-semibold text-text-main">{title}</h2>
+        <div className="flex justify-between items-center px-4 py-3 border-b border-border-color">
+          <h2 className="text-base font-semibold text-text-main">{title}</h2>
           <IconButton onClick={onClose} tooltip="Close" size="sm" variant="ghost" className="-mr-2">
             <XIcon className="w-5 h-5" />
           </IconButton>

@@ -51,14 +51,14 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onSave, onDel
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
-      <div className="flex justify-between items-center px-6 py-6 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
+      <div className="flex justify-between items-center px-4 py-3 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Template Title"
-              className="bg-transparent text-2xl font-semibold text-text-main focus:outline-none w-full truncate placeholder:text-text-secondary"
+              className="bg-transparent text-lg font-semibold text-text-main focus:outline-none w-full truncate placeholder:text-text-secondary"
             />
             {isDirty && (
                 <div className="relative group flex-shrink-0">
@@ -89,12 +89,12 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onSave, onDel
             onChange={(e) => setContent(e.target.value)}
             onScroll={syncScroll}
             spellCheck="false"
-            className="absolute inset-0 p-6 w-full h-full bg-transparent text-transparent caret-primary resize-none font-mono text-base focus:outline-none z-10 whitespace-pre-wrap break-words"
+            className="absolute inset-0 p-4 w-full h-full bg-transparent text-transparent caret-primary resize-none font-mono text-sm focus:outline-none z-10 whitespace-pre-wrap break-words"
             />
             <pre 
                 ref={preRef}
                 aria-hidden="true" 
-                className="absolute inset-0 p-6 w-full h-full overflow-auto pointer-events-none font-mono text-base whitespace-pre-wrap break-words"
+                className="absolute inset-0 p-4 w-full h-full overflow-auto pointer-events-none font-mono text-sm whitespace-pre-wrap break-words"
             >
             <code className="language-markdown" dangerouslySetInnerHTML={{ __html: highlightedContent }} />
             </pre>

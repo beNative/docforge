@@ -86,13 +86,13 @@ const InfoView: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden h-full">
-      <h1 className="text-2xl font-semibold text-text-main mb-4 px-6 pt-6">Application Information</h1>
+      <h1 className="text-xl font-semibold text-text-main mb-4 px-6 pt-6">Application Information</h1>
       <div className="flex border-b border-border-color mb-4 px-6">
         {(Object.keys(docFiles) as DocTab[]).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 -mb-px ${
               activeTab === tab
                 ? 'border-primary text-primary'
                 : 'border-transparent text-text-secondary hover:text-text-main'

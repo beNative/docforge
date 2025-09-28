@@ -50,7 +50,7 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
                         placeholder="Search by command or keybinding..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-secondary border border-border-color rounded-md pl-9 pr-3 py-2 text-sm text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
+                        className="w-full bg-secondary border border-border-color rounded-md pl-9 pr-3 py-1.5 text-xs text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
                     />
                 </div>
             </div>
