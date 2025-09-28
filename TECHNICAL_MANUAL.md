@@ -12,6 +12,7 @@ This document provides a technical overview of the DocForge application's archit
     -   [State Management](#state-management)
 4.  [Key Systems](#key-systems)
     -   [Database & Repository Service](#database--repository-service)
+    -   [Universal Editor & Preview System](#universal-editor--preview-system)
     -   [LLM Service](#llm-service)
     -   [Component Breakdown](#component-breakdown)
 
@@ -22,6 +23,7 @@ This document provides a technical overview of the DocForge application's archit
 -   **Framework:** [Electron](https://www.electronjs.org/) for cross-platform desktop application development.
 -   **UI Library:** [React](https://reactjs.org/) for building the user interface.
 -   **Language:** [TypeScript](https://www.typescriptlang.org/) for type safety and improved developer experience.
+-   **Editor Core:** [Monaco Editor](https://microsoft.github.io/monaco-editor/) for a rich, consistent editing experience.
 -   **Database:** [SQLite](https://www.sqlite.org/index.html) via the [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) library for robust, local data storage.
 -   **Bundler:** [esbuild](https://esbuild.github.io/) for fast and efficient bundling of the application's source code.
 -   **Styling:** [Tailwind CSS](https://tailwindcss.com/) for a utility-first CSS framework.
@@ -45,6 +47,8 @@ doc-forge/
 │   └── preload.ts        # Preload script for secure IPC.
 ├── hooks/                # Custom React hooks for business logic.
 ├── services/             # Modules for data access and external systems.
+│   ├── preview/          # Renderer plugins for the preview system.
+│   └── ...
 ├── release/              # Output directory for packaged application.
 ├── dist/                 # Output directory for bundled code.
 ├── index.html            # The main HTML file for the renderer process.
@@ -96,6 +100,15 @@ This is the core data persistence layer, replacing the old JSON file system.
 -   **Schema:** The database uses a highly normalized schema with tables for `nodes` (hierarchy), `documents`, `content_store` (for content-addressable storage and deduplication), and `doc_versions`.
 -   **One-Time Migration:** The repository contains logic to detect if it's the first run with the new database. If old JSON files are found, it reads them and sends the data to the main process to be migrated into the SQLite database in a single, safe transaction.
 
+### Universal Editor & Preview System
+
+This system provides a consistent and extensible editing experience for all document types. It is built on a decoupled, modular architecture.
+
+-   **`CodeEditor.tsx`:** A React component that wraps and configures the Monaco Editor instance. It's responsible for managing the editor's content, theme, and language for syntax highlighting based on props.
+-   **`PreviewPane.tsx`:** This component is responsible for displaying the rendered output of a document. It debounces content updates for performance and uses the `PreviewService` to get the correct output.
+-   **`services/previewService.ts`:** This service acts as a registry for all available renderer "plugins." It exposes a method, `getRendererForLanguage()`, which finds and returns the appropriate renderer for a given language ID (e.g., 'markdown').
+-   **Renderer Plugins (`services/preview/`):** Each file format with a preview is supported by a dedicated renderer class that implements the `IRenderer` interface. This makes the system highly extensible: to support a new format, one only needs to create a new renderer class and add it to the `previewService` registry. Currently, renderers for Markdown, HTML, and plaintext (fallback) are implemented.
+
 ### LLM Service (`services/llmService.ts`)
 
 This module handles all communication with the external Large Language Model. It is largely unchanged by the database migration.
@@ -106,6 +119,6 @@ This module handles all communication with the external Large Language Model. It
 
 -   **`App.tsx`:** The root component that orchestrates the entire application. It initializes the repository, triggers the data migration if needed, manages the main layout, and uses the data hooks (`useNodes`, `useSettings`, etc.).
 -   **`Sidebar.tsx`:** Manages the display of the `nodes` tree (documents and folders) and templates. It handles search/filtering, drag-and-drop, and keyboard navigation.
--   **`DocumentEditor.tsx`:** The main editor. It now receives a `Node` object. When content is saved, it communicates with the repository to hash the content, create a new version, and update the database, leveraging the content-addressable storage system.
+-   **`DocumentEditor.tsx`:** The primary user-facing editor component. It serves as a layout controller, managing the view mode (editor, preview, split-screen) and containing both the `CodeEditor` (Monaco) and `PreviewPane` components. It orchestrates the flow of data between the editor and the preview.
 -   **`SettingsView.tsx`:** Manages all application settings, which are now read from and saved to the `settings` table in the database.
 -   **`DocumentHistoryView.tsx`:** This view now fetches version history for a document directly from the database, providing a reliable timeline of changes.

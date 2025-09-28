@@ -1,5 +1,16 @@
 # Version Log
 
+## v0.5.0 - The Universal Editor Update
+
+This is a major feature release that replaces the simple Markdown editor with the powerful Monaco Editor (the core of VS Code) for all documents. It introduces a flexible, multi-format live preview system and makes Markdown the default for new documents.
+
+### ✨ New Features & Major Improvements
+
+-   **Universal Monaco Editor**: The editor has been upgraded to the Monaco Editor for all file types. This provides a consistent, professional-grade editing experience with syntax highlighting, code folding, and bracket matching for dozens of languages (e.g., Markdown, HTML, JS, Python).
+-   **Multi-Format Live Preview**: The preview system is now modular and extensible. It supports live, rendered previews for both Markdown and HTML. The preview can be viewed in a vertical or horizontal split-screen layout.
+-   **Language Selector**: A dropdown menu has been added to the editor toolbar, allowing users to manually change the language for syntax highlighting for any code file.
+-   **Markdown by Default**: New documents created via the "New Document" button now default to the Markdown language type, enabling the live preview and rich text features immediately.
+
 ## v0.4.0 - The Logging & Stability Update
 
 This release introduces comprehensive action logging, a redesigned logger panel, and significant improvements to the database backup feature.

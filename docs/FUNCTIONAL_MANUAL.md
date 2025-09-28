@@ -80,28 +80,29 @@ The bar at the bottom of the window provides at-a-glance information about the a
 
 ### Creating and Managing Documents and Folders
 
-- **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut.
+- **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut. New documents default to Markdown.
+- **New Code File:** Click the code icon to create a source code file. Provide a filename with an extension (e.g., `script.js`) for automatic language detection.
 - **New Root Folder:** Click the folder icon with a `+` to create a new folder at the root of your document list.
 - **New Subfolder:** Select an existing folder and click the "New Subfolder" icon to create a folder inside it.
 - **Duplicate Selection:** Select one or more items and click the "Duplicate" icon to create a deep copy.
 
 ### Editing Documents
 
-The document editor is a powerful Markdown-aware text editor.
+The document editor is powered by Monaco, the same editor core used in VS Code, providing a rich and consistent experience for all document types.
 
 - **Title:** The title of the document can be edited directly at the top of the editor.
-- **Auto-Naming:** If the title is blank, the application can generate a title for you based on the content using your configured LLM.
-- **Content:** The main text area supports Markdown syntax.
-- **View Modes:**
+- **Auto-Naming:** If the title is blank, the application can generate a title for you based on the content using your configured LLM (only for Markdown and plaintext files).
+- **Content:** The main text area supports syntax highlighting for dozens of languages (e.g., Markdown, HTML, JavaScript, Python), code folding, and bracket matching.
+- **Language Selector:** You can manually change the language for syntax highlighting using the dropdown menu in the editor's toolbar.
+- **View Modes:** For document types that support a preview (like Markdown and HTML):
     - **Editor Only:** The default text editing view.
-    - **Preview Only:** A rendered view of your Markdown content.
+    - **Preview Only:** A rendered view of your content.
     - **Split Vertical/Horizontal:** A side-by-side or top-and-bottom view of the editor and the live preview.
 - **Toolbar Actions:**
     - **Save Version:** Manually save the current content as a new version in the document's history. The button icon will be highlighted when there are unsaved changes.
-    - **Undo/Redo:** Step backward or forward through your changes.
     - **Version History:** Open a view to see all saved versions of the document.
     - **Copy:** Copy the document's content to the clipboard.
-    - **Refine with AI:** Send the document's content to your configured LLM to get an improved version.
+    - **Refine with AI:** Send the document's content to your configured LLM to get an improved version (only for Markdown and plaintext files).
     - **Delete:** Delete the current document. A confirmation is required, where pressing `Enter` will confirm the action.
 
 ### Organizing with Drag and Drop
@@ -115,7 +116,7 @@ You can drop an item (or a group of items):
 
 ### AI-Powered Refinement
 
-Clicking the **Refine with AI** (sparkles) button in the editor toolbar sends your current document content to your configured local LLM. The AI's task is not to *answer* the document's request, but to *improve* the document itself. A modal will appear with the suggested refinement, which you can then accept or discard. The "Accept" button is the default and can be triggered by pressing `Enter`.
+Clicking the **Refine with AI** (sparkles) button in the editor toolbar sends your current document content to your configured local LLM. The AI's task is not to *answer* the document's request, but to *improve* the document itself. A modal will appear with the suggested refinement, which you can then accept or discard. The "Accept" button is the default and can be triggered by pressing `Enter`. This feature is available for Markdown and plaintext documents.
 
 ### Using Templates
 
