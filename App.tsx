@@ -877,69 +877,71 @@ const MainApp: React.FC = () => {
                 ) : (
                     <Header {...headerProps} />
                 )}
-                <main className="flex-1 flex overflow-hidden">
-                    {view === 'editor' && (
-                        <>
-                             <aside 
-                                style={{ width: `${sidebarWidth}px` }} 
-                                className="bg-secondary border-r border-border-color flex flex-col flex-shrink-0"
-                            >
-                                <Sidebar 
-                                    documents={items}
-                                    documentTree={documentTree}
-                                    navigableItems={navigableItems}
-                                    selectedIds={selectedIds}
-                                    setSelectedIds={setSelectedIds}
-                                    lastClickedId={lastClickedId}
-                                    setLastClickedId={setLastClickedId}
-                                    activeNodeId={activeNodeId}
-                                    onSelectNode={handleSelectNode}
-                                    onDeleteSelection={handleDeleteSelection}
-                                    onDeleteNode={handleDeleteNode}
-                                    onRenameNode={handleRenameNode}
-                                    onMoveNode={moveItems}
-                                    onNewDocument={() => handleNewDocument()}
-                                    onNewRootFolder={handleNewRootFolder}
-                                    onNewSubfolder={handleNewSubfolder}
-                                    onDuplicateSelection={handleDuplicateSelection}
-                                    onCopyNodeContent={handleCopyNodeContent}
-                                    expandedFolderIds={expandedFolderIds}
-                                    onToggleExpand={handleToggleExpand}
-                                    onExpandAll={handleExpandAll}
-                                    onCollapseAll={handleCollapseAll}
-                                    searchTerm={searchTerm}
-                                    setSearchTerm={setSearchTerm}
-                                    onContextMenu={handleContextMenu}
-                                    renamingNodeId={renamingNodeId}
-                                    onRenameComplete={() => setRenamingNodeId(null)}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    <main className="flex-1 flex overflow-hidden">
+                        {view === 'editor' && (
+                            <>
+                                 <aside 
+                                    style={{ width: `${sidebarWidth}px` }} 
+                                    className="bg-secondary border-r border-border-color flex flex-col flex-shrink-0"
+                                >
+                                    <Sidebar 
+                                        documents={items}
+                                        documentTree={documentTree}
+                                        navigableItems={navigableItems}
+                                        selectedIds={selectedIds}
+                                        setSelectedIds={setSelectedIds}
+                                        lastClickedId={lastClickedId}
+                                        setLastClickedId={setLastClickedId}
+                                        activeNodeId={activeNodeId}
+                                        onSelectNode={handleSelectNode}
+                                        onDeleteSelection={handleDeleteSelection}
+                                        onDeleteNode={handleDeleteNode}
+                                        onRenameNode={handleRenameNode}
+                                        onMoveNode={moveItems}
+                                        onNewDocument={() => handleNewDocument()}
+                                        onNewRootFolder={handleNewRootFolder}
+                                        onNewSubfolder={handleNewSubfolder}
+                                        onDuplicateSelection={handleDuplicateSelection}
+                                        onCopyNodeContent={handleCopyNodeContent}
+                                        expandedFolderIds={expandedFolderIds}
+                                        onToggleExpand={handleToggleExpand}
+                                        onExpandAll={handleExpandAll}
+                                        onCollapseAll={handleCollapseAll}
+                                        searchTerm={searchTerm}
+                                        setSearchTerm={setSearchTerm}
+                                        onContextMenu={handleContextMenu}
+                                        renamingNodeId={renamingNodeId}
+                                        onRenameComplete={() => setRenamingNodeId(null)}
 
-                                    templates={templates}
-                                    activeTemplateId={activeTemplateId}
-                                    onSelectTemplate={handleSelectTemplate}
-                                    onDeleteTemplate={handleDeleteTemplate}
-                                    onRenameTemplate={handleRenameTemplate}
-                                    onNewTemplate={handleNewTemplate}
-                                    onNewFromTemplate={() => setCreateFromTemplateOpen(true)}
+                                        templates={templates}
+                                        activeTemplateId={activeTemplateId}
+                                        onSelectTemplate={handleSelectTemplate}
+                                        onDeleteTemplate={handleDeleteTemplate}
+                                        onRenameTemplate={handleRenameTemplate}
+                                        onNewTemplate={handleNewTemplate}
+                                        onNewFromTemplate={() => setCreateFromTemplateOpen(true)}
+                                    />
+                                </aside>
+                                <div 
+                                    onMouseDown={handleSidebarMouseDown}
+                                    className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
                                 />
-                            </aside>
-                            <div 
-                                onMouseDown={handleSidebarMouseDown}
-                                className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
-                            />
-                        </>
-                    )}
-                    <section className="flex-1 flex flex-col overflow-hidden bg-background">
-                        <div className="flex-1 overflow-hidden relative">
-                            {renderMainContent()}
-                        </div>
-                        <LoggerPanel 
-                            isVisible={isLoggerVisible} 
-                            onToggleVisibility={() => setIsLoggerVisible(v => !v)}
-                            height={loggerPanelHeight}
-                            onResizeStart={handleLoggerMouseDown}
-                        />
-                    </section>
-                </main>
+                            </>
+                        )}
+                        <section className="flex-1 flex flex-col overflow-hidden bg-background">
+                            <div className="flex-1 overflow-hidden relative">
+                                {renderMainContent()}
+                            </div>
+                        </section>
+                    </main>
+                    <LoggerPanel 
+                        isVisible={isLoggerVisible} 
+                        onToggleVisibility={() => setIsLoggerVisible(v => !v)}
+                        height={loggerPanelHeight}
+                        onResizeStart={handleLoggerMouseDown}
+                    />
+                </div>
                 <StatusBar 
                     status={llmStatus}
                     modelName={settings.llmModelName}
