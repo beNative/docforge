@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -95,6 +96,27 @@
             width: 1rem; height: 1rem; background: rgb(var(--color-accent)); cursor: pointer; border-radius: 9999px; border: none;
         }
 
+        /* Custom Scrollbar Styles */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: rgba(var(--color-text-secondary), 0.4);
+            border-radius: 4px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(var(--color-text-secondary), 0.7);
+        }
+        ::-webkit-scrollbar-corner {
+            background: transparent;
+        }
+
         /* Custom PrismJS theme for light/dark mode */
         pre[class*="language-"] { background: transparent; }
         :not(pre) > code[class*="language-"] { background: rgb(var(--color-secondary)); }
@@ -185,6 +207,7 @@
             border: none;
         }
     </style>
+    
 <script type="importmap">
 {
   "imports": {
