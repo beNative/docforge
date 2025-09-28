@@ -206,8 +206,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
         <div className="flex items-center gap-3 flex-1 min-w-0">
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-lg font-semibold text-text-main focus:outline-none w-full truncate"/>
             {supportsAiTools && (
-              <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl} tooltip="Regenerate Title with AI" size="sm" variant="ghost" className="flex-shrink-0">
-                {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-5 h-5 text-primary" />}
+              <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl} tooltip="Regenerate Title with AI" size="xs" variant="ghost" className="flex-shrink-0">
+                {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-4 h-4 text-primary" />}
               </IconButton>
             )}
             {isDirty && <div className="relative group flex-shrink-0"><div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div><span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-md opacity-0 group-hover:opacity-100">Unsaved changes</span></div>}
@@ -217,19 +217,19 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             <div className="h-5 w-px bg-border-color mx-1"></div>
             {supportsPreview && (
               <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
-                  <IconButton onClick={() => handleViewModeButton('edit')} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : ''}`}><PencilIcon className="w-5 h-5" /></IconButton>
-                  <IconButton onClick={() => handleViewModeButton('preview')} tooltip="Preview Only" size="sm" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : ''}`}><EyeIcon className="w-5 h-5" /></IconButton>
-                  <IconButton onClick={() => handleViewModeButton('split-vertical')} tooltip="Split Vertical" size="sm" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : ''}`}><LayoutVerticalIcon className="w-5 h-5" /></IconButton>
-                  <IconButton onClick={() => handleViewModeButton('split-horizontal')} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-5 h-5" /></IconButton>
+                  <IconButton onClick={() => handleViewModeButton('edit')} tooltip="Editor Only" size="xs" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : ''}`}><PencilIcon className="w-4 h-4" /></IconButton>
+                  <IconButton onClick={() => handleViewModeButton('preview')} tooltip="Preview Only" size="xs" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : ''}`}><EyeIcon className="w-4 h-4" /></IconButton>
+                  <IconButton onClick={() => handleViewModeButton('split-vertical')} tooltip="Split Vertical" size="xs" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : ''}`}><LayoutVerticalIcon className="w-4 h-4" /></IconButton>
+                  <IconButton onClick={() => handleViewModeButton('split-horizontal')} tooltip="Split Horizontal" size="xs" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-4 h-4" /></IconButton>
               </div>
             )}
             <div className="h-5 w-px bg-border-color mx-1"></div>
-            <IconButton onClick={onShowHistory} tooltip="View Version History" size="sm" variant="ghost"><HistoryIcon className="w-5 h-5" /></IconButton>
+            <IconButton onClick={onShowHistory} tooltip="View Version History" size="xs" variant="ghost"><HistoryIcon className="w-4 h-4" /></IconButton>
             <div className="h-5 w-px bg-border-color mx-1"></div>
-            <IconButton onClick={handleManualSave} disabled={!isDirty || isRefining} tooltip="Save Version" size="sm" variant="ghost"><SaveIcon className={`w-5 h-5 ${isDirty ? 'text-primary' : ''}`} /></IconButton>
-            <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="sm" variant="ghost">{isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}</IconButton>
-            {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}</IconButton>)}
-            <IconButton onClick={() => onDelete(documentNode.id)} tooltip="Delete Document" size="sm" variant="destructive"><TrashIcon className="w-5 h-5" /></IconButton>
+            <IconButton onClick={handleManualSave} disabled={!isDirty || isRefining} tooltip="Save Version" size="xs" variant="ghost"><SaveIcon className={`w-4 h-4 ${isDirty ? 'text-primary' : ''}`} /></IconButton>
+            <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
+            {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
+            <IconButton onClick={() => onDelete(documentNode.id)} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
         </div>
       </div>
       <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>

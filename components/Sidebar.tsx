@@ -308,24 +308,24 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 <header className="flex items-center justify-between p-1 flex-shrink-0 sticky top-0 bg-secondary z-10">
                     <h2 className="text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
                     <div className="flex items-center gap-0.5">
-                    <IconButton onClick={onExpandAll} tooltip="Expand All" size="sm" tooltipPosition="bottom">
-                        <ExpandAllIcon />
+                    <IconButton onClick={onExpandAll} tooltip="Expand All" size="xs" tooltipPosition="bottom">
+                        <ExpandAllIcon className="w-4 h-4" />
                     </IconButton>
-                    <IconButton onClick={onCollapseAll} tooltip="Collapse All" size="sm" tooltipPosition="bottom">
-                        <CollapseAllIcon />
+                    <IconButton onClick={onCollapseAll} tooltip="Collapse All" size="xs" tooltipPosition="bottom">
+                        <CollapseAllIcon className="w-4 h-4" />
                     </IconButton>
                     <div className="h-5 w-px bg-border-color mx-1"></div>
-                     <IconButton onClick={props.onNewFromTemplate} tooltip={getTooltip('new-from-template', 'New from Template')} size="sm" tooltipPosition="bottom">
-                        <DocumentDuplicateIcon />
+                     <IconButton onClick={props.onNewFromTemplate} tooltip={getTooltip('new-from-template', 'New from Template')} size="xs" tooltipPosition="bottom">
+                        <DocumentDuplicateIcon className="w-4 h-4" />
                     </IconButton>
-                    <IconButton onClick={props.onNewDocument} tooltip={getTooltip('new-document', 'New Document')} size="sm" tooltipPosition="bottom">
-                        <PlusIcon />
+                    <IconButton onClick={props.onNewDocument} tooltip={getTooltip('new-document', 'New Document')} size="xs" tooltipPosition="bottom">
+                        <PlusIcon className="w-4 h-4" />
                     </IconButton>
-                    <IconButton onClick={props.onNewCodeFile} tooltip={getTooltip('new-code-file', 'New Code File')} size="sm" tooltipPosition="bottom">
-                        <CodeIcon />
+                    <IconButton onClick={props.onNewCodeFile} tooltip={getTooltip('new-code-file', 'New Code File')} size="xs" tooltipPosition="bottom">
+                        <CodeIcon className="w-4 h-4" />
                     </IconButton>
-                    <IconButton onClick={props.onNewRootFolder} tooltip={getTooltip('new-folder', 'New Root Folder')} size="sm" tooltipPosition="bottom">
-                        <FolderPlusIcon />
+                    <IconButton onClick={props.onNewRootFolder} tooltip={getTooltip('new-folder', 'New Root Folder')} size="xs" tooltipPosition="bottom">
+                        <FolderPlusIcon className="w-4 h-4" />
                     </IconButton>
                     </div>
                 </header>
@@ -371,8 +371,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     </div>
                     {!isTemplatesCollapsed && (
                     <div className="flex items-center gap-1">
-                        <IconButton onClick={props.onNewTemplate} tooltip={getTooltip('new-template', 'New Template')} size="sm" tooltipPosition="bottom">
-                            <PlusIcon />
+                        <IconButton onClick={props.onNewTemplate} tooltip={getTooltip('new-template', 'New Template')} size="xs" tooltipPosition="bottom">
+                            <PlusIcon className="w-4 h-4" />
                         </IconButton>
                     </div>
                     )}
