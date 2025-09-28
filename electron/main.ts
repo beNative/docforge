@@ -4,9 +4,14 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { platform } from 'process';
 import path from 'path';
 import fs from 'fs/promises';
+import { createReadStream, createWriteStream } from 'fs';
 import { autoUpdater } from 'electron-updater';
 import { databaseService } from './database';
 import log from 'electron-log/main';
+import * as zlib from 'zlib';
+import * as os from 'os';
+import * as stream from 'stream';
+import { promisify } from 'util';
 
 // Fix: Inform TypeScript about the __dirname global variable provided by Node.js, which is present in a CommonJS-like environment.
 declare const __dirname: string;
@@ -140,22 +145,43 @@ ipcMain.handle('db:get-path', () => databaseService.getDbPath());
 ipcMain.handle('db:backup', async () => {
     if (!mainWindow) return { success: false, error: 'Main window not available' };
     const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-        title: 'Save Database Backup',
-        defaultPath: `docforge_backup_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.db`,
-        filters: [{ name: 'Database Files', extensions: ['db'] }, { name: 'All Files', extensions: ['*'] }]
+        title: 'Save Compressed Database Backup',
+        defaultPath: `docforge_backup_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.db.gz`,
+        filters: [{ name: 'Compressed Backup', extensions: ['gz'] }, { name: 'All Files', extensions: ['*'] }]
     });
 
     if (canceled || !filePath) {
         return { success: true, message: 'Backup canceled by user.' };
     }
 
+    const tempDbPath = path.join(os.tmpdir(), `docforge-temp-backup-${Date.now()}.db`);
+
     try {
-        await databaseService.backupDatabase(filePath);
-        console.log(`Database successfully backed up to ${filePath}`);
-        return { success: true, message: `Backup saved to ${filePath}` };
+        // 1. Backup to a temporary file
+        await databaseService.backupDatabase(tempDbPath);
+
+        // 2. Gzip the temporary file to the final destination
+        const readStream = createReadStream(tempDbPath);
+        const writeStream = createWriteStream(filePath);
+        const gzip = zlib.createGzip();
+        
+        const pipeline = promisify(stream.pipeline);
+        await pipeline(readStream, gzip, writeStream);
+
+        console.log(`Successfully compressed backup to ${filePath}`);
+        return { success: true, message: `Compressed backup saved to ${filePath}` };
     } catch (error) {
-        console.error('Database backup failed:', error);
-        return { success: false, error: error instanceof Error ? error.message : 'Failed to save backup.' };
+        console.error('Database backup and compression failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to save compressed backup.' };
+    } finally {
+        // 3. Clean up the temporary file
+        try {
+            await fs.unlink(tempDbPath);
+            console.log(`Cleaned up temporary backup file: ${tempDbPath}`);
+        } catch (cleanupError) {
+            console.error(`Failed to clean up temporary backup file ${tempDbPath}:`, cleanupError);
+            // Don't bubble this up to the user.
+        }
     }
 });
 
