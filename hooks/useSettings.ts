@@ -15,31 +15,32 @@ export const useSettings = () => {
 
   useEffect(() => {
     const loadAndEnhanceSettings = async () => {
-      let loadedSettings = await repository.getAllSettings();
+      let loadedSettingsFromDB = await repository.getAllSettings();
       
-      // If no settings in DB, could be first run or post-migration.
-      if (Object.keys(loadedSettings).length === 0) {
-        // We defer to the repository's migration logic to handle old settings.
-        // For a true first run, we save the defaults.
+      // If no settings in DB, this is a true first run.
+      if (Object.keys(loadedSettingsFromDB).length === 0) {
         await repository.saveAllSettings(DEFAULT_SETTINGS);
-        loadedSettings = DEFAULT_SETTINGS;
+        loadedSettingsFromDB = DEFAULT_SETTINGS;
         addLog('INFO', 'Initialized default settings in the database.');
       }
+      
+      // Merge with defaults to ensure all properties exist for existing users after an update.
+      const mergedSettings = { ...DEFAULT_SETTINGS, ...loadedSettingsFromDB };
 
       // If provider name is missing but URL is present, try to discover it.
-      if (loadedSettings.llmProviderUrl && !loadedSettings.llmProviderName) {
+      if (mergedSettings.llmProviderUrl && !mergedSettings.llmProviderName) {
           addLog('DEBUG', 'LLM provider name is missing, attempting to discover it.');
           try {
               const services = await llmDiscoveryService.discoverServices();
-              const matchingService = services.find(s => s.generateUrl === loadedSettings.llmProviderUrl);
+              const matchingService = services.find(s => s.generateUrl === mergedSettings.llmProviderUrl);
               if (matchingService) {
-                  loadedSettings.llmProviderName = matchingService.name;
-                  loadedSettings.apiType = matchingService.apiType;
+                  mergedSettings.llmProviderName = matchingService.name;
+                  mergedSettings.apiType = matchingService.apiType;
                   addLog('INFO', `Discovered and set provider name to: "${matchingService.name}"`);
                   // Save the enhanced settings back
-                  await repository.saveAllSettings(loadedSettings);
+                  await repository.saveAllSettings(mergedSettings);
               } else {
-                  addLog('WARNING', `Could not find a matching running service for the saved URL: ${loadedSettings.llmProviderUrl}`);
+                  addLog('WARNING', `Could not find a matching running service for the saved URL: ${mergedSettings.llmProviderUrl}`);
               }
           } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
@@ -47,9 +48,9 @@ export const useSettings = () => {
           }
       }
 
-      setSettings(loadedSettings as Settings);
+      setSettings(mergedSettings);
       setLoaded(true);
-      addLog('DEBUG', 'Settings loaded from database.');
+      addLog('DEBUG', 'Settings loaded from database and merged with defaults.');
     };
 
     loadAndEnhanceSettings();
