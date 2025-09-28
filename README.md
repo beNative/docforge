@@ -16,7 +16,9 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Version History:** Explicitly save new versions of your documents with a dedicated button. Manage your history by viewing diffs, deleting old versions, and restoring to any point in time.
 - **Local LLM Discovery:** Automatically detects running local LLM providers like Ollama and LM Studio for easy setup.
 - **Customizable Interface:** Switch between light and dark themes, adjust the UI scale, and choose from multiple icon sets to personalize your experience.
+- **Comprehensive Action Logging**: Every user action is logged, providing a clear audit trail and making debugging easier.
 - **Offline First:** All your data is stored locally on your machine.
+- **Compressed Backups**: Database backups are compressed with Gzip to significantly reduce file size.
 - **Auto-Update:** The application can automatically check for and install updates (pre-release versions are opt-in).
 - **Resizable Layout:** The sidebar, templates panel, and logger panel are all fully resizable to customize your workspace.
 

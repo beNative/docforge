@@ -1,5 +1,19 @@
 # Version Log
 
+## v0.4.0 - The Logging & Stability Update
+
+This release introduces comprehensive action logging, a redesigned logger panel, and significant improvements to the database backup feature.
+
+### ✨ New Features & Major Improvements
+
+-   **Comprehensive Action Logging**: Every user action—including button clicks, menu selections, and commands—is now logged to the Application Log. This provides a clear audit trail and makes debugging significantly easier.
+-   **Integrated Logger Panel**: The logger panel has been redesigned to integrate seamlessly into the main window. When opened, it pushes the main content area up instead of overlapping it, ensuring all controls remain visible and accessible.
+-   **Compressed Backups**: The database backup feature now uses Gzip compression, significantly reducing the size of backup files (saved with a `.db.gz` extension).
+
+### 🐛 Bug Fixes
+
+-   **Backup Functionality**: Fixed a critical bug that prevented the database backup feature from running correctly.
+
 ## v0.3.0 - The Layout Update
 
 This release focuses on improving the sidebar layout and user interaction, making it more flexible and intuitive.

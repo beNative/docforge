@@ -158,6 +158,9 @@ Accessed via the info icon in the title bar. This view contains tabs for reading
 
 ### Logger Panel
 
-Accessed via the terminal icon in the title bar. This panel slides up from the bottom and displays internal application logs.
+Accessed via the terminal icon in the title bar, this panel is your primary tool for debugging and monitoring application activity.
+
+- **Integrated Layout:** The panel is part of the main application layout. When opened, it pushes the content above it upwards, rather than covering it. This ensures the main screen remains fully interactive. The panel's height is resizable by dragging its top border.
+- **Action Logging:** The logger automatically records every significant action you take in the application, such as creating a document, changing a setting, or using a command. This provides a clear history of operations.
 - **Filtering:** You can filter logs by level (DEBUG, INFO, WARNING, ERROR).
 - **Actions:** You can clear the logs or save the current session's log to a file.
