@@ -97,14 +97,13 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
-        <header className="flex justify-between items-center px-4 py-1 h-8 gap-4 flex-shrink-0 border-b border-border-color bg-secondary">
+        <header className="flex justify-between items-center px-4 h-7 gap-4 flex-shrink-0 border-b border-border-color bg-secondary">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-                <h1 className="text-base font-semibold text-text-main truncate">
+                <h1 className="text-sm font-semibold text-text-main truncate">
                     History for "{document.title}"
                 </h1>
             </div>
             <div className="flex items-center gap-2">
-                {/* FIX: Changed invalid variant "secondary" to "ghost" for IconButton. */}
                 <IconButton onClick={() => { addLog('INFO', `User action: Back to editor from history for document "${document.title}".`); onBackToEditor(); }} variant="ghost" size="sm" tooltip="Back to Editor">
                     <ArrowLeftIcon className="w-4 h-4" />
                 </IconButton>
@@ -113,18 +112,18 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
 
         <div className="flex-1 flex gap-4 overflow-hidden p-4 bg-secondary">
             <aside className="w-1/3 max-w-sm border-r border-border-color pr-4 flex flex-col">
-                <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-sm font-semibold">Versions</h3>
+                <div className="flex justify-between items-center mb-1.5 flex-shrink-0 h-7">
+                    <h3 className="text-xs font-semibold px-1.5">Versions</h3>
                     <Button 
                         variant="destructive"
-                        className="px-2 py-1"
+                        className="px-1.5 py-0.5 text-[11px]"
                         disabled={selectedVersionIds.size === 0}
                         onClick={() => {
                             addLog('INFO', `User action: Delete ${selectedVersionIds.size} version(s) for document "${document.title}".`);
                             setIsConfirmingDelete(true);
                         }}
                     >
-                       <TrashIcon className="w-3 h-3 mr-1.5" />
+                       <TrashIcon className="w-3 h-3 mr-1" />
                        Delete ({selectedVersionIds.size})
                     </Button>
                 </div>
@@ -134,7 +133,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         const isB = compareBIndex === index;
                         return (
                             <li key={version.id}>
-                                <div className={`w-full text-left p-1.5 rounded-md transition-colors flex items-center justify-between ${isA || isB ? 'bg-primary/5' : 'hover:bg-border-color/20'}`}>
+                                <div className={`w-full text-left p-1 rounded-md transition-colors flex items-center justify-between ${isA || isB ? 'bg-primary/5' : 'hover:bg-border-color/20'}`}>
                                     <div className="flex items-center gap-2">
                                         <input
                                           type="checkbox"
@@ -144,20 +143,20 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                                           disabled={version.version_id === -1}
                                         />
                                         <div>
-                                            <span className="block text-xs font-medium text-text-main">{formatDate(version.createdAt)}</span>
-                                            <span className="text-xs text-text-secondary">{index === 0 ? '(Current Version)' : `Version ${versionsWithCurrent.length - 1 - index}`}</span>
+                                            <span className="block text-[11px] font-medium text-text-main">{formatDate(version.createdAt)}</span>
+                                            <span className="text-[10px] text-text-secondary">{index === 0 ? '(Current Version)' : `Version ${versionsWithCurrent.length - 1 - index}`}</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <button 
                                           onClick={() => compareBIndex !== index && setCompareAIndex(index)} 
                                           title="Set as 'A' for comparison"
-                                          className={`w-5 h-5 text-xs rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isA ? 'bg-primary text-primary-text focus:ring-primary' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
+                                          className={`w-4 h-4 text-[10px] rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isA ? 'bg-primary text-primary-text focus:ring-primary' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
                                         >A</button>
                                         <button 
                                           onClick={() => compareAIndex !== index && setCompareBIndex(index)} 
                                           title="Set as 'B' for comparison"
-                                          className={`w-5 h-5 text-xs rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isB ? 'bg-destructive-bg text-destructive-text focus:ring-destructive-text' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
+                                          className={`w-4 h-4 text-[10px] rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isB ? 'bg-destructive-bg text-destructive-text focus:ring-destructive-text' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
                                         >B</button>
                                     </div>
                                 </div>
@@ -171,19 +170,19 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
             </aside>
 
             <main className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex justify-between items-center mb-2 flex-shrink-0">
+                <div className="flex justify-between items-center mb-1.5 flex-shrink-0 h-7">
                     <div>
-                        <h3 className="text-sm font-semibold">Comparison</h3>
-                        <p className="text-xs text-text-secondary">
+                        <h3 className="text-xs font-semibold">Comparison</h3>
+                        <p className="text-[11px] text-text-secondary">
                            Comparing version from <span className="font-semibold text-text-main">{formatDate(newerVersion.createdAt)}</span> with <span className="font-semibold text-text-main">{olderVersion ? formatDate(olderVersion.createdAt) : 'None'}</span>
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Newer Version Content"}>
-                            {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
+                        <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Newer Version Content"} size="sm">
+                            {isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}
                         </IconButton>
-                        <Button onClick={() => { addLog('INFO', `User action: Restore version for document "${document.title}".`); onRestore(newerVersion.content); }} disabled={newerVersion.version_id === -1} variant="secondary" className="px-2 py-1">
-                            <UndoIcon className="w-4 h-4 mr-2"/>
+                        <Button onClick={() => { addLog('INFO', `User action: Restore version for document "${document.title}".`); onRestore(newerVersion.content); }} disabled={newerVersion.version_id === -1} variant="secondary" className="px-1.5 py-0.5 text-[11px]">
+                            <UndoIcon className="w-3 h-3 mr-1.5"/>
                             Restore Newer Version
                         </Button>
                     </div>

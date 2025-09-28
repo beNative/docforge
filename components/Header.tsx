@@ -33,7 +33,7 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="flex items-center justify-between px-3 h-8 flex-shrink-0 bg-secondary border-b border-border-color z-30">
+    <header className="flex items-center justify-between px-3 h-7 flex-shrink-0 bg-secondary border-b border-border-color z-30">
       <div className="flex items-center gap-2">
         <TerminalIcon className="w-4 h-4 text-primary"/>
         <h1 className="text-sm font-semibold text-text-main tracking-wide">DocForge</h1>
