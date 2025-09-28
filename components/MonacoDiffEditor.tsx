@@ -12,86 +12,75 @@ interface MonacoDiffEditorProps {
 
 const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language }) => {
     const editorRef = useRef<HTMLDivElement>(null);
-    const monacoInstanceRef = useRef<any>(null);
+    const editorInstanceRef = useRef<any>(null);
     const { theme } = useTheme();
     
-    // Store props in refs to avoid re-running the main effect on every change,
-    // which would re-create the editor instance. We want to update it instead.
-    const propsRef = useRef({ oldText, newText, language });
-    propsRef.current = { oldText, newText, language };
-
-    // Effect for creating and cleaning up the editor instance
     useEffect(() => {
-        let editorInstance: any;
-
+        let modelsToDispose: { original: any; modified: any; } | null = null;
+        
         if (editorRef.current && typeof ((window as any).require) !== 'undefined') {
-             // Use require AMD loader if available
             (window as any).require(['vs/editor/editor.main'], () => {
-                if (!editorRef.current) return; // Component might have unmounted
-                
-                editorInstance = monaco.editor.createDiffEditor(editorRef.current, {
-                    originalEditable: false,
-                    readOnly: true,
-                    theme: theme === 'dark' ? 'vs-dark' : 'vs',
-                    automaticLayout: true,
-                    fontSize: 12,
-                    fontFamily: 'JetBrains Mono, monospace',
-                    wordWrap: 'on',
-                    renderSideBySide: true,
-                    minimap: { enabled: false },
-                });
+                if (!editorRef.current) return;
 
-                const originalModel = monaco.editor.createModel(propsRef.current.oldText, propsRef.current.language);
-                const modifiedModel = monaco.editor.createModel(propsRef.current.newText, propsRef.current.language);
+                // Create editor only if it doesn't exist
+                if (!editorInstanceRef.current) {
+                     editorInstanceRef.current = monaco.editor.createDiffEditor(editorRef.current, {
+                        originalEditable: false,
+                        readOnly: true,
+                        automaticLayout: true,
+                        fontSize: 12,
+                        fontFamily: 'JetBrains Mono, monospace',
+                        wordWrap: 'on',
+                        renderSideBySide: true,
+                        minimap: { enabled: false },
+                    });
+                }
+
+                const editor = editorInstanceRef.current;
                 
-                editorInstance.setModel({
+                // Always set theme and models
+                monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
+
+                const originalModel = monaco.editor.createModel(oldText, language);
+                const modifiedModel = monaco.editor.createModel(newText, language);
+                
+                // Get old models BEFORE setting new ones to dispose later
+                modelsToDispose = editor.getModel();
+
+                editor.setModel({
                     original: originalModel,
                     modified: modifiedModel
                 });
-
-                monacoInstanceRef.current = editorInstance;
+                
+                // Dispose old models AFTER setting new ones
+                if (modelsToDispose) {
+                    modelsToDispose.original?.dispose();
+                    modelsToDispose.modified?.dispose();
+                }
             });
         }
 
         return () => {
-            if (monacoInstanceRef.current) {
-                monacoInstanceRef.current.dispose();
-                monacoInstanceRef.current = null;
+            // Cleanup happens when the effect re-runs or the component unmounts
+            if (modelsToDispose) {
+                modelsToDispose.original?.dispose();
+                modelsToDispose.modified?.dispose();
             }
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only run once on mount
+    }, [oldText, newText, language, theme]); // Re-run effect when content or theme changes
 
-    // Effect to update theme
+    // Final cleanup on unmount
     useEffect(() => {
-        if (monacoInstanceRef.current) {
-            monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
-        }
-    }, [theme]);
-    
-    // Effect to update models when text or language changes
-    useEffect(() => {
-        if (monacoInstanceRef.current) {
-            const editor = monacoInstanceRef.current;
-            const models = editor.getModel();
-
-            if (models) {
-                const { original, modified } = models;
-                if (original.getValue() !== oldText) {
-                    original.setValue(oldText);
-                }
-                if (modified.getValue() !== newText) {
-                    modified.setValue(newText);
-                }
-                if (original.getLanguageId() !== language) {
-                    monaco.editor.setModelLanguage(original, language);
-                }
-                if (modified.getLanguageId() !== language) {
-                    monaco.editor.setModelLanguage(modified, language);
-                }
+        return () => {
+            if (editorInstanceRef.current) {
+                const models = editorInstanceRef.current.getModel();
+                models?.original?.dispose();
+                models?.modified?.dispose();
+                editorInstanceRef.current.dispose();
+                editorInstanceRef.current = null;
             }
         }
-    }, [oldText, newText, language]);
+    }, []);
 
     return <div ref={editorRef} className="w-full h-full border border-border-color rounded-md" />;
 };
