@@ -1,5 +1,14 @@
 # Version Log
 
+## v0.3.0 - The Layout Update
+
+This release focuses on improving the sidebar layout and user interaction, making it more flexible and intuitive.
+
+### ✨ New Features & Major Improvements
+
+-   **Resizable Templates Panel:** The 'Templates' panel in the sidebar is now resizable. Users can drag the horizontal splitter to adjust the panel's height, providing more space for documents when needed.
+-   **Streamlined UI:** The 'New from Template' button has been moved from the bottom of the sidebar to the 'Documents' header as a dedicated icon button. This creates a cleaner, more consistent, and always-visible access point for creating documents from templates.
+
 ## v0.2.0 - The Workflow Update
 
 This version introduces significant workflow enhancements, giving users more explicit control over versioning and document organization.

@@ -18,6 +18,7 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Customizable Interface:** Switch between light and dark themes, adjust the UI scale, and choose from multiple icon sets to personalize your experience.
 - **Offline First:** All your data is stored locally on your machine.
 - **Auto-Update:** The application can automatically check for and install updates (pre-release versions are opt-in).
+- **Resizable Layout:** The sidebar, templates panel, and logger panel are all fully resizable to customize your workspace.
 
 ## Getting Started
 

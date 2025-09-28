@@ -47,13 +47,11 @@ The resizable left panel is your main navigation and organization area.
 
 - **Search:** A search bar at the top allows you to filter your documents and folders by title.
 - **Documents List:** A hierarchical tree view of all your documents and folders.
-    - **Folders:** Can be expanded or collapsed. You can create new folders at the root level.
+    - **Action Toolbar:** A toolbar at the top of the list provides icon buttons to quickly create a new document, create a new root folder, create a new document from a template, and expand/collapse all folders.
+    - **Folders:** Can be expanded or collapsed.
     - **Documents:** Individual document files. Selecting a document opens it in the Main Content Area.
-- **Templates List:** A separate list below your documents for managing reusable templates.
-- **Action Buttons:**
-    - **New Folder/New Document:** Buttons at the top of the documents list to create new items.
-    - **New Template:** A button at the top of the templates list.
-    - **New from Template...:** A button at the very bottom of the sidebar to create a new document using an existing template.
+- **Templates List:** A separate panel below your documents for managing reusable templates. This panel is resizable; you can drag its top border to adjust its height.
+    - **Action Toolbar:** The templates panel has its own toolbar for creating new templates.
 
 The entire list of documents and templates can be navigated using your keyboard's arrow keys. Use `Up`/`Down` to move between items, `Right` to expand a folder, `Left` to collapse a folder (or move to its parent), and `Enter` to open the selected item.
 
@@ -124,7 +122,7 @@ Clicking the **Refine with AI** (sparkles) button in the editor toolbar sends yo
 Templates are useful for documents you create often.
 
 - **Create a Template:** Use the "New Template" button in the sidebar. In the template editor, use `{{variable_name}}` syntax to define placeholders.
-- **Create from Template:** Click the "New from Template..." button at the bottom of the sidebar. A modal will appear allowing you to select a template and fill in the values for its variables. This will generate a new document with the content filled in. Pressing `Enter` in this dialog will create the document once all required fields are filled.
+- **Create from Template:** Click the "New from Template..." icon in the sidebar's document toolbar. A modal will appear allowing you to select a template and fill in the values for its variables. This will generate a new document with the content filled in. Pressing `Enter` in this dialog will create the document once all required fields are filled.
 
 ### Version History
 

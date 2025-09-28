@@ -4,8 +4,7 @@ import TemplateList from './TemplateList';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DocumentTemplate } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, FolderDownIcon, ChevronDownIcon, ChevronRightIcon, CopyIcon, ExpandAllIcon, CollapseAllIcon } from './Icons';
-import Button from './Button';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
@@ -76,11 +75,6 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
   const sidebarRef = useRef<HTMLDivElement>(null);
   const isResizingTemplates = useRef(false);
-  
-  const activeNode = useMemo(() => {
-    return props.documents.find(p => p.id === props.activeNodeId) || null;
-  }, [props.documents, props.activeNodeId]);
-
 
   // Effect to manage focus state
   useEffect(() => {
