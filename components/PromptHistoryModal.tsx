@@ -5,7 +5,7 @@ import type { DocumentOrFolder, DocumentVersion as Version } from '../types';
 import { useDocumentHistory } from '../hooks/usePromptHistory';
 import Modal from './Modal';
 import Button from './Button';
-import DiffViewer from './DiffViewer';
+import MonacoDiffEditor from './MonacoDiffEditor';
 import { CheckIcon, CopyIcon, UndoIcon } from './Icons';
 import IconButton from './IconButton';
 
@@ -93,10 +93,13 @@ const DocumentHistoryModal: React.FC<DocumentHistoryModalProps> = ({ document, o
                  </div>
             </div>
             
-            <DiffViewer
-                oldText={previousVersion ? previousVersion.content : ''}
-                newText={selectedVersion.content}
-            />
+            <div className="flex-1 min-h-0">
+              <MonacoDiffEditor
+                  oldText={previousVersion ? previousVersion.content : ''}
+                  newText={selectedVersion.content}
+                  language={document.language_hint || 'plaintext'}
+              />
+            </div>
         </main>
       </div>
     </Modal>

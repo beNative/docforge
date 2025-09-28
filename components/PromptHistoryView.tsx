@@ -4,7 +4,7 @@ import type { DocumentOrFolder, DocumentVersion as Version } from '../types';
 // Fix: Import the new standalone hook.
 import { useDocumentHistory } from '../hooks/usePromptHistory';
 import Button from './Button';
-import DiffViewer from './DiffViewer';
+import MonacoDiffEditor from './MonacoDiffEditor';
 import { CheckIcon, CopyIcon, UndoIcon, ArrowLeftIcon, TrashIcon } from './Icons';
 import IconButton from './IconButton';
 import ConfirmModal from './ConfirmModal';
@@ -231,10 +231,13 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                     </div>
                 </div>
                 
-                <DiffViewer
-                    oldText={previousVersion ? previousVersion.content : ''}
-                    newText={selectedVersion.content}
-                />
+                <div className="flex-1 min-h-0">
+                    <MonacoDiffEditor
+                        oldText={previousVersion ? previousVersion.content : ''}
+                        newText={selectedVersion.content}
+                        language={document.language_hint || 'plaintext'}
+                    />
+                </div>
             </main>
         </div>
         {isConfirmingDelete && (
