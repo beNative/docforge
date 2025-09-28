@@ -5,7 +5,6 @@ export const LOCAL_STORAGE_KEYS = {
   SIDEBAR_WIDTH: 'docforge_sidebar_width',
   LOGGER_PANEL_HEIGHT: 'docforge_logger_panel_height',
   EXPANDED_FOLDERS: 'docforge_expanded_folders',
-  SIDEBAR_DOCS_PANEL_HEIGHT: 'docforge_sidebar_docs_panel_height',
   SIDEBAR_TEMPLATES_COLLAPSED: 'docforge_sidebar_templates_collapsed',
 
   // Legacy keys used for migration check:
