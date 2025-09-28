@@ -446,6 +446,13 @@ const MainApp: React.FC = () => {
         }
     };
 
+    const handleLanguageChange = useCallback((newLanguage: string) => {
+        if (activeNodeId && activeNode?.type === 'document') {
+            addLog('INFO', `User action: Change language for document "${activeNode?.title}" to "${newLanguage}".`);
+            updateItem(activeNodeId, { language_hint: newLanguage });
+        }
+    }, [activeNodeId, activeNode, updateItem, addLog]);
+
     const handleCommitVersion = (content: string) => {
         if (activeNodeId) {
             commitVersion(activeNodeId, content);
@@ -866,6 +873,7 @@ const MainApp: React.FC = () => {
                         onDelete={handleDeleteNode}
                         settings={settings}
                         onShowHistory={() => setDocumentView('history')}
+                        onLanguageChange={handleLanguageChange}
                     />
                 );
             }

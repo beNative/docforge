@@ -9,6 +9,7 @@ import { useHistoryState } from '../hooks/useHistoryState';
 import IconButton from './IconButton';
 import Button from './Button';
 import CodeEditor from './CodeEditor';
+import { SUPPORTED_LANGUAGES } from '../services/languageService';
 
 // Let TypeScript know Prism and marked are available on the window
 declare const Prism: any;
@@ -23,6 +24,7 @@ interface DocumentEditorProps {
   onDelete: (id: string) => void;
   settings: Settings;
   onShowHistory: () => void;
+  onLanguageChange: (language: string) => void;
 }
 
 // =================================================================================
@@ -101,7 +103,7 @@ const PreviewPane: React.FC<{ renderedPreviewHtml: string }> = React.memo(({ ren
 // Main DocumentEditor Component
 // =================================================================================
 
-const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCommitVersion, onDelete, settings, onShowHistory }) => {
+const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange }) => {
   const [title, setTitle] = useState(document.title);
   const { state: content, setState: setContent, undo, redo, canUndo, canRedo } = useHistoryState(document.content || '');
   
@@ -376,7 +378,31 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
                 </div>
             )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+            {isCodeFile && (
+                <>
+                    <div className="flex items-center">
+                        <label htmlFor="language-select" className="text-sm font-medium text-text-secondary mr-2">Language:</label>
+                        <select
+                            id="language-select"
+                            value={document.language_hint || 'plaintext'}
+                            onChange={(e) => onLanguageChange(e.target.value)}
+                            className="bg-background text-text-main text-sm rounded-md py-1 pl-2 pr-7 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
+                            style={{ 
+                                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a3a3a3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, 
+                                backgroundPosition: 'right 0.2rem center', 
+                                backgroundRepeat: 'no-repeat', 
+                                backgroundSize: '1.2em 1.2em' 
+                            }}
+                        >
+                            {SUPPORTED_LANGUAGES.map(lang => (
+                                <option key={lang.id} value={lang.id}>{lang.label}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="h-6 w-px bg-border-color mx-1"></div>
+                </>
+            )}
             {!isCodeFile && (
               <>
                 <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">

@@ -32,29 +32,10 @@ export const useNodes = () => {
     return newNode;
   }, [addLog, refreshNodes]);
 
-  const updateNode = useCallback(async (nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'>>) => {
+  const updateNode = useCallback(async (nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null }>) => {
     await repository.updateNode(nodeId, updates);
-    addLog('DEBUG', `Node updated with ID: ${nodeId}`);
-    
-    // Optimistic update for faster UI feedback on title change
-    setNodes(prevNodes => {
-        const updateRecursively = (items: Node[]): Node[] => {
-            return items.map(item => {
-                if (item.node_id === nodeId) {
-                    return { ...item, ...updates };
-                }
-                if (item.children) {
-                    return { ...item, children: updateRecursively(item.children) };
-                }
-                return item;
-            });
-        };
-        return updateRecursively(prevNodes);
-    });
-    // Still refresh for structural changes or to ensure consistency
-    if (updates.parent_id !== undefined) {
-       await refreshNodes();
-    }
+    addLog('DEBUG', `Node updated with ID: ${nodeId}. Refreshing tree.`);
+    await refreshNodes();
   }, [addLog, refreshNodes]);
 
   const deleteNode = useCallback(async (nodeId: string) => {

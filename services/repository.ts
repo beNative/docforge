@@ -164,7 +164,7 @@ export const repository = {
         const flatNodes = await window.electronAPI.dbQuery(`
             SELECT 
                 n.*, 
-                d.document_id, d.doc_type, d.current_version_id,
+                d.document_id, d.doc_type, d.language_hint, d.current_version_id,
                 cs.text_content as content
             FROM nodes n
             LEFT JOIN documents d ON n.node_id = d.node_id
@@ -239,15 +239,30 @@ export const repository = {
         return createdNode as Node;
     },
     
-    async updateNode(nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'>>) {
-        const fields = Object.keys(updates).map(key => `${key.replace(/([A-Z])/g, '_$1').toLowerCase()} = ?`).join(', ');
-        const params = Object.values(updates);
-        if (fields.length === 0) return;
-
-        await window.electronAPI!.dbRun(
-            `UPDATE nodes SET ${fields}, updated_at = ? WHERE node_id = ?`,
-            [...params, new Date().toISOString(), nodeId]
-        );
+    async updateNode(nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null }>) {
+        const nodeUpdates: Partial<Pick<Node, 'title' | 'parent_id'>> = {};
+        if (updates.title !== undefined) nodeUpdates.title = updates.title;
+        if (updates.parent_id !== undefined) nodeUpdates.parent_id = updates.parent_id;
+    
+        const now = new Date().toISOString();
+    
+        if (Object.keys(nodeUpdates).length > 0) {
+            const fields = Object.keys(nodeUpdates).map(key => `${key} = ?`).join(', ');
+            const params = Object.values(nodeUpdates);
+            await window.electronAPI!.dbRun(
+                `UPDATE nodes SET ${fields}, updated_at = ? WHERE node_id = ?`,
+                [...params, now, nodeId]
+            );
+        }
+        
+        if (updates.language_hint !== undefined) {
+            await window.electronAPI!.dbRun(
+                `UPDATE documents SET language_hint = ? WHERE node_id = ?`,
+                [updates.language_hint, nodeId]
+            );
+            // Also update the updated_at on the node for consistency
+            await window.electronAPI!.dbRun(`UPDATE nodes SET updated_at = ? WHERE node_id = ?`, [now, nodeId]);
+        }
     },
 
     async updateDocumentContent(nodeId: string, newContent: string, documentId?: number) {

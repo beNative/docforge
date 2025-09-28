@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import type { Node, DocumentOrFolder, DocType } from '../types';
 import { useNodes } from './useNodes';
+import { mapExtensionToLanguageId } from '../services/languageService';
 
 /**
  * Adapter function to convert the new `Node` data structure
@@ -60,7 +61,7 @@ export const useDocuments = () => {
       parent_id: parentId,
       node_type: 'document',
       title,
-      document: { content, doc_type, language_hint } as any,
+      document: { content, doc_type, language_hint: mapExtensionToLanguageId(language_hint) } as any,
     });
     return nodeToDocumentOrFolder(newNode);
   }, [addNode]);
@@ -75,9 +76,13 @@ export const useDocuments = () => {
   }, [addNode]);
 
   const updateItem = useCallback(async (id: string, updates: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => {
-    // This function now only handles metadata like title and parentId.
-    if (updates.title !== undefined || updates.parentId !== undefined) {
-        await updateNode(id, { title: updates.title, parent_id: updates.parentId });
+    const nodeUpdates: Parameters<typeof updateNode>[1] = {};
+    if (updates.title !== undefined) nodeUpdates.title = updates.title;
+    if (updates.parentId !== undefined) nodeUpdates.parent_id = updates.parentId;
+    if (updates.language_hint !== undefined) nodeUpdates.language_hint = updates.language_hint;
+
+    if (Object.keys(nodeUpdates).length > 0) {
+        await updateNode(id, nodeUpdates);
     }
   }, [updateNode]);
 

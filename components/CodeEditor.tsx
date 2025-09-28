@@ -10,32 +10,6 @@ interface CodeEditorProps {
   onChange: (newContent: string) => void;
 }
 
-const mapLanguage = (hint: string | null): string => {
-    if (!hint) return 'plaintext';
-    switch (hint.toLowerCase()) {
-        case 'js':
-        case 'jsx':
-            return 'javascript';
-        case 'ts':
-        case 'tsx':
-            return 'typescript';
-        case 'py':
-            return 'python';
-        case 'html':
-            return 'html';
-        case 'css':
-            return 'css';
-        case 'java':
-            return 'java';
-        case 'pas':
-            return 'pascal';
-        case 'dfm':
-             return 'ini';
-        default:
-            return 'plaintext';
-    }
-}
-
 const CodeEditor: React.FC<CodeEditorProps> = ({ content, language, onChange }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
@@ -72,7 +46,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ content, language, onChange }) 
 
                     const editorInstance = monaco.editor.create(editorRef.current, {
                         value: content,
-                        language: mapLanguage(language),
+                        language: language || 'plaintext',
                         theme: theme === 'dark' ? 'vs-dark' : 'vs',
                         automaticLayout: true,
                         fontSize: 14,
@@ -126,7 +100,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ content, language, onChange }) 
     // Effect to update language
     useEffect(() => {
         if (monacoInstanceRef.current && monacoInstanceRef.current.getModel()) {
-            monaco.editor.setModelLanguage(monacoInstanceRef.current.getModel(), mapLanguage(language));
+            monaco.editor.setModelLanguage(monacoInstanceRef.current.getModel(), language || 'plaintext');
         }
     }, [language]);
 
