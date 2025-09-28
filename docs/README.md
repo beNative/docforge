@@ -7,19 +7,21 @@ DocForge is a desktop application designed to streamline the process of creating
 ## Key Features
 
 - **Modern, Draggable Title Bar:** A sleek, VS Code-style custom title bar maximizes screen space and integrates essential functions (Electron version only).
-- **Integrated Command Palette:** Quickly access all core functions from a central search bar built directly into the title bar.
-- **Hierarchical Document Organization:** Organize your documents and ideas in a familiar folder structure. Create nested subfolders, duplicate items, and use drag-and-drop to rearrange your workspace.
-- **Full Keyboard Navigation:** Navigate the document and template sidebar using only the keyboard for a faster workflow.
+- **Integrated Command Palette:** Quickly access all core functions from a central search bar.
+- **Hierarchical Document Organization:** Organize your documents in a familiar folder structure. Create nested subfolders, duplicate items, and use drag-and-drop to rearrange your workspace or import files from your computer.
+- **Full Context Menu & Keyboard Navigation:** Navigate and manage items using a complete right-click context menu or use only the keyboard for a faster workflow.
 - **Universal Monaco Editor:** A powerful, VS Code-like editor is used for all document types, including Markdown, HTML, and various source code files, with syntax highlighting and code folding.
 - **Multi-Format Live Preview:** Get a real-time, rendered preview for multiple document types (including Markdown and HTML). The preview can be displayed side-by-side (vertically or horizontally) with the editor.
 - **AI-Powered Refinement:** Use your connected local LLM to automatically refine and improve your documents with a single click.
 - **Document Templating:** Create reusable document templates with variables to quickly generate new documents for recurring tasks.
-- **Version History:** Explicitly save new versions of your documents with a dedicated button. Manage your history by viewing diffs, deleting old versions, and restoring to any point in time.
+- **Version History:** Explicitly save new versions of your documents. Manage your history by viewing diffs, deleting old versions, and restoring to any point in time.
 - **Local LLM Discovery:** Automatically detects running local LLM providers like Ollama and LM Studio for easy setup.
-- **Customizable Interface:** Switch between light and dark themes, adjust the UI scale, and choose from multiple icon sets to personalize your experience.
+- **Highly Customizable:**
+    - **Interface:** Switch between light and dark themes, adjust the UI scale, and choose from multiple icon sets.
+    - **Keyboard Shortcuts:** Remap default shortcuts for core application commands to fit your preferences.
+- **Database Management:** A dedicated settings panel allows you to view database statistics, run integrity checks, and perform maintenance like backups and optimization.
 - **Comprehensive Action Logging**: Every user action is logged, providing a clear audit trail and making debugging easier.
 - **Offline First:** All your data is stored locally on your machine.
-- **Compressed Backups**: Database backups are compressed with Gzip to significantly reduce file size.
 - **Auto-Update:** The application can automatically check for and install updates (pre-release versions are opt-in).
 - **Resizable Layout:** The sidebar, templates panel, and logger panel are all fully resizable to customize your workspace.
 

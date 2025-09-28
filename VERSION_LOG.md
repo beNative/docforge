@@ -1,5 +1,18 @@
 # Version Log
 
+## v0.6.0 - The Customization & Workflow Update
+
+This release introduces powerful new ways to customize your workspace and streamline your workflow, including fully configurable keyboard shortcuts, an advanced settings editor, and enhanced file import capabilities.
+
+### ✨ New Features & Major Improvements
+
+-   **Customizable Keyboard Shortcuts**: A new "Keyboard Shortcuts" section has been added to the Settings view. Users can now view and customize the keyboard shortcuts for all major application commands to match their personal workflow.
+-   **Advanced Settings Editor**: For power users, an "Advanced" settings tab is now available, offering both an interactive tree editor and a raw JSON editor for direct configuration of the application's settings.
+-   **Direct Code File Creation**: A "New Code File" action has been added, allowing users to create new source code files by specifying a filename with an extension (e.g., `script.py`), which automatically sets the correct language for syntax highlighting.
+-   **Enhanced File Import**: Users can now drag and drop files and folders directly into the application window or sidebar to import them. The application will intelligently preserve the folder structure of the dropped items.
+-   **Database Management Tools**: The Settings view now includes a "Database" section with tools to view statistics, run an integrity check, create compressed backups, and optimize the database file (`VACUUM`).
+-   **Full Context Menu**: The document and folder list now has a complete context menu (right-click) providing quick access to all common actions like creating, renaming, duplicating, and deleting items.
+
 ## v0.5.0 - The Universal Editor Update
 
 This is a major feature release that replaces the simple Markdown editor with the powerful Monaco Editor (the core of VS Code) for all documents. It introduces a flexible, multi-format live preview system and makes Markdown the default for new documents.

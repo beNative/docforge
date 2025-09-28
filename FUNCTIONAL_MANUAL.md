@@ -33,7 +33,7 @@ The resizable left panel is your main navigation and organization area.
 - **Templates List:** A separate panel below your documents for managing reusable templates. This panel is resizable; you can drag its top border to adjust its height.
     - **Action Toolbar:** The templates panel has its own toolbar for creating new templates.
 
-The entire list of documents and templates can be navigated using your keyboard's arrow keys. Use `Up`/`Down` to move between items, `Right` to expand a folder, `Left` to collapse a folder (or move to its parent), and `Enter` to open the selected item.
+The entire list of documents and templates can be navigated using your keyboard's arrow keys. Use `Up`/`Down` to move between items, `Right` to expand a folder, `Left` to collapse a folder (or move to its parent), and `Enter` to open the selected item. Alternatively, right-clicking on an item or in the empty space of the sidebar will open a context menu with common actions.
 
 ### The Main Content Area
 
@@ -61,7 +61,7 @@ The bar at the bottom of the window provides at-a-glance information about the a
 ### Creating and Managing Documents and Folders
 
 - **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut. New documents default to Markdown.
-- **New Code File:** Click the code icon to create a source code file. Provide a filename with an extension (e.g., `script.js`) for automatic language detection.
+- **New Code File:** Click the code icon. A dialog will appear asking you to provide a filename with an extension (e.g., `script.js`) for automatic language detection.
 - **New Root Folder:** Click the folder icon with a `+` to create a new folder at the root of your document list.
 - **New Subfolder:** Select an existing folder and click the "New Subfolder" icon to create a folder inside it.
 - **Duplicate Selection:** Select one or more items and click the "Duplicate" icon to create a deep copy.
@@ -93,6 +93,8 @@ You can drop an item (or a group of items):
 - **Before** another item to place it above.
 - **After** another item to place it below.
 - **Inside** a folder to move it into that folder.
+
+**Importing from your computer:** You can also drag files and folders directly from your operating system's file explorer into the sidebar. Dropping them on a folder will import them into that folder, while dropping them in an empty area will import them to the root. The original folder structure is preserved.
 
 ### AI-Powered Refinement
 
@@ -130,8 +132,10 @@ The Command Palette is the fastest way to access most of DocForge's features.
 Accessed via the gear icon in the title bar. The settings are organized into categories:
 - **LLM Provider:** Configure your connection to a local AI service. You can detect running services and select a model.
 - **Appearance:** Change the UI scale and choose from different icon sets.
+- **Keyboard Shortcuts:** View and customize keyboard shortcuts for all major application actions. You can record a new key combination for any command.
 - **General:** Configure application behavior, like auto-saving logs and opting into pre-release updates.
-- **Advanced:** View and edit the raw JSON configuration file, and import/export your settings.
+- **Database:** View detailed statistics about your local database file, and perform maintenance tasks such as creating a compressed backup, checking file integrity, and optimizing the database size (`VACUUM`).
+- **Advanced:** View and edit the raw JSON configuration file using an interactive tree or a raw text editor, and import/export your settings.
 
 ### Info View
 
