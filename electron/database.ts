@@ -293,7 +293,7 @@ export const databaseService = {
   },
 
   async backupDatabase(filePath: string): Promise<void> {
-    await db.backup(filePath).run();
+    await db.backup(filePath);
   },
 
   runIntegrityCheck(): string {

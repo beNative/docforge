@@ -151,16 +151,20 @@ ipcMain.handle('db:backup', async () => {
     });
 
     if (canceled || !filePath) {
+        console.log('Database backup canceled by user.');
         return { success: true, message: 'Backup canceled by user.' };
     }
 
     const tempDbPath = path.join(os.tmpdir(), `docforge-temp-backup-${Date.now()}.db`);
+    console.log(`Starting database backup to temporary file: ${tempDbPath}`);
 
     try {
         // 1. Backup to a temporary file
         await databaseService.backupDatabase(tempDbPath);
+        console.log('Temporary backup file created successfully.');
 
         // 2. Gzip the temporary file to the final destination
+        console.log(`Compressing backup to: ${filePath}`);
         const readStream = createReadStream(tempDbPath);
         const writeStream = createWriteStream(filePath);
         const gzip = zlib.createGzip();
