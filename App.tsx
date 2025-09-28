@@ -25,6 +25,9 @@ import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import ConfirmModal from './components/ConfirmModal';
 import UpdateNotification from './components/UpdateNotification';
 import FatalError from './components/FatalError';
+import { repository } from './services/repository';
+import TemplateEditor from './components/TemplateEditor';
+
 
 import {
   PlusIcon, FolderPlusIcon, TrashIcon, SparklesIcon, CommandIcon,

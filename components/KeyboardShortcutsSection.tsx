@@ -34,7 +34,6 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
             }
             acc[category].push(command);
             return acc;
-        // FIX: Add explicit type to the initial accumulator object for the reduce function.
         }, {} as Record<string, Command[]>);
     }, [commands, searchTerm, settings.customShortcuts]);
 
