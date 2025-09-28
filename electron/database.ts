@@ -4,6 +4,7 @@ import fs, { statSync } from 'fs';
 import Database from 'better-sqlite3';
 import { INITIAL_SCHEMA } from './schema';
 import { v4 as uuidv4 } from 'uuid';
+import * as crypto from 'crypto';
 // Fix: Import types to use for casting
 import type { Node, Document, DocVersion, DatabaseStats } from '../types';
 
@@ -11,6 +12,32 @@ let db: Database.Database;
 
 const DB_FILE_NAME = 'docforge.db';
 const DB_PATH = path.join(app.getPath('userData'), DB_FILE_NAME);
+
+// Helper function from languageService.ts, now inside database.ts to avoid cross-context dependencies
+const mapExtensionToLanguageId_local = (extension: string | null): string => {
+    if (!extension) return 'plaintext';
+    switch (extension.toLowerCase()) {
+        case 'js': case 'jsx': return 'javascript';
+        case 'ts': case 'tsx': return 'typescript';
+        case 'py': return 'python';
+        case 'html': case 'htm': return 'html';
+        case 'css': return 'css';
+        case 'json': return 'json';
+        case 'md': case 'markdown': return 'markdown';
+        case 'java': return 'java';
+        case 'cs': return 'csharp';
+        case 'cpp': case 'cxx': case 'h': case 'hpp': return 'cpp';
+        case 'go': return 'go';
+        case 'rs': return 'rust';
+        case 'rb': return 'ruby';
+        case 'php': return 'php';
+        case 'sql': return 'sql';
+        case 'yml': case 'yaml': return 'yaml';
+        case 'pas': return 'pascal';
+        case 'dfm': case 'ini': return 'ini';
+        default: return 'plaintext';
+    }
+};
 
 export const databaseService = {
   init() {
@@ -305,6 +332,80 @@ export const databaseService = {
     } catch (error) {
       console.error('Delete versions transaction failed:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  importFiles(filesData: {path: string, name: string, content: string}[], targetParentId: string | null): { success: boolean, error?: string } {
+    const transaction = db.transaction(() => {
+        console.log(`Starting import transaction for ${filesData.length} files.`);
+        const knownFolderPaths = new Map<string, string>(); // 'parentId/folderName' -> 'node_id'
+
+        const getContentId = (content: string): number => {
+            const sha = crypto.createHash('sha256').update(content).digest('hex');
+            let contentRow = db.prepare('SELECT content_id FROM content_store WHERE sha256_hex = ?').get(sha) as { content_id: number } | undefined;
+            if (contentRow) {
+                return contentRow.content_id;
+            }
+            const result = db.prepare('INSERT INTO content_store (sha256_hex, text_content) VALUES (?, ?)').run(sha, content);
+            return Number(result.lastInsertRowid);
+        };
+        
+        for (const file of filesData) {
+            let currentParentId = targetParentId;
+            const pathParts = file.path.split(/[/\\]/).slice(0, -1);
+            
+            for (const part of pathParts) {
+                if (!part) continue; // Skip empty parts
+                const folderPathKey = `${currentParentId || 'root'}/${part}`;
+
+                if (knownFolderPaths.has(folderPathKey)) {
+                    currentParentId = knownFolderPaths.get(folderPathKey)!;
+                } else {
+                    const existingFolder = db.prepare('SELECT node_id FROM nodes WHERE title = ? AND parent_id ' + (currentParentId ? '= ?' : 'IS NULL')).get(part, currentParentId) as { node_id: string } | undefined;
+
+                    if (existingFolder) {
+                        currentParentId = existingFolder.node_id;
+                    } else {
+                        const newFolderId = uuidv4();
+                        const now = new Date().toISOString();
+                        const maxSortOrderResult = db.prepare(`SELECT MAX(sort_order) as max_order FROM nodes WHERE parent_id ${currentParentId ? '= ?' : 'IS NULL'}`).get(currentParentId) as { max_order: number | null };
+                        const sortOrder = (maxSortOrderResult?.max_order ?? -1) + 1;
+
+                        db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, 'folder', ?, ?, ?, ?)`).run(newFolderId, currentParentId, part, sortOrder, now, now);
+                        console.log(`Created folder "${part}" with id ${newFolderId}`);
+                        currentParentId = newFolderId;
+                    }
+                    knownFolderPaths.set(folderPathKey, currentParentId);
+                }
+            }
+
+            // Now create the document node
+            const newNodeId = uuidv4();
+            const now = new Date().toISOString();
+            const maxSortOrderResult = db.prepare(`SELECT MAX(sort_order) as max_order FROM nodes WHERE parent_id ${currentParentId ? '= ?' : 'IS NULL'}`).get(currentParentId) as { max_order: number | null };
+            const sortOrder = (maxSortOrderResult?.max_order ?? -1) + 1;
+            const extension = file.name.split('.').pop() || null;
+            const languageHint = mapExtensionToLanguageId_local(extension);
+
+            db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, 'document', ?, ?, ?, ?)`).run(newNodeId, currentParentId, file.name, sortOrder, now, now);
+
+            const docResult = db.prepare(`INSERT INTO documents (node_id, doc_type, language_hint) VALUES (?, ?, ?)`).run(newNodeId, 'source_code', languageHint);
+            const documentId = Number(docResult.lastInsertRowid);
+
+            const contentId = getContentId(file.content);
+            const versionResult = db.prepare(`INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)`).run(documentId, now, contentId);
+            const newVersionId = Number(versionResult.lastInsertRowid);
+            db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?').run(newVersionId, documentId);
+            console.log(`Created document "${file.name}" with node id ${newNodeId}`);
+        }
+    });
+
+    try {
+        transaction();
+        return { success: true };
+    } catch (error) {
+        console.error('File import transaction failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   },
 

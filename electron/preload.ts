@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbVacuum: () => ipcRenderer.invoke('db:vacuum'),
   dbGetStats: () => ipcRenderer.invoke('db:get-stats'),
   dbGetPath: () => ipcRenderer.invoke('db:get-path'),
+  dbImportFiles: (filesData: any[], targetParentId: string | null) => ipcRenderer.invoke('db:import-files', filesData, targetParentId),
 
   // --- Migration-related FS access ---
   legacyFileExists: (filename: string) => ipcRenderer.invoke('fs:legacy-file-exists', filename),

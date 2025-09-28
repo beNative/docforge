@@ -141,6 +141,15 @@ ipcMain.handle('db:migrate-from-json', (_, data) => databaseService.migrateFromJ
 ipcMain.handle('db:duplicate-nodes', (_, nodeIds) => databaseService.duplicateNodes(nodeIds));
 ipcMain.handle('db:delete-versions', (_, documentId, versionIds) => databaseService.deleteVersions(documentId, versionIds));
 ipcMain.handle('db:get-path', () => databaseService.getDbPath());
+ipcMain.handle('db:import-files', async (_, filesData, targetParentId) => {
+    try {
+        const result = databaseService.importFiles(filesData, targetParentId);
+        return result;
+    } catch (error) {
+        console.error('File import failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to import files.' };
+    }
+});
 
 ipcMain.handle('db:backup', async () => {
     if (!mainWindow) return { success: false, error: 'Main window not available' };

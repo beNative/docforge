@@ -52,7 +52,7 @@ const getDescendantIdsRecursive = (nodeId: string, allNodes: Node[]): Set<string
  * This allows the UI to function without a full refactor of all components.
  */
 export const useDocuments = () => {
-  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes } = useNodes();
+  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes, importFiles, addLog } = useNodes();
 
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
@@ -111,9 +111,32 @@ export const useDocuments = () => {
       await moveNodes(draggedIds, targetId, position);
   }, [moveNodes]);
 
+  const addDocumentsFromFiles = useCallback(async (files: { path: string; name: string; file: File }[], targetNodeId: string | null) => {
+    addLog('INFO', `Importing ${files.length} files...`);
+
+    const fileReadPromises = files.map(entry => {
+      return new Promise<{ path: string; name: string; content: string }>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ path: entry.path, name: entry.name, content: reader.result as string });
+        reader.onerror = (error) => reject(error);
+        reader.readAsText(entry.file);
+      });
+    });
+
+    try {
+      const filesData = await Promise.all(fileReadPromises);
+      await importFiles(filesData, targetNodeId);
+      addLog('INFO', 'File import process completed successfully in the backend.');
+      await refreshNodes();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addLog('ERROR', `File import failed: ${message}`);
+    }
+  }, [addLog, importFiles, refreshNodes]);
+
   const getDescendantIds = useCallback((nodeId: string): Set<string> => {
       return getDescendantIdsRecursive(nodeId, allNodesFlat);
   }, [allNodesFlat]);
 
-  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems };
+  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles };
 };

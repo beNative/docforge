@@ -18,6 +18,7 @@ interface DocumentTreeItemProps {
   onDeleteNode: (id: string, shiftKey: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onDropFiles: (files: FileList, parentId: string | null) => void;
   onToggleExpand: (id: string) => void;
   onCopyNodeContent: (id: string) => void;
   searchTerm: string;
@@ -66,6 +67,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onDeleteNode,
     onRenameNode,
     onMoveNode,
+    onDropFiles,
     onToggleExpand,
     onCopyNodeContent,
     onMoveUp,
@@ -137,9 +139,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const position = getDropPosition(e, isFolder, itemRef.current);
-    if (position !== dropPosition) {
-        setDropPosition(position);
+    if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/json')) {
+        const position = getDropPosition(e, isFolder, itemRef.current);
+        if (position !== dropPosition) {
+            setDropPosition(position);
+        }
     }
   };
   
@@ -152,10 +156,16 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const draggedIdsJSON = e.dataTransfer.getData('application/json');
-    // Recalculate position on drop for accuracy, avoiding state lag.
     const finalDropPosition = getDropPosition(e, isFolder, itemRef.current);
+    setDropPosition(null);
     
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const parentId = finalDropPosition === 'inside' ? node.id : node.parentId;
+        onDropFiles(e.dataTransfer.files, parentId);
+        return;
+    }
+
+    const draggedIdsJSON = e.dataTransfer.getData('application/json');
     if (draggedIdsJSON && finalDropPosition) {
         const draggedIds = JSON.parse(draggedIdsJSON);
         if (!draggedIds.includes(node.id)) { // Prevent dropping on itself
@@ -166,7 +176,6 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
             }
         }
     }
-    setDropPosition(null);
   };
   
   const handleContextMenu = (e: React.MouseEvent) => {

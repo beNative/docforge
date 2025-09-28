@@ -25,6 +25,7 @@ interface SidebarProps {
   onDeleteNode: (id: string, shiftKey?: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onDropFiles: (files: FileList, parentId: string | null) => void;
   onNewDocument: () => void;
   onNewRootFolder: () => void;
   onNewSubfolder: () => void;
@@ -338,6 +339,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onDeleteNode={props.onDeleteNode}
                     onRenameNode={props.onRenameNode}
                     onMoveNode={props.onMoveNode}
+                    onDropFiles={props.onDropFiles}
                     onCopyNodeContent={props.onCopyNodeContent}
                     searchTerm={searchTerm}
                     expandedIds={props.expandedFolderIds}

@@ -447,6 +447,16 @@ export const repository = {
         }
     },
 
+    async importFiles(filesData: {path: string, name: string, content: string}[], targetParentId: string | null) {
+        if (!window.electronAPI?.dbImportFiles) {
+            throw new Error("File import is not supported in this environment.");
+        }
+        const result = await window.electronAPI.dbImportFiles(filesData, targetParentId);
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to import files in main process.');
+        }
+    },
+
     async getDbPath(): Promise<string> {
         if (!window.electronAPI?.dbGetPath) throw new Error("getDbPath not supported.");
         return window.electronAPI.dbGetPath();

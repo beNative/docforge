@@ -68,5 +68,9 @@ export const useNodes = () => {
       addLog('DEBUG', `Content for node ${nodeId} saved.`);
   }, [addLog]);
 
-  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes };
+  const importFiles = useCallback(async (filesData: {path: string, name: string, content: string}[], targetParentId: string | null) => {
+    await repository.importFiles(filesData, targetParentId);
+  }, []);
+
+  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, addLog };
 };

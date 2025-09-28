@@ -17,7 +17,7 @@ import InfoView from './components/InfoView';
 import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon } from './components/Icons';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
@@ -42,6 +42,10 @@ const MIN_LOGGER_HEIGHT = 100;
 const isElectron = !!window.electronAPI;
 
 type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
+
+interface FileWithRelativePath extends File {
+    readonly webkitRelativePath: string;
+}
 
 const App: React.FC = () => {
     const { addLog } = useLogger();
@@ -82,7 +86,7 @@ const App: React.FC = () => {
 
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems } = useDocuments();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     
     const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
@@ -109,12 +113,14 @@ const MainApp: React.FC = () => {
     const [confirmAction, setConfirmAction] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; position: { x: number, y: number }, items: MenuItem[] }>({ isOpen: false, position: { x: 0, y: 0 }, items: [] });
+    const [isDraggingFile, setIsDraggingFile] = useState(false);
 
 
     const isSidebarResizing = useRef(false);
     const isLoggerResizing = useRef(false);
     const commandPaletteTargetRef = useRef<HTMLDivElement>(null);
     const commandPaletteInputRef = useRef<HTMLInputElement>(null);
+    const dragCounter = useRef(0);
 
     const llmStatus = useLLMStatus(settings.llmProviderUrl);
     const { logs, addLog } = useLogger();
@@ -260,6 +266,75 @@ const MainApp: React.FC = () => {
             setIsDetecting(false);
         }
     }, [addLog]);
+
+    const handleDropFiles = useCallback(async (files: FileList, parentId: string | null) => {
+        if (!files || files.length === 0) return;
+        
+        const fileEntries = Array.from(files).map(file => {
+            const f = file as FileWithRelativePath;
+            return {
+                path: f.webkitRelativePath || f.name,
+                name: f.name,
+                file: f,
+            };
+        });
+
+        await addDocumentsFromFiles(fileEntries, parentId);
+    }, [addDocumentsFromFiles]);
+
+    useEffect(() => {
+        const handleDragEnter = (e: DragEvent) => {
+            if (e.dataTransfer?.types.includes('Files')) {
+                e.preventDefault();
+                dragCounter.current++;
+                if (dragCounter.current === 1) {
+                    setIsDraggingFile(true);
+                    addLog('DEBUG', 'Drag operation with files started over the application window.');
+                }
+            }
+        };
+
+        const handleDragOver = (e: DragEvent) => {
+            if (e.dataTransfer?.types.includes('Files')) {
+                e.preventDefault();
+            }
+        };
+        
+        const handleDragLeave = (e: DragEvent) => {
+            e.preventDefault();
+            dragCounter.current--;
+            if (dragCounter.current === 0) {
+               setIsDraggingFile(false);
+               addLog('DEBUG', 'Drag operation left application window.');
+            }
+        };
+
+        const handleDrop = (e: DragEvent) => {
+            e.preventDefault();
+            dragCounter.current = 0;
+            setIsDraggingFile(false);
+            // Global drop is only handled if not caught by a more specific target
+            if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+                 const target = e.target as HTMLElement;
+                 if (!target.closest('[data-item-id]')) { // Prevent double handling
+                    addLog('INFO', `${e.dataTransfer.files.length} file(s) dropped on the application window (root).`);
+                    handleDropFiles(e.dataTransfer.files, null);
+                }
+            }
+        };
+
+        window.addEventListener('dragenter', handleDragEnter);
+        window.addEventListener('dragover', handleDragOver);
+        window.addEventListener('dragleave', handleDragLeave);
+        window.addEventListener('drop', handleDrop);
+        
+        return () => {
+            window.removeEventListener('dragenter', handleDragEnter);
+            window.removeEventListener('dragover', handleDragOver);
+            window.removeEventListener('dragleave', handleDragLeave);
+            window.removeEventListener('drop', handleDrop);
+        };
+    }, [handleDropFiles, addLog]);
 
     useEffect(() => {
         handleDetectServices();
@@ -938,6 +1013,7 @@ const MainApp: React.FC = () => {
                                         onDeleteNode={handleDeleteNode}
                                         onRenameNode={handleRenameNode}
                                         onMoveNode={moveItems}
+                                        onDropFiles={handleDropFiles}
                                         onNewDocument={() => handleNewDocument()}
                                         onNewRootFolder={handleNewRootFolder}
                                         onNewSubfolder={handleNewSubfolder}
@@ -999,6 +1075,13 @@ const MainApp: React.FC = () => {
                 />
             </div>
             
+            {isDraggingFile && (
+                <div className="fixed inset-0 bg-primary/20 border-4 border-dashed border-primary flex flex-col items-center justify-center pointer-events-none z-50">
+                    <FolderDownIcon className="w-24 h-24 text-primary/80 mb-4" />
+                    <p className="text-2xl font-bold text-primary-text bg-primary/80 px-4 py-2 rounded-md">Drop files to import</p>
+                </div>
+            )}
+
             <CommandPalette 
                 isOpen={isCommandPaletteOpen} 
                 onClose={handleCloseCommandPalette}

@@ -17,6 +17,8 @@ declare global {
       dbVacuum: () => Promise<{ success: boolean; error?: string }>;
       dbGetStats: () => Promise<{ success: boolean; stats?: DatabaseStats; error?: string }>;
       dbGetPath: () => Promise<string>;
+      // FIX: Add missing `dbImportFiles` to the electronAPI type definition.
+      dbImportFiles: (filesData: {path: string; name: string; content: string}[], targetParentId: string | null) => Promise<{ success: boolean; error?: string }>;
       legacyFileExists: (filename: string) => Promise<boolean>;
       readLegacyFile: (filename: string) => Promise<{ success: boolean, data?: string, error?: string }>;
       getAppVersion: () => Promise<string>;

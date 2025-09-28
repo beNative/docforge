@@ -12,6 +12,7 @@ interface DocumentListProps {
   onDeleteNode: (id: string, shiftKey?: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onDropFiles: (files: FileList, parentId: string | null) => void;
   onCopyNodeContent: (id: string) => void;
   searchTerm: string;
   expandedIds: Set<string>;
@@ -24,7 +25,7 @@ interface DocumentListProps {
 }
 
 const DocumentList: React.FC<DocumentListProps> = ({ 
-  tree, documents, selectedIds, focusedItemId, onSelectNode, onDeleteNode, onRenameNode, onMoveNode, onCopyNodeContent, searchTerm, expandedIds, onToggleExpand, onMoveUp, onMoveDown, onContextMenu, renamingNodeId, onRenameComplete
+  tree, documents, selectedIds, focusedItemId, onSelectNode, onDeleteNode, onRenameNode, onMoveNode, onDropFiles, onCopyNodeContent, searchTerm, expandedIds, onToggleExpand, onMoveUp, onMoveDown, onContextMenu, renamingNodeId, onRenameComplete
 }) => {
   // Fix: Corrected useState declaration syntax from `=>` to `=`. This resolves all subsequent "cannot find name" errors.
   const [isRootDropping, setIsRootDropping] = useState(false);
@@ -39,6 +40,11 @@ const DocumentList: React.FC<DocumentListProps> = ({
     if (target.closest('li[draggable="true"]')) {
       return;
     }
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        onDropFiles(e.dataTransfer.files, null);
+        return;
+    }
     
     const draggedIdsJSON = e.dataTransfer.getData('application/json');
     if (draggedIdsJSON) {
@@ -49,12 +55,16 @@ const DocumentList: React.FC<DocumentListProps> = ({
   };
 
   const handleRootDragOver = (e: React.DragEvent) => {
-      e.preventDefault();
-      const target = e.target as HTMLElement;
-      if (!target.closest('li[draggable="true"]')) {
-        e.dataTransfer.dropEffect = 'move';
-        setIsRootDropping(true);
-      }
+    e.preventDefault();
+    if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/json')) {
+        const target = e.target as HTMLElement;
+        if (!target.closest('li[draggable="true"]')) {
+            e.dataTransfer.dropEffect = 'move';
+            setIsRootDropping(true);
+        }
+    } else {
+        e.dataTransfer.dropEffect = 'none';
+    }
   };
 
   const handleRootDragLeave = () => {
@@ -97,6 +107,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onDeleteNode={onDeleteNode}
                 onRenameNode={onRenameNode}
                 onMoveNode={onMoveNode}
+                onDropFiles={onDropFiles}
                 onToggleExpand={onToggleExpand}
                 onCopyNodeContent={onCopyNodeContent}
                 searchTerm={searchTerm}
