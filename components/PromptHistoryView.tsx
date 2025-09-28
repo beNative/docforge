@@ -17,9 +17,11 @@ interface DocumentHistoryViewProps {
 const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onBackToEditor, onRestore }) => {
   const { versions, deleteVersions } = useDocumentHistory(document.id);
   const [isCopied, setIsCopied] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(0);
   const [selectedVersionIds, setSelectedVersionIds] = useState<Set<number>>(new Set());
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const { addLog } = useLogger();
+  const listRef = useRef<HTMLUListElement>(null);
   
   const versionsWithCurrent = useMemo(() => {
     const historyVersions = versions.map(v => ({
@@ -46,6 +48,11 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const [compareAIndex, setCompareAIndex] = useState(0);
   const [compareBIndex, setCompareBIndex] = useState(versionsWithCurrent.length > 1 ? 1 : 0);
 
+  useEffect(() => {
+    // Reset focus if versions change (e.g., after deletion)
+    setFocusedIndex(0);
+  }, [versions]);
+
   const { newerVersion, olderVersion } = useMemo(() => {
     const newerIdx = Math.min(compareAIndex, compareBIndex);
     const olderIdx = Math.max(compareAIndex, compareBIndex);
@@ -55,10 +62,12 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
     };
   }, [compareAIndex, compareBIndex, versionsWithCurrent]);
 
+  const focusedVersion = useMemo(() => versionsWithCurrent[focusedIndex], [focusedIndex, versionsWithCurrent]);
+
   const handleCopy = async () => {
-    if (!newerVersion) return;
+    if (!focusedVersion) return;
     try {
-        await navigator.clipboard.writeText(newerVersion.content);
+        await navigator.clipboard.writeText(focusedVersion.content);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
@@ -95,6 +104,31 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
     setIsConfirmingDelete(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusedIndex(prev => Math.max(0, prev - 1));
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusedIndex(prev => Math.min(versionsWithCurrent.length - 1, prev + 1));
+    }
+  };
+
+  useEffect(() => {
+    const itemElement = listRef.current?.querySelector(`[data-index="${focusedIndex}"]`);
+    itemElement?.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth',
+    });
+  }, [focusedIndex]);
+  
+  // Auto-focus the list for keyboard navigation when the view mounts
+  useEffect(() => {
+    setTimeout(() => {
+        listRef.current?.focus();
+    }, 100);
+  }, []);
+
   return (
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
         <header className="flex justify-between items-center px-4 h-7 gap-4 flex-shrink-0 border-b border-border-color bg-secondary">
@@ -127,13 +161,19 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                        Delete ({selectedVersionIds.size})
                     </Button>
                 </div>
-                <ul className="space-y-1 overflow-y-auto -mr-2 pr-2">
+                <ul ref={listRef} onKeyDown={handleKeyDown} tabIndex={0} className="space-y-1 overflow-y-auto -mr-2 pr-2 focus:outline-none">
                     {versionsWithCurrent.map((version, index) => {
                         const isA = compareAIndex === index;
                         const isB = compareBIndex === index;
+                        const isFocused = focusedIndex === index;
                         return (
-                            <li key={version.id}>
-                                <div className={`w-full text-left p-1 rounded-md transition-colors flex items-center justify-between ${isA || isB ? 'bg-primary/5' : 'hover:bg-border-color/20'}`}>
+                            <li key={version.id} data-index={index}>
+                                <div 
+                                    onClick={() => setFocusedIndex(index)}
+                                    className={`w-full text-left p-1 rounded-md transition-colors flex items-center justify-between cursor-pointer relative ${
+                                        isA || isB ? 'bg-primary/5' : 'hover:bg-border-color/20'
+                                    }`}
+                                >
                                     <div className="flex items-center gap-2">
                                         <input
                                           type="checkbox"
@@ -141,6 +181,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                                           checked={selectedVersionIds.has(version.version_id)}
                                           onChange={() => handleToggleVersionSelection(version.version_id)}
                                           disabled={version.version_id === -1}
+                                          onClick={(e) => e.stopPropagation()} // Prevent row click from firing
                                         />
                                         <div>
                                             <span className="block text-[11px] font-medium text-text-main">{formatDate(version.createdAt)}</span>
@@ -159,6 +200,9 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                                           className={`w-4 h-4 text-[10px] rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isB ? 'bg-destructive-bg text-destructive-text focus:ring-destructive-text' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
                                         >B</button>
                                     </div>
+                                    {isFocused && (
+                                        <div className="absolute inset-0 ring-1 ring-primary pointer-events-none rounded-md"></div>
+                                    )}
                                 </div>
                             </li>
                         );
@@ -174,16 +218,16 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                     <div>
                         <h3 className="text-xs font-semibold">Comparison</h3>
                         <p className="text-[11px] text-text-secondary">
-                           Comparing version from <span className="font-semibold text-text-main">{formatDate(newerVersion.createdAt)}</span> with <span className="font-semibold text-text-main">{olderVersion ? formatDate(olderVersion.createdAt) : 'None'}</span>
+                           Comparing A (<span className="font-semibold text-text-main">{formatDate(newerVersion.createdAt)}</span>) with B (<span className="font-semibold text-text-main">{olderVersion ? formatDate(olderVersion.createdAt) : 'None'}</span>)
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Newer Version Content"} size="sm">
+                        <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Selected Version"} size="sm">
                             {isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}
                         </IconButton>
-                        <Button onClick={() => { addLog('INFO', `User action: Restore version for document "${document.title}".`); onRestore(newerVersion.content); }} disabled={newerVersion.version_id === -1} variant="secondary" className="px-1.5 py-0.5 text-[11px]">
+                        <Button onClick={() => { addLog('INFO', `User action: Restore version for document "${document.title}".`); onRestore(focusedVersion.content); }} disabled={focusedIndex === 0} variant="secondary" className="px-1.5 py-0.5 text-[11px]">
                             <UndoIcon className="w-3 h-3 mr-1.5"/>
-                            Restore Newer Version
+                            Restore Selected Version
                         </Button>
                     </div>
                 </div>
