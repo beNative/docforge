@@ -22,6 +22,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const { addLog } = useLogger();
   const listRef = useRef<HTMLUListElement>(null);
+  const [selectionAnchor, setSelectionAnchor] = useState<number | null>(null);
   
   const versionsWithCurrent = useMemo(() => {
     const historyVersions = versions.map(v => ({
@@ -105,12 +106,47 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowUp') {
+    const totalItems = versionsWithCurrent.length;
+    if (totalItems === 0) return;
+
+    if (e.key === ' ' || e.key === 'Spacebar') {
         e.preventDefault();
-        setFocusedIndex(prev => Math.max(0, prev - 1));
-    } else if (e.key === 'ArrowDown') {
+        const focused = versionsWithCurrent[focusedIndex];
+        if (focused) {
+            handleToggleVersionSelection(focused.version_id);
+        }
+        return;
+    }
+
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
-        setFocusedIndex(prev => Math.min(versionsWithCurrent.length - 1, prev + 1));
+        const direction = e.key === 'ArrowUp' ? -1 : 1;
+        const newIndex = Math.max(0, Math.min(totalItems - 1, focusedIndex + direction));
+
+        if (newIndex === focusedIndex) return;
+
+        if (e.shiftKey) {
+            const anchor = selectionAnchor ?? focusedIndex;
+            if (selectionAnchor === null) {
+              setSelectionAnchor(focusedIndex);
+            }
+
+            const start = Math.min(anchor, newIndex);
+            const end = Math.max(anchor, newIndex);
+
+            const newSelectedIds = new Set<number>();
+            for (let i = start; i <= end; i++) {
+                const version = versionsWithCurrent[i];
+                if (version && version.version_id !== -1) {
+                    newSelectedIds.add(version.version_id);
+                }
+            }
+            setSelectedVersionIds(newSelectedIds);
+        } else {
+            setSelectionAnchor(newIndex);
+        }
+
+        setFocusedIndex(newIndex);
     }
   };
 
@@ -169,7 +205,10 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         return (
                             <li key={version.id} data-index={index}>
                                 <div 
-                                    onClick={() => setFocusedIndex(index)}
+                                    onClick={() => {
+                                      setFocusedIndex(index);
+                                      setSelectionAnchor(index);
+                                    }}
                                     className={`w-full text-left p-1 rounded-md transition-colors flex items-center justify-between cursor-pointer relative ${
                                         isA || isB ? 'bg-primary/5' : 'hover:bg-border-color/20'
                                     }`}
