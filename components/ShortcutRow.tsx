@@ -71,7 +71,7 @@ export const ShortcutRow: React.FC<ShortcutRowProps> = ({ command, commands, set
           <>
             <div className="flex items-center gap-1.5 h-8">
               {effectiveShortcut && effectiveShortcut.length > 0 ? (
-                effectiveShortcut.map(key => <Keycap key={key}>{formatShortcutForDisplay([key])}</Keycap>)
+                <Keycap>{formatShortcutForDisplay(effectiveShortcut)}</Keycap>
               ) : (
                 <span className="text-xs text-text-secondary px-2">Not set</span>
               )}

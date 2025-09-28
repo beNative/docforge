@@ -21,21 +21,33 @@ export const formatShortcut = (e: KeyboardEvent): string => {
 };
 
 /**
- * Formats an array of keys into a user-friendly display string.
- * e.g., ["Ctrl", "N"] -> "Ctrl + N"
+ * Formats an array of keys into a user-friendly, compact display string.
+ * e.g., ["Control", "N"] -> "Ctrl+N"
  */
 export const formatShortcutForDisplay = (keys: string[]): string => {
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    return keys.map(key => {
+    const formattedKeys = keys.map(key => {
         if (isMac) {
-            if (key === 'Ctrl') return '⌃';
-            if (key === 'Meta') return '⌘';
-            if (key === 'Alt') return '⌥';
-            if (key === 'Shift') return '⇧';
+            switch (key) {
+                case 'Control': return '⌃';
+                case 'Meta': return '⌘';
+                case 'Alt': return '⌥';
+                case 'Shift': return '⇧';
+                default: return key.toUpperCase();
+            }
+        } else {
+            switch (key) {
+                case 'Control': return 'Ctrl';
+                case 'Meta': return 'Win';
+                case 'Alt': return 'Alt';
+                case 'Shift': return 'Shift';
+                default: return key.toUpperCase();
+            }
         }
-        return key;
-    }).join(' + ');
+    });
+    return formattedKeys.join('+');
 };
+
 
 /**
  * Builds a map from a shortcut string to a Command object.

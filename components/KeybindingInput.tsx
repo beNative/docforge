@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Command } from '../types';
-import { formatShortcut } from '../services/shortcutService';
+import { formatShortcutForDisplay } from '../services/shortcutService';
 import { XIcon } from './Icons';
 import IconButton from './IconButton';
 
@@ -63,7 +63,7 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
             className={`flex items-center h-8 px-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${conflict ? 'border-destructive-border' : 'border-border-color'}`}
             >
                 <span className="text-text-secondary">
-                    {keys.length > 0 ? keys.join(' + ') : 'Press desired keys...'}
+                    {keys.length > 0 ? formatShortcutForDisplay(keys) : 'Press desired keys...'}
                 </span>
             </div>
             <IconButton onClick={onCancel} tooltip="Cancel" size="sm" variant="ghost">
