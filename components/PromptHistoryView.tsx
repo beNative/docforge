@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { DocumentOrFolder } from '../types';
 import { useDocumentHistory } from '../hooks/usePromptHistory';
 import Button from './Button';
@@ -14,6 +14,10 @@ interface DocumentHistoryViewProps {
   onRestore: (content: string) => void;
 }
 
+const MIN_VERSIONS_PANEL_WIDTH = 240;
+const MIN_COMPARISON_PANEL_WIDTH = 300;
+const DEFAULT_VERSIONS_PANEL_WIDTH = 320;
+
 const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onBackToEditor, onRestore }) => {
   const { versions, deleteVersions } = useDocumentHistory(document.id);
   const [isCopied, setIsCopied] = useState(false);
@@ -23,6 +27,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const { addLog } = useLogger();
   const listRef = useRef<HTMLUListElement>(null);
   const [selectionAnchor, setSelectionAnchor] = useState<number | null>(null);
+  const [versionsPanelWidth, setVersionsPanelWidth] = useState(DEFAULT_VERSIONS_PANEL_WIDTH);
+  const isResizing = useRef(false);
   
   const versionsWithCurrent = useMemo(() => {
     const historyVersions = versions.map(v => ({
@@ -50,9 +56,46 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const [compareBIndex, setCompareBIndex] = useState(versionsWithCurrent.length > 1 ? 1 : 0);
 
   useEffect(() => {
-    // Reset focus if versions change (e.g., after deletion)
     setFocusedIndex(0);
   }, [versions]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    // Fix: Explicitly use `window.document` to avoid shadowing by the `document` prop.
+    window.document.body.style.cursor = 'col-resize';
+    // Fix: Explicitly use `window.document` to avoid shadowing by the `document` prop.
+    window.document.body.style.userSelect = 'none';
+  }, []);
+
+  const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
+      if (!isResizing.current) return;
+
+      const newWidth = e.clientX;
+      const maxWidth = window.innerWidth - MIN_COMPARISON_PANEL_WIDTH;
+      const clampedWidth = Math.max(MIN_VERSIONS_PANEL_WIDTH, Math.min(newWidth, maxWidth));
+      setVersionsPanelWidth(clampedWidth);
+  }, []);
+  
+  const handleGlobalMouseUp = useCallback(() => {
+      if (isResizing.current) {
+          isResizing.current = false;
+          // Fix: Explicitly use `window.document` to avoid shadowing by the `document` prop.
+          window.document.body.style.cursor = 'default';
+          // Fix: Explicitly use `window.document` to avoid shadowing by the `document` prop.
+          window.document.body.style.userSelect = 'auto';
+      }
+  }, []);
+
+  useEffect(() => {
+      window.addEventListener('mousemove', handleGlobalMouseMove);
+      window.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => {
+          window.removeEventListener('mousemove', handleGlobalMouseMove);
+          window.removeEventListener('mouseup', handleGlobalMouseUp);
+      };
+  }, [handleGlobalMouseMove, handleGlobalMouseUp]);
+
 
   const { newerVersion, olderVersion } = useMemo(() => {
     const newerIdx = Math.min(compareAIndex, compareBIndex);
@@ -85,7 +128,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   };
 
   const handleToggleVersionSelection = (versionId: number) => {
-    if (versionId === -1) return; // Cannot select 'Current' for deletion
+    if (versionId === -1) return;
     setSelectedVersionIds(prev => {
         const newSet = new Set(prev);
         if (newSet.has(versionId)) {
@@ -100,7 +143,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const handleDeleteSelected = async () => {
     await deleteVersions(Array.from(selectedVersionIds));
     setSelectedVersionIds(new Set());
-    setCompareAIndex(0); // Reset comparison to current
+    setCompareAIndex(0);
     setCompareBIndex(versionsWithCurrent.length > 1 ? 1 : 0);
     setIsConfirmingDelete(false);
   };
@@ -158,7 +201,6 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
     });
   }, [focusedIndex]);
   
-  // Auto-focus the list for keyboard navigation when the view mounts
   useEffect(() => {
     setTimeout(() => {
         listRef.current?.focus();
@@ -180,77 +222,79 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
             </div>
         </header>
 
-        <div className="flex-1 flex gap-4 overflow-hidden bg-secondary">
-            <aside className="w-1/3 max-w-sm border-r border-border-color p-4 flex flex-col">
-                <div className="flex justify-between items-center mb-1.5 flex-shrink-0 h-7">
-                    <h3 className="text-xs font-semibold px-1.5">Versions</h3>
-                    <Button 
-                        variant="destructive"
-                        className="px-1.5 py-0.5 text-[11px]"
-                        disabled={selectedVersionIds.size === 0}
-                        onClick={() => {
-                            addLog('INFO', `User action: Delete ${selectedVersionIds.size} version(s) for document "${document.title}".`);
-                            setIsConfirmingDelete(true);
-                        }}
-                    >
-                       <TrashIcon className="w-3 h-3 mr-1" />
-                       Delete ({selectedVersionIds.size})
-                    </Button>
-                </div>
-                <ul ref={listRef} onKeyDown={handleKeyDown} tabIndex={0} className="space-y-1 overflow-y-auto -mr-2 pr-2 focus:outline-none">
-                    {versionsWithCurrent.map((version, index) => {
-                        const isA = compareAIndex === index;
-                        const isB = compareBIndex === index;
-                        const isFocused = focusedIndex === index;
-                        return (
-                            <li key={version.id} data-index={index}>
-                                <div 
-                                    onClick={() => {
-                                      setFocusedIndex(index);
-                                      setSelectionAnchor(index);
-                                    }}
-                                    className={`w-full text-left p-1 rounded-md transition-colors flex items-center justify-between cursor-pointer relative ${
-                                        isA || isB ? 'bg-primary/5' : isFocused ? 'bg-border-color/30' : 'hover:bg-border-color/20'
-                                    }`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                          type="checkbox"
-                                          className="form-checkbox h-3 w-3 rounded-sm text-primary bg-background border-border-color focus:ring-primary disabled:opacity-50"
-                                          checked={selectedVersionIds.has(version.version_id)}
-                                          onChange={() => handleToggleVersionSelection(version.version_id)}
-                                          disabled={version.version_id === -1}
-                                          onClick={(e) => e.stopPropagation()} // Prevent row click from firing
-                                        />
-                                        <div>
-                                            <span className="block text-[11px] font-medium text-text-main">{formatDate(version.createdAt)}</span>
-                                            <span className="text-[10px] text-text-secondary">{index === 0 ? '(Current Version)' : `Version ${versionsWithCurrent.length - 1 - index}`}</span>
+        <div className="flex-1 flex overflow-hidden bg-secondary">
+            <aside style={{ width: `${versionsPanelWidth}px` }} className="flex flex-col flex-shrink-0">
+                <div className="p-4 flex flex-col flex-1 overflow-hidden h-full">
+                    <div className="flex justify-between items-center mb-1.5 flex-shrink-0 h-7">
+                        <h3 className="text-xs font-semibold px-1.5">Versions</h3>
+                        <Button 
+                            variant="destructive"
+                            className="px-1.5 py-0.5 text-[11px]"
+                            disabled={selectedVersionIds.size === 0}
+                            onClick={() => {
+                                addLog('INFO', `User action: Delete ${selectedVersionIds.size} version(s) for document "${document.title}".`);
+                                setIsConfirmingDelete(true);
+                            }}
+                        >
+                        <TrashIcon className="w-3 h-3 mr-1" />
+                        Delete ({selectedVersionIds.size})
+                        </Button>
+                    </div>
+                    <ul ref={listRef} onKeyDown={handleKeyDown} tabIndex={0} className="space-y-1 overflow-y-auto -mr-2 pr-2 focus:outline-none flex-1">
+                        {versionsWithCurrent.map((version, index) => {
+                            const isA = compareAIndex === index;
+                            const isB = compareBIndex === index;
+                            const isFocused = focusedIndex === index;
+                            return (
+                                <li key={version.id} data-index={index}>
+                                    <div 
+                                        onClick={() => {
+                                        setFocusedIndex(index);
+                                        setSelectionAnchor(index);
+                                        }}
+                                        className={`w-full text-left p-1 rounded-md transition-colors flex items-center justify-between cursor-pointer relative ${
+                                            isA || isB ? 'bg-primary/5' : isFocused ? 'bg-border-color/30' : 'hover:bg-border-color/20'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                            type="checkbox"
+                                            className="form-checkbox h-3 w-3 rounded-sm text-primary bg-background border-border-color focus:ring-primary disabled:opacity-50"
+                                            checked={selectedVersionIds.has(version.version_id)}
+                                            onChange={() => handleToggleVersionSelection(version.version_id)}
+                                            disabled={version.version_id === -1}
+                                            onClick={(e) => e.stopPropagation()}
+                                            />
+                                            <div>
+                                                <span className="block text-[11px] font-medium text-text-main">{formatDate(version.createdAt)}</span>
+                                                <span className="text-[10px] text-text-secondary">{index === 0 ? '(Current Version)' : `Version ${versionsWithCurrent.length - 1 - index}`}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button 
+                                            onClick={() => compareBIndex !== index && setCompareAIndex(index)} 
+                                            title="Set as 'A' for comparison"
+                                            className={`w-4 h-4 text-[10px] rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isA ? 'bg-primary text-primary-text focus:ring-primary' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
+                                            >A</button>
+                                            <button 
+                                            onClick={() => compareAIndex !== index && setCompareBIndex(index)} 
+                                            title="Set as 'B' for comparison"
+                                            className={`w-4 h-4 text-[10px] rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isB ? 'bg-destructive-bg text-destructive-text focus:ring-destructive-text' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
+                                            >B</button>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-1">
-                                        <button 
-                                          onClick={() => compareBIndex !== index && setCompareAIndex(index)} 
-                                          title="Set as 'A' for comparison"
-                                          className={`w-4 h-4 text-[10px] rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isA ? 'bg-primary text-primary-text focus:ring-primary' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
-                                        >A</button>
-                                        <button 
-                                          onClick={() => compareAIndex !== index && setCompareBIndex(index)} 
-                                          title="Set as 'B' for comparison"
-                                          className={`w-4 h-4 text-[10px] rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isB ? 'bg-destructive-bg text-destructive-text focus:ring-destructive-text' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
-                                        >B</button>
-                                    </div>
-                                </div>
-                            </li>
-                        );
-                    })}
-                     {versionsWithCurrent.length <= 1 && (
-                        <li className="text-xs text-text-secondary p-2 text-center">No history found.</li>
-                    )}
-                </ul>
+                                </li>
+                            );
+                        })}
+                        {versionsWithCurrent.length <= 1 && (
+                            <li className="text-xs text-text-secondary p-2 text-center">No history found.</li>
+                        )}
+                    </ul>
+                </div>
             </aside>
-
+            <div onMouseDown={handleMouseDown} className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200" />
             <main className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex justify-between items-center mb-1.5 flex-shrink-0 h-7">
+                <div className="flex justify-between items-center flex-shrink-0 h-7 px-4">
                     <div>
                         <h3 className="text-xs font-semibold">Comparison</h3>
                         <p className="text-[11px] text-text-secondary">
