@@ -202,9 +202,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
-      <div className="flex justify-between items-center px-4 py-3 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
+      <div className="flex justify-between items-center px-4 py-2 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-lg font-semibold text-text-main focus:outline-none w-full truncate"/>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate"/>
             {supportsAiTools && (
               <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl} tooltip="Regenerate Title with AI" size="xs" variant="ghost" className="flex-shrink-0">
                 {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-4 h-4 text-primary" />}
