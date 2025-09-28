@@ -653,10 +653,16 @@ const MainApp: React.FC = () => {
         const firstSelectedNode = nodeId ? items.find(i => i.id === nodeId) : null;
         const parentIdForNewItem = firstSelectedNode?.type === 'folder' ? firstSelectedNode.id : firstSelectedNode?.parentId ?? null;
         
+        const newFromTemplateAction = () => {
+            addLog('INFO', 'Context Menu: New Document from Template.');
+            setCreateFromTemplateOpen(true);
+        };
+
         if (nodeId) { // Clicked on an item
             menuItems.push(
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem) },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem) },
+                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction },
                 { type: 'separator' },
                 { label: 'Rename', icon: PencilIcon, action: () => setRenamingNodeId(nodeId), disabled: currentSelection.size !== 1 },
                 { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0 },
@@ -668,7 +674,8 @@ const MainApp: React.FC = () => {
         } else { // Clicked on empty space
              menuItems.push(
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null) },
-                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null) }
+                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null) },
+                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction }
             );
         }
 
@@ -933,7 +940,9 @@ const MainApp: React.FC = () => {
                                 </section>
                             </>
                         ) : (
-                            renderMainContent()
+                            <section className="flex-1 flex flex-col overflow-hidden bg-background">
+                                {renderMainContent()}
+                            </section>
                         )}
                     </main>
                     <LoggerPanel 
