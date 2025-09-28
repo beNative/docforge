@@ -1,24 +1,18 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { DocumentOrFolder, Settings } from '../types';
+import type { DocumentOrFolder, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, UndoIcon, RedoIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon } from './Icons';
+import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
-import { useHistoryState } from '../hooks/useHistoryState';
 import IconButton from './IconButton';
 import Button from './Button';
-import CodeEditor from './CodeEditor';
+import MonacoEditor from './CodeEditor'; // Renamed in spirit, using existing file
+import PreviewPane from './PreviewPane';
 import { SUPPORTED_LANGUAGES } from '../services/languageService';
 
-// Let TypeScript know Prism and marked are available on the window
-declare const Prism: any;
-declare const marked: any;
-
-type ViewMode = 'edit' | 'preview' | 'split-vertical' | 'split-horizontal';
-
 interface DocumentEditorProps {
-  document: DocumentOrFolder;
+  documentNode: DocumentOrFolder;
   onSave: (prompt: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => void;
   onCommitVersion: (content: string) => void;
   onDelete: (id: string) => void;
@@ -27,85 +21,9 @@ interface DocumentEditorProps {
   onLanguageChange: (language: string) => void;
 }
 
-// =================================================================================
-// Sub-components moved outside to prevent re-mounting and focus loss on re-render
-// =================================================================================
-
-interface EditorPaneProps {
-    content: string;
-    setContent: (newState: string | ((prevState: string) => string)) => void;
-    undo: () => void;
-    redo: () => void;
-}
-
-const EditorPane: React.FC<EditorPaneProps> = ({ content, setContent, undo, redo }) => {
-    const editorRef = useRef<HTMLTextAreaElement>(null);
-    const preRef = useRef<HTMLPreElement>(null);
-
-    const highlightedContent = useMemo(() => {
-        if (typeof Prism === 'undefined' || !Prism.languages.markdown) {
-            return content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-        return Prism.highlight(content + '\n', Prism.languages.markdown, 'markdown');
-    }, [content]);
-
-    const syncScroll = () => {
-        if (editorRef.current && preRef.current) {
-            preRef.current.scrollTop = editorRef.current.scrollTop;
-            preRef.current.scrollLeft = editorRef.current.scrollLeft;
-        }
-    };
-
-    const handleContentKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-        const isUndo = (isMac ? e.metaKey : e.ctrlKey) && !e.shiftKey && e.key === 'z';
-        const isRedo = (isMac ? e.metaKey && e.shiftKey && e.key === 'z' : e.ctrlKey && e.key === 'y');
-
-        if (isUndo) { e.preventDefault(); undo(); }
-        if (isRedo) { e.preventDefault(); redo(); }
-    };
-    
-    return (
-        <div 
-            className="editor-container relative w-full h-full focus-within:ring-2 focus-within:ring-primary"
-            data-placeholder={!content ? "Enter your document content here..." : ""}
-        >
-            <textarea
-                ref={editorRef}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                onKeyDown={handleContentKeyDown}
-                onScroll={syncScroll}
-                spellCheck="false"
-                className="absolute inset-0 p-6 w-full h-full bg-transparent text-transparent caret-primary resize-none font-mono text-base focus:outline-none z-10 whitespace-pre-wrap break-words"
-            />
-            <pre 
-                ref={preRef}
-                aria-hidden="true" 
-                className="absolute inset-0 p-6 w-full h-full overflow-auto pointer-events-none font-mono text-base whitespace-pre-wrap break-words"
-            >
-                <code className="language-markdown" dangerouslySetInnerHTML={{ __html: highlightedContent }} />
-            </pre>
-        </div>
-    );
-};
-
-const PreviewPane: React.FC<{ renderedPreviewHtml: string }> = React.memo(({ renderedPreviewHtml }) => (
-    <div className="w-full h-full p-6 overflow-auto">
-        <div 
-            className="markdown-content text-text-secondary" 
-            dangerouslySetInnerHTML={{ __html: renderedPreviewHtml }}
-        />
-    </div>
-));
-
-// =================================================================================
-// Main DocumentEditor Component
-// =================================================================================
-
-const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange }) => {
-  const [title, setTitle] = useState(document.title);
-  const { state: content, setState: setContent, undo, redo, canUndo, canRedo } = useHistoryState(document.content || '');
+const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange }) => {
+  const [title, setTitle] = useState(documentNode.title);
+  const [content, setContent] = useState(documentNode.content || '');
   
   const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,67 +32,58 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('edit');
-  const [splitSize, setSplitSize] = useState(50); // For resizable panes, in percentage
+  const [splitSize, setSplitSize] = useState(50);
   const { addLog } = useLogger();
   
   const isResizing = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
+  const isContentInitialized = useRef(false);
 
-  const isCodeFile = document.doc_type === 'source_code';
-
-  // Reset content and view when the document ID or external content changes.
+  // Reset content and view when the document ID changes.
   useEffect(() => {
-    setContent(document.content || '', { history: 'replace' });
+    setContent(documentNode.content || '');
     setViewMode('edit');
     setSplitSize(50);
-  }, [document.id, document.content, setContent]);
+    isContentInitialized.current = true;
+  }, [documentNode.id]);
 
-  // Sync the title from props. This handles both new documents and external title changes (like AI generation)
-  // without resetting the editor's content.
   useEffect(() => {
-    setTitle(document.title);
-  }, [document.id, document.title]);
+    setTitle(documentNode.title);
+  }, [documentNode.id, documentNode.title]);
   
-  // Effect to detect unsaved content changes
   useEffect(() => {
-    setIsDirty(content !== document.content);
-  }, [content, document.content]);
+    // Only mark as dirty after the initial content has been loaded.
+    if (isContentInitialized.current) {
+        setIsDirty(content !== documentNode.content);
+    }
+  }, [content, documentNode.content]);
 
   // Debounced auto-save for title only
   useEffect(() => {
-    if (title === document.title) {
-      return;
-    }
+    if (title === documentNode.title) return;
     const handler = setTimeout(() => {
       onSave({ title });
     }, 500);
     return () => clearTimeout(handler);
-  }, [title, onSave, document.title]);
-  
-  const renderedPreviewHtml = useMemo(() => {
-    if (typeof marked === 'undefined' || !content) {
-        return '';
-    }
-    return marked.parse(content);
-  }, [content]);
+  }, [title, onSave, documentNode.title]);
 
   // --- Resizable Splitter Logic ---
   const handleSplitterMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
-    window.document.body.style.userSelect = 'none';
-    if (viewMode === 'split-vertical') {
-        window.document.body.style.cursor = 'col-resize';
-    } else {
-        window.document.body.style.cursor = 'row-resize';
-    }
+    // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
+    document.body.style.userSelect = 'none';
+    // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
+    document.body.style.cursor = viewMode === 'split-vertical' ? 'col-resize' : 'row-resize';
   };
 
   const handleGlobalMouseUp = useCallback(() => {
     isResizing.current = false;
-    window.document.body.style.userSelect = 'auto';
-    window.document.body.style.cursor = 'default';
+    // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
+    document.body.style.userSelect = 'auto';
+    // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
+    document.body.style.cursor = 'default';
   }, []);
 
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
@@ -182,25 +91,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
     
     const container = splitContainerRef.current;
     const rect = container.getBoundingClientRect();
-    let newSize;
-
-    if (viewMode === 'split-vertical') {
-        newSize = ((e.clientX - rect.left) / rect.width) * 100;
-    } else if (viewMode === 'split-horizontal') {
-        newSize = ((e.clientY - rect.top) / rect.height) * 100;
-    } else {
-        return;
-    }
+    const newSize = viewMode === 'split-vertical'
+        ? ((e.clientX - rect.left) / rect.width) * 100
+        : ((e.clientY - rect.top) / rect.height) * 100;
     
-    const clampedSize = Math.max(10, Math.min(90, newSize));
-
-    setSplitSize(clampedSize);
+    setSplitSize(Math.max(10, Math.min(90, newSize)));
   }, [viewMode]);
 
   useEffect(() => {
     window.addEventListener('mousemove', handleGlobalMouseMove);
     window.addEventListener('mouseup', handleGlobalMouseUp);
-
     return () => {
         window.removeEventListener('mousemove', handleGlobalMouseMove);
         window.removeEventListener('mouseup', handleGlobalMouseUp);
@@ -223,35 +123,22 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
       const result = await llmService.refineDocument(content, settings, addLog);
       setRefinedContent(result);
     } catch (e) {
-      if (e instanceof Error) {
-        setError(e.message);
-        addLog('ERROR', `AI refinement failed: ${e.message}`);
-      } else {
-        setError('An unknown error occurred.');
-        addLog('ERROR', 'AI refinement failed with an unknown error.');
-      }
+      const message = e instanceof Error ? e.message : 'An unknown error occurred.';
+      setError(message);
+      addLog('ERROR', `AI refinement failed: ${message}`);
     } finally {
       setIsRefining(false);
     }
   };
   
   const handleGenerateTitle = async () => {
-    if (!settings.llmProviderUrl || !settings.llmModelName || !content.trim()) {
-      addLog('WARNING', 'Cannot generate title because LLM is not configured or content is empty.');
-      return;
-    }
-    
+    if (!settings.llmProviderUrl || !settings.llmModelName || !content.trim()) return;
     setIsGeneratingTitle(true);
     setError(null);
     addLog('INFO', 'Attempting to generate title based on content.');
     try {
       const newTitle = await llmService.generateTitle(content, settings, addLog);
-      if (newTitle) {
-        setTitle(newTitle);
-        addLog('INFO', `Successfully generated title: "${newTitle}"`);
-      } else {
-        addLog('WARNING', 'AI returned an empty title.');
-      }
+      setTitle(newTitle);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(`Could not generate title: ${message}`);
@@ -263,83 +150,45 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
 
   const acceptRefinement = () => {
     if (refinedContent) {
-      setContent(refinedContent); // This pushes the new state to history
+      setContent(refinedContent);
       addLog('INFO', `AI refinement accepted for document: "${title}"`);
     }
     setRefinedContent(null);
   };
-
-  const discardRefinement = () => {
-    addLog('INFO', `AI refinement discarded for document: "${title}"`);
-    setRefinedContent(null);
-  }
   
-  const handleAcceptSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    acceptRefinement();
-  };
-
   const handleCopy = async () => {
     if (!content.trim()) return;
-    try {
-        await navigator.clipboard.writeText(content);
-        setIsCopied(true);
-        addLog('INFO', `Document content copied to clipboard.`);
-        setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-        addLog('ERROR', `Failed to copy to clipboard: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
+    await navigator.clipboard.writeText(content);
+    setIsCopied(true);
+    addLog('INFO', `Document content copied to clipboard.`);
+    setTimeout(() => setIsCopied(false), 2000);
   };
+
+  const language = documentNode.language_hint || 'plaintext';
+  const supportsAiTools = ['markdown', 'plaintext'].includes(language);
+  const supportsPreview = ['markdown', 'html'].includes(language);
   
   const renderContent = () => {
-    if (isCodeFile) {
-        return <CodeEditor content={content} language={document.language_hint || null} onChange={setContent} />;
-    }
-
-    const editorPaneProps = { content, setContent, undo, redo };
-    const previewPaneProps = { renderedPreviewHtml };
+    const editor = <MonacoEditor content={content} language={language} onChange={setContent} />;
+    const preview = <PreviewPane content={content} language={language} />;
     
     switch(viewMode) {
-        case 'edit':
-            return <EditorPane {...editorPaneProps} />;
-        case 'preview':
-            return <PreviewPane {...previewPaneProps} />;
+        case 'edit': return editor;
+        case 'preview': return supportsPreview ? preview : editor;
         case 'split-vertical':
             return (
-                <div 
-                    ref={splitContainerRef} 
-                    className="grid h-full"
-                    style={{ gridTemplateColumns: `${splitSize}% 0.375rem minmax(0, 1fr)` }}
-                >
-                    <div className="h-full overflow-hidden min-w-0">
-                        <EditorPane {...editorPaneProps} />
-                    </div>
-                    <div 
-                        onMouseDown={handleSplitterMouseDown}
-                        className="h-full bg-border-color/50 hover:bg-primary cursor-col-resize transition-colors"
-                    />
-                    <div className="h-full overflow-hidden min-w-0">
-                        <PreviewPane {...previewPaneProps} />
-                    </div>
+                <div ref={splitContainerRef} className="grid h-full" style={{ gridTemplateColumns: `${splitSize}% 1px minmax(0, 1fr)` }}>
+                    <div className="h-full overflow-hidden min-w-0">{editor}</div>
+                    <div onMouseDown={handleSplitterMouseDown} className="h-full bg-border-color/50 hover:bg-primary cursor-col-resize transition-colors"/>
+                    <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
                 </div>
             );
         case 'split-horizontal':
             return (
-                <div 
-                    ref={splitContainerRef} 
-                    className="grid w-full h-full"
-                    style={{ gridTemplateRows: `${splitSize}% 0.375rem minmax(0, 1fr)` }}
-                >
-                    <div className="w-full overflow-hidden min-h-0">
-                        <EditorPane {...editorPaneProps} />
-                    </div>
-                    <div
-                        onMouseDown={handleSplitterMouseDown}
-                        className="w-full bg-border-color/50 hover:bg-primary cursor-row-resize transition-colors"
-                    />
-                    <div className="w-full overflow-hidden min-h-0">
-                        <PreviewPane {...previewPaneProps} />
-                    </div>
+                <div ref={splitContainerRef} className="grid w-full h-full" style={{ gridTemplateRows: `${splitSize}% 1px minmax(0, 1fr)` }}>
+                    <div className="w-full overflow-hidden min-h-0">{editor}</div>
+                    <div onMouseDown={handleSplitterMouseDown} className="w-full bg-border-color/50 hover:bg-primary cursor-row-resize transition-colors"/>
+                    <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
                 </div>
             );
     }
@@ -349,130 +198,43 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
       <div className="flex justify-between items-center px-6 py-6 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={isGeneratingTitle ? "Generating title..." : "Document Title"}
-              disabled={isGeneratingTitle}
-              className="bg-transparent text-2xl font-semibold text-text-main focus:outline-none w-full truncate placeholder:text-text-secondary disabled:opacity-70"
-            />
-            {!isCodeFile && (
-              <IconButton
-                onClick={handleGenerateTitle}
-                disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl || !settings.llmModelName}
-                tooltip="Regenerate Title with AI"
-                size="sm"
-                variant="ghost"
-                className="flex-shrink-0"
-              >
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-2xl font-semibold text-text-main focus:outline-none w-full truncate"/>
+            {supportsAiTools && (
+              <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl} tooltip="Regenerate Title with AI" size="sm" variant="ghost" className="flex-shrink-0">
                 {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-5 h-5 text-primary" />}
               </IconButton>
             )}
-            {isDirty && !isGeneratingTitle && (
-                <div className="relative group flex-shrink-0">
-                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-md opacity-0 group-hover:opacity-100 transition-opacity delay-500 pointer-events-none">
-                        Unsaved changes
-                    </span>
-                </div>
-            )}
+            {isDirty && <div className="relative group flex-shrink-0"><div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div><span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-md opacity-0 group-hover:opacity-100">Unsaved changes</span></div>}
         </div>
         <div className="flex items-center gap-2">
-            {isCodeFile && (
-                <>
-                    <div className="flex items-center">
-                        <label htmlFor="language-select" className="text-sm font-medium text-text-secondary mr-2">Language:</label>
-                        <select
-                            id="language-select"
-                            value={document.language_hint || 'plaintext'}
-                            onChange={(e) => onLanguageChange(e.target.value)}
-                            className="bg-background text-text-main text-sm rounded-md py-1 pl-2 pr-7 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
-                            style={{ 
-                                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a3a3a3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, 
-                                backgroundPosition: 'right 0.2rem center', 
-                                backgroundRepeat: 'no-repeat', 
-                                backgroundSize: '1.2em 1.2em' 
-                            }}
-                        >
-                            {SUPPORTED_LANGUAGES.map(lang => (
-                                <option key={lang.id} value={lang.id}>{lang.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="h-6 w-px bg-border-color mx-1"></div>
-                </>
-            )}
-            {!isCodeFile && (
-              <>
-                <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
-                    <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "edit".'); setViewMode('edit'); }} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : 'text-text-secondary'}`} >
-                        <PencilIcon className="w-5 h-5" />
-                    </IconButton>
-                    <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "preview".'); setViewMode('preview'); }} tooltip="Preview Only" size="sm" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
-                        <EyeIcon className="w-5 h-5" />
-                    </IconButton>
-                    <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "split-vertical".'); setViewMode('split-vertical'); }} tooltip="Split Vertical" size="sm" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
-                        <LayoutVerticalIcon className="w-5 h-5" />
-                    </IconButton>
-                    <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "split-horizontal".'); setViewMode('split-horizontal'); }} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
-                        <LayoutHorizontalIcon className="w-5 h-5" />
-                    </IconButton>
-                </div>
-                <div className="h-6 w-px bg-border-color mx-1"></div>
-                <IconButton onClick={undo} disabled={!canUndo || viewMode === 'preview'} tooltip="Undo (Ctrl+Z)" size="sm" variant="ghost">
-                    <UndoIcon className="w-5 h-5" />
-                </IconButton>
-                <IconButton onClick={redo} disabled={!canRedo || viewMode === 'preview'} tooltip="Redo (Ctrl+Y)" size="sm" variant="ghost">
-                    <RedoIcon className="w-5 h-5" />
-                </IconButton>
-              </>
-            )}
-            
-            <IconButton onClick={() => { addLog('INFO', `User action: View version history for document "${document.title}".`); onShowHistory(); }} tooltip="View Version History" size="sm" variant="ghost">
-              <HistoryIcon className="w-5 h-5" />
-            </IconButton>
-            
+            <div className="flex items-center"><label htmlFor="language-select" className="text-sm font-medium text-text-secondary mr-2">Language:</label><select id="language-select" value={language} onChange={(e) => onLanguageChange(e.target.value)} className="bg-background text-text-main text-sm rounded-md py-1 pl-2 pr-7 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none" style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a3a3a3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.2rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.2em 1.2em' }}>{SUPPORTED_LANGUAGES.map(lang => (<option key={lang.id} value={lang.id}>{lang.label}</option>))}</select></div>
             <div className="h-6 w-px bg-border-color mx-1"></div>
-            
-            <IconButton onClick={handleManualSave} disabled={!isDirty || isRefining} tooltip="Save Version" size="sm" variant="ghost">
-                <SaveIcon className={`w-5 h-5 ${isDirty ? 'text-primary' : ''}`} />
-            </IconButton>
-            <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="sm" variant="ghost">
-              {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
-            </IconButton>
-            {!isCodeFile && (
-              <IconButton onClick={handleRefine} disabled={!content.trim() || viewMode === 'preview' || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">
-                  {isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}
-              </IconButton>
+            {supportsPreview && (
+              <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
+                  <IconButton onClick={() => setViewMode('edit')} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : ''}`}><PencilIcon className="w-5 h-5" /></IconButton>
+                  <IconButton onClick={() => setViewMode('preview')} tooltip="Preview Only" size="sm" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : ''}`}><EyeIcon className="w-5 h-5" /></IconButton>
+                  <IconButton onClick={() => setViewMode('split-vertical')} tooltip="Split Vertical" size="sm" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : ''}`}><LayoutVerticalIcon className="w-5 h-5" /></IconButton>
+                  <IconButton onClick={() => setViewMode('split-horizontal')} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-5 h-5" /></IconButton>
+              </div>
             )}
-            <IconButton onClick={() => onDelete(document.id)} tooltip="Delete Document" size="sm" variant="destructive">
-              <TrashIcon className="w-5 h-5" />
-            </IconButton>
+            <div className="h-6 w-px bg-border-color mx-1"></div>
+            <IconButton onClick={onShowHistory} tooltip="View Version History" size="sm" variant="ghost"><HistoryIcon className="w-5 h-5" /></IconButton>
+            <div className="h-6 w-px bg-border-color mx-1"></div>
+            <IconButton onClick={handleManualSave} disabled={!isDirty || isRefining} tooltip="Save Version" size="sm" variant="ghost"><SaveIcon className={`w-5 h-5 ${isDirty ? 'text-primary' : ''}`} /></IconButton>
+            <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="sm" variant="ghost">{isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}</IconButton>
+            {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining} tooltip="Refine with AI" size="sm" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-5 h-5 text-primary" />}</IconButton>)}
+            <IconButton onClick={() => onDelete(documentNode.id)} tooltip="Delete Document" size="sm" variant="destructive"><TrashIcon className="w-5 h-5" /></IconButton>
         </div>
       </div>
-
-      <div className="flex-1 flex flex-col bg-secondary overflow-hidden">
-        {renderContent()}
-        {error && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-destructive-text p-3 bg-destructive-bg rounded-md text-sm shadow-lg z-20">{error}</div>}
-      </div>
-      
+      <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>
+      {error && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-destructive-text p-3 bg-destructive-bg rounded-md shadow-lg z-20">{error}</div>}
       {refinedContent && (
-        <Modal onClose={discardRefinement} title="AI Refinement Suggestion" initialFocusRef={acceptButtonRef}>
-          <form onSubmit={handleAcceptSubmit}>
+        <Modal onClose={() => setRefinedContent(null)} title="AI Refinement Suggestion" initialFocusRef={acceptButtonRef}>
+          <form onSubmit={(e) => { e.preventDefault(); acceptRefinement(); }}>
             <div className="p-6 text-text-main">
-                <p className="text-text-secondary mb-4 text-sm">The AI suggests the following refinement. You can accept this change or discard it.</p>
-                <div className="p-3 my-4 bg-background border border-border-color rounded-md whitespace-pre-wrap font-mono text-sm max-h-96 overflow-y-auto">
-                    {refinedContent}
-                </div>
-                <div className="flex justify-end gap-3 mt-6">
-                    <Button onClick={discardRefinement} variant="secondary" type="button">
-                        Discard
-                    </Button>
-                    <Button ref={acceptButtonRef} type="submit" variant="primary">
-                        Accept
-                    </Button>
-                </div>
+                <p className="text-text-secondary mb-4 text-sm">The AI suggests the following refinement.</p>
+                <div className="p-3 my-4 bg-background border border-border-color rounded-md whitespace-pre-wrap font-mono text-sm max-h-96 overflow-y-auto">{refinedContent}</div>
+                <div className="flex justify-end gap-3 mt-6"><Button onClick={() => setRefinedContent(null)} variant="secondary" type="button">Discard</Button><Button ref={acceptButtonRef} type="submit" variant="primary">Accept</Button></div>
             </div>
           </form>
         </Modal>

@@ -867,7 +867,7 @@ const MainApp: React.FC = () => {
                 return (
                     <DocumentEditor 
                         key={activeNode.id}
-                        document={activeNode}
+                        documentNode={activeNode}
                         onSave={handleSaveDocumentTitle}
                         onCommitVersion={handleCommitVersion}
                         onDelete={handleDeleteNode}

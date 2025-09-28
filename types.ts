@@ -49,6 +49,7 @@ declare global {
 
 export type NodeType = 'folder' | 'document';
 export type DocType = 'prompt' | 'source_code';
+export type ViewMode = 'edit' | 'preview' | 'split-vertical' | 'split-horizontal';
 
 export interface Node {
   node_id: string;
