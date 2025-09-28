@@ -58,12 +58,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
       className="fixed z-50 w-56 rounded-md bg-secondary p-1.5 shadow-2xl border border-border-color animate-fade-in-fast"
     >
       <ul className="space-y-1">
-        {/* Fix: Restructure to use an if/else block to help TypeScript correctly narrow the 'MenuItem' union type.
-            The early return pattern was not sufficient for the type checker in this case. */}
+        {/* Fix: Restructured the type guard to check for a property on the desired object type directly, which ensures proper type narrowing for the MenuItem union. */}
         {items.map((item, index) => {
-          if ('type' in item && item.type === 'separator') {
-            return <li key={`separator-${index}`} className="h-px bg-border-color my-1.5" />;
-          } else {
+          if ('label' in item) {
             const { label, action, icon: Icon, disabled, shortcut } = item;
 
             return (
@@ -81,6 +78,8 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
                 </button>
               </li>
             );
+          } else {
+            return <li key={`separator-${index}`} className="h-px bg-border-color my-1.5" />;
           }
         })}
       </ul>

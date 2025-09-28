@@ -48,6 +48,20 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ content, language, onChange }) 
 
     useEffect(() => {
         if (editorRef.current && typeof ((window as any).require) !== 'undefined') {
+            // Configure Monaco Environment to load workers from CDN. This is crucial for syntax highlighting.
+            if (!(window as any).MonacoEnvironment) {
+                (window as any).MonacoEnvironment = {
+                    getWorkerUrl: function (_moduleId: any, label: string) {
+                        const CDN_PATH = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs';
+                        if (label === 'json') return `${CDN_PATH}/language/json/json.worker.js`;
+                        if (label === 'css' || label === 'scss' || label === 'less') return `${CDN_PATH}/language/css/css.worker.js`;
+                        if (label === 'html' || label === 'handlebars' || label === 'razor') return `${CDN_PATH}/language/html/html.worker.js`;
+                        if (label === 'typescript' || label === 'javascript') return `${CDN_PATH}/language/typescript/ts.worker.js`;
+                        return `${CDN_PATH}/editor/editor.worker.js`;
+                    },
+                };
+            }
+
             (window as any).require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' }});
             (window as any).require(['vs/editor/editor.main'], () => {
                  if (editorRef.current) {
