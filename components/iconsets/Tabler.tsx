@@ -165,3 +165,13 @@ export const ExpandAllIcon: React.FC<IconProps> = ({ className }) => (
 export const CollapseAllIcon: React.FC<IconProps> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 14h6v6" /><path d="M4 20l6 -6" /><path d="M20 14h-6v6" /><path d="M14 20l6 -6" /><path d="M4 10h6v-6" /><path d="M4 4l6 6" /><path d="M20 10h-6v-6" /><path d="M14 4l6 6" /></svg>
 );
+{/* FIX: Add missing FormatIcon to resolve error in Icons.tsx. */}
+export const FormatIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}>
+        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+        <line x1="20" y1="6" x2="9" y2="6" />
+        <line x1="20" y1="12" x2="13" y2="12" />
+        <line x1="20" y1="18" x2="9" y2="18" />
+        <path d="M4 8l4 4l-4 4" />
+    </svg>
+);

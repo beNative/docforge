@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { useTheme } from '../hooks/useTheme';
 
 // Let TypeScript know monaco is available on the window
@@ -10,11 +10,21 @@ interface CodeEditorProps {
   onChange: (newContent: string) => void;
 }
 
-const CodeEditor: React.FC<CodeEditorProps> = ({ content, language, onChange }) => {
+export interface CodeEditorHandle {
+  format: () => void;
+}
+
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const { theme } = useTheme();
     const contentRef = useRef(content);
+
+    useImperativeHandle(ref, () => ({
+        format() {
+            monacoInstanceRef.current?.getAction('editor.action.formatDocument').run();
+        }
+    }));
 
     useEffect(() => {
         contentRef.current = content;
@@ -106,6 +116,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ content, language, onChange }) 
 
 
     return <div ref={editorRef} className="w-full h-full" />;
-};
+});
 
 export default CodeEditor;

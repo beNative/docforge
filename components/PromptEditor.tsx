@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { DocumentOrFolder, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon } from './Icons';
+import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
 import IconButton from './IconButton';
 import Button from './Button';
-import MonacoEditor from './CodeEditor'; // Renamed in spirit, using existing file
+import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
 import PreviewPane from './PreviewPane';
 import { SUPPORTED_LANGUAGES } from '../services/languageService';
 
@@ -20,9 +20,10 @@ interface DocumentEditorProps {
   onShowHistory: () => void;
   onLanguageChange: (language: string) => void;
   onViewModeChange: (mode: ViewMode) => void;
+  formatTrigger: number;
 }
 
-const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange, onViewModeChange }) => {
+const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange, onViewModeChange, formatTrigger }) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
   
@@ -40,6 +41,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
   const isContentInitialized = useRef(false);
+  const editorRef = useRef<CodeEditorHandle>(null);
+  const isInitialMount = useRef(true);
 
   // Reset content and view when the document changes.
   useEffect(() => {
@@ -68,6 +71,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     }, 500);
     return () => clearTimeout(handler);
   }, [title, onSave, documentNode.title]);
+  
+  // Triggered by command palette
+  useEffect(() => {
+    if (isInitialMount.current) {
+        isInitialMount.current = false;
+        return;
+    }
+    if (formatTrigger > 0) {
+        editorRef.current?.format();
+    }
+  }, [formatTrigger]);
 
   // --- Resizable Splitter Logic ---
   const handleSplitterMouseDown = (e: React.MouseEvent) => {
@@ -119,6 +133,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const handleViewModeButton = (newMode: ViewMode) => {
     setViewMode(newMode);
     onViewModeChange(newMode);
+  };
+  
+  const handleFormatDocument = () => {
+    editorRef.current?.format();
   };
 
   const handleRefine = async () => {
@@ -173,9 +191,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const language = documentNode.language_hint || 'plaintext';
   const supportsAiTools = ['markdown', 'plaintext'].includes(language);
   const supportsPreview = ['markdown', 'html'].includes(language);
+  const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(language);
   
   const renderContent = () => {
-    const editor = <MonacoEditor content={content} language={language} onChange={setContent} />;
+    const editor = <MonacoEditor ref={editorRef} content={content} language={language} onChange={setContent} />;
     const preview = <PreviewPane content={content} language={language} />;
     
     switch(viewMode) {
@@ -224,6 +243,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
               </div>
             )}
             <div className="h-5 w-px bg-border-color mx-1"></div>
+            {supportsFormatting && (
+              <IconButton onClick={handleFormatDocument} tooltip="Format Document" size="xs" variant="ghost">
+                <FormatIcon className="w-4 h-4" />
+              </IconButton>
+            )}
             <IconButton onClick={onShowHistory} tooltip="View Version History" size="xs" variant="ghost"><HistoryIcon className="w-4 h-4" /></IconButton>
             <div className="h-5 w-px bg-border-color mx-1"></div>
             <IconButton onClick={handleManualSave} disabled={!isDirty || isRefining} tooltip="Save Version" size="xs" variant="ghost"><SaveIcon className={`w-4 h-4 ${isDirty ? 'text-primary' : ''}`} /></IconButton>

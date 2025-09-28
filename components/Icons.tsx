@@ -350,6 +350,7 @@ export const PencilIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.PencilIcon {...props} />;
         case 'feather': return <FeatherIcons.PencilIcon {...props} />;
         case 'tabler': return <TablerIcons.PencilIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.PencilIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.PencilIcon {...props} />;
     }
@@ -361,6 +362,7 @@ export const RefreshIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.RefreshIcon {...props} />;
         case 'feather': return <FeatherIcons.RefreshIcon {...props} />;
         case 'tabler': return <TablerIcons.RefreshIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.RefreshIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.RefreshIcon {...props} />;
     }
@@ -372,6 +374,7 @@ export const LayoutHorizontalIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.LayoutHorizontalIcon {...props} />;
         case 'feather': return <FeatherIcons.LayoutHorizontalIcon {...props} />;
         case 'tabler': return <TablerIcons.LayoutHorizontalIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.LayoutHorizontalIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.LayoutHorizontalIcon {...props} />;
     }
@@ -383,6 +386,7 @@ export const LayoutVerticalIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.LayoutVerticalIcon {...props} />;
         case 'feather': return <FeatherIcons.LayoutVerticalIcon {...props} />;
         case 'tabler': return <TablerIcons.LayoutVerticalIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.LayoutVerticalIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.LayoutVerticalIcon {...props} />;
     }
@@ -394,6 +398,7 @@ export const MinimizeIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.MinimizeIcon {...props} />;
         case 'feather': return <FeatherIcons.MinimizeIcon {...props} />;
         case 'tabler': return <TablerIcons.MinimizeIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.MinimizeIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.MinimizeIcon {...props} />;
     }
@@ -405,6 +410,7 @@ export const MaximizeIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.MaximizeIcon {...props} />;
         case 'feather': return <FeatherIcons.MaximizeIcon {...props} />;
         case 'tabler': return <TablerIcons.MaximizeIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.MaximizeIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.MaximizeIcon {...props} />;
     }
@@ -416,6 +422,7 @@ export const RestoreIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.RestoreIcon {...props} />;
         case 'feather': return <FeatherIcons.RestoreIcon {...props} />;
         case 'tabler': return <TablerIcons.RestoreIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.RestoreIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.RestoreIcon {...props} />;
     }
@@ -432,6 +439,7 @@ export const WarningIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.WarningIcon {...props} />;
         case 'feather': return <FeatherIcons.WarningIcon {...props} />;
         case 'tabler': return <TablerIcons.WarningIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.WarningIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.WarningIcon {...props} />;
     }
@@ -443,6 +451,7 @@ export const DatabaseIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.DatabaseIcon {...props} />;
         case 'feather': return <FeatherIcons.DatabaseIcon {...props} />;
         case 'tabler': return <TablerIcons.DatabaseIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.DatabaseIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.DatabaseIcon {...props} />;
     }
@@ -454,6 +463,7 @@ export const SaveIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.SaveIcon {...props} />;
         case 'feather': return <FeatherIcons.SaveIcon {...props} />;
         case 'tabler': return <TablerIcons.SaveIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.SaveIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.SaveIcon {...props} />;
     }
@@ -465,6 +475,7 @@ export const ExpandAllIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.ExpandAllIcon {...props} />;
         case 'feather': return <FeatherIcons.ExpandAllIcon {...props} />;
         case 'tabler': return <TablerIcons.ExpandAllIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.ExpandAllIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.MaximizeIcon {...props} />;
     }
@@ -476,7 +487,21 @@ export const CollapseAllIcon: React.FC<IconProps> = (props) => {
         case 'lucide': return <LucideIcons.CollapseAllIcon {...props} />;
         case 'feather': return <FeatherIcons.CollapseAllIcon {...props} />;
         case 'tabler': return <TablerIcons.CollapseAllIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
         case 'material': return <MaterialIcons.CollapseAllIcon {...props} />;
         case 'heroicons': default: return <HeroIcons.RestoreIcon {...props} />;
+    }
+};
+
+export const FormatIcon: React.FC<IconProps> = (props) => {
+    const { iconSet } = useIconSet();
+    switch (iconSet) {
+        case 'lucide': return <LucideIcons.FormatIcon {...props} />;
+        case 'feather': return <FeatherIcons.FormatIcon {...props} />;
+        // FIX: Add missing case for TablerIcons to resolve "does not exist" error.
+        case 'tabler': return <TablerIcons.FormatIcon {...props} />;
+        // FIX: Add missing case for MaterialIcons to resolve "does not exist" error.
+        case 'material': return <MaterialIcons.FormatIcon {...props} />;
+        case 'heroicons': default: return <HeroIcons.FormatIcon {...props} />;
     }
 };

@@ -257,3 +257,12 @@ export const ExpandAllIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) =>
 export const CollapseAllIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
 );
+
+export const FormatIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <line x1="14" y1="6" x2="20" y2="6"/>
+      <line x1="14" y1="12" x2="20" y2="12"/>
+      <line x1="14" y1="18" x2="20" y2="18"/>
+      <polyline points="4 8 8 12 4 16"/>
+    </svg>
+);
