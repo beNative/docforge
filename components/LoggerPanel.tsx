@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import ReactDOM from 'react-dom';
 import { useLogger } from '../hooks/useLogger';
 import { LogLevel } from '../types';
 import { DownloadIcon, TrashIcon, ChevronDownIcon } from './Icons';
@@ -64,22 +63,21 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
     }
   };
   
-  const overlayRoot = document.getElementById('overlay-root');
-  if (!overlayRoot) return null;
+  if (!isVisible) {
+    return null;
+  }
 
-  const panelContent = (
+  return (
     <div
       style={{ height: `${height}px` }}
-      className={`fixed bottom-0 left-0 right-0 z-20 flex-col bg-secondary shadow-lg ${
-        isVisible ? 'flex' : 'hidden'
-      }`}
+      className="flex-shrink-0 flex flex-col bg-secondary shadow-lg border-t border-border-color"
       aria-hidden={!isVisible}
     >
       <div
         onMouseDown={onResizeStart}
-        className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200 absolute top-0"
+        className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
       />
-      <header className="flex items-center justify-between p-2 pt-3 border-b border-border-color flex-shrink-0">
+      <header className="flex items-center justify-between p-2 border-b border-border-color flex-shrink-0">
         <h3 className="font-semibold text-text-main px-2">Application Logs</h3>
         <div className="flex items-center gap-1">
           <span className="text-xs text-text-secondary mr-2">Filter:</span>
@@ -115,8 +113,6 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
       </div>
     </div>
   );
-
-  return ReactDOM.createPortal(panelContent, overlayRoot);
 };
 
 export default LoggerPanel;

@@ -928,8 +928,16 @@ const MainApp: React.FC = () => {
                             />
                         </>
                     )}
-                    <section className="flex-1 flex flex-col overflow-y-auto bg-background">
-                        {renderMainContent()}
+                    <section className="flex-1 flex flex-col overflow-hidden bg-background">
+                        <div className="flex-1 overflow-hidden relative">
+                            {renderMainContent()}
+                        </div>
+                        <LoggerPanel 
+                            isVisible={isLoggerVisible} 
+                            onToggleVisibility={() => setIsLoggerVisible(v => !v)}
+                            height={loggerPanelHeight}
+                            onResizeStart={handleLoggerMouseDown}
+                        />
                     </section>
                 </main>
                 <StatusBar 
@@ -947,12 +955,6 @@ const MainApp: React.FC = () => {
                 />
             </div>
             
-            <LoggerPanel 
-                isVisible={isLoggerVisible} 
-                onToggleVisibility={() => setIsLoggerVisible(v => !v)}
-                height={loggerPanelHeight}
-                onResizeStart={handleLoggerMouseDown}
-            />
             <CommandPalette 
                 isOpen={isCommandPaletteOpen} 
                 onClose={handleCloseCommandPalette}
