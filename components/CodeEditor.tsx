@@ -67,6 +67,11 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ content, language, onChange }) 
                             enabled: true,
                         },
                         wordWrap: 'on',
+                        folding: true,
+                        showFoldingControls: 'always',
+                        bracketPairColorization: {
+                            enabled: true,
+                        },
                     });
 
                     editorInstance.onDidChangeModelContent(() => {

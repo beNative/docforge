@@ -58,28 +58,30 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
       className="fixed z-50 w-56 rounded-md bg-secondary p-1.5 shadow-2xl border border-border-color animate-fade-in-fast"
     >
       <ul className="space-y-1">
+        {/* Fix: Restructure to use an if/else block to help TypeScript correctly narrow the 'MenuItem' union type.
+            The early return pattern was not sufficient for the type checker in this case. */}
         {items.map((item, index) => {
           if ('type' in item && item.type === 'separator') {
             return <li key={`separator-${index}`} className="h-px bg-border-color my-1.5" />;
-          }
-          
-          const { label, action, icon: Icon, disabled, shortcut } = item;
+          } else {
+            const { label, action, icon: Icon, disabled, shortcut } = item;
 
-          return (
-            <li key={label}>
-              <button
-                onClick={() => { if(!disabled) { action(); onClose(); } }}
-                disabled={disabled}
-                className="w-full flex items-center justify-between text-left px-3 py-2 text-sm rounded-md transition-colors text-text-main disabled:text-text-secondary/50 disabled:cursor-not-allowed hover:bg-primary hover:text-primary-text focus:bg-primary focus:text-primary-text focus:outline-none"
-              >
-                <div className="flex items-center gap-3">
-                  {Icon && <Icon className="w-4 h-4" />}
-                  <span>{label}</span>
-                </div>
-                {shortcut && <span className="text-xs text-text-secondary">{shortcut}</span>}
-              </button>
-            </li>
-          );
+            return (
+              <li key={label}>
+                <button
+                  onClick={() => { if(!disabled) { action(); onClose(); } }}
+                  disabled={disabled}
+                  className="w-full flex items-center justify-between text-left px-3 py-2 text-sm rounded-md transition-colors text-text-main disabled:text-text-secondary/50 disabled:cursor-not-allowed hover:bg-primary hover:text-primary-text focus:bg-primary focus:text-primary-text focus:outline-none"
+                >
+                  <div className="flex items-center gap-3">
+                    {Icon && <Icon className="w-4 h-4" />}
+                    <span>{label}</span>
+                  </div>
+                  {shortcut && <span className="text-xs text-text-secondary">{shortcut}</span>}
+                </button>
+              </li>
+            );
+          }
         })}
       </ul>
       <style>{`
