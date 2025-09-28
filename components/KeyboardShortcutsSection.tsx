@@ -136,7 +136,7 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
                 {hasAppResults && Object.entries(filteredAndGroupedCommands).map(([category, cmds]) => (
                     <div key={category}>
                         <h3 className="text-base font-semibold text-text-main mb-3">{category}</h3>
-                        <div className="space-y-1">
+                        <div>
                             {cmds.map(command => (
                                 <ShortcutRow
                                     key={command.id}
@@ -159,7 +159,7 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
                         {filteredEditorShortcuts.map(group => (
                             <div key={group.category}>
                                 <h3 className="text-base font-semibold text-text-main mb-3">{group.category}</h3>
-                                <div className="space-y-1">
+                                <div>
                                     {group.shortcuts.map(shortcut => (
                                         <ReadOnlyShortcutRow
                                             key={shortcut.description}
