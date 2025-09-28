@@ -103,7 +103,7 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
     };
     
     return (
-        <header className="draggable flex items-center justify-between h-8 flex-shrink-0 bg-secondary border-b border-border-color z-30 text-text-main">
+        <header className="draggable flex items-center justify-between h-7 flex-shrink-0 bg-secondary border-b border-border-color z-30 text-text-main">
             <div className={`flex items-center flex-1 ${platform === 'darwin' ? 'pl-20' : 'pl-2'}`}>
                 <TerminalIcon className="w-4 h-4 text-primary mr-2" />
                 <span className="font-semibold text-xs">DocForge</span>
