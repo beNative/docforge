@@ -1,7 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-// Fix: Import correct types. DocumentVersion is an alias for DocVersion now.
-import type { DocumentOrFolder, DocumentVersion as Version } from '../types';
-// Fix: Import the new standalone hook.
+import type { DocumentOrFolder } from '../types';
 import { useDocumentHistory } from '../hooks/usePromptHistory';
 import Button from './Button';
 import MonacoDiffEditor from './MonacoDiffEditor';
@@ -44,21 +42,23 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
       ...historyVersions
     ];
   }, [document, versions]);
+  
+  const [compareAIndex, setCompareAIndex] = useState(0);
+  const [compareBIndex, setCompareBIndex] = useState(versionsWithCurrent.length > 1 ? 1 : 0);
 
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(0);
-  const listRef = useRef<HTMLUListElement>(null);
+  const { newerVersion, olderVersion } = useMemo(() => {
+    const newerIdx = Math.min(compareAIndex, compareBIndex);
+    const olderIdx = Math.max(compareAIndex, compareBIndex);
+    return { 
+      newerVersion: versionsWithCurrent[newerIdx],
+      olderVersion: versionsWithCurrent[olderIdx] || null
+    };
+  }, [compareAIndex, compareBIndex, versionsWithCurrent]);
 
-  useEffect(() => {
-    listRef.current?.focus();
-  }, []);
-
-  const selectedVersion = versionsWithCurrent[selectedIndex];
-  const previousVersion = versionsWithCurrent[selectedIndex + 1];
-
-  const handleCopy = async (content: string) => {
+  const handleCopy = async () => {
+    if (!newerVersion) return;
     try {
-        await navigator.clipboard.writeText(content);
+        await navigator.clipboard.writeText(newerVersion.content);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
@@ -68,11 +68,14 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleString();
+    return date.toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
   };
 
   const handleToggleVersionSelection = (versionId: number) => {
-    if (versionId === -1) return;
+    if (versionId === -1) return; // Cannot select 'Current' for deletion
     setSelectedVersionIds(prev => {
         const newSet = new Set(prev);
         if (newSet.has(versionId)) {
@@ -87,154 +90,109 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const handleDeleteSelected = async () => {
     await deleteVersions(Array.from(selectedVersionIds));
     setSelectedVersionIds(new Set());
-    setSelectedIndex(0); // Reset selection to current after delete
-    setLastSelectedIndex(0);
+    setCompareAIndex(0); // Reset comparison to current
+    setCompareBIndex(versionsWithCurrent.length > 1 ? 1 : 0);
     setIsConfirmingDelete(false);
-  };
-
-  const handleVersionClick = (e: React.MouseEvent, index: number) => {
-    const versionId = versionsWithCurrent[index].version_id;
-    const isShift = e.shiftKey;
-    const isCtrl = e.ctrlKey || e.metaKey;
-
-    if (isShift && lastSelectedIndex !== null) {
-        const start = Math.min(lastSelectedIndex, index);
-        const end = Math.max(lastSelectedIndex, index);
-        const rangeIds = versionsWithCurrent.slice(start, end + 1)
-            .map(v => v.version_id)
-            .filter(id => id !== -1);
-        setSelectedVersionIds(new Set(rangeIds));
-    } else if (isCtrl) {
-        handleToggleVersionSelection(versionId);
-        setLastSelectedIndex(index);
-    } else {
-        setSelectedVersionIds(versionId !== -1 ? new Set([versionId]) : new Set());
-        setLastSelectedIndex(index);
-    }
-    setSelectedIndex(index);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    const { key, shiftKey, metaKey, ctrlKey } = e;
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    const isCtrlCmd = isMac ? metaKey : ctrlKey;
-
-    if (key === 'ArrowUp' || key === 'ArrowDown') {
-      e.preventDefault();
-      const newIndex = key === 'ArrowUp'
-        ? Math.max(0, selectedIndex - 1)
-        : Math.min(versionsWithCurrent.length - 1, selectedIndex + 1);
-
-      if (shiftKey) {
-        const anchor = lastSelectedIndex === null ? selectedIndex : lastSelectedIndex;
-        const start = Math.min(anchor, newIndex);
-        const end = Math.max(anchor, newIndex);
-        const rangeIds = versionsWithCurrent.slice(start, end + 1)
-          .map(v => v.version_id).filter(id => id !== -1);
-        setSelectedVersionIds(new Set(rangeIds));
-      } else {
-        setSelectedVersionIds(new Set());
-        setLastSelectedIndex(newIndex);
-      }
-      setSelectedIndex(newIndex);
-    } else if (key === ' ') {
-      e.preventDefault();
-      handleToggleVersionSelection(versionsWithCurrent[selectedIndex].version_id);
-    } else if (isCtrlCmd && (key === 'a' || key === 'A')) {
-      e.preventDefault();
-      const allIds = versionsWithCurrent.map(v => v.version_id).filter(id => id !== -1);
-      setSelectedVersionIds(new Set(allIds));
-    } else if (key === 'Delete' || key === 'Backspace') {
-      e.preventDefault();
-      if (selectedVersionIds.size > 0) {
-        setIsConfirmingDelete(true);
-      }
-    }
   };
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
-        <header className="flex justify-between items-center px-6 py-6 gap-4 flex-shrink-0 border-b border-border-color bg-secondary">
+        <header className="flex justify-between items-center px-4 py-1 h-8 gap-4 flex-shrink-0 border-b border-border-color bg-secondary">
             <div className="flex items-center gap-3 flex-1 min-w-0">
-                <h1 className="text-2xl font-semibold text-text-main truncate">
+                <h1 className="text-base font-semibold text-text-main truncate">
                     History for "{document.title}"
                 </h1>
             </div>
             <div className="flex items-center gap-2">
-                <Button onClick={() => { addLog('INFO', `User action: Back to editor from history for document "${document.title}".`); onBackToEditor(); }} variant="secondary">
-                    <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                    Back to Editor
-                </Button>
+                {/* FIX: Changed invalid variant "secondary" to "ghost" for IconButton. */}
+                <IconButton onClick={() => { addLog('INFO', `User action: Back to editor from history for document "${document.title}".`); onBackToEditor(); }} variant="ghost" size="sm" tooltip="Back to Editor">
+                    <ArrowLeftIcon className="w-4 h-4" />
+                </IconButton>
             </div>
         </header>
 
-        <div className="flex-1 flex gap-6 overflow-hidden p-6 bg-secondary">
-            <aside className="w-1/3 max-w-xs border-r border-border-color pr-6 flex flex-col">
-                <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-lg font-semibold">Versions</h3>
+        <div className="flex-1 flex gap-4 overflow-hidden p-4 bg-secondary">
+            <aside className="w-1/3 max-w-sm border-r border-border-color pr-4 flex flex-col">
+                <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-semibold">Versions</h3>
                     <Button 
-                        variant="destructive" 
+                        variant="destructive"
+                        className="px-2 py-1"
                         disabled={selectedVersionIds.size === 0}
                         onClick={() => {
                             addLog('INFO', `User action: Delete ${selectedVersionIds.size} version(s) for document "${document.title}".`);
                             setIsConfirmingDelete(true);
                         }}
                     >
-                       <TrashIcon className="w-4 h-4 mr-2" />
+                       <TrashIcon className="w-3 h-3 mr-1.5" />
                        Delete ({selectedVersionIds.size})
                     </Button>
                 </div>
-                <ul ref={listRef} onKeyDown={handleKeyDown} tabIndex={0} className="space-y-1 overflow-y-auto focus:outline-none focus:ring-2 focus:ring-primary rounded-md">
+                <ul className="space-y-1 overflow-y-auto -mr-2 pr-2">
                     {versionsWithCurrent.map((version, index) => {
-                        const isFocused = selectedIndex === index;
-                        const isSelected = selectedVersionIds.has(version.version_id);
+                        const isA = compareAIndex === index;
+                        const isB = compareBIndex === index;
                         return (
                             <li key={version.id}>
-                                <button
-                                    onClick={(e) => handleVersionClick(e, index)}
-                                    className={`w-full text-left p-2 rounded-md text-sm transition-colors ${
-                                        isFocused
-                                        ? 'bg-primary/10 text-primary font-semibold'
-                                        : isSelected
-                                        ? 'bg-border-color'
-                                        : 'text-text-secondary hover:bg-border-color/50 hover:text-text-main'
-                                    }`}
-                                >
-                                    <span className="block">{formatDate(version.createdAt)}</span>
-                                    <span className="text-xs opacity-80">{index === 0 ? '(Current Version)' : `Version ${versionsWithCurrent.length - 1 - index}`}</span>
-                                </button>
+                                <div className={`w-full text-left p-1.5 rounded-md transition-colors flex items-center justify-between ${isA || isB ? 'bg-primary/5' : 'hover:bg-border-color/20'}`}>
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                          type="checkbox"
+                                          className="form-checkbox h-3 w-3 rounded-sm text-primary bg-background border-border-color focus:ring-primary disabled:opacity-50"
+                                          checked={selectedVersionIds.has(version.version_id)}
+                                          onChange={() => handleToggleVersionSelection(version.version_id)}
+                                          disabled={version.version_id === -1}
+                                        />
+                                        <div>
+                                            <span className="block text-xs font-medium text-text-main">{formatDate(version.createdAt)}</span>
+                                            <span className="text-xs text-text-secondary">{index === 0 ? '(Current Version)' : `Version ${versionsWithCurrent.length - 1 - index}`}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button 
+                                          onClick={() => compareBIndex !== index && setCompareAIndex(index)} 
+                                          title="Set as 'A' for comparison"
+                                          className={`w-5 h-5 text-xs rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isA ? 'bg-primary text-primary-text focus:ring-primary' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
+                                        >A</button>
+                                        <button 
+                                          onClick={() => compareAIndex !== index && setCompareBIndex(index)} 
+                                          title="Set as 'B' for comparison"
+                                          className={`w-5 h-5 text-xs rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isB ? 'bg-destructive-bg text-destructive-text focus:ring-destructive-text' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
+                                        >B</button>
+                                    </div>
+                                </div>
                             </li>
                         );
                     })}
                      {versionsWithCurrent.length <= 1 && (
-                        <li className="text-sm text-text-secondary p-2 text-center">No history found.</li>
+                        <li className="text-xs text-text-secondary p-2 text-center">No history found.</li>
                     )}
                 </ul>
             </aside>
 
             <main className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                <div className="flex justify-between items-center mb-2 flex-shrink-0">
                     <div>
-                        <h3 className="text-lg font-semibold">Changes in this version</h3>
-                        <p className="text-sm text-text-secondary">
-                            {selectedIndex === versionsWithCurrent.length - 1 ? 'This is the first version.' : 'Compared to the previous version.'}
+                        <h3 className="text-sm font-semibold">Comparison</h3>
+                        <p className="text-xs text-text-secondary">
+                           Comparing version from <span className="font-semibold text-text-main">{formatDate(newerVersion.createdAt)}</span> with <span className="font-semibold text-text-main">{olderVersion ? formatDate(olderVersion.createdAt) : 'None'}</span>
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <IconButton onClick={() => handleCopy(selectedVersion.content)} tooltip={isCopied ? "Copied!" : "Copy Content"}>
+                        <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Newer Version Content"}>
                             {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
                         </IconButton>
-                        <Button onClick={() => { addLog('INFO', `User action: Restore version for document "${document.title}".`); onRestore(selectedVersion.content); }} disabled={selectedIndex === 0} variant="secondary">
+                        <Button onClick={() => { addLog('INFO', `User action: Restore version for document "${document.title}".`); onRestore(newerVersion.content); }} disabled={newerVersion.version_id === -1} variant="secondary" className="px-2 py-1">
                             <UndoIcon className="w-4 h-4 mr-2"/>
-                            Restore this version
+                            Restore Newer Version
                         </Button>
                     </div>
                 </div>
                 
                 <div className="flex-1 min-h-0">
                     <MonacoDiffEditor
-                        oldText={previousVersion ? previousVersion.content : ''}
-                        newText={selectedVersion.content}
+                        oldText={olderVersion ? olderVersion.content : ''}
+                        newText={newerVersion ? newerVersion.content : ''}
                         language={document.language_hint || 'plaintext'}
                     />
                 </div>
