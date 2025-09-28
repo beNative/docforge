@@ -180,8 +180,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
             </div>
         </header>
 
-        <div className="flex-1 flex gap-4 overflow-hidden p-4 bg-secondary">
-            <aside className="w-1/3 max-w-sm border-r border-border-color pr-4 flex flex-col">
+        <div className="flex-1 flex gap-4 overflow-hidden bg-secondary">
+            <aside className="w-1/3 max-w-sm border-r border-border-color p-4 flex flex-col">
                 <div className="flex justify-between items-center mb-1.5 flex-shrink-0 h-7">
                     <h3 className="text-xs font-semibold px-1.5">Versions</h3>
                     <Button 
@@ -210,7 +210,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                                       setSelectionAnchor(index);
                                     }}
                                     className={`w-full text-left p-1 rounded-md transition-colors flex items-center justify-between cursor-pointer relative ${
-                                        isA || isB ? 'bg-primary/5' : 'hover:bg-border-color/20'
+                                        isA || isB ? 'bg-primary/5' : isFocused ? 'bg-border-color/30' : 'hover:bg-border-color/20'
                                     }`}
                                 >
                                     <div className="flex items-center gap-2">
@@ -239,9 +239,6 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                                           className={`w-4 h-4 text-[10px] rounded-full font-bold flex items-center justify-center transition-colors focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-offset-secondary ${isB ? 'bg-destructive-bg text-destructive-text focus:ring-destructive-text' : 'bg-border-color text-text-secondary hover:bg-border-color focus:ring-text-secondary'}`}
                                         >B</button>
                                     </div>
-                                    {isFocused && (
-                                        <div className="absolute inset-0 ring-1 ring-primary pointer-events-none rounded-md"></div>
-                                    )}
                                 </div>
                             </li>
                         );
