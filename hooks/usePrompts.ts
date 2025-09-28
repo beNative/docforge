@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import type { Node, DocumentOrFolder } from '../types';
+import type { Node, DocumentOrFolder, DocType } from '../types';
 import { useNodes } from './useNodes';
 
 /**
@@ -14,6 +14,8 @@ const nodeToDocumentOrFolder = (node: Node): DocumentOrFolder => ({
   createdAt: node.created_at,
   updatedAt: node.updated_at,
   parentId: node.parent_id,
+  doc_type: node.document?.doc_type,
+  language_hint: node.document?.language_hint,
 });
 
 /**
@@ -53,12 +55,12 @@ export const useDocuments = () => {
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
 
-  const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '' }: { parentId: string | null, title?: string, content?: string }) => {
+  const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '', doc_type = 'prompt', language_hint = null }: { parentId: string | null, title?: string, content?: string, doc_type?: DocType, language_hint?: string | null }) => {
     const newNode = await addNode({
       parent_id: parentId,
       node_type: 'document',
       title,
-      document: { content, doc_type: 'prompt' } as any,
+      document: { content, doc_type, language_hint } as any,
     });
     return nodeToDocumentOrFolder(newNode);
   }, [addNode]);

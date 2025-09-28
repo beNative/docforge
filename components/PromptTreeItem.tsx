@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder } from '../types';
 import IconButton from './IconButton';
-import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon } from './Icons';
+import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon } from './Icons';
 
 export interface DocumentNode extends DocumentOrFolder {
   children: DocumentNode[];
@@ -88,6 +88,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isFocused = focusedItemId === node.id;
   const isExpanded = expandedIds.has(node.id);
   const isFolder = node.type === 'folder';
+  const isCodeFile = node.doc_type === 'source_code';
   
   useEffect(() => {
     if (renamingNodeId === node.id) {
@@ -206,7 +207,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                 {isFolder ? (
                     isExpanded ? <FolderOpenIcon className="w-4 h-4 flex-shrink-0" /> : <FolderIcon className="w-4 h-4 flex-shrink-0" />
                 ) : (
-                    <FileIcon className="w-4 h-4 flex-shrink-0" />
+                    isCodeFile ? <CodeIcon className="w-4 h-4 flex-shrink-0" /> : <FileIcon className="w-4 h-4 flex-shrink-0" />
                 )}
 
                 {isRenaming ? (

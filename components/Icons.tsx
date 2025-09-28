@@ -87,6 +87,10 @@ export const TerminalIcon: React.FC<IconProps> = (props) => {
     }
 };
 
+export const CodeIcon: React.FC<IconProps> = (props) => {
+    return <TerminalIcon {...props} />;
+};
+
 export const DownloadIcon: React.FC<IconProps> = (props) => {
     const { iconSet } = useIconSet();
     switch (iconSet) {

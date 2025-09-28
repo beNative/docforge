@@ -48,7 +48,7 @@ declare global {
 // =================================================================
 
 export type NodeType = 'folder' | 'document';
-export type DocType = 'prompt'; // Can be extended later, e.g., 'markdown', 'source_code'
+export type DocType = 'prompt' | 'source_code';
 
 export interface Node {
   node_id: string;
@@ -103,6 +103,9 @@ export interface DocumentOrFolder {
   createdAt: string;
   updatedAt: string;
   parentId: string | null;
+  // Document-specific properties for the UI adapter
+  doc_type?: DocType;
+  language_hint?: string | null;
 }
 
 // Fix: Renamed LegacyPromptVersion to DocumentVersion and aliased it to the new DocVersion type

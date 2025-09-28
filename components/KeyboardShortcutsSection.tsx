@@ -24,18 +24,16 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
             return command.name.toLowerCase().includes(lowercasedTerm) || shortcutString.includes(lowercasedTerm);
         });
 
-        // Fix: The generic argument on `reduce` can fail in some TS configurations. Casting the initial
-        // value `{}` to the accumulator's type (`Record<string, Command[]>`) is a more robust way to
-        // ensure TypeScript correctly infers the return type of `reduce`. This resolves both the
-        // type argument error on this line and the subsequent '.map is not a function' error.
-        return filtered.reduce((acc, command) => {
+        // Fix: Use a generic type argument for `reduce` to ensure the accumulator's type is correctly inferred by TypeScript.
+        // This resolves an issue where the grouped object's value type was `unknown`, causing a compile error on `.map`.
+        return filtered.reduce<Record<string, Command[]>>((acc, command) => {
             const category = command.category;
             if (!acc[category]) {
                 acc[category] = [];
             }
             acc[category].push(command);
             return acc;
-        }, {} as Record<string, Command[]>);
+        }, {});
     }, [commands, searchTerm, settings.customShortcuts]);
 
     return (
