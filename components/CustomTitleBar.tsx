@@ -35,7 +35,7 @@ const CommandPaletteSearch: React.FC<CommandPaletteSearchProps> = ({
 }) => (
     <div 
         ref={commandPaletteTargetRef}
-        className="not-draggable flex-1 max-w-lg mx-auto h-7 px-3 rounded-md bg-background border border-border-color hover:border-primary/50 flex items-center gap-2 relative"
+        className="not-draggable flex-1 max-w-lg mx-auto h-6 px-3 rounded-md bg-background border border-border-color hover:border-primary/50 flex items-center gap-2 relative"
     >
         <SearchIcon className="w-4 h-4 text-text-secondary" />
         <input
@@ -63,7 +63,7 @@ const WindowControls: React.FC<{ platform: string, isMaximized: boolean }> = ({ 
   // Fix: Check for electronAPI existence.
   if (!window.electronAPI) return null;
 
-  const buttonClass = "not-draggable w-12 h-8 flex items-center justify-center transition-colors hover:bg-border-color/50 focus:outline-none";
+  const buttonClass = "not-draggable w-12 h-7 flex items-center justify-center transition-colors hover:bg-border-color/50 focus:outline-none";
   const closeButtonClass = `${buttonClass} hover:bg-red-500 hover:text-white`;
 
   const controls = (
@@ -103,9 +103,9 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
     };
     
     return (
-        <header className="draggable flex items-center justify-between h-9 flex-shrink-0 bg-secondary border-b border-border-color z-30 text-text-main">
+        <header className="draggable flex items-center justify-between h-8 flex-shrink-0 bg-secondary border-b border-border-color z-30 text-text-main">
             <div className={`flex items-center flex-1 ${platform === 'darwin' ? 'pl-20' : 'pl-2'}`}>
-                <TerminalIcon className="w-5 h-5 text-primary mr-2" />
+                <TerminalIcon className="w-4 h-4 text-primary mr-2" />
                 <span className="font-semibold text-xs">DocForge</span>
             </div>
 
@@ -121,18 +121,18 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
             </div>
 
             <div className="flex items-center gap-1 flex-1 justify-end">
-                <IconButton onClick={onShowEditorView} tooltip={getTooltip('toggle-editor', 'Editor')} size="sm" className={`not-draggable ${isEditorViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
-                    <PencilIcon className="w-5 h-5" />
+                <IconButton onClick={onShowEditorView} tooltip={getTooltip('toggle-editor', 'Editor')} size="xs" className={`not-draggable ${isEditorViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
+                    <PencilIcon className="w-4 h-4" />
                 </IconButton>
-                <IconButton onClick={onToggleInfoView} tooltip={getTooltip('toggle-info', 'Info')} size="sm" className={`not-draggable ${isInfoViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
-                    <InfoIcon className="w-5 h-5" />
+                <IconButton onClick={onToggleInfoView} tooltip={getTooltip('toggle-info', 'Info')} size="xs" className={`not-draggable ${isInfoViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
+                    <InfoIcon className="w-4 h-4" />
                 </IconButton>
-                <IconButton onClick={onToggleLogger} tooltip={getTooltip('toggle-logs', 'Logs')} size="sm" className="not-draggable" tooltipPosition="bottom">
-                    <TerminalIcon className="w-5 h-5" />
+                <IconButton onClick={onToggleLogger} tooltip={getTooltip('toggle-logs', 'Logs')} size="xs" className="not-draggable" tooltipPosition="bottom">
+                    <TerminalIcon className="w-4 h-4" />
                 </IconButton>
-                <ThemeToggleButton size="sm" tooltipPosition="bottom" className="not-draggable" />
-                <IconButton onClick={onToggleSettingsView} tooltip={getTooltip('toggle-settings', 'Settings')} size="sm" className={`not-draggable ${isSettingsViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
-                    <GearIcon className="w-5 h-5" />
+                <ThemeToggleButton size="xs" tooltipPosition="bottom" className="not-draggable" />
+                <IconButton onClick={onToggleSettingsView} tooltip={getTooltip('toggle-settings', 'Settings')} size="xs" className={`not-draggable ${isSettingsViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
+                    <GearIcon className="w-4 h-4" />
                 </IconButton>
             </div>
             

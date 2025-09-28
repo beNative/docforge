@@ -4,13 +4,14 @@ import IconButton from './IconButton';
 import { SunIcon, MoonIcon } from './Icons';
 
 interface ThemeToggleButtonProps {
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
   tooltipPosition?: 'top' | 'bottom';
   className?: string;
 }
 
 const ThemeToggleButton: React.FC<ThemeToggleButtonProps> = ({ size = 'md', tooltipPosition = 'bottom', className }) => {
   const { theme, toggleTheme } = useTheme();
+  const iconClassName = size === 'xs' ? 'w-4 h-4' : 'w-5 h-5';
 
   return (
     <IconButton
@@ -20,7 +21,7 @@ const ThemeToggleButton: React.FC<ThemeToggleButtonProps> = ({ size = 'md', tool
       size={size}
       className={className}
     >
-      {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
+      {theme === 'light' ? <MoonIcon className={iconClassName} /> : <SunIcon className={iconClassName} />}
     </IconButton>
   );
 };
