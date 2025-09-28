@@ -8,6 +8,7 @@ import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDow
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
+import { useLogger } from '../hooks/useLogger';
 
 type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
 
@@ -71,6 +72,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
+  const { addLog } = useLogger();
 
 
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -105,6 +107,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   // --- Collapse/Expand Logic ---
   const handleToggleCollapse = () => {
     const newCollapsedState = !isTemplatesCollapsed;
+    addLog('INFO', `User action: Toggled templates panel ${newCollapsedState ? 'collapsed' : 'expanded'}.`);
     setIsTemplatesCollapsed(newCollapsedState);
     storageService.save(LOCAL_STORAGE_KEYS.SIDEBAR_TEMPLATES_COLLAPSED, newCollapsedState);
   };

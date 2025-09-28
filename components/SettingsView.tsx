@@ -14,6 +14,7 @@ import { repository } from '../services/repository';
 import ToggleSwitch from './ToggleSwitch';
 import SettingRow from './SettingRow';
 import SettingsTreeEditor from './SettingsTreeEditor';
+import { useLogger } from '../hooks/useLogger';
 
 interface SettingsViewProps {
   settings: Settings;
@@ -37,6 +38,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discovere
   const [currentSettings, setCurrentSettings] = useState<Settings>(settings);
   const [isDirty, setIsDirty] = useState(false);
   const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
+  const { addLog } = useLogger();
 
   // Fix: Use Partial for the record type to allow an empty object as the initial value for the ref.
   const sectionRefs = useRef<Partial<Record<SettingsCategory, HTMLDivElement | null>>>({});
@@ -79,6 +81,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discovere
   }, []);
 
   const handleSave = () => {
+    addLog('INFO', 'User action: Save settings.');
     onSave(currentSettings);
   };
   
@@ -324,6 +327,7 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
         status: 'running' | 'success' | 'error';
         message?: string;
     } | null>(null);
+    const { addLog } = useLogger();
 
     const loadData = useCallback(async () => {
         setIsLoadingStats(true);
@@ -350,6 +354,7 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
     }, [loadData]);
 
     const handleBackup = async () => {
+        addLog('INFO', 'User action: Initiate database backup.');
         setOperation({ name: 'backup', status: 'running' });
         const result = await repository.backupDatabase();
         if (result.success) {
@@ -360,6 +365,7 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
     };
 
     const handleIntegrityCheck = async () => {
+        addLog('INFO', 'User action: Initiate database integrity check.');
         setOperation({ name: 'integrity', status: 'running' });
         const result = await repository.runIntegrityCheck();
         if (result.success) {
@@ -371,6 +377,7 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
     };
 
     const handleVacuum = async () => {
+        addLog('INFO', 'User action: Initiate database vacuum (optimize).');
         setOperation({ name: 'vacuum', status: 'running' });
         const result = await repository.runVacuum();
         if (result.success) {

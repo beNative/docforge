@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Modal from './Modal';
 import Button from './Button';
 import type { DocumentTemplate } from '../types';
+import { useLogger } from '../hooks/useLogger';
 
 interface CreateFromTemplateModalProps {
   templates: DocumentTemplate[];
@@ -15,6 +16,7 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
   const [documentTitle, setDocumentTitle] = useState('');
   const [variables, setVariables] = useState<Record<string, string>>({});
   const createButtonRef = useRef<HTMLButtonElement>(null);
+  const { addLog } = useLogger();
 
   const selectedTemplate = useMemo(() => {
     // Fix: Use template_id instead of id
@@ -57,7 +59,7 @@ const CreateFromTemplateModal: React.FC<CreateFromTemplateModalProps> = ({ templ
   };
 
   return (
-    <Modal onClose={onClose} title="Create Document from Template" initialFocusRef={createButtonRef}>
+    <Modal onClose={() => { addLog('INFO', 'User action: Canceled "Create from Template" dialog.'); onClose(); }} title="Create Document from Template" initialFocusRef={createButtonRef}>
       <form onSubmit={handleSubmit}>
         <div className="p-6 text-text-main space-y-4">
           <div>

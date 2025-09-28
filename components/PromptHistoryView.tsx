@@ -8,6 +8,7 @@ import DiffViewer from './DiffViewer';
 import { CheckIcon, CopyIcon, UndoIcon, ArrowLeftIcon, TrashIcon } from './Icons';
 import IconButton from './IconButton';
 import ConfirmModal from './ConfirmModal';
+import { useLogger } from '../hooks/useLogger';
 
 interface DocumentHistoryViewProps {
   document: DocumentOrFolder;
@@ -20,6 +21,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const [isCopied, setIsCopied] = useState(false);
   const [selectedVersionIds, setSelectedVersionIds] = useState<Set<number>>(new Set());
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const { addLog } = useLogger();
   
   const versionsWithCurrent = useMemo(() => {
     const historyVersions = versions.map(v => ({
@@ -159,7 +161,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                 </h1>
             </div>
             <div className="flex items-center gap-2">
-                <Button onClick={onBackToEditor} variant="secondary">
+                <Button onClick={() => { addLog('INFO', `User action: Back to editor from history for document "${document.title}".`); onBackToEditor(); }} variant="secondary">
                     <ArrowLeftIcon className="w-4 h-4 mr-2" />
                     Back to Editor
                 </Button>
@@ -173,7 +175,10 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                     <Button 
                         variant="destructive" 
                         disabled={selectedVersionIds.size === 0}
-                        onClick={() => setIsConfirmingDelete(true)}
+                        onClick={() => {
+                            addLog('INFO', `User action: Delete ${selectedVersionIds.size} version(s) for document "${document.title}".`);
+                            setIsConfirmingDelete(true);
+                        }}
                     >
                        <TrashIcon className="w-4 h-4 mr-2" />
                        Delete ({selectedVersionIds.size})
@@ -219,7 +224,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         <IconButton onClick={() => handleCopy(selectedVersion.content)} tooltip={isCopied ? "Copied!" : "Copy Content"}>
                             {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
                         </IconButton>
-                        <Button onClick={() => onRestore(selectedVersion.content)} disabled={selectedIndex === 0} variant="secondary">
+                        <Button onClick={() => { addLog('INFO', `User action: Restore version for document "${document.title}".`); onRestore(selectedVersion.content); }} disabled={selectedIndex === 0} variant="secondary">
                             <UndoIcon className="w-4 h-4 mr-2"/>
                             Restore this version
                         </Button>
@@ -236,8 +241,14 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
             <ConfirmModal
                 title="Delete Versions"
                 message={<>Are you sure you want to permanently delete {selectedVersionIds.size} version(s)? This action cannot be undone.</>}
-                onConfirm={handleDeleteSelected}
-                onCancel={() => setIsConfirmingDelete(false)}
+                onConfirm={() => {
+                    addLog('INFO', 'User confirmed version deletion.');
+                    handleDeleteSelected();
+                }}
+                onCancel={() => {
+                    addLog('INFO', 'User cancelled version deletion.');
+                    setIsConfirmingDelete(false);
+                }}
             />
         )}
     </div>

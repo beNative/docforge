@@ -39,7 +39,7 @@ const inactiveFilterClasses: Record<LogLevel, string> = {
 
 
 const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility, height, onResizeStart }) => {
-  const { logs, clearLogs } = useLogger();
+  const { logs, clearLogs, addLog } = useLogger();
   const [filter, setFilter] = useState<LogLevel | 'ALL'>('ALL');
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -55,6 +55,7 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
   }, [filteredLogs, isVisible]);
 
   const handleSaveLog = async () => {
+    addLog('INFO', 'User action: Save log to file.');
     const logContent = logs.map(log => `[${log.timestamp}] [${log.level}] ${log.message}`).join('\n');
     try {
       await storageService.saveLogToFile(logContent);
@@ -90,10 +91,10 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
           <IconButton onClick={handleSaveLog} tooltip="Save Log" variant="ghost" size="sm" tooltipPosition="bottom">
             <DownloadIcon className="w-5 h-5" />
           </IconButton>
-          <IconButton onClick={clearLogs} tooltip="Clear Logs" variant="destructive" size="sm" tooltipPosition="bottom">
+          <IconButton onClick={() => { addLog('INFO', 'User action: Clear logs.'); clearLogs(); }} tooltip="Clear Logs" variant="destructive" size="sm" tooltipPosition="bottom">
             <TrashIcon className="w-5 h-5" />
           </IconButton>
-          <IconButton onClick={onToggleVisibility} tooltip="Close Panel" variant="ghost" size="sm" tooltipPosition="bottom">
+          <IconButton onClick={() => { addLog('INFO', 'User action: Close logger panel.'); onToggleVisibility(); }} tooltip="Close Panel" variant="ghost" size="sm" tooltipPosition="bottom">
             <ChevronDownIcon className="w-5 h-5" />
           </IconButton>
         </div>

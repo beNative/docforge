@@ -269,6 +269,7 @@ const MainApp: React.FC = () => {
 
     // Service Discovery logic
     const handleDetectServices = useCallback(async () => {
+        addLog('INFO', 'User action: Detecting LLM services.');
         setIsDetecting(true);
         try {
             const services = await llmDiscoveryService.discoverServices();
@@ -334,6 +335,7 @@ const MainApp: React.FC = () => {
     }, [activeNode]);
 
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
+        addLog('INFO', 'User action: Create New Document.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
         const newDoc = await addDocument({ parentId: effectiveParentId });
         setActiveNodeId(newDoc.id);
@@ -342,9 +344,10 @@ const MainApp: React.FC = () => {
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addDocument, getParentIdForNewItem]);
+    }, [addDocument, getParentIdForNewItem, addLog]);
     
     const handleNewFolder = useCallback(async (parentId?: string | null) => {
+        addLog('INFO', 'User action: Create New Folder.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
         const newFolder = await addFolder(effectiveParentId);
         setActiveNodeId(newFolder.id);
@@ -353,35 +356,40 @@ const MainApp: React.FC = () => {
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addFolder, getParentIdForNewItem]);
+    }, [addFolder, getParentIdForNewItem, addLog]);
 
     const handleNewRootFolder = useCallback(async () => {
+        addLog('INFO', 'User action: Create New Root Folder.');
         await handleNewFolder(null);
-    }, [handleNewFolder]);
+    }, [handleNewFolder, addLog]);
 
     const handleNewSubfolder = useCallback(async () => {
         if (activeNode?.type === 'folder') {
+            addLog('INFO', `User action: Create New Subfolder in "${activeNode.title}".`);
             await handleNewFolder(activeNode.id);
             setExpandedFolderIds(prev => new Set(prev).add(activeNode.id));
         }
-    }, [handleNewFolder, activeNode]);
+    }, [handleNewFolder, activeNode, addLog]);
 
     const handleDuplicateSelection = useCallback(async () => {
         if (selectedIds.size > 0) {
+            addLog('INFO', `User action: Duplicate ${selectedIds.size} selected item(s).`);
             await duplicateItems(Array.from(selectedIds));
         }
-    }, [selectedIds, duplicateItems]);
+    }, [selectedIds, duplicateItems, addLog]);
 
     const handleNewTemplate = useCallback(async () => {
+        addLog('INFO', 'User action: Create New Template.');
         const newTemplate = await addTemplate();
         setActiveTemplateId(newTemplate.template_id);
         setLastClickedId(newTemplate.template_id);
         setActiveNodeId(null);
         setSelectedIds(new Set());
         setView('editor');
-    }, [addTemplate]);
+    }, [addTemplate, addLog]);
 
     const handleCreateFromTemplate = useCallback(async (title: string, content: string) => {
+        addLog('INFO', `User action: Create Document from Template, title: "${title}".`);
         const newDoc = await addDocument({ parentId: null, title, content });
         setActiveNodeId(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
@@ -389,7 +397,7 @@ const MainApp: React.FC = () => {
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addDocument]);
+    }, [addDocument, addLog]);
 
     const handleSelectNode = useCallback((id: string, e: React.MouseEvent) => {
         if (activeNodeId !== id) {
@@ -481,6 +489,7 @@ const MainApp: React.FC = () => {
     }, [items, addLog]);
 
     const handleModelChange = (modelId: string) => {
+        addLog('INFO', `User action: Set LLM model to "${modelId}".`);
         saveSettings({ ...settings, llmModelName: modelId });
     };
     
@@ -523,6 +532,7 @@ const MainApp: React.FC = () => {
         if (totalItems === 0) return;
     
         const performDelete = async () => {
+            addLog('INFO', `Executing delete for ${totalItems} item(s).`);
             if (topLevelNodeIds.length > 0) {
                 await deleteItems(topLevelNodeIds);
             }
@@ -548,40 +558,46 @@ const MainApp: React.FC = () => {
         };
     
         if (force) {
+            addLog('WARNING', `User action: Force deleting ${totalItems} item(s).`);
             await performDelete();
         } else {
             setConfirmAction({
                 title: `Delete ${totalItems} item(s)`,
                 message: <>Are you sure you want to permanently delete {totalItems} selected item(s)? This action cannot be undone.</>,
                 onConfirm: () => {
+                    addLog('INFO', 'User confirmed deletion.');
                     performDelete();
                     setConfirmAction(null);
                 }
             });
         }
-    }, [items, templates, deleteItems, deleteTemplates, activeNodeId, activeTemplateId, lastClickedId]);
+    }, [items, templates, deleteItems, deleteTemplates, activeNodeId, activeTemplateId, lastClickedId, addLog]);
 
     const handleDeleteNode = useCallback((id: string, shiftKey: boolean = false) => {
         const itemToDelete = items.find(p => p.id === id);
         if (!itemToDelete) return;
+        addLog('INFO', `User action: Delete node "${itemToDelete.title}" (ID: ${id}).`);
 
         const idsToDelete = selectedIds.has(id) ? selectedIds : new Set([id]);
         
         handleDeleteSelection(idsToDelete, { force: shiftKey });
-    }, [items, selectedIds, handleDeleteSelection]);
+    }, [items, selectedIds, handleDeleteSelection, addLog]);
 
     const handleDeleteTemplate = useCallback((id: string, shiftKey: boolean = false) => {
         const templateToDelete = templates.find(t => t.template_id === id);
         if (!templateToDelete) return;
+        addLog('INFO', `User action: Delete template "${templateToDelete.title}" (ID: ${id}).`);
 
         const idsToDelete = selectedIds.has(id) ? selectedIds : new Set([id]);
 
         handleDeleteSelection(idsToDelete, { force: shiftKey });
-    }, [templates, selectedIds, handleDeleteSelection]);
+    }, [templates, selectedIds, handleDeleteSelection, addLog]);
 
     const handleToggleExpand = (id: string) => {
         setExpandedFolderIds(prev => {
           const newSet = new Set(prev);
+          const isExpanding = !newSet.has(id);
+          addLog('DEBUG', `User action: Toggled folder ${isExpanding ? 'expansion' : 'collapse'} for ID: ${id}.`);
           if (newSet.has(id)) {
             newSet.delete(id);
           } else {
@@ -592,17 +608,20 @@ const MainApp: React.FC = () => {
     };
 
     const handleExpandAll = () => {
+        addLog('INFO', 'User action: Expand All Folders.');
         const allFolderIds = items.filter(item => item.type === 'folder').map(item => item.id);
         setExpandedFolderIds(new Set(allFolderIds));
     };
 
     const handleCollapseAll = () => {
+        addLog('INFO', 'User action: Collapse All Folders.');
         setExpandedFolderIds(new Set());
     };
 
     const toggleSettingsView = () => {
-        setView(v => v === 'settings' ? 'editor' : 'settings')
-    }
+        addLog('INFO', `User action: Toggled settings view ${view === 'settings' ? 'off' : 'on'}.`);
+        setView(v => v === 'settings' ? 'editor' : 'settings');
+    };
 
     const handleRestoreDocumentVersion = useCallback((documentId: string, content: string) => {
         const doc = items.find(p => p.id === documentId);
@@ -616,6 +635,7 @@ const MainApp: React.FC = () => {
     const handleContextMenu = useCallback((e: React.MouseEvent, nodeId: string | null) => {
         e.preventDefault();
         e.stopPropagation();
+        addLog('DEBUG', `User action: Opened context menu on ${nodeId ? `node ${nodeId}`: 'root'}.`);
 
         let currentSelection = selectedIds;
         if (nodeId && !selectedIds.has(nodeId)) {
@@ -656,7 +676,7 @@ const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog]);
 
     // --- Resizable Panels Logic ---
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -721,8 +741,9 @@ const MainApp: React.FC = () => {
     // --- End Resizable Panels Logic ---
     
     const handleOpenCommandPalette = useCallback(() => {
+        addLog('INFO', 'User action: Opened command palette.');
         setIsCommandPaletteOpen(true);
-    }, []);
+    }, [addLog]);
 
     const handleCloseCommandPalette = useCallback(() => {
         setIsCommandPaletteOpen(false);
@@ -730,6 +751,7 @@ const MainApp: React.FC = () => {
     }, []);
     
     const handleToggleCommandPalette = useCallback(() => {
+        addLog('INFO', `User action: Toggled command palette ${isCommandPaletteOpen ? 'off' : 'on'}.`);
         setIsCommandPaletteOpen(prev => {
             const isOpen = !prev;
             if (isOpen) {
@@ -742,7 +764,7 @@ const MainApp: React.FC = () => {
             }
             return isOpen;
         });
-    }, []);
+    }, [addLog, isCommandPaletteOpen]);
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -766,17 +788,17 @@ const MainApp: React.FC = () => {
     
     // Command Palette Commands
     const commands: Command[] = useMemo(() => [
-        { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'], keywords: 'add create file' },
+        { id: 'new-document', name: 'Create New Document', action: handleNewDocument, category: 'File', icon: PlusIcon, shortcut: ['Ctrl', 'N'], keywords: 'add create file' },
         { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
-        { id: 'new-from-template', name: 'New Document from Template...', action: () => setCreateFromTemplateOpen(true), category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create file instance' },
+        { id: 'new-from-template', name: 'New Document from Template...', action: () => { addLog('INFO', 'Command: New Document from Template.'); setCreateFromTemplateOpen(true); }, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create file instance' },
         { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: CopyIcon, keywords: 'copy clone' },
         { id: 'delete-item', name: 'Delete Selection', action: () => handleDeleteSelection(selectedIds), category: 'File', icon: TrashIcon, keywords: 'remove discard' },
-        { id: 'toggle-editor', name: 'Switch to Editor View', action: () => setView('editor'), category: 'View', icon: PencilIcon, keywords: 'main document' },
+        { id: 'toggle-editor', name: 'Switch to Editor View', action: () => { addLog('INFO', 'Command: Switch to Editor View.'); setView('editor'); }, category: 'View', icon: PencilIcon, keywords: 'main document' },
         { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
-        { id: 'toggle-info', name: 'Toggle Info View', action: () => setView(v => v === 'info' ? 'editor' : 'info'), category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
-        { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => setIsLoggerVisible(v => !v), category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds]);
+        { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
+        { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
+    ], [handleNewDocument, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog]);
 
     const getSupportedIconSet = (iconSet: Settings['iconSet']): 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material' => {
         const supportedSets: Array<Settings['iconSet']> = ['heroicons', 'lucide', 'feather', 'tabler', 'material'];
@@ -832,9 +854,9 @@ const MainApp: React.FC = () => {
 
     const headerProps = {
         onToggleSettingsView: toggleSettingsView,
-        onToggleInfoView: () => setView(v => v === 'info' ? 'editor' : 'info'),
-        onShowEditorView: () => setView('editor'),
-        onToggleLogger: () => setIsLoggerVisible(v => !v),
+        onToggleInfoView: () => { addLog('INFO', `User action: Toggled info view ${view === 'info' ? 'off' : 'on'}.`); setView(v => v === 'info' ? 'editor' : 'info'); },
+        onShowEditorView: () => { addLog('INFO', 'User action: Switched to editor view.'); setView('editor'); },
+        onToggleLogger: () => { addLog('INFO', `User action: Toggled logger panel ${isLoggerVisible ? 'off' : 'on'}.`); setIsLoggerVisible(v => !v); },
         onOpenCommandPalette: handleOpenCommandPalette,
         isInfoViewActive: view === 'info',
         isSettingsViewActive: view === 'settings',
@@ -965,7 +987,7 @@ const MainApp: React.FC = () => {
                     title={confirmAction.title}
                     message={confirmAction.message}
                     onConfirm={confirmAction.onConfirm}
-                    onCancel={() => setConfirmAction(null)}
+                    onCancel={() => { addLog('INFO', 'User cancelled action.'); setConfirmAction(null); }}
                 />
             )}
         </IconProvider>

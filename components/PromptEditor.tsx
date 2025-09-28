@@ -215,6 +215,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
 
   // --- Action Handlers ---
   const handleManualSave = () => {
+    addLog('INFO', `User action: Manually save version for document "${title}".`);
     if (isDirty) {
       onCommitVersion(content);
     }
@@ -223,7 +224,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
   const handleRefine = async () => {
     setIsRefining(true);
     setError(null);
-    addLog('INFO', `Requesting AI refinement for document: "${title}"`);
+    addLog('INFO', `User action: Requesting AI refinement for document: "${title}"`);
     try {
       const result = await llmService.refineDocument(content, settings, addLog);
       setRefinedContent(result);
@@ -379,16 +380,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
         </div>
         <div className="flex items-center gap-1">
             <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
-                <IconButton onClick={() => setViewMode('edit')} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : 'text-text-secondary'}`} >
+                <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "edit".'); setViewMode('edit'); }} tooltip="Editor Only" size="sm" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : 'text-text-secondary'}`} >
                     <PencilIcon className="w-5 h-5" />
                 </IconButton>
-                <IconButton onClick={() => setViewMode('preview')} tooltip="Preview Only" size="sm" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
+                <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "preview".'); setViewMode('preview'); }} tooltip="Preview Only" size="sm" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
                     <EyeIcon className="w-5 h-5" />
                 </IconButton>
-                 <IconButton onClick={() => setViewMode('split-vertical')} tooltip="Split Vertical" size="sm" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
+                 <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "split-vertical".'); setViewMode('split-vertical'); }} tooltip="Split Vertical" size="sm" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
                     <LayoutVerticalIcon className="w-5 h-5" />
                 </IconButton>
-                 <IconButton onClick={() => setViewMode('split-horizontal')} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
+                 <IconButton onClick={() => { addLog('INFO', 'User action: Set editor view to "split-horizontal".'); setViewMode('split-horizontal'); }} tooltip="Split Horizontal" size="sm" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : 'text-text-secondary'}`}>
                     <LayoutHorizontalIcon className="w-5 h-5" />
                 </IconButton>
             </div>
@@ -401,7 +402,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ document, onSave, onCom
             <IconButton onClick={redo} disabled={!canRedo || viewMode === 'preview'} tooltip="Redo (Ctrl+Y)" size="sm" variant="ghost">
                 <RedoIcon className="w-5 h-5" />
             </IconButton>
-            <IconButton onClick={onShowHistory} tooltip="View Version History" size="sm" variant="ghost">
+            <IconButton onClick={() => { addLog('INFO', `User action: View version history for document "${document.title}".`); onShowHistory(); }} tooltip="View Version History" size="sm" variant="ghost">
               <HistoryIcon className="w-5 h-5" />
             </IconButton>
             

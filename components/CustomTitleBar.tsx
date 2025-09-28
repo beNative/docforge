@@ -1,11 +1,8 @@
-
-
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import IconButton from './IconButton';
 import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, SearchIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, PencilIcon } from './Icons';
 import ThemeToggleButton from './ThemeToggleButton';
+import { useLogger } from '../hooks/useLogger';
 
 // info
 
@@ -54,10 +51,11 @@ const CommandPaletteSearch: React.FC<CommandPaletteSearchProps> = ({
 );
 
 const WindowControls: React.FC<{ platform: string, isMaximized: boolean }> = ({ platform, isMaximized }) => {
+  const { addLog } = useLogger();
   // Fix: Use optional chaining, which is now type-safe.
-  const handleMinimize = () => window.electronAPI?.minimizeWindow();
-  const handleMaximize = () => window.electronAPI?.maximizeWindow();
-  const handleClose = () => window.electronAPI?.closeWindow();
+  const handleMinimize = () => { addLog('INFO', 'User action: Minimize window.'); window.electronAPI?.minimizeWindow(); };
+  const handleMaximize = () => { addLog('INFO', `User action: ${isMaximized ? 'Restore' : 'Maximize'} window.`); window.electronAPI?.maximizeWindow(); };
+  const handleClose = () => { addLog('INFO', 'User action: Close window.'); window.electronAPI?.closeWindow(); };
 
   // Fix: Check for electronAPI existence.
   if (!window.electronAPI) return null;

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import Button from './Button';
 import { DownloadIcon, XIcon } from './Icons';
 import IconButton from './IconButton';
+import { useLogger } from '../hooks/useLogger';
 
 interface UpdateNotificationProps {
   version: string;
@@ -11,6 +12,7 @@ interface UpdateNotificationProps {
 }
 
 const UpdateNotification: React.FC<UpdateNotificationProps> = ({ version, onInstall, onClose }) => {
+  const { addLog } = useLogger();
   const overlayRoot = document.getElementById('overlay-root');
   if (!overlayRoot) return null;
 
@@ -27,16 +29,16 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ version, onInst
               DocForge version <span className="font-bold">{version}</span> has been downloaded.
             </p>
             <div className="mt-4 flex gap-3">
-              <Button onClick={onInstall} variant="primary" className="flex-1">
+              <Button onClick={() => { addLog('INFO', 'User action: Clicked "Restart & Install" for update.'); onInstall(); }} variant="primary" className="flex-1">
                 Restart & Install
               </Button>
-              <Button onClick={onClose} variant="secondary">
+              <Button onClick={() => { addLog('INFO', 'User action: Dismissed update notification ("Later").'); onClose(); }} variant="secondary">
                 Later
               </Button>
             </div>
           </div>
           <div className="-mt-2 -mr-2">
-            <IconButton onClick={onClose} tooltip="Close" size="sm" variant="ghost">
+            <IconButton onClick={() => { addLog('INFO', 'User action: Closed update notification.'); onClose(); }} tooltip="Close" size="sm" variant="ghost">
               <XIcon className="w-5 h-5" />
             </IconButton>
           </div>
