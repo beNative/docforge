@@ -70,13 +70,15 @@ export class MarkdownRenderer implements IRenderer {
         return `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
       };
 
-      marked.setOptions({
+      // FIX: Use marked.parseSync to avoid issues with recent async-by-default changes in marked.js.
+      // Pass options directly to the parse function instead of using the deprecated setOptions for renderers.
+      // Ensure content is a string to prevent errors.
+      const html = marked.parseSync(content || '', {
         gfm: true,
         breaks: true,
         renderer: renderer,
       });
       
-      const html = marked.parse(content);
       const output = <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />;
       return { output };
     } catch (e) {
