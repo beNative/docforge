@@ -15,6 +15,22 @@ const escapeHtml = (unsafe: string) => {
    .replace(/'/g, "&#039;");
 }
 
+/**
+ * Safely unescapes HTML entities.
+ * The 'code' property from a marked.js renderer is pre-escaped.
+ */
+const unescapeHtml = (html: string): string => {
+    try {
+        const txt = document.createElement("textarea");
+        txt.innerHTML = html;
+        return txt.value;
+    } catch(e) {
+        // Fallback in case of malformed HTML during typing.
+        return html;
+    }
+}
+
+
 export class MarkdownRenderer implements IRenderer {
   canRender(languageId: string): boolean {
     return languageId === 'markdown';
@@ -29,19 +45,24 @@ export class MarkdownRenderer implements IRenderer {
       const renderer = new marked.Renderer();
 
       // Override the code renderer to handle mermaid and prism highlighting
-      renderer.code = (code: string, lang: string) => {
+      renderer.code = (code: string, lang: string, escaped: boolean) => {
         const language = (lang || '').toLowerCase();
         
         if (language === 'mermaid') {
-          // Mermaid will read the text content of this div.
-          // The content itself is not rendered as HTML by the browser, so it's safe.
-          return `<div class="mermaid">${code}</div>`;
+          // The 'code' from marked is HTML-escaped. Mermaid.js needs the raw text content.
+          // We unescape it and place it in the div. The browser won't parse the content
+          // as HTML tags, and mermaid will read the correct raw text.
+          const rawCode = escaped ? unescapeHtml(code) : code;
+          return `<div class="mermaid">${rawCode}</div>`;
         }
 
+        // Prism also needs unescaped code to work correctly.
+        const codeToHighlight = escaped ? unescapeHtml(code) : code;
         const validLang = Prism.languages[language];
+        
         const highlighted = validLang
-          ? Prism.highlight(code, Prism.languages[language], language)
-          : escapeHtml(code);
+          ? Prism.highlight(codeToHighlight, Prism.languages[language], language)
+          : escapeHtml(codeToHighlight); // Re-escape if not highlighted
         
         const finalLang = validLang ? language : 'plaintext';
 
