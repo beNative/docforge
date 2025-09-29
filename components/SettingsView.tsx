@@ -301,6 +301,51 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         </CardButton>
                     </div>
                 </SettingRow>
+                <SettingRow label="Markdown Font Size" description="Adjust the base font size for the Markdown preview.">
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="markdownFontSize"
+                            type="range"
+                            min="12"
+                            max="24"
+                            step="1"
+                            value={settings.markdownFontSize}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownFontSize: Number(e.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownFontSize}px</span>
+                    </div>
+                </SettingRow>
+                <SettingRow label="Markdown Line Height" description="Control the spacing between lines of text for better readability.">
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="markdownLineHeight"
+                            type="range"
+                            min="1.2"
+                            max="2.2"
+                            step="0.1"
+                            value={settings.markdownLineHeight}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownLineHeight: Number(e.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownLineHeight.toFixed(1)}</span>
+                    </div>
+                </SettingRow>
+                <SettingRow label="Markdown Max Width" description="Set the maximum width of the text content to improve line length.">
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="markdownMaxWidth"
+                            type="range"
+                            min="500"
+                            max="1200"
+                            step="20"
+                            value={settings.markdownMaxWidth}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownMaxWidth: Number(e.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownMaxWidth}px</span>
+                    </div>
+                </SettingRow>
             </div>
         </div>
     );

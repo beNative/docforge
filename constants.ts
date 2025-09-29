@@ -26,6 +26,9 @@ export const DEFAULT_SETTINGS: Settings = {
   allowPrerelease: false,
   uiScale: 100,
   customShortcuts: {},
+  markdownFontSize: 16,
+  markdownLineHeight: 1.7,
+  markdownMaxWidth: 800,
 };
 
 export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [

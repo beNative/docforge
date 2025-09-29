@@ -143,6 +143,9 @@ export interface Settings {
   allowPrerelease: boolean;
   uiScale: number;
   customShortcuts: Record<string, string[]>;
+  markdownFontSize: number;
+  markdownLineHeight: number;
+  markdownMaxWidth: number;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';

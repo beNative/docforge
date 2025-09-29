@@ -140,7 +140,11 @@
 
         /* Markdown rendering styles */
         .markdown-content {
-            line-height: 1.6;
+            font-size: var(--markdown-font-size, 16px);
+            line-height: var(--markdown-line-height, 1.7);
+            max-width: var(--markdown-max-width, 800px);
+            margin-left: auto;
+            margin-right: auto;
         }
         .markdown-content > :first-child {
             margin-top: 0 !important;

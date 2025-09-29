@@ -133,6 +133,14 @@ const MainApp: React.FC = () => {
         }
     }, [settings.uiScale, settingsLoaded]);
 
+    useEffect(() => {
+        if (settingsLoaded) {
+            document.documentElement.style.setProperty('--markdown-font-size', `${settings.markdownFontSize}px`);
+            document.documentElement.style.setProperty('--markdown-line-height', String(settings.markdownLineHeight));
+            document.documentElement.style.setProperty('--markdown-max-width', `${settings.markdownMaxWidth}px`);
+        }
+    }, [settings.markdownFontSize, settings.markdownLineHeight, settings.markdownMaxWidth, settingsLoaded]);
+
     const activeNode = useMemo(() => {
         return items.find(p => p.id === activeNodeId) || null;
     }, [items, activeNodeId]);
