@@ -5,9 +5,10 @@ import Spinner from './Spinner';
 interface PreviewPaneProps {
   content: string;
   language: string | null;
+  onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 }
 
-const PreviewPane: React.FC<PreviewPaneProps> = React.memo(({ content, language }) => {
+const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ content, language, onScroll }, ref) => {
   const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +48,7 @@ const PreviewPane: React.FC<PreviewPaneProps> = React.memo(({ content, language 
   }, [content, language]);
 
   return (
-    <div className="w-full h-full p-6 overflow-auto bg-secondary">
+    <div ref={ref} onScroll={onScroll} className="w-full h-full p-6 overflow-auto bg-secondary">
       {isLoading && (
         <div className="flex items-center justify-center h-full text-text-secondary">
             <Spinner />

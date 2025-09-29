@@ -8,13 +8,16 @@ interface CodeEditorProps {
   content: string;
   language: string | null;
   onChange: (newContent: string) => void;
+  onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number; }) => void;
 }
 
 export interface CodeEditorHandle {
   format: () => void;
+  setScrollTop: (scrollTop: number) => void;
+  getScrollInfo: () => Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number; }>;
 }
 
-const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange }, ref) => {
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const { theme } = useTheme();
@@ -23,6 +26,23 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     useImperativeHandle(ref, () => ({
         format() {
             monacoInstanceRef.current?.getAction('editor.action.formatDocument').run();
+        },
+        setScrollTop(scrollTop: number) {
+            monacoInstanceRef.current?.setScrollTop(scrollTop, monaco.editor.ScrollType.Immediate);
+        },
+        getScrollInfo() {
+            return new Promise(resolve => {
+                if (monacoInstanceRef.current) {
+                    const editor = monacoInstanceRef.current;
+                    resolve({
+                        scrollTop: editor.getScrollTop(),
+                        scrollHeight: editor.getScrollHeight(),
+                        clientHeight: editor.getLayoutInfo().height,
+                    });
+                } else {
+                    resolve({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
+                }
+            });
         }
     }));
 
@@ -79,6 +99,16 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                         }
                     });
 
+                    editorInstance.onDidScrollChange((e: any) => {
+                        if (e.scrollTopChanged) {
+                           onScroll?.({
+                               scrollTop: e.scrollTop,
+                               scrollHeight: e.scrollHeight,
+                               clientHeight: editorInstance.getLayoutInfo().height
+                           });
+                        }
+                    });
+
                     monacoInstanceRef.current = editorInstance;
                 }
             });
@@ -90,13 +120,17 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 monacoInstanceRef.current = null;
             }
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [onScroll, onChange, content, language, theme]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {
         if (monacoInstanceRef.current && monacoInstanceRef.current.getValue() !== content) {
+            // Preserve view state (like cursor position) when updating content
+            const viewState = monacoInstanceRef.current.saveViewState();
             monacoInstanceRef.current.setValue(content);
+            if(viewState) {
+                monacoInstanceRef.current.restoreViewState(viewState);
+            }
         }
     }, [content]);
 

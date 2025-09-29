@@ -42,6 +42,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
   const isContentInitialized = useRef(false);
   const editorRef = useRef<CodeEditorHandle>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncing = useRef(false);
+  const syncTimeout = useRef<number | null>(null);
   const isInitialMount = useRef(true);
 
   // Reset content and view when the document changes.
@@ -122,6 +125,54 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     };
   }, [handleGlobalMouseMove, handleGlobalMouseUp]);
 
+  // --- Scroll Synchronization Logic ---
+  const handleEditorScroll = useCallback((scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number; }) => {
+    if (!viewMode.startsWith('split-') || isSyncing.current || !previewScrollRef.current) return;
+    
+    if (scrollInfo.scrollHeight <= scrollInfo.clientHeight) return;
+
+    const percentage = scrollInfo.scrollTop / (scrollInfo.scrollHeight - scrollInfo.clientHeight);
+    
+    const previewEl = previewScrollRef.current;
+    if (previewEl.scrollHeight <= previewEl.clientHeight) return;
+    const newPreviewScrollTop = percentage * (previewEl.scrollHeight - previewEl.clientHeight);
+
+    isSyncing.current = true;
+    previewEl.scrollTop = newPreviewScrollTop;
+
+    if (syncTimeout.current) clearTimeout(syncTimeout.current);
+    syncTimeout.current = window.setTimeout(() => {
+        isSyncing.current = false;
+    }, 100);
+  }, [viewMode]);
+
+  const handlePreviewScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    if (!viewMode.startsWith('split-') || isSyncing.current || !editorRef.current) return;
+
+    const previewEl = e.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = previewEl;
+
+    if (scrollHeight <= clientHeight) return;
+
+    const percentage = scrollTop / (scrollHeight - clientHeight);
+    
+    const editor = editorRef.current;
+    editor.getScrollInfo().then(editorInfo => {
+        if (!isSyncing.current && editorInfo.scrollHeight > editorInfo.clientHeight) {
+            const newEditorScrollTop = percentage * (editorInfo.scrollHeight - editorInfo.clientHeight);
+            
+            isSyncing.current = true;
+            editor.setScrollTop(newEditorScrollTop);
+
+            if (syncTimeout.current) clearTimeout(syncTimeout.current);
+            syncTimeout.current = window.setTimeout(() => {
+                isSyncing.current = false;
+            }, 100);
+        }
+    });
+  }, [viewMode]);
+
+
   // --- Action Handlers ---
   const handleManualSave = () => {
     addLog('INFO', `User action: Manually save version for document "${title}".`);
@@ -194,8 +245,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(language);
   
   const renderContent = () => {
-    const editor = <MonacoEditor ref={editorRef} content={content} language={language} onChange={setContent} />;
-    const preview = <PreviewPane content={content} language={language} />;
+    const editor = <MonacoEditor ref={editorRef} content={content} language={language} onChange={setContent} onScroll={handleEditorScroll} />;
+    const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} />;
     
     switch(viewMode) {
         case 'edit': return editor;
