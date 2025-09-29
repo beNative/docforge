@@ -120,7 +120,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 monacoInstanceRef.current = null;
             }
         };
-    }, [onScroll, onChange, content, language, theme]);
+    }, [onChange, onScroll]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {
