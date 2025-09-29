@@ -49,11 +49,12 @@ export class MarkdownRenderer implements IRenderer {
         const language = (lang || '').toLowerCase();
         
         if (language === 'mermaid') {
-          // The 'code' from marked is HTML-escaped. Mermaid.js needs the raw text content.
-          // We unescape it and place it in the div. The browser won't parse the content
-          // as HTML tags, and mermaid will read the correct raw text.
+          // The 'code' from marked is HTML-escaped. We unescape it to get the raw text.
           const rawCode = escaped ? unescapeHtml(code) : code;
-          return `<div class="mermaid">${rawCode}</div>`;
+          // We must re-escape the raw code before placing it inside the div.
+          // This prevents marked.js from interpreting characters like '<' as HTML.
+          // The PreviewPane component will be responsible for un-escaping this before rendering.
+          return `<div class="mermaid">${escapeHtml(rawCode)}</div>`;
         }
 
         // Prism also needs unescaped code to work correctly.
