@@ -82,73 +82,78 @@ export class MarkdownRenderer implements IRenderer {
       doLog('DEBUG', '[MarkdownRenderer] marked and Prism are loaded.');
       
       const renderer = new marked.Renderer();
-      const originalCodespanRenderer = renderer.codespan.bind(renderer);
-      const originalParagraphRenderer = renderer.paragraph.bind(renderer);
-      const originalTextRenderer = renderer.text.bind(renderer);
-      const originalHeadingRenderer = renderer.heading.bind(renderer);
 
-      const logWrapper = (name: string, fn: Function) => (...args: any[]) => {
-          try {
-              const argTypes = args.map(arg => `${typeof arg}: ${String(arg).substring(0, 70)}...`).join(', ');
-              doLog('DEBUG', `[MarkdownRenderer] renderer.${name} called with args (${argTypes})`);
-              
-              if(args.some(arg => typeof arg !== 'string' && typeof arg !== 'boolean' && typeof arg !== 'number' && typeof arg !== 'object' && arg !== null && arg !== undefined)) {
-                  doLog('WARNING', `[MarkdownRenderer] renderer.${name} received unexpected argument type. Arguments:`, args);
+      const guardAndLogWrapper = (name: string, originalFn: Function) => (...args: any[]) => {
+          doLog('DEBUG', `[MarkdownRenderer] Guard wrapper for renderer.${name} called.`);
+          
+          const guardedArgs = args.map((arg, index) => {
+              if (typeof arg !== 'string') {
+                  doLog('WARNING', `[MarkdownRenderer] renderer.${name} received non-string argument at index ${index}. Coercing to string. Original value:`, arg);
+                  return String(arg ?? '');
               }
-              return fn(...args);
-          } catch(e) {
-              // FIX: The `doLog` function expects a maximum of 3 arguments. Consolidated extra arguments into a single data object.
-              doLog('ERROR', `[MarkdownRenderer] Error in renderer.${name}.`, { arguments: args, error: e });
+              return arg;
+          });
+
+          try {
+              return originalFn(...guardedArgs);
+          } catch (e) {
+              doLog('ERROR', `[MarkdownRenderer] Error in renderer.${name} after guarding.`, { arguments: guardedArgs, error: e });
               return name.includes('span') ? '`error`' : '<p>-- render error --</p>';
           }
+      };
+      
+      const methodsToWrap: (keyof typeof renderer)[] = [
+          'blockquote', 'html', 'heading', 'hr', 'list', 'listitem', 'checkbox', 'paragraph',
+          'table', 'tablerow', 'tablecell', 'strong', 'em', 'codespan', 'br', 'del', 'link', 'image', 'text'
+      ];
+      
+      for (const method of methodsToWrap) {
+          if (typeof renderer[method] === 'function') {
+              const originalFn = renderer[method].bind(renderer);
+              // FIX: Explicitly cast 'method' to a string to satisfy the 'guardAndLogWrapper' function signature.
+              // 'method' is derived from 'methodsToWrap', which contains only string keys, so this cast is safe.
+              (renderer as any)[method] = guardAndLogWrapper(String(method), originalFn);
+          }
       }
+      
+      renderer.code = (code: any, lang: any, escaped: boolean) => {
+        // Adapt to marked.js tokenizer passing a token object instead of strings.
+        const isToken = typeof code === 'object' && code !== null;
+        const actualCode = isToken ? code.text : String(code ?? '');
+        const actualLang = isToken ? code.lang : String(lang ?? '');
+        // When a token is passed, `escaped` is not provided and the text is raw.
+        const actualEscaped = isToken ? false : !!escaped;
 
-      renderer.code = (code: string, lang: string, escaped: boolean) => {
-        doLog('DEBUG', `[MarkdownRenderer] renderer.code called. lang: "${lang}" (type: ${typeof lang}), escaped: ${escaped}. Code type: ${typeof code}.`);
+        doLog('DEBUG', `[MarkdownRenderer] renderer.code called. lang: "${actualLang}", escaped: ${actualEscaped}, isToken: ${isToken}.`);
 
-        const safeCode = String(code ?? '');
-        const safeLang = String(lang ?? '').toLowerCase();
-        
-        if (typeof code !== 'string') {
-          doLog('WARNING', `[MarkdownRenderer] renderer.code received non-string code. Original value:`, code);
+        if (typeof actualCode !== 'string') {
+          doLog('WARNING', `[MarkdownRenderer] renderer.code has non-string code after processing. Original code arg:`, code);
         }
-        if (typeof lang !== 'string') {
-          doLog('WARNING', `[MarkdownRenderer] renderer.code received non-string lang. Original value:`, lang);
+        if (typeof actualLang !== 'string') {
+          doLog('WARNING', `[MarkdownRenderer] renderer.code has non-string lang after processing. Original lang arg:`, lang);
         }
-        
-        doLog('DEBUG', `[MarkdownRenderer] renderer.code processing safe lang: "${safeLang}"`);
 
+        const safeCode = String(actualCode ?? '');
+        const safeLang = String(actualLang ?? '').toLowerCase();
+        
         if (safeLang === 'mermaid') {
           doLog('DEBUG', '[MarkdownRenderer] Detected mermaid block.');
-          const rawCode = escaped ? unescapeHtml(safeCode) : safeCode;
-          doLog('DEBUG', `[MarkdownRenderer] Mermaid raw code (unescaped length): ${rawCode.length}`);
+          const rawCode = actualEscaped ? unescapeHtml(safeCode) : safeCode;
           const escapedForDiv = escapeHtml(rawCode);
-          doLog('DEBUG', `[MarkdownRenderer] Mermaid code escaped for div insertion.`);
           return `<div class="mermaid">${escapedForDiv}</div>`;
         }
 
-        const codeToHighlight = escaped ? unescapeHtml(safeCode) : safeCode;
-        if(escaped) doLog('DEBUG', `[MarkdownRenderer] Unescaped code for highlighting (length): ${codeToHighlight.length}`);
-
+        const codeToHighlight = actualEscaped ? unescapeHtml(safeCode) : safeCode;
+        
         const validLang = Prism.languages[safeLang];
-        doLog('DEBUG', `[MarkdownRenderer] Prism language found for "${safeLang}": ${!!validLang}`);
         
         const highlighted = validLang
           ? Prism.highlight(codeToHighlight, Prism.languages[safeLang], safeLang)
           : escapeHtml(codeToHighlight);
         
-        if (!validLang) doLog('DEBUG', `[MarkdownRenderer] No Prism language found, falling back to HTML escape.`);
-
         const finalLang = validLang ? safeLang : 'plaintext';
-        const finalHtml = `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
-        doLog('DEBUG', `[MarkdownRenderer] renderer.code finished. Returning pre block.`);
-        return finalHtml;
+        return `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
       };
-
-      renderer.codespan = logWrapper('codespan', originalCodespanRenderer);
-      renderer.paragraph = logWrapper('paragraph', originalParagraphRenderer);
-      renderer.text = logWrapper('text', originalTextRenderer);
-      renderer.heading = logWrapper('heading', originalHeadingRenderer);
 
       doLog('DEBUG', '[MarkdownRenderer] Custom renderer configured. Calling marked.parse...');
       
