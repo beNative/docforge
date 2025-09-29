@@ -136,13 +136,6 @@ export class MarkdownRenderer implements IRenderer {
         const safeCode = String(actualCode ?? '');
         const safeLang = String(actualLang ?? '').toLowerCase();
         
-        if (safeLang === 'mermaid') {
-          doLog('DEBUG', '[MarkdownRenderer] Detected mermaid block.');
-          const rawCode = actualEscaped ? unescapeHtml(safeCode) : safeCode;
-          const escapedForDiv = escapeHtml(rawCode);
-          return `<div class="mermaid">${escapedForDiv}</div>`;
-        }
-
         const codeToHighlight = actualEscaped ? unescapeHtml(safeCode) : safeCode;
         
         const validLang = Prism.languages[safeLang];

@@ -4,23 +4,6 @@ import Spinner from './Spinner';
 import { useTheme } from '../hooks/useTheme';
 import type { LogLevel } from '../types';
 
-// Let TypeScript know mermaid is available on the window
-declare const mermaid: any;
-
-/**
- * Safely unescapes HTML entities.
- */
-const unescapeHtml = (html: string): string => {
-    try {
-        const txt = document.createElement("textarea");
-        txt.innerHTML = html;
-        return txt.value;
-    } catch(e) {
-        // Fallback in case of malformed HTML.
-        return html;
-    }
-};
-
 interface PreviewPaneProps {
   content: string;
   language: string | null;
@@ -67,55 +50,6 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
       clearTimeout(debounceTimer);
     };
   }, [content, language, addLog]);
-
-  // Effect to render Mermaid diagrams after the main content is in the DOM
-  useEffect(() => {
-    const renderMermaidDiagrams = async () => {
-        if (ref && typeof ref !== 'function' && ref.current && typeof mermaid !== 'undefined') {
-            try {
-                mermaid.initialize({
-                    startOnLoad: false,
-                    theme: theme === 'dark' ? 'dark' : 'default',
-                    securityLevel: 'strict',
-                });
-            
-                const mermaidNodes = ref.current.querySelectorAll('.mermaid');
-                if (mermaidNodes.length > 0) {
-                    const renderPromises = Array.from(mermaidNodes).map(async (node, index) => {
-                        // FIX: Cast node to HTMLElement to access innerHTML. `querySelectorAll` returns a list of
-                        // generic `Element` types, which do not have the `innerHTML` property.
-                        const element = node as HTMLElement;
-                        const id = `mermaid-graph-${index}-${Date.now()}`;
-                        const rawCode = unescapeHtml(element.innerHTML);
-                        
-                        element.innerHTML = '<div class="flex items-center justify-center p-4 text-xs text-text-secondary"><span class="mr-2"><svg class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" viewBox="0 0 24 24"></svg></span>Rendering diagram...</div>';
-
-                        try {
-                            const { svg } = await mermaid.render(id, rawCode);
-                            element.innerHTML = svg;
-                        } catch(e) {
-                            if (e instanceof Error) {
-                                console.error("Mermaid.js rendering error:", e.message);
-                                element.innerHTML = `<pre class="text-error text-xs p-2 bg-destructive-bg/20 rounded-md">Mermaid Error:\n${e.message}</pre>`;
-                            }
-                        }
-                    });
-                    await Promise.all(renderPromises);
-                }
-            } catch (e) {
-                if (e instanceof Error) {
-                    console.error("Mermaid.js initialization failed:", e.message);
-                }
-            }
-        }
-    };
-    
-    // We only run the mermaid render after the main markdown render is complete
-    if (renderedOutput) {
-        renderMermaidDiagrams();
-    }
-  }, [renderedOutput, ref, theme]);
-
 
   return (
     <div ref={ref} onScroll={onScroll} className="w-full h-full p-6 overflow-auto bg-secondary">
