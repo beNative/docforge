@@ -70,43 +70,49 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
 
   // Effect to render Mermaid diagrams after the main content is in the DOM
   useEffect(() => {
-    if (renderedOutput && ref && typeof ref !== 'function' && ref.current && typeof mermaid !== 'undefined') {
-      try {
-        mermaid.initialize({
-            startOnLoad: false,
-            theme: theme === 'dark' ? 'dark' : 'default',
-            securityLevel: 'strict',
-        });
-       
-        const mermaidNodes = ref.current.querySelectorAll('.mermaid');
+    const renderMermaidDiagrams = async () => {
+        if (ref && typeof ref !== 'function' && ref.current && typeof mermaid !== 'undefined') {
+            try {
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: theme === 'dark' ? 'dark' : 'default',
+                    securityLevel: 'strict',
+                });
+            
+                const mermaidNodes = ref.current.querySelectorAll('.mermaid');
+                if (mermaidNodes.length > 0) {
+                    const renderPromises = Array.from(mermaidNodes).map(async (node, index) => {
+                        // FIX: Cast node to HTMLElement to access innerHTML. `querySelectorAll` returns a list of
+                        // generic `Element` types, which do not have the `innerHTML` property.
+                        const element = node as HTMLElement;
+                        const id = `mermaid-graph-${index}-${Date.now()}`;
+                        const rawCode = unescapeHtml(element.innerHTML);
+                        
+                        element.innerHTML = '<div class="flex items-center justify-center p-4 text-xs text-text-secondary"><span class="mr-2"><svg class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" viewBox="0 0 24 24"></svg></span>Rendering diagram...</div>';
 
-        if (mermaidNodes.length > 0) {
-            // Use mermaid.render for more control and to avoid race conditions with React's DOM management.
-            mermaidNodes.forEach((node, index) => {
-                const id = `mermaid-graph-${index}-${Date.now()}`;
-                const rawCode = unescapeHtml(node.innerHTML);
-                
-                // Clear the node to prevent the raw code from flashing
-                node.innerHTML = '<div class="flex items-center justify-center p-4 text-xs text-text-secondary"><span class="mr-2"><svg class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" viewBox="0 0 24 24"></svg></span>Rendering diagram...</div>';
-
-                try {
-                    // mermaid.render returns the SVG code as a string
-                    const svg = mermaid.render(id, rawCode);
-                    // Insert the rendered SVG into the node
-                    node.innerHTML = svg;
-                } catch(e) {
-                    if (e instanceof Error) {
-                        console.error("Mermaid.js rendering error:", e.message);
-                        node.innerHTML = `<pre class="text-error text-xs p-2 bg-destructive-bg/20 rounded-md">Mermaid Error:\n${e.message}</pre>`;
-                    }
+                        try {
+                            const { svg } = await mermaid.render(id, rawCode);
+                            element.innerHTML = svg;
+                        } catch(e) {
+                            if (e instanceof Error) {
+                                console.error("Mermaid.js rendering error:", e.message);
+                                element.innerHTML = `<pre class="text-error text-xs p-2 bg-destructive-bg/20 rounded-md">Mermaid Error:\n${e.message}</pre>`;
+                            }
+                        }
+                    });
+                    await Promise.all(renderPromises);
                 }
-            });
+            } catch (e) {
+                if (e instanceof Error) {
+                    console.error("Mermaid.js initialization failed:", e.message);
+                }
+            }
         }
-      } catch (e) {
-        if (e instanceof Error) {
-            console.error("Mermaid.js initialization failed:", e.message);
-        }
-      }
+    };
+    
+    // We only run the mermaid render after the main markdown render is complete
+    if (renderedOutput) {
+        renderMermaidDiagrams();
     }
   }, [renderedOutput, ref, theme]);
 
