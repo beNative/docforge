@@ -85,15 +85,16 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
             return command.name.toLowerCase().includes(lowercasedTerm) || shortcutString.includes(lowercasedTerm);
         });
 
-        // FIX: Add a generic type to the `reduce` call to correctly type the accumulator and the return value.
-        return filtered.reduce<Record<string, Command[]>>((acc, command) => {
+        // FIX: The untyped initial value `{}` for `reduce` caused the accumulator `acc` to have an implicit `any` type,
+        // leading to cascading type errors. Explicitly casting the initial value allows TypeScript to infer the correct type.
+        return filtered.reduce((acc, command) => {
             const category = command.category;
             if (!acc[category]) {
                 acc[category] = [];
             }
             acc[category].push(command);
             return acc;
-        }, {});
+        }, {} as Record<string, Command[]>);
     }, [commands, searchTerm, settings.customShortcuts]);
 
     const filteredEditorShortcuts = useMemo(() => {
