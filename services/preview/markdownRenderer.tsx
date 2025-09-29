@@ -114,6 +114,13 @@ export class MarkdownRenderer implements IRenderer {
         const finalLang = validLang ? safeLang : 'plaintext';
         return `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
       };
+      
+      // FIX: The `text` renderer is now passed a token object from marked.js.
+      // The default renderer does not handle this, causing incorrect output for lists and other elements.
+      // This override correctly extracts the text content from the token.
+      renderer.text = (text: any) => {
+        return typeof text === 'object' && text?.text ? text.text : text;
+      };
 
       doLog('DEBUG', '[MarkdownRenderer] Custom renderer configured. Calling marked.parse...');
       
