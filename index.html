@@ -139,43 +139,53 @@
         .dark .token.regex, .dark .token.important, .dark .token.variable { color: #f1fa8c; }
 
         /* Markdown rendering styles */
+        .markdown-content {
+            line-height: 1.6;
+        }
         .markdown-content > :first-child {
             margin-top: 0 !important;
         }
-        .markdown-content h1, .markdown-content h2, .markdown-content h3 {
+        .markdown-content h1, .markdown-content h2, .markdown-content h3, .markdown-content h4, .markdown-content h5, .markdown-content h6 {
             color: rgb(var(--color-text-main));
-            margin-top: 1.25em;
-            margin-bottom: 0.6em;
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
             font-weight: 600;
+            line-height: 1.2;
         }
         .markdown-content h1 {
-            font-size: 1.5rem; /* text-2xl */
+            font-size: 2em;
             border-bottom: 1px solid rgb(var(--color-border));
-            padding-bottom: 0.3em;
+            padding-bottom: 0.4em;
         }
         .markdown-content h2 {
-            font-size: 1.25rem; /* text-xl */
+            font-size: 1.5em;
+            border-bottom: 1px solid rgb(var(--color-border));
+            padding-bottom: 0.4em;
         }
         .markdown-content h3 {
-            font-size: 1.125rem; /* text-lg */
+            font-size: 1.25em;
         }
         .markdown-content p {
-            margin-bottom: 0.8em;
-            line-height: 1.5;
+            margin-bottom: 1em;
+            line-height: 1.7;
         }
         .markdown-content ul, .markdown-content ol {
-            padding-left: 1.5em;
-            margin-bottom: 0.8em;
+            padding-left: 2em;
+            margin-bottom: 1em;
         }
         .markdown-content li {
-            margin-bottom: 0.25em;
+            margin-bottom: 0.5em;
+        }
+        .markdown-content li > p {
+            margin-bottom: 0.5em; /* Handle paragraphs inside list items */
         }
         .markdown-content a {
-            color: rgb(var(--color-accent));
-            text-decoration: underline;
+            color: rgb(var(--color-primary));
+            text-decoration: none;
+            font-weight: 500;
         }
         .markdown-content a:hover {
-            opacity: 0.8;
+            text-decoration: underline;
         }
         .markdown-content code {
             background-color: rgb(var(--color-background));
@@ -184,16 +194,16 @@
             font-size: 85%;
             border-radius: 6px;
             font-family: 'JetBrains Mono', monospace;
-            color: rgb(var(--color-accent));
+            color: rgb(var(--color-destructive-text)); /* A common convention for inline code */
             border: 1px solid rgb(var(--color-border));
         }
         .markdown-content pre {
             background-color: rgb(var(--color-background));
             padding: 1em;
             border: 1px solid rgb(var(--color-border));
-            border-radius: 6px;
+            border-radius: 8px; /* Slightly more rounded */
             overflow-x: auto;
-            margin-bottom: 1em;
+            margin-bottom: 1.25em;
         }
         .markdown-content pre code {
             padding: 0;
@@ -201,17 +211,36 @@
             font-size: 100%;
             background-color: transparent;
             border: none;
+            color: inherit; /* Let PrismJS handle the color */
+        }
+        .markdown-content blockquote {
+            padding: 0.5em 1.5em;
+            margin: 0 0 1em;
+            border-left: 4px solid rgb(var(--color-border));
+            color: rgb(var(--color-text-secondary));
+        }
+        .markdown-content blockquote p {
+            margin-bottom: 0;
+        }
+        .markdown-content hr {
+            border: none;
+            height: 1px;
+            background-color: rgb(var(--color-border));
+            margin: 2em 0;
         }
         /* GFM Table styles */
         .markdown-content table {
             border-collapse: collapse;
             width: auto;
-            margin: 1em 0;
+            margin: 1.25em 0;
             border: 1px solid rgb(var(--color-border));
+            display: block; /* For responsiveness */
+            overflow-x: auto; /* For responsiveness */
         }
         .markdown-content th, .markdown-content td {
             border: 1px solid rgb(var(--color-border));
-            padding: 0.5em 0.75em;
+            padding: 0.6em 0.9em;
+            white-space: nowrap; /* Prevent ugly wrapping in tables */
         }
         .markdown-content th {
             font-weight: 600;
@@ -226,7 +255,7 @@
             list-style-type: none;
         }
         .markdown-content .task-list-item input[type="checkbox"] {
-            margin: 0 0.2em 0.25em -1.4em;
+            margin: 0 0.35em 0.25em -1.6em;
             vertical-align: middle;
             pointer-events: none; /* Make checkbox display-only */
         }
