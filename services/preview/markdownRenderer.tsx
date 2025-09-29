@@ -5,6 +5,16 @@ import type { IRenderer } from './IRenderer';
 declare const marked: any;
 declare const Prism: any;
 
+// Helper to escape HTML entities.
+const escapeHtml = (unsafe: string) => {
+  return unsafe
+   .replace(/&/g, "&amp;")
+   .replace(/</g, "&lt;")
+   .replace(/>/g, "&gt;")
+   .replace(/"/g, "&quot;")
+   .replace(/'/g, "&#039;");
+}
+
 export class MarkdownRenderer implements IRenderer {
   canRender(languageId: string): boolean {
     return languageId === 'markdown';
@@ -16,16 +26,32 @@ export class MarkdownRenderer implements IRenderer {
         throw new Error('Markdown parser (marked.js) or Syntax highlighter (Prism.js) is not loaded.');
       }
       
+      const renderer = new marked.Renderer();
+
+      // Override the code renderer to handle mermaid and prism highlighting
+      renderer.code = (code: string, lang: string) => {
+        const language = (lang || '').toLowerCase();
+        
+        if (language === 'mermaid') {
+          // Mermaid will read the text content of this div.
+          // The content itself is not rendered as HTML by the browser, so it's safe.
+          return `<div class="mermaid">${code}</div>`;
+        }
+
+        const validLang = Prism.languages[language];
+        const highlighted = validLang
+          ? Prism.highlight(code, Prism.languages[language], language)
+          : escapeHtml(code);
+        
+        const finalLang = validLang ? language : 'plaintext';
+
+        return `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
+      };
+
       marked.setOptions({
-        gfm: true, // Enable GitHub Flavored Markdown (tables, task lists, etc.)
-        breaks: true, // Interpret carriage returns as <br>
-        highlight: (code: string, lang: string) => {
-          if (Prism.languages[lang]) {
-            return Prism.highlight(code, Prism.languages[lang], lang);
-          }
-          // Let marked.js handle the code block if the language is not supported by Prism
-          return null;
-        },
+        gfm: true,
+        breaks: true,
+        renderer: renderer,
       });
       
       const html = marked.parse(content);

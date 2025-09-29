@@ -47,6 +47,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markdown.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
     <style>
         :root {
@@ -262,6 +263,15 @@
             margin: 0 0.35em 0.25em -1.6em;
             vertical-align: middle;
             pointer-events: none; /* Make checkbox display-only */
+        }
+        /* Mermaid diagram styles */
+        .markdown-content .mermaid {
+            background-color: rgb(var(--color-background));
+            padding: 1em;
+            border: 1px solid rgb(var(--color-border));
+            border-radius: 8px;
+            margin-bottom: 1.25em;
+            text-align: center;
         }
     </style> 
     

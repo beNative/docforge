@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { previewService } from '../services/previewService';
 import Spinner from './Spinner';
+import { useTheme } from '../hooks/useTheme';
+
+// Let TypeScript know mermaid is available on the window
+declare const mermaid: any;
 
 interface PreviewPaneProps {
   content: string;
@@ -12,6 +16,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
   const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { theme } = useTheme();
 
   useEffect(() => {
     let isCancelled = false;
@@ -46,6 +51,34 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
       clearTimeout(debounceTimer);
     };
   }, [content, language]);
+
+  // Effect to render Mermaid diagrams after the main content is in the DOM
+  useEffect(() => {
+    if (renderedOutput && ref && typeof ref !== 'function' && ref.current && typeof mermaid !== 'undefined') {
+      try {
+        // Initialize with the current theme. This is safe to call multiple times.
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: theme === 'dark' ? 'dark' : 'default',
+            securityLevel: 'strict',
+        });
+       
+        const mermaidNodes = ref.current.querySelectorAll('.mermaid');
+        if (mermaidNodes.length > 0) {
+          // mermaid.run() is async, but we don't need to await it.
+          mermaid.run({ nodes: mermaidNodes }).catch((e: Error) => {
+            console.error("Mermaid.js rendering error:", e.message);
+            // We could set an error state here to show in the UI if needed
+          });
+        }
+      } catch (e) {
+        if (e instanceof Error) {
+            console.error("Mermaid.js initialization failed:", e.message);
+        }
+      }
+    }
+  }, [renderedOutput, ref, theme]);
+
 
   return (
     <div ref={ref} onScroll={onScroll} className="w-full h-full p-6 overflow-auto bg-secondary">
