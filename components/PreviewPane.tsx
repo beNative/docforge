@@ -72,7 +72,6 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
   useEffect(() => {
     if (renderedOutput && ref && typeof ref !== 'function' && ref.current && typeof mermaid !== 'undefined') {
       try {
-        // Initialize with the current theme. This is safe to call multiple times.
         mermaid.initialize({
             startOnLoad: false,
             theme: theme === 'dark' ? 'dark' : 'default',
@@ -80,20 +79,28 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
         });
        
         const mermaidNodes = ref.current.querySelectorAll('.mermaid');
+
         if (mermaidNodes.length > 0) {
-          // The markdown renderer HTML-escapes the content of mermaid blocks
-          // to prevent the marked.js parser from breaking on characters like '<'.
-          // We need to un-escape it here so mermaid.js gets the raw diagram source.
-          mermaidNodes.forEach(node => {
-            const escapedContent = node.innerHTML;
-            node.textContent = unescapeHtml(escapedContent);
-          });
-          
-          // mermaid.run() is async, but we don't need to await it.
-          mermaid.run({ nodes: mermaidNodes }).catch((e: Error) => {
-            console.error("Mermaid.js rendering error:", e.message);
-            // We could set an error state here to show in the UI if needed
-          });
+            // Use mermaid.render for more control and to avoid race conditions with React's DOM management.
+            mermaidNodes.forEach((node, index) => {
+                const id = `mermaid-graph-${index}-${Date.now()}`;
+                const rawCode = unescapeHtml(node.innerHTML);
+                
+                // Clear the node to prevent the raw code from flashing
+                node.innerHTML = '<div class="flex items-center justify-center p-4 text-xs text-text-secondary"><span class="mr-2"><svg class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" viewBox="0 0 24 24"></svg></span>Rendering diagram...</div>';
+
+                try {
+                    // mermaid.render returns the SVG code as a string
+                    const svg = mermaid.render(id, rawCode);
+                    // Insert the rendered SVG into the node
+                    node.innerHTML = svg;
+                } catch(e) {
+                    if (e instanceof Error) {
+                        console.error("Mermaid.js rendering error:", e.message);
+                        node.innerHTML = `<pre class="text-error text-xs p-2 bg-destructive-bg/20 rounded-md">Mermaid Error:\n${e.message}</pre>`;
+                    }
+                }
+            });
         }
       } catch (e) {
         if (e instanceof Error) {
