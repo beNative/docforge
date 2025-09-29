@@ -82,39 +82,6 @@ export class MarkdownRenderer implements IRenderer {
       doLog('DEBUG', '[MarkdownRenderer] marked and Prism are loaded.');
       
       const renderer = new marked.Renderer();
-
-      const guardAndLogWrapper = (name: string, originalFn: Function) => (...args: any[]) => {
-          doLog('DEBUG', `[MarkdownRenderer] Guard wrapper for renderer.${name} called.`);
-          
-          const guardedArgs = args.map((arg, index) => {
-              if (typeof arg !== 'string') {
-                  doLog('WARNING', `[MarkdownRenderer] renderer.${name} received non-string argument at index ${index}. Coercing to string. Original value:`, arg);
-                  return String(arg ?? '');
-              }
-              return arg;
-          });
-
-          try {
-              return originalFn(...guardedArgs);
-          } catch (e) {
-              doLog('ERROR', `[MarkdownRenderer] Error in renderer.${name} after guarding.`, { arguments: guardedArgs, error: e });
-              return name.includes('span') ? '`error`' : '<p>-- render error --</p>';
-          }
-      };
-      
-      const methodsToWrap: (keyof typeof renderer)[] = [
-          'blockquote', 'html', 'heading', 'hr', 'list', 'listitem', 'checkbox', 'paragraph',
-          'table', 'tablerow', 'tablecell', 'strong', 'em', 'codespan', 'br', 'del', 'link', 'image', 'text'
-      ];
-      
-      for (const method of methodsToWrap) {
-          if (typeof renderer[method] === 'function') {
-              const originalFn = renderer[method].bind(renderer);
-              // FIX: Explicitly cast 'method' to a string to satisfy the 'guardAndLogWrapper' function signature.
-              // 'method' is derived from 'methodsToWrap', which contains only string keys, so this cast is safe.
-              (renderer as any)[method] = guardAndLogWrapper(String(method), originalFn);
-          }
-      }
       
       renderer.code = (code: any, lang: any, escaped: boolean) => {
         // Adapt to marked.js tokenizer passing a token object instead of strings.
