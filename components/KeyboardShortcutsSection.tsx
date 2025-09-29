@@ -94,6 +94,8 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
             }
             acc[category].push(command);
             return acc;
+        // FIX: The untyped initial value `{}` for `reduce` caused the accumulator `acc` to have an implicit `any` type,
+        // leading to cascading type errors. Explicitly providing a generic argument to reduce fixes this.
         }, {} as Record<string, Command[]>);
     }, [commands, searchTerm, settings.customShortcuts]);
 

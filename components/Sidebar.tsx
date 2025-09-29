@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
@@ -302,9 +303,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         </div>
       </div>
 
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
             {/* Documents Panel */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0">
                 <header className="flex items-center justify-between p-1 flex-shrink-0 sticky top-0 bg-secondary z-10">
                     <h2 className="text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
                     <div className="flex items-center gap-0.5">
