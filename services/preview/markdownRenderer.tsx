@@ -70,10 +70,9 @@ export class MarkdownRenderer implements IRenderer {
         return `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
       };
 
-      // FIX: Reverted to `marked.parse` and added `await` for compatibility with both sync and async versions.
-      // This resolves the "parseSync is not a function" error while guarding against future library updates.
-      // The `content || ''` check is retained to fix the original "e.replace is not a function" error.
-      const html = await marked.parse(content || '', {
+      // FIX: Explicitly cast content to a string to robustly handle any non-string values (null, undefined, objects)
+      // that cause the 'e.replace is not a function' error.
+      const html = await marked.parse(String(content ?? ''), {
         gfm: true,
         breaks: true,
         renderer: renderer,
