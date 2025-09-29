@@ -115,33 +115,16 @@ export class MarkdownRenderer implements IRenderer {
         return `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
       };
       
-      // FIX: The `marked.js` parser seems to be passing token objects instead of rendered strings to some renderers.
-      // This helper safely extracts the text content if the argument is a token.
-      const resolveTextArgument = (text: any) => {
+      // FIX: This is the definitive fix for all text rendering issues.
+      // The `marked.js` library now passes token objects to the text renderer.
+      // This custom renderer handles those tokens and ensures a string is always returned,
+      // which fixes lists, links, paragraphs, and prevents "cannot read length" errors.
+      renderer.text = (text: any) => {
         if (typeof text === 'object' && text !== null && typeof text.text === 'string') {
           return text.text;
         }
-        return text;
-      };
-
-      // Keep a reference to the original methods
-      const original = {
-        paragraph: renderer.paragraph.bind(renderer),
-        heading: renderer.heading.bind(renderer),
-        listitem: renderer.listitem.bind(renderer),
-      };
-
-      // Override renderers for block-level elements that were failing.
-      renderer.paragraph = (text: any) => {
-        return original.paragraph(resolveTextArgument(text));
-      };
-      
-      renderer.heading = (text: any, level: number, raw: string, slugger: any) => {
-        return original.heading(resolveTextArgument(text), level, raw, slugger);
-      };
-
-      renderer.listitem = (text: any, task: boolean, checked: boolean) => {
-        return original.listitem(resolveTextArgument(text), task, checked);
+        // Safely coerce any value (including null/undefined) to a string.
+        return String(text ?? '');
       };
 
       doLog('DEBUG', '[MarkdownRenderer] Custom renderer configured. Calling marked.parse...');
