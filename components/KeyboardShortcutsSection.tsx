@@ -85,17 +85,14 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
             return command.name.toLowerCase().includes(lowercasedTerm) || shortcutString.includes(lowercasedTerm);
         });
 
-        // FIX: The untyped initial value `{}` for `reduce` caused the accumulator `acc` to have an implicit `any` type,
-        // leading to cascading type errors. Explicitly casting the initial value allows TypeScript to infer the correct type.
-        return filtered.reduce((acc, command) => {
+        // FIX: The `reduce` method was causing a type error. This has been resolved by explicitly typing the accumulator and the initial value.
+        return filtered.reduce((acc: Record<string, Command[]>, command) => {
             const category = command.category;
             if (!acc[category]) {
                 acc[category] = [];
             }
             acc[category].push(command);
             return acc;
-        // FIX: The untyped initial value `{}` for `reduce` caused the accumulator `acc` to have an implicit `any` type,
-        // leading to cascading type errors. Explicitly providing a generic argument to reduce fixes this.
         }, {} as Record<string, Command[]>);
     }, [commands, searchTerm, settings.customShortcuts]);
 
@@ -136,22 +133,26 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
             </div>
 
             <div className="mt-6 space-y-6">
-                {hasAppResults && Object.entries(filteredAndGroupedCommands).map(([category, cmds]) => (
-                    <div key={category}>
-                        <h3 className="text-base font-semibold text-text-main mb-3">{category}</h3>
-                        <div>
-                            {cmds.map(command => (
-                                <ShortcutRow
-                                    key={command.id}
-                                    command={command}
-                                    commands={commands}
-                                    settings={settings}
-                                    setCurrentSettings={setCurrentSettings}
-                                />
-                            ))}
+                {/* FIX: Replaced `Object.entries` with `Object.keys` to avoid potential type issues with older TypeScript configurations where `Object.entries` might not be defined. */}
+                {hasAppResults && Object.keys(filteredAndGroupedCommands).map(category => {
+                    const cmds = filteredAndGroupedCommands[category];
+                    return (
+                        <div key={category}>
+                            <h3 className="text-base font-semibold text-text-main mb-3">{category}</h3>
+                            <div>
+                                {cmds.map(command => (
+                                    <ShortcutRow
+                                        key={command.id}
+                                        command={command}
+                                        commands={commands}
+                                        settings={settings}
+                                        setCurrentSettings={setCurrentSettings}
+                                    />
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
             
             {hasEditorResults && (

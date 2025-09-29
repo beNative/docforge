@@ -1014,7 +1014,7 @@ const MainApp: React.FC = () => {
                     <Header {...headerProps} />
                 )}
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="flex-1 flex overflow-hidden">
+                    <main className="flex-1 flex overflow-hidden min-h-0">
                         {view === 'editor' ? (
                             <>
                                 <aside 
