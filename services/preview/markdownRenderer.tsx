@@ -14,6 +14,12 @@ export class MarkdownRenderer implements IRenderer {
       if (typeof marked === 'undefined') {
         throw new Error('Markdown parser (marked.js) is not loaded.');
       }
+      
+      marked.setOptions({
+        gfm: true, // Enable GitHub Flavored Markdown (tables, task lists, etc.)
+        breaks: true, // Interpret carriage returns as <br>
+      });
+      
       const html = marked.parse(content);
       const output = <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />;
       return { output };

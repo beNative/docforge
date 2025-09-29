@@ -202,6 +202,34 @@
             background-color: transparent;
             border: none;
         }
+        /* GFM Table styles */
+        .markdown-content table {
+            border-collapse: collapse;
+            width: auto;
+            margin: 1em 0;
+            border: 1px solid rgb(var(--color-border));
+        }
+        .markdown-content th, .markdown-content td {
+            border: 1px solid rgb(var(--color-border));
+            padding: 0.5em 0.75em;
+        }
+        .markdown-content th {
+            font-weight: 600;
+            background-color: rgb(var(--color-background));
+            text-align: left;
+        }
+        .markdown-content tr:nth-child(2n) {
+            background-color: rgb(var(--color-background));
+        }
+        /* GFM Task List styles */
+        .markdown-content .task-list-item {
+            list-style-type: none;
+        }
+        .markdown-content .task-list-item input[type="checkbox"] {
+            margin: 0 0.2em 0.25em -1.4em;
+            vertical-align: middle;
+            pointer-events: none; /* Make checkbox display-only */
+        }
     </style> 
     
     
