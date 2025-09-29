@@ -115,11 +115,33 @@ export class MarkdownRenderer implements IRenderer {
         return `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
       };
       
-      // FIX: The `text` renderer is now passed a token object from marked.js.
-      // The default renderer does not handle this, causing incorrect output for lists and other elements.
-      // This override correctly extracts the text content from the token.
-      renderer.text = (text: any) => {
-        return typeof text === 'object' && text?.text ? text.text : text;
+      // FIX: The `marked.js` parser seems to be passing token objects instead of rendered strings to some renderers.
+      // This helper safely extracts the text content if the argument is a token.
+      const resolveTextArgument = (text: any) => {
+        if (typeof text === 'object' && text !== null && typeof text.text === 'string') {
+          return text.text;
+        }
+        return text;
+      };
+
+      // Keep a reference to the original methods
+      const original = {
+        paragraph: renderer.paragraph.bind(renderer),
+        heading: renderer.heading.bind(renderer),
+        listitem: renderer.listitem.bind(renderer),
+      };
+
+      // Override renderers for block-level elements that were failing.
+      renderer.paragraph = (text: any) => {
+        return original.paragraph(resolveTextArgument(text));
+      };
+      
+      renderer.heading = (text: any, level: number, raw: string, slugger: any) => {
+        return original.heading(resolveTextArgument(text), level, raw, slugger);
+      };
+
+      renderer.listitem = (text: any, task: boolean, checked: boolean) => {
+        return original.listitem(resolveTextArgument(text), task, checked);
       };
 
       doLog('DEBUG', '[MarkdownRenderer] Custom renderer configured. Calling marked.parse...');
