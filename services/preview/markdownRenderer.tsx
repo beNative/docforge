@@ -46,11 +46,13 @@ export class MarkdownRenderer implements IRenderer {
 
       // Override the code renderer to handle mermaid and prism highlighting
       renderer.code = (code: string, lang: string, escaped: boolean) => {
-        const language = (lang || '').toLowerCase();
+        // Guard against non-string inputs which can cause a crash in helper functions.
+        const safeCode = String(code ?? '');
+        const safeLang = String(lang ?? '').toLowerCase();
         
-        if (language === 'mermaid') {
+        if (safeLang === 'mermaid') {
           // The 'code' from marked is HTML-escaped. We unescape it to get the raw text.
-          const rawCode = escaped ? unescapeHtml(code) : code;
+          const rawCode = escaped ? unescapeHtml(safeCode) : safeCode;
           // We must re-escape the raw code before placing it inside the div.
           // This prevents marked.js from interpreting characters like '<' as HTML.
           // The PreviewPane component will be responsible for un-escaping this before rendering.
@@ -58,19 +60,19 @@ export class MarkdownRenderer implements IRenderer {
         }
 
         // Prism also needs unescaped code to work correctly.
-        const codeToHighlight = escaped ? unescapeHtml(code) : code;
-        const validLang = Prism.languages[language];
+        const codeToHighlight = escaped ? unescapeHtml(safeCode) : safeCode;
+        const validLang = Prism.languages[safeLang];
         
         const highlighted = validLang
-          ? Prism.highlight(codeToHighlight, Prism.languages[language], language)
+          ? Prism.highlight(codeToHighlight, Prism.languages[safeLang], safeLang)
           : escapeHtml(codeToHighlight); // Re-escape if not highlighted
         
-        const finalLang = validLang ? language : 'plaintext';
+        const finalLang = validLang ? safeLang : 'plaintext';
 
         return `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
       };
 
-      // FIX: Explicitly cast content to a string to robustly handle any non-string values (null, undefined, objects)
+      // Explicitly cast content to a string to robustly handle any non-string values (null, undefined, objects)
       // that cause the 'e.replace is not a function' error.
       const html = await marked.parse(String(content ?? ''), {
         gfm: true,
