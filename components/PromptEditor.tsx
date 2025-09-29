@@ -246,7 +246,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   
   const renderContent = () => {
     const editor = <MonacoEditor ref={editorRef} content={content} language={language} onChange={setContent} onScroll={handleEditorScroll} />;
-    const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} />;
+    const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} />;
     
     switch(viewMode) {
         case 'edit': return editor;

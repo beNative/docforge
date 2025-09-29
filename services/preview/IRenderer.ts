@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { LogLevel } from '../../types';
 
 export interface IRenderer {
   /**
@@ -9,5 +10,5 @@ export interface IRenderer {
   /**
    * Takes a string of content and transforms it into a renderable React element or HTML string.
    */
-  render(content: string): Promise<{ output: React.ReactElement | string; error?: string }>;
+  render(content: string, addLog?: (level: LogLevel, message: string) => void): Promise<{ output: React.ReactElement | string; error?: string }>;
 }

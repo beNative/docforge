@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { previewService } from '../services/previewService';
 import Spinner from './Spinner';
 import { useTheme } from '../hooks/useTheme';
+import type { LogLevel } from '../types';
 
 // Let TypeScript know mermaid is available on the window
 declare const mermaid: any;
@@ -24,9 +25,10 @@ interface PreviewPaneProps {
   content: string;
   language: string | null;
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
+  addLog: (level: LogLevel, message: string) => void;
 }
 
-const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ content, language, onScroll }, ref) => {
+const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ content, language, onScroll, addLog }, ref) => {
   const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,7 +45,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
 
       setError(null);
       const renderer = previewService.getRendererForLanguage(language);
-      const result = await renderer.render(content);
+      const result = await renderer.render(content, addLog);
 
       clearTimeout(loadingTimer);
       if (!isCancelled) {
@@ -64,7 +66,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
       isCancelled = true;
       clearTimeout(debounceTimer);
     };
-  }, [content, language]);
+  }, [content, language, addLog]);
 
   // Effect to render Mermaid diagrams after the main content is in the DOM
   useEffect(() => {
