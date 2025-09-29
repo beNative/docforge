@@ -1001,7 +1001,7 @@ const MainApp: React.FC = () => {
 
     return (
         <IconProvider value={{ iconSet: getSupportedIconSet(settings.iconSet) }}>
-            <div className="flex flex-col h-full font-sans bg-background text-text-main antialiased">
+            <div className="flex flex-col h-full font-sans bg-background text-text-main antialiased overflow-hidden">
                 {isElectron ? (
                     <CustomTitleBar
                         {...headerProps}
