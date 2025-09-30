@@ -1,50 +1,95 @@
-import React from 'react';
+import React, { useRef, useEffect, forwardRef } from 'react';
 import type { IRenderer } from './IRenderer';
 import type { LogLevel } from '../../types';
+import { useTheme } from '../../hooks/useTheme';
 
-// Let TypeScript know 'marked' and 'Prism' are available on the window
-declare const marked: any;
-declare const Prism: any;
-
-// Helper to escape HTML entities.
-const escapeHtml = (unsafe: string) => {
-  return unsafe
-   .replace(/&/g, "&amp;")
-   .replace(/</g, "&lt;")
-   .replace(/>/g, "&gt;")
-   .replace(/"/g, "&quot;")
-   .replace(/'/g, "&#039;");
+interface MuyaViewerProps {
+  content: string;
+  onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 }
 
-/**
- * Safely unescapes HTML entities.
- * The 'code' property from a marked.js renderer is pre-escaped.
- */
-const unescapeHtml = (html: string): string => {
-    try {
-        const txt = document.createElement("textarea");
-        txt.innerHTML = html;
-        return txt.value;
-    } catch(e) {
-        // Fallback in case of malformed HTML during typing.
-        return html;
-    }
-}
+const MuyaViewer = forwardRef<HTMLDivElement, MuyaViewerProps>(({ content, onScroll }, ref) => {
+  const { theme } = useTheme();
+  const muyaContainerRef = useRef<HTMLDivElement>(null);
+  const muyaInstanceRef = useRef<any>(null);
 
-const safeStringify = (obj: any): string => {
-    try {
-        const cache = new Set();
-        return JSON.stringify(obj, (key, value) => {
-            if (typeof value === 'object' && value !== null) {
-                if (cache.has(value)) return '[Circular]';
-                cache.add(value);
-            }
-            return value;
-        }, 2);
-    } catch (e) {
-        return `[Unserializable: ${e instanceof Error ? e.message : String(e)}]`;
+  useEffect(() => {
+    let instance: any = null;
+    if (muyaContainerRef.current && typeof Muya !== 'undefined') {
+      if (muyaInstanceRef.current) {
+        muyaInstanceRef.current.destroy();
+      }
+
+      const options = {
+        markdown: content,
+        disableEdit: true,
+      };
+      instance = new Muya(muyaContainerRef.current, options);
+      muyaInstanceRef.current = instance;
     }
-};
+    return () => {
+      instance?.destroy();
+      muyaInstanceRef.current = null;
+    };
+  }, [theme]); // Re-initialize on theme change for proper styling
+
+  useEffect(() => {
+    if (muyaInstanceRef.current && muyaInstanceRef.current.getMarkdown() !== content) {
+      muyaInstanceRef.current.setMarkdown(content);
+    }
+  }, [content]);
+
+  return (
+    <div ref={ref} onScroll={onScroll} className="w-full h-full overflow-auto bg-secondary">
+      <div ref={muyaContainerRef} />
+      <style>{`
+        /* Styles to integrate Muya with the app theme */
+        .mu-container {
+          padding: 1.5rem; /* Match old p-6 */
+          background-color: transparent !important;
+          color: rgb(var(--color-text-secondary));
+        }
+        .mu-editor-focus-mode .mu-content-dom-read-only, .mu-editor .mu-content-dom-read-only {
+          padding: 0;
+        }
+        .mu-editor {
+          font-size: var(--markdown-font-size, 16px) !important;
+          line-height: var(--markdown-line-height, 1.7) !important;
+          max-width: var(--markdown-max-width, 800px) !important;
+          margin-left: auto;
+          margin-right: auto;
+        }
+        .dark .mu-container h1, .dark .mu-container h2, .dark .mu-container h3, .dark .mu-container h4, .dark .mu-container h5, .dark .mu-container h6 {
+            color: rgb(var(--color-text-main));
+        }
+        .mu-container h1, .mu-container h2 {
+            border-bottom: 1px solid rgb(var(--color-border));
+        }
+        .mu-container code:not([class*="language-"]) {
+            background-color: rgb(var(--color-background));
+            border: 1px solid rgb(var(--color-border));
+            color: rgb(var(--color-destructive-text));
+        }
+        .mu-container blockquote {
+            border-left: 4px solid rgb(var(--color-border));
+        }
+        .mu-container table {
+          border-collapse: collapse;
+        }
+        .mu-container th, .mu-container td {
+          border: 1px solid rgb(var(--color-border));
+        }
+        .dark .mu-container th {
+          background-color: rgb(var(--color-background));
+        }
+        /* Hide Muya's resizer in preview mode */
+        .mu-image-resizer {
+          display: none;
+        }
+      `}</style>
+    </div>
+  );
+});
 
 export class MarkdownRenderer implements IRenderer {
   canRender(languageId: string): boolean {
@@ -52,96 +97,16 @@ export class MarkdownRenderer implements IRenderer {
   }
 
   async render(content: string, addLog?: (level: LogLevel, message: string) => void): Promise<{ output: React.ReactElement; error?: string }> {
-    const doLog = (level: LogLevel, message: string, data?: any) => {
-        const fullMessage = data !== undefined ? `${message}\nData: ${safeStringify(data)}` : message;
-        if (addLog) {
-            addLog(level, fullMessage);
-        } else {
-            const consoleMethod = level.toLowerCase() as 'debug' | 'warn' | 'error' | 'info';
-            if (console[consoleMethod]) {
-                console[consoleMethod](message, data ?? '');
-            } else {
-                console.log(`[${level}] ${message}`, data ?? '');
-            }
-        }
-    };
-
-    doLog('DEBUG', `[MarkdownRenderer] Starting render. Input content type: ${typeof content}. Length: ${content?.length ?? 'N/A'}`);
-    if (typeof content !== 'string') {
-        doLog('DEBUG', `[MarkdownRenderer] Coercing non-string content to string. Original value:`, content);
-    }
-    const contentAsString = String(content ?? '');
-
     try {
-      if (typeof marked === 'undefined' || typeof Prism === 'undefined') {
-        const errorMsg = 'Markdown parser (marked.js) or Syntax highlighter (Prism.js) is not loaded.';
-        doLog('ERROR', `[MarkdownRenderer] ${errorMsg}`);
+      if (typeof Muya === 'undefined') {
+        const errorMsg = 'Markdown editor (Muya) is not loaded.';
+        addLog?.('ERROR', `[MarkdownRenderer] ${errorMsg}`);
         throw new Error(errorMsg);
       }
-      
-      doLog('DEBUG', '[MarkdownRenderer] marked and Prism are loaded.');
-      
-      const renderer = new marked.Renderer();
-      
-      renderer.code = (code: any, lang: any, escaped: boolean) => {
-        // Adapt to marked.js tokenizer passing a token object instead of strings.
-        const isToken = typeof code === 'object' && code !== null;
-        const actualCode = isToken ? code.text : String(code ?? '');
-        const actualLang = isToken ? code.lang : String(lang ?? '');
-        // When a token is passed, `escaped` is not provided and the text is raw.
-        const actualEscaped = isToken ? false : !!escaped;
-
-        doLog('DEBUG', `[MarkdownRenderer] renderer.code called. lang: "${actualLang}", escaped: ${actualEscaped}, isToken: ${isToken}.`);
-
-        if (typeof actualCode !== 'string') {
-          doLog('WARNING', `[MarkdownRenderer] renderer.code has non-string code after processing. Original code arg:`, code);
-        }
-        if (typeof actualLang !== 'string') {
-          doLog('WARNING', `[MarkdownRenderer] renderer.code has non-string lang after processing. Original lang arg:`, lang);
-        }
-
-        const safeCode = String(actualCode ?? '');
-        const safeLang = String(actualLang ?? '').toLowerCase();
-        
-        const codeToHighlight = actualEscaped ? unescapeHtml(safeCode) : safeCode;
-        
-        const validLang = Prism.languages[safeLang];
-        
-        const highlighted = validLang
-          ? Prism.highlight(codeToHighlight, Prism.languages[safeLang], safeLang)
-          : escapeHtml(codeToHighlight);
-        
-        const finalLang = validLang ? safeLang : 'plaintext';
-        return `<pre class="language-${finalLang}"><code class="language-${finalLang}">${highlighted}</code></pre>`;
-      };
-      
-      // FIX: This is the definitive fix for all text rendering issues.
-      // The `marked.js` library now passes token objects to the text renderer.
-      // This custom renderer handles those tokens and ensures a string is always returned,
-      // which fixes lists, links, paragraphs, and prevents "cannot read length" errors.
-      renderer.text = (text: any) => {
-        if (typeof text === 'object' && text !== null && typeof text.text === 'string') {
-          return text.text;
-        }
-        // Safely coerce any value (including null/undefined) to a string.
-        return String(text ?? '');
-      };
-
-      doLog('DEBUG', '[MarkdownRenderer] Custom renderer configured. Calling marked.parse...');
-      
-      const html = await marked.parse(contentAsString, {
-        gfm: true,
-        breaks: true,
-        renderer: renderer,
-      });
-
-      doLog('DEBUG', '[MarkdownRenderer] marked.parse completed successfully.');
-      
-      const output = <div className="markdown-content" dangerouslySetInnerHTML={{ __html: html }} />;
-      return { output };
+      return { output: <MuyaViewer content={content} /> };
     } catch (e) {
-      const error = e instanceof Error ? e.message : 'Failed to render Markdown';
-      doLog('ERROR', `[MarkdownRenderer] Render failed. Error:`, e);
+      const error = e instanceof Error ? e.message : 'Failed to render Markdown with Muya';
+      addLog?.('ERROR', `[MarkdownRenderer] Render failed: ${error}`);
       return { output: <></>, error };
     }
   }

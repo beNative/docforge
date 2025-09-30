@@ -12,7 +12,7 @@ interface PreviewPaneProps {
 }
 
 const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ content, language, onScroll, addLog }, ref) => {
-  const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | string | null>(null);
+  const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { theme } = useTheme();
@@ -36,7 +36,15 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
           setError(result.error);
           setRenderedOutput(null);
         } else {
-          setRenderedOutput(result.output);
+          // Clone the returned element to inject the ref and onScroll handler
+          // This allows renderers to provide components that can be scroll-synced.
+          if (React.isValidElement(result.output)) {
+            const elementWithProps = React.cloneElement(result.output, { ref, onScroll });
+            setRenderedOutput(elementWithProps);
+          } else {
+            // Fallback for non-element outputs, though our current renderers all return elements.
+            setRenderedOutput(<div ref={ref} onScroll={onScroll}>{result.output}</div>);
+          }
         }
         setIsLoading(false);
       }
@@ -49,17 +57,17 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
       isCancelled = true;
       clearTimeout(debounceTimer);
     };
-  }, [content, language, addLog]);
+  }, [content, language, addLog, ref, onScroll]);
 
   return (
-    <div ref={ref} onScroll={onScroll} className="w-full h-full p-6 overflow-auto bg-secondary">
+    <div className="w-full h-full bg-secondary">
       {isLoading && (
-        <div className="flex items-center justify-center h-full text-text-secondary">
+        <div className="flex items-center justify-center h-full text-text-secondary p-6">
             <Spinner />
             <span className="ml-2">Generating preview...</span>
         </div>
       )}
-      {error && <div className="text-destructive-text p-3 bg-destructive-bg rounded-md">{error}</div>}
+      {error && <div className="text-destructive-text p-3 bg-destructive-bg rounded-md m-6">{error}</div>}
       {!isLoading && !error && renderedOutput}
     </div>
   );
