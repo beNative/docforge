@@ -1,10 +1,7 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
-
-// Let TypeScript know that 'marked' is available globally from the script tag in index.html
-declare const marked: {
-  parse(markdown: string): string;
-};
+import React, { useState, useEffect } from 'react';
+import PreviewPane from './PreviewPane';
+import Spinner from './Spinner';
+import { useLogger } from '../hooks/useLogger';
 
 type DocTab = 'Readme' | 'Functional Manual' | 'Technical Manual' | 'Version Log';
 
@@ -24,10 +21,10 @@ const InfoView: React.FC = () => {
     'Version Log': 'Loading...',
   });
   const [error, setError] = useState<string | null>(null);
+  const { addLog } = useLogger();
 
   useEffect(() => {
     const fetchDocs = async () => {
-      // Fix: Use optional chaining which is type-safe now with the global declaration.
       const isElectron = window.electronAPI;
       try {
         const docPromises = (Object.keys(docFiles) as DocTab[]).map(async (tab) => {
@@ -36,7 +33,6 @@ const InfoView: React.FC = () => {
 
           if (isElectron) {
             const result = await window.electronAPI!.readDoc(filename);
-            // Fix: Restructured the type guard to use an if/else block. This makes the type narrowing more explicit, ensuring TypeScript correctly identifies the type of 'result' in each branch.
             if (result.success === true) {
               text = result.content;
             } else {
@@ -77,13 +73,6 @@ const InfoView: React.FC = () => {
     fetchDocs();
   }, []);
 
-  const renderedHtml = useMemo(() => {
-    if (typeof marked === 'undefined' || !documents[activeTab]) {
-      return '';
-    }
-    return marked.parse(documents[activeTab]);
-  }, [documents, activeTab]);
-
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden h-full">
       <h1 className="text-xl font-semibold text-text-main mb-4 px-6 pt-6">Application Information</h1>
@@ -103,8 +92,15 @@ const InfoView: React.FC = () => {
         ))}
       </div>
       {error && <div className="mx-6 mb-4 text-destructive-text p-3 bg-destructive-bg rounded-md">{error}</div>}
-      <div className="flex-1 bg-secondary overflow-y-auto p-6">
-        <div className="markdown-content text-text-secondary" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+      <div className="flex-1 bg-secondary overflow-y-auto">
+        {documents[activeTab] === 'Loading...' ? (
+            <div className="flex items-center justify-center h-full text-text-secondary">
+                <Spinner />
+                <span className="ml-2">Loading documentation...</span>
+            </div>
+        ) : (
+            <PreviewPane content={documents[activeTab]} language="markdown" addLog={addLog} />
+        )}
       </div>
     </div>
   );

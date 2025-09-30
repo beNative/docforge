@@ -1,7 +1,8 @@
-import React, { useRef, useEffect, forwardRef } from 'react';
+import React, { useRef, useEffect, forwardRef, useState } from 'react';
 import type { IRenderer } from './IRenderer';
 import type { LogLevel } from '../../types';
 import { useTheme } from '../../hooks/useTheme';
+import Spinner from '../../components/Spinner';
 
 interface MuyaViewerProps {
   content: string;
@@ -12,32 +13,73 @@ const MuyaViewer = forwardRef<HTMLDivElement, MuyaViewerProps>(({ content, onScr
   const { theme } = useTheme();
   const muyaContainerRef = useRef<HTMLDivElement>(null);
   const muyaInstanceRef = useRef<any>(null);
+  const [isMuyaLoaded, setIsMuyaLoaded] = useState(typeof Muya !== 'undefined');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    let instance: any = null;
-    if (muyaContainerRef.current && typeof Muya !== 'undefined') {
-      if (muyaInstanceRef.current) {
-        muyaInstanceRef.current.destroy();
-      }
+    if (isMuyaLoaded) return;
 
-      const options = {
-        markdown: content,
-        disableEdit: true,
-      };
-      instance = new Muya(muyaContainerRef.current, options);
-      muyaInstanceRef.current = instance;
+    const interval = setInterval(() => {
+      if (typeof Muya !== 'undefined') {
+        setIsMuyaLoaded(true);
+        clearInterval(interval);
+      }
+    }, 100);
+
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      if (typeof Muya === 'undefined') {
+        setLoadError("Failed to load Markdown editor (Muya) from CDN. Please check your internet connection.");
+      }
+    }, 5000); // 5 second timeout
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [isMuyaLoaded]);
+
+
+  useEffect(() => {
+    if (!isMuyaLoaded || !muyaContainerRef.current) {
+      return;
     }
+    
+    if (muyaInstanceRef.current) {
+      muyaInstanceRef.current.destroy();
+    }
+
+    const options = {
+      markdown: content,
+      disableEdit: true,
+    };
+    const instance = new Muya(muyaContainerRef.current, options);
+    muyaInstanceRef.current = instance;
+
     return () => {
       instance?.destroy();
       muyaInstanceRef.current = null;
     };
-  }, [theme]); // Re-initialize on theme change for proper styling
+  }, [isMuyaLoaded, theme]); // Re-initialize on load and theme change
 
   useEffect(() => {
     if (muyaInstanceRef.current && muyaInstanceRef.current.getMarkdown() !== content) {
       muyaInstanceRef.current.setMarkdown(content);
     }
-  }, [content]);
+  }, [content, isMuyaLoaded]);
+
+  if (loadError) {
+    return <div className="p-4 text-destructive-text">{loadError}</div>;
+  }
+
+  if (!isMuyaLoaded) {
+    return (
+      <div className="flex items-center justify-center h-full text-text-secondary p-6">
+        <Spinner />
+        <span className="ml-2">Loading Markdown engine...</span>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} onScroll={onScroll} className="w-full h-full overflow-auto bg-secondary">
@@ -98,11 +140,6 @@ export class MarkdownRenderer implements IRenderer {
 
   async render(content: string, addLog?: (level: LogLevel, message: string) => void): Promise<{ output: React.ReactElement; error?: string }> {
     try {
-      if (typeof Muya === 'undefined') {
-        const errorMsg = 'Markdown editor (Muya) is not loaded.';
-        addLog?.('ERROR', `[MarkdownRenderer] ${errorMsg}`);
-        throw new Error(errorMsg);
-      }
       return { output: <MuyaViewer content={content} /> };
     } catch (e) {
       const error = e instanceof Error ? e.message : 'Failed to render Markdown with Muya';
