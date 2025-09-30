@@ -1,7 +1,7 @@
 import React, { forwardRef } from 'react';
 import { Editor, rootCtx, defaultValueCtx, editorViewOptionsCtx } from '@milkdown/core';
 import { nord } from '@milkdown/theme-nord';
-import { MilkdownProvider, useEditor, ReactEditor } from '@milkdown/react';
+import { MilkdownProvider, useEditor } from '@milkdown/react';
 import { commonmark } from '@milkdown/preset-commonmark';
 import type { IRenderer } from './IRenderer';
 import type { LogLevel } from '../../types';
@@ -34,7 +34,7 @@ const MilkdownViewer = forwardRef<HTMLDivElement, MilkdownViewerProps>(({ conten
         .use(nord)
         .use(commonmark)
     );
-    return <ReactEditor editor={editor} />;
+    return <>{editor}</>;
   };
 
   return (
