@@ -1,132 +1,94 @@
-import React, { useRef, useEffect, forwardRef, useState } from 'react';
+import React, { forwardRef } from 'react';
+import { Editor, rootCtx, defaultValueCtx, editorViewOptionsCtx } from '@milkdown/core';
+import { nord } from '@milkdown/theme-nord';
+import { MilkdownProvider, useEditor, ReactEditor } from '@milkdown/react';
+import { commonmark } from '@milkdown/preset-commonmark';
 import type { IRenderer } from './IRenderer';
 import type { LogLevel } from '../../types';
 import { useTheme } from '../../hooks/useTheme';
-import Spinner from '../../components/Spinner';
 
-interface MuyaViewerProps {
+import '@milkdown/theme-nord/style.css';
+
+interface MilkdownViewerProps {
   content: string;
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 }
 
-const MuyaViewer = forwardRef<HTMLDivElement, MuyaViewerProps>(({ content, onScroll }, ref) => {
+const MilkdownViewer = forwardRef<HTMLDivElement, MilkdownViewerProps>(({ content, onScroll }, ref) => {
   const { theme } = useTheme();
-  const muyaContainerRef = useRef<HTMLDivElement>(null);
-  const muyaInstanceRef = useRef<any>(null);
-  const [isMuyaLoaded, setIsMuyaLoaded] = useState(typeof Muya !== 'undefined');
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isMuyaLoaded) return;
-
-    const interval = setInterval(() => {
-      if (typeof Muya !== 'undefined') {
-        setIsMuyaLoaded(true);
-        clearInterval(interval);
-      }
-    }, 100);
-
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      if (typeof Muya === 'undefined') {
-        setLoadError("Failed to load Markdown editor (Muya) from CDN. Please check your internet connection.");
-      }
-    }, 5000); // 5 second timeout
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [isMuyaLoaded]);
-
-
-  useEffect(() => {
-    if (!isMuyaLoaded || !muyaContainerRef.current) {
-      return;
-    }
-    
-    if (muyaInstanceRef.current) {
-      muyaInstanceRef.current.destroy();
-    }
-
-    const options = {
-      markdown: content,
-      disableEdit: true,
-    };
-    const instance = new Muya(muyaContainerRef.current, options);
-    muyaInstanceRef.current = instance;
-
-    return () => {
-      instance?.destroy();
-      muyaInstanceRef.current = null;
-    };
-  }, [isMuyaLoaded, theme]); // Re-initialize on load and theme change
-
-  useEffect(() => {
-    if (muyaInstanceRef.current && muyaInstanceRef.current.getMarkdown() !== content) {
-      muyaInstanceRef.current.setMarkdown(content);
-    }
-  }, [content, isMuyaLoaded]);
-
-  if (loadError) {
-    return <div className="p-4 text-destructive-text">{loadError}</div>;
-  }
-
-  if (!isMuyaLoaded) {
-    return (
-      <div className="flex items-center justify-center h-full text-text-secondary p-6">
-        <Spinner />
-        <span className="ml-2">Loading Markdown engine...</span>
-      </div>
+  // This inner component uses a `key` prop to force re-mounting when the content changes.
+  // This ensures `useEditor` is re-run with the new `defaultValueCtx`.
+  const EditorWithContent = () => {
+    const { editor } = useEditor((root) =>
+      Editor.make()
+        .config((ctx) => {
+          ctx.set(rootCtx, root);
+          ctx.set(defaultValueCtx, content);
+          ctx.update(editorViewOptionsCtx, (prev) => ({
+            ...prev,
+            editable: () => false,
+            attributes: { class: 'milkdown-preview' },
+          }));
+        })
+        .use(nord)
+        .use(commonmark)
     );
-  }
+    return <ReactEditor editor={editor} />;
+  };
 
   return (
-    <div ref={ref} onScroll={onScroll} className="w-full h-full overflow-auto bg-secondary">
-      <div ref={muyaContainerRef} />
+    <div ref={ref} onScroll={onScroll} className={`w-full h-full overflow-auto milkdown-container bg-secondary ${theme}`}>
+      <MilkdownProvider>
+        <EditorWithContent key={content} />
+      </MilkdownProvider>
       <style>{`
-        /* Styles to integrate Muya with the app theme */
-        .mu-container {
-          padding: 1.5rem; /* Match old p-6 */
-          background-color: transparent !important;
-          color: rgb(var(--color-text-secondary));
+        .milkdown-container {
+          /* Apply app theme variables to Nord theme CSS variables */
+          --nord0: var(--color-secondary); /* Main background */
+          --nord1: var(--color-background); /* Lighter background */
+          --nord2: var(--color-border);
+          --nord3: var(--color-border);
+          --nord4: var(--color-text-main); /* Headings */
+          --nord5: var(--color-text-secondary);
+          --nord6: var(--color-text-secondary); /* Main text */
+          --nord7: rgb(var(--color-accent)); /* Primary accent */
+          --nord8: rgb(var(--color-accent));
+          --nord9: rgb(var(--color-accent-hover));
+          --nord10: rgb(var(--color-success));
+          --nord11: rgb(var(--color-warning));
+          --nord12: rgb(var(--color-info));
+          --nord13: rgb(var(--color-accent));
+          --nord14: rgb(var(--color-destructive-text));
+          --nord15: rgb(var(--color-warning));
         }
-        .mu-editor-focus-mode .mu-content-dom-read-only, .mu-editor .mu-content-dom-read-only {
-          padding: 0;
+
+        .milkdown-container .milkdown-preview {
+            padding: 1.5rem;
+            max-width: var(--markdown-max-width, 800px);
+            margin: 0 auto;
         }
-        .mu-editor {
+
+        .milkdown-container .prose {
           font-size: var(--markdown-font-size, 16px) !important;
           line-height: var(--markdown-line-height, 1.7) !important;
-          max-width: var(--markdown-max-width, 800px) !important;
-          margin-left: auto;
-          margin-right: auto;
         }
-        .dark .mu-container h1, .dark .mu-container h2, .dark .mu-container h3, .dark .mu-container h4, .dark .mu-container h5, .dark .mu-container h6 {
-            color: rgb(var(--color-text-main));
+
+        .milkdown-container .prose, 
+        .milkdown-container .prose h1, .milkdown-container .prose h2, .milkdown-container .prose h3, .milkdown-container .prose h4, .milkdown-container .prose h5, .milkdown-container .prose h6 {
+            font-family: 'Inter', sans-serif !important;
         }
-        .mu-container h1, .mu-container h2 {
-            border-bottom: 1px solid rgb(var(--color-border));
+        
+        .milkdown-container .prose code, .milkdown-container .prose pre {
+            font-family: 'JetBrains Mono', monospace !important;
         }
-        .mu-container code:not([class*="language-"]) {
-            background-color: rgb(var(--color-background));
-            border: 1px solid rgb(var(--color-border));
-            color: rgb(var(--color-destructive-text));
+
+        /* Hide editor-specific elements in read-only mode */
+        .milkdown .ProseMirror-cursor, .milkdown .prosemirror-gapcursor {
+            display: none !important;
         }
-        .mu-container blockquote {
-            border-left: 4px solid rgb(var(--color-border));
-        }
-        .mu-container table {
-          border-collapse: collapse;
-        }
-        .mu-container th, .mu-container td {
-          border: 1px solid rgb(var(--color-border));
-        }
-        .dark .mu-container th {
-          background-color: rgb(var(--color-background));
-        }
-        /* Hide Muya's resizer in preview mode */
-        .mu-image-resizer {
-          display: none;
+        .milkdown-container .prose hr {
+            background-color: rgb(var(--color-border)) !important;
         }
       `}</style>
     </div>
@@ -140,9 +102,9 @@ export class MarkdownRenderer implements IRenderer {
 
   async render(content: string, addLog?: (level: LogLevel, message: string) => void): Promise<{ output: React.ReactElement; error?: string }> {
     try {
-      return { output: <MuyaViewer content={content} /> };
+      return { output: <MilkdownViewer content={content} /> };
     } catch (e) {
-      const error = e instanceof Error ? e.message : 'Failed to render Markdown with Muya';
+      const error = e instanceof Error ? e.message : 'Failed to render Markdown with Milkdown';
       addLog?.('ERROR', `[MarkdownRenderer] Render failed: ${error}`);
       return { output: <></>, error };
     }

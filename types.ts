@@ -3,7 +3,6 @@ import type React from 'react';
 // Fix: Add global declaration for window.electronAPI to inform TypeScript of the preload script's additions.
 // Added NodeJS.Process augmentation to fix type error in main process.
 declare global {
-  const Muya: any;
   interface Window {
     electronAPI?: {
       dbQuery: (sql: string, params?: any[]) => Promise<any[]>;
