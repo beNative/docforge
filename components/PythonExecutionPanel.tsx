@@ -210,11 +210,11 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
   }, [environments]);
 
   return (
-    <div className="mt-4 rounded-lg border border-border-color bg-secondary/60">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-color">
-        <div className="flex items-center gap-2 text-sm font-semibold text-text-main">
+    <div className="h-full flex flex-col text-sm text-text-main">
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border-color/50">
+        <div className="flex items-center gap-2 font-semibold">
           <TerminalIcon className="w-4 h-4" />
-          Python Execution
+          <span>Python Execution</span>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -229,86 +229,101 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
           </Button>
         </div>
       </div>
-      <div className="px-4 py-4 space-y-4 text-sm text-text-main">
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-text-secondary">Virtual Environment</label>
-          <select
-            className="bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
-            value={selectedEnvId ?? AUTO_OPTION_VALUE}
-            onChange={handleEnvironmentChange}
-          >
-            <option value={AUTO_OPTION_VALUE}>Auto-create using defaults (Python {defaults.targetPythonVersion})</option>
-            {environmentOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          {ensureError && <p className="text-xs text-destructive-text">{ensureError}</p>}
-          {runError && <p className="text-xs text-destructive-text">{runError}</p>}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold text-text-secondary">Console Display</label>
-          <select
-            className="bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
-            value={consoleBehavior}
-            onChange={(event) => {
-              const value = event.target.value as PythonConsoleBehavior;
-              setConsoleBehavior(value);
-              if (typeof window !== 'undefined') {
-                window.localStorage.setItem('docforge.python.consoleBehavior', value);
-              }
-            }}
-          >
-            <option value="in-app">In-app console window</option>
-            <option value="hidden">Hidden (no console window)</option>
-            <option value="windows-terminal" disabled={!isWindows}>
-              {isWindows ? 'Windows Terminal (interactive)' : 'Windows Terminal (Windows only)'}
-            </option>
-          </select>
-          {!isWindows && consoleBehavior === 'windows-terminal' && (
-            <p className="text-xs text-destructive-text">
-              Windows Terminal execution is only available on Windows. Please select a different console option.
-            </p>
-          )}
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Recent Runs</span>
-            {isRunning && <span className="text-xs text-primary">Running…</span>}
-          </div>
-          {runHistory.length === 0 ? (
-            <p className="text-xs text-text-secondary">No runs recorded yet.</p>
-          ) : (
+      <div className="flex-1 overflow-auto pt-3">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,260px)_1fr] md:items-start">
+          <div className="space-y-4">
             <div className="space-y-2">
-              {runHistory.map((run) => (
-                <button
-                  key={run.runId}
-                  className={`w-full text-left border rounded-md px-3 py-2 text-xs transition-colors ${run.runId === selectedRunId ? 'border-primary bg-primary/10' : 'border-border-color hover:border-primary'}`}
-                  onClick={() => setSelectedRunId(run.runId)}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-text-main">{run.status.toUpperCase()}</span>
-                    <span className="text-text-secondary">{formatTimestamp(run.startedAt)}</span>
-                  </div>
-                  <div className="mt-1 text-text-secondary">
-                    Exit Code: {run.exitCode ?? '—'}
-                    {run.errorMessage && <span className="ml-2 text-destructive-text">{run.errorMessage}</span>}
-                  </div>
-                </button>
-              ))}
+              <div className="flex items-center justify-between text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                <span>Virtual Environment</span>
+                {isRunning && <span className="text-primary normal-case">Running…</span>}
+              </div>
+              <select
+                className="w-full bg-background border border-border-color/60 rounded-md px-3 py-1.5 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+                value={selectedEnvId ?? AUTO_OPTION_VALUE}
+                onChange={handleEnvironmentChange}
+              >
+                <option value={AUTO_OPTION_VALUE}>Auto-create using defaults (Python {defaults.targetPythonVersion})</option>
+                {environmentOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              {ensureError && <p className="text-xs text-destructive-text">{ensureError}</p>}
+              {runError && <p className="text-xs text-destructive-text">{runError}</p>}
             </div>
-          )}
-        </div>
 
-        {currentRun && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Execution Log</span>
-              <span className="text-xs text-text-secondary">Run ID: {currentRun.runId.slice(0, 8)}</span>
+            <div className="space-y-2">
+              <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide block">Console Display</span>
+              <select
+                className="w-full bg-background border border-border-color/60 rounded-md px-3 py-1.5 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+                value={consoleBehavior}
+                onChange={(event) => {
+                  const value = event.target.value as PythonConsoleBehavior;
+                  setConsoleBehavior(value);
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.setItem('docforge.python.consoleBehavior', value);
+                  }
+                }}
+              >
+                <option value="in-app">In-app console window</option>
+                <option value="hidden">Hidden (no console window)</option>
+                <option value="windows-terminal" disabled={!isWindows}>
+                  {isWindows ? 'Windows Terminal (interactive)' : 'Windows Terminal (Windows only)'}
+                </option>
+              </select>
+              {!isWindows && consoleBehavior === 'windows-terminal' && (
+                <p className="text-xs text-destructive-text">
+                  Windows Terminal execution is only available on Windows. Please select a different console option.
+                </p>
+              )}
             </div>
-            <div className="max-h-60 overflow-y-auto bg-background border border-border-color rounded-md p-3 font-mono text-xs space-y-1">
-              {logEntries.length === 0 ? (
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                <span>Recent Runs</span>
+                {runHistory.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-xs text-primary hover:underline"
+                    onClick={() => { refreshRuns(selectedRunId).catch(() => undefined); }}
+                  >
+                    Refresh
+                  </button>
+                )}
+              </div>
+              {runHistory.length === 0 ? (
+                <p className="text-xs text-text-secondary">No runs recorded yet.</p>
+              ) : (
+                <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+                  {runHistory.map((run) => (
+                    <button
+                      key={run.runId}
+                      className={`w-full text-left rounded-md px-3 py-2 text-xs transition-colors border ${run.runId === selectedRunId ? 'border-primary bg-primary/10' : 'border-border-color/60 hover:border-primary/60 bg-background/60'}`}
+                      onClick={() => setSelectedRunId(run.runId)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-text-main">{run.status.toUpperCase()}</span>
+                        <span className="text-text-secondary">{formatTimestamp(run.startedAt)}</span>
+                      </div>
+                      <div className="mt-1 text-text-secondary">
+                        Exit Code: {run.exitCode ?? '—'}
+                        {run.errorMessage && <span className="ml-2 text-destructive-text">{run.errorMessage}</span>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 min-h-[180px]">
+            <div className="flex items-center justify-between text-xs font-semibold text-text-secondary uppercase tracking-wide">
+              <span>Execution Log</span>
+              {currentRun && <span className="text-text-secondary">Run ID: {currentRun.runId.slice(0, 8)}</span>}
+            </div>
+            <div className="flex-1 overflow-auto rounded-md border border-border-color/60 bg-background/80 p-3 font-mono text-xs space-y-1">
+              {!currentRun ? (
+                <div className="text-text-secondary">Select a run to view its output.</div>
+              ) : logEntries.length === 0 ? (
                 <div className="text-text-secondary">Waiting for output…</div>
               ) : (
                 logEntries.map((entry, index) => (
@@ -319,7 +334,7 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
