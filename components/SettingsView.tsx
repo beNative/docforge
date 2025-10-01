@@ -288,14 +288,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discovere
       }
     );
 
-    const refs = sectionRefs.current;
-    Object.values(refs).forEach((ref) => {
-      if (ref instanceof Element) observer.observe(ref);
-    });
-
-    return () => {
-      Object.values(refs).forEach((ref) => {
-        if (ref instanceof Element) observer.unobserve(ref);
+      <header className="flex items-center justify-between px-4 h-7 border-b border-border-color bg-secondary flex-shrink-0">
+        <h1 className="text-xs font-semibold text-text-secondary tracking-[0.2em] uppercase">Settings</h1>
+        <div className="flex items-center gap-3">
+          {pythonValidationError && (
+            <p className="text-[11px] text-destructive-text max-w-xs text-right leading-snug">
+              Python settings error: {pythonValidationError}
+            </p>
+          )}
+            className="h-7"
       });
     };
   }, []);
