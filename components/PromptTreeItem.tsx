@@ -201,7 +201,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
             onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
             onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
             className={`w-full text-left p-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
-                isSelected ? 'bg-background text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
+                isSelected ? 'bg-tree-selected text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
             } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
         >
             <div className="flex items-center gap-1.5 flex-1 truncate">
