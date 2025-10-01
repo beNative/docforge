@@ -71,7 +71,7 @@ const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: Document
 };
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands } = props;
+  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
@@ -83,13 +83,16 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
   // Effect to manage focus state
   useEffect(() => {
-    if (!focusedItemId || !navigableItems.some(item => item.id === focusedItemId)) {
-      const activeItem = props.activeNodeId || props.activeTemplateId;
-      if (activeItem && navigableItems.some(item => item.id === activeItem)) {
+    const activeItem = props.activeNodeId || props.activeTemplateId;
+    if (activeItem && navigableItems.some(item => item.id === activeItem)) {
+      if (focusedItemId !== activeItem) {
         setFocusedItemId(activeItem);
-      } else {
-        setFocusedItemId(navigableItems[0]?.id || null);
       }
+      return;
+    }
+
+    if (!focusedItemId || !navigableItems.some(item => item.id === focusedItemId)) {
+      setFocusedItemId(navigableItems[0]?.id || null);
     }
   }, [navigableItems, focusedItemId, props.activeNodeId, props.activeTemplateId]);
 
@@ -100,6 +103,24 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         element?.scrollIntoView({ block: 'nearest' });
     }
   }, [focusedItemId]);
+
+  useEffect(() => {
+    if (!pendingRevealId || !sidebarRef.current) {
+        return;
+    }
+
+    const raf = requestAnimationFrame(() => {
+        const element = sidebarRef.current?.querySelector(`[data-item-id='${pendingRevealId}']`) as HTMLElement | null;
+        if (element) {
+            element.scrollIntoView({ block: 'center' });
+            setFocusedItemId(pendingRevealId);
+            onRevealHandled();
+        }
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [pendingRevealId, documentTree, onRevealHandled]);
+
 
   // --- Load initial layout state from storage ---
   useEffect(() => {

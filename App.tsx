@@ -94,6 +94,7 @@ const MainApp: React.FC = () => {
     const [lastClickedId, setLastClickedId] = useState<string | null>(null);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
     const [expandedFolderIds, setExpandedFolderIds] = useState(new Set<string>());
+    const [pendingRevealId, setPendingRevealId] = useState<string | null>(null);
     const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
 
     const [view, setView] = useState<'editor' | 'info' | 'settings'>('editor');
@@ -421,7 +422,8 @@ const MainApp: React.FC = () => {
             }
             return next;
         });
-    }, [items]);
+        setPendingRevealId(node.id);
+    }, [items, setPendingRevealId]);
 
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document.');
@@ -1094,6 +1096,8 @@ const MainApp: React.FC = () => {
                                         renamingNodeId={renamingNodeId}
                                         onRenameComplete={() => setRenamingNodeId(null)}
                                         commands={enrichedCommands}
+                                        pendingRevealId={pendingRevealId}
+                                        onRevealHandled={() => setPendingRevealId(null)}
                                         templates={templates}
                                         activeTemplateId={activeTemplateId}
                                         onSelectTemplate={handleSelectTemplate}
@@ -1195,3 +1199,4 @@ const MainApp: React.FC = () => {
 };
 
 export default App;
+
