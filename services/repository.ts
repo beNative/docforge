@@ -1,7 +1,257 @@
 import type { Node, Document, DocVersion, DocumentOrFolder, DocumentVersion, DocumentTemplate, Settings, ContentStore, ViewMode } from '../types';
 import { cryptoService } from './cryptoService';
-import { EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
+import { DEFAULT_SETTINGS, EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
+
+const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
+
+type BrowserState = {
+    nodes: Node[];
+    templates: DocumentTemplate[];
+    settings: Settings;
+    docVersions: Record<number, DocVersion[]>;
+    nextDocumentId: number;
+    nextVersionId: number;
+};
+
+const BROWSER_STATE_STORAGE_KEY = 'docforge:browser-state:v1';
+
+const cloneNodeTree = (nodes: Node[]): Node[] =>
+    nodes.map(node => ({
+        ...node,
+        document: node.document ? { ...node.document } : undefined,
+        pythonSettings: node.pythonSettings ? { ...node.pythonSettings } : undefined,
+        children: node.children ? cloneNodeTree(node.children) : undefined,
+    }));
+
+const cloneDocVersions = (versions: DocVersion[] = []): DocVersion[] =>
+    versions.map(version => ({ ...version }));
+
+const persistBrowserState = (state: BrowserState | null) => {
+    if (typeof window === 'undefined' || !window.localStorage || !state) return;
+    window.localStorage.setItem(BROWSER_STATE_STORAGE_KEY, JSON.stringify(state));
+};
+
+const sortNodeTree = (nodes: Node[]) => {
+    nodes.sort((a, b) => a.sort_order - b.sort_order);
+    for (const node of nodes) {
+        if (node.children) {
+            sortNodeTree(node.children);
+        }
+    }
+};
+
+const createSampleBrowserState = (): BrowserState => {
+    const now = new Date().toISOString();
+    const rootId = 'sample-root';
+    const documentNodeId = 'sample-doc';
+    const documentId = 1;
+    const versionId = 1;
+    const sampleContent = '# Welcome to DocForge\n\nThis is a static dataset provided for browser preview mode.';
+
+    const document: Document = {
+        document_id: documentId,
+        node_id: documentNodeId,
+        doc_type: 'prompt',
+        language_hint: 'markdown',
+        default_view_mode: 'split-vertical',
+        current_version_id: versionId,
+        content: sampleContent,
+    };
+
+    const documentNode: Node = {
+        node_id: documentNodeId,
+        parent_id: rootId,
+        node_type: 'document',
+        title: 'Getting Started',
+        sort_order: 0,
+        created_at: now,
+        updated_at: now,
+        document,
+    };
+
+    const rootNode: Node = {
+        node_id: rootId,
+        parent_id: null,
+        node_type: 'folder',
+        title: 'Sample Workspace',
+        sort_order: 0,
+        created_at: now,
+        updated_at: now,
+        children: [documentNode],
+    };
+
+    return {
+        nodes: [rootNode],
+        templates: EXAMPLE_TEMPLATES.map((template, index) => ({
+            ...template,
+            template_id: `sample-template-${index}`,
+            created_at: now,
+            updated_at: now,
+        })),
+        settings: { ...DEFAULT_SETTINGS },
+        docVersions: {
+            [documentId]: [
+                {
+                    version_id: versionId,
+                    document_id: documentId,
+                    created_at: now,
+                    content_id: versionId,
+                    content: sampleContent,
+                },
+            ],
+        },
+        nextDocumentId: documentId + 1,
+        nextVersionId: versionId + 1,
+    };
+};
+
+const loadBrowserState = (): BrowserState => {
+    if (typeof window === 'undefined' || !window.localStorage) {
+        return createSampleBrowserState();
+    }
+
+    const raw = window.localStorage.getItem(BROWSER_STATE_STORAGE_KEY);
+    if (!raw) {
+        return createSampleBrowserState();
+    }
+
+    try {
+        const parsed = JSON.parse(raw) as BrowserState;
+        // Ensure arrays exist and sort orders are respected.
+        sortNodeTree(parsed.nodes);
+        return parsed;
+    } catch {
+        return createSampleBrowserState();
+    }
+};
+
+let browserState: BrowserState | null = isElectron ? null : loadBrowserState();
+
+const ensureBrowserState = (): BrowserState => {
+    if (!browserState) {
+        browserState = loadBrowserState();
+    }
+    return browserState;
+};
+
+const ensureChildrenArray = (node: Node): Node[] => {
+    if (!node.children) {
+        node.children = [];
+    }
+    return node.children;
+};
+
+const findNodeWithParent = (
+    nodeId: string,
+    nodes: Node[],
+    parent: Node | null = null,
+): { node: Node | null; parent: Node | null; index: number } => {
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
+        if (node.node_id === nodeId) {
+            return { node, parent, index: i };
+        }
+        if (node.children) {
+            const result = findNodeWithParent(nodeId, node.children, node);
+            if (result.node) {
+                return result;
+            }
+        }
+    }
+    return { node: null, parent: null, index: -1 };
+};
+
+const removeNodeFromCollection = (collection: Node[], index: number) => {
+    collection.splice(index, 1);
+};
+
+const collectDescendantNodeIds = (node: Node, accumulator: string[] = []): string[] => {
+    accumulator.push(node.node_id);
+    if (node.children) {
+        for (const child of node.children) {
+            collectDescendantNodeIds(child, accumulator);
+        }
+    }
+    return accumulator;
+};
+
+const deleteDocumentData = (state: BrowserState, node: Node) => {
+    if (node.document) {
+        delete state.docVersions[node.document.document_id];
+    }
+    if (node.children) {
+        for (const child of node.children) {
+            deleteDocumentData(state, child);
+        }
+    }
+};
+
+const mapNodeTree = (nodes: Node[], mapper: (node: Node) => void) => {
+    for (const node of nodes) {
+        mapper(node);
+        if (node.children) {
+            mapNodeTree(node.children, mapper);
+        }
+    }
+};
+
+const duplicateNodeRecursive = (state: BrowserState, node: Node, newParentId: string | null, sortOrder: number): Node => {
+    const now = new Date().toISOString();
+    const clonedNode: Node = {
+        ...node,
+        node_id: uuidv4(),
+        parent_id: newParentId,
+        sort_order: sortOrder,
+        created_at: now,
+        updated_at: now,
+        document: node.document ? { ...node.document } : undefined,
+        children: undefined,
+    };
+
+    if (clonedNode.document) {
+        const newDocumentId = state.nextDocumentId++;
+        const originalDocumentId = clonedNode.document.document_id;
+        clonedNode.document = {
+            ...clonedNode.document,
+            document_id: newDocumentId,
+            node_id: clonedNode.node_id,
+            current_version_id: null,
+        };
+        const versions = state.docVersions[originalDocumentId] || [];
+        const clonedVersions: DocVersion[] = versions.map(version => {
+            const newVersionId = state.nextVersionId++;
+            return {
+                ...version,
+                version_id: newVersionId,
+                document_id: newDocumentId,
+                content_id: newVersionId,
+            };
+        });
+        if (clonedVersions.length > 0) {
+            clonedNode.document.current_version_id = clonedVersions[clonedVersions.length - 1].version_id;
+        } else if (clonedNode.document.content) {
+            const versionId = state.nextVersionId++;
+            clonedVersions.push({
+                version_id: versionId,
+                document_id: newDocumentId,
+                created_at: now,
+                content_id: versionId,
+                content: clonedNode.document.content,
+            });
+            clonedNode.document.current_version_id = versionId;
+        }
+        state.docVersions[newDocumentId] = clonedVersions;
+    }
+
+    if (node.children) {
+        clonedNode.children = node.children.map((child, index) =>
+            duplicateNodeRecursive(state, child, clonedNode.node_id, index)
+        );
+    }
+
+    return clonedNode;
+};
 
 /**
  * Transforms legacy DocumentOrFolder[] data into the new normalized database schema.
@@ -104,7 +354,14 @@ export const repository = {
 
     async init() {
         if (this._isInitialized) return;
-        
+
+        if (!isElectron) {
+            ensureBrowserState();
+            console.warn('Repository initialized in browser preview mode. Data will not be persisted to a local database.');
+            this._isInitialized = true;
+            return;
+        }
+
         if (!window.electronAPI) {
             throw new Error("Electron API is not available. This application is designed to run in Electron.");
         }
@@ -161,6 +418,13 @@ export const repository = {
     },
 
     async getNodeTree(): Promise<Node[]> {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const cloned = cloneNodeTree(state.nodes);
+            sortNodeTree(cloned);
+            return cloned;
+        }
+
         if (!window.electronAPI) return [];
         const flatNodes = await window.electronAPI.dbQuery(`
             SELECT
@@ -221,9 +485,69 @@ export const repository = {
     },
 
     async addNode(nodeData: Omit<Node, 'node_id' | 'sort_order' | 'created_at' | 'updated_at'>): Promise<Node> {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const now = new Date().toISOString();
+            const newNodeId = uuidv4();
+            const baseNode: Node = {
+                node_id: newNodeId,
+                parent_id: nodeData.parent_id,
+                node_type: nodeData.node_type,
+                title: nodeData.title,
+                sort_order: 0,
+                created_at: now,
+                updated_at: now,
+            };
+
+            let siblings: Node[];
+            if (nodeData.parent_id) {
+                const { node: parentNode } = findNodeWithParent(nodeData.parent_id, state.nodes);
+                siblings = parentNode ? ensureChildrenArray(parentNode) : state.nodes;
+                if (!parentNode) {
+                    baseNode.parent_id = null;
+                }
+            } else {
+                siblings = state.nodes;
+            }
+
+            baseNode.sort_order = siblings.length;
+
+            if (nodeData.node_type === 'document') {
+                const documentId = state.nextDocumentId++;
+                const content = nodeData.document?.content ?? '';
+                let versionId: number | null = null;
+                if (content) {
+                    versionId = state.nextVersionId++;
+                }
+                baseNode.document = {
+                    document_id: documentId,
+                    node_id: newNodeId,
+                    doc_type: nodeData.document?.doc_type ?? 'prompt',
+                    language_hint: nodeData.document?.language_hint ?? null,
+                    default_view_mode: nodeData.document?.default_view_mode ?? null,
+                    current_version_id: versionId,
+                    content,
+                };
+                state.docVersions[documentId] = [];
+                if (content && versionId) {
+                    state.docVersions[documentId].push({
+                        version_id: versionId,
+                        document_id: documentId,
+                        created_at: now,
+                        content_id: versionId,
+                        content,
+                    });
+                }
+            }
+
+            siblings.push(baseNode);
+            persistBrowserState(state);
+            return cloneNodeTree([baseNode])[0];
+        }
+
         const newNodeId = uuidv4();
         const now = new Date().toISOString();
-        
+
         const maxSortOrderResult = await window.electronAPI!.dbGet(
             `SELECT MAX(sort_order) as max_order FROM nodes WHERE parent_id ${nodeData.parent_id ? '= ?' : 'IS NULL'}`,
             nodeData.parent_id ? [nodeData.parent_id] : []
@@ -241,7 +565,7 @@ export const repository = {
                 [newNodeId, nodeData.document.doc_type, nodeData.document.language_hint]
             );
             const documentId = docRes.lastInsertRowid;
-            
+
             if (nodeData.document.content) {
                 await this.updateDocumentContent(newNodeId, nodeData.document.content, documentId as number);
             }
@@ -250,14 +574,53 @@ export const repository = {
         const createdNode = await window.electronAPI!.dbGet(`SELECT * FROM nodes WHERE node_id = ?`, [newNodeId]);
         return createdNode as Node;
     },
-    
     async updateNode(nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null; default_view_mode?: ViewMode | null }>) {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const result = findNodeWithParent(nodeId, state.nodes);
+            if (!result.node) return;
+
+            const now = new Date().toISOString();
+            const node = result.node;
+            if (updates.title !== undefined) {
+                node.title = updates.title ?? node.title;
+            }
+
+            if (updates.parent_id !== undefined && updates.parent_id !== node.parent_id) {
+                const currentCollection = result.parent ? ensureChildrenArray(result.parent) : state.nodes;
+                currentCollection.splice(result.index, 1);
+                currentCollection.forEach((child, index) => {
+                    child.sort_order = index;
+                });
+
+                node.parent_id = updates.parent_id ?? null;
+                const parentLookup = updates.parent_id ? findNodeWithParent(updates.parent_id, state.nodes) : { node: null, parent: null, index: -1 };
+                const newParent = parentLookup.node;
+                const targetCollection = newParent ? ensureChildrenArray(newParent) : state.nodes;
+                node.sort_order = targetCollection.length;
+                targetCollection.push(node);
+            }
+
+            if (node.document) {
+                if (updates.language_hint !== undefined) {
+                    node.document.language_hint = updates.language_hint;
+                }
+                if (updates.default_view_mode !== undefined) {
+                    node.document.default_view_mode = updates.default_view_mode;
+                }
+            }
+
+            node.updated_at = now;
+            persistBrowserState(state);
+            return;
+        }
+
         const nodeUpdates: Partial<Pick<Node, 'title' | 'parent_id'>> = {};
         if (updates.title !== undefined) nodeUpdates.title = updates.title;
         if (updates.parent_id !== undefined) nodeUpdates.parent_id = updates.parent_id;
-    
+
         const now = new Date().toISOString();
-    
+
         if (Object.keys(nodeUpdates).length > 0) {
             const fields = Object.keys(nodeUpdates).map(key => `${key} = ?`).join(', ');
             const params = Object.values(nodeUpdates);
@@ -266,7 +629,7 @@ export const repository = {
                 [...params, now, nodeId]
             );
         }
-        
+
         if (updates.language_hint !== undefined) {
             await window.electronAPI!.dbRun(
                 `UPDATE documents SET language_hint = ? WHERE node_id = ?`,
@@ -274,7 +637,7 @@ export const repository = {
             );
             await window.electronAPI!.dbRun(`UPDATE nodes SET updated_at = ? WHERE node_id = ?`, [now, nodeId]);
         }
-        
+
         if (updates.default_view_mode !== undefined) {
             await window.electronAPI!.dbRun(
                 `UPDATE documents SET default_view_mode = ? WHERE node_id = ?`,
@@ -285,6 +648,33 @@ export const repository = {
     },
 
     async updateDocumentContent(nodeId: string, newContent: string, documentId?: number) {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const { node } = findNodeWithParent(nodeId, state.nodes);
+            if (!node || !node.document) {
+                throw new Error(`No document found for node ${nodeId}`);
+            }
+
+            const docId = node.document.document_id;
+            const now = new Date().toISOString();
+            node.document.content = newContent;
+            const versionId = state.nextVersionId++;
+            node.document.current_version_id = versionId;
+            node.updated_at = now;
+
+            const versions = state.docVersions[docId] ?? [];
+            versions.push({
+                version_id: versionId,
+                document_id: docId,
+                created_at: now,
+                content_id: versionId,
+                content: newContent,
+            });
+            state.docVersions[docId] = versions;
+            persistBrowserState(state);
+            return;
+        }
+
         let docId = documentId;
         if (!docId) {
             const doc = await window.electronAPI!.dbGet(`SELECT document_id FROM documents WHERE node_id = ?`, [nodeId]);
@@ -293,7 +683,7 @@ export const repository = {
         }
 
         const sha = await cryptoService.sha256(newContent);
-        
+
         let content = await window.electronAPI!.dbGet(`SELECT content_id FROM content_store WHERE sha256_hex = ?`, [sha]);
         let contentId;
         if (content) {
@@ -308,22 +698,55 @@ export const repository = {
             [docId, new Date().toISOString(), contentId]
         );
         const newVersionId = versionRes.lastInsertRowid;
-        
+
         await window.electronAPI!.dbRun(`UPDATE documents SET current_version_id = ? WHERE document_id = ?`, [newVersionId, docId]);
         await window.electronAPI!.dbRun(`UPDATE nodes SET updated_at = ? WHERE node_id = ?`, [new Date().toISOString(), nodeId]);
     },
     
     async deleteNode(nodeId: string) {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const result = findNodeWithParent(nodeId, state.nodes);
+            if (!result.node) return;
+            const collection = result.parent ? ensureChildrenArray(result.parent) : state.nodes;
+            const [removed] = collection.splice(result.index, 1);
+            if (removed) {
+                deleteDocumentData(state, removed);
+            }
+            collection.forEach((child, index) => {
+                child.sort_order = index;
+            });
+            persistBrowserState(state);
+            return;
+        }
         await window.electronAPI!.dbRun(`DELETE FROM nodes WHERE node_id = ?`, [nodeId]);
     },
 
     async deleteNodes(nodeIds: string[]) {
         if (nodeIds.length === 0) return;
+        if (!isElectron) {
+            for (const id of nodeIds) {
+                await this.deleteNode(id);
+            }
+            return;
+        }
         const placeholders = nodeIds.map(() => '?').join(',');
         await window.electronAPI!.dbRun(`DELETE FROM nodes WHERE node_id IN (${placeholders})`, nodeIds);
     },
 
     async duplicateNodes(nodeIds: string[]) {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            for (const id of nodeIds) {
+                const { node, parent } = findNodeWithParent(id, state.nodes);
+                if (!node) continue;
+                const targetCollection = parent ? ensureChildrenArray(parent) : state.nodes;
+                const clone = duplicateNodeRecursive(state, node, parent ? parent.node_id : null, targetCollection.length);
+                targetCollection.push(clone);
+            }
+            persistBrowserState(state);
+            return;
+        }
         if (!window.electronAPI?.dbDuplicateNodes) return;
         const result = await window.electronAPI.dbDuplicateNodes(nodeIds);
         if (!result.success) {
@@ -332,10 +755,59 @@ export const repository = {
     },
     
     async moveNodes(draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const extracted: Node[] = [];
+            for (const id of draggedIds) {
+                const result = findNodeWithParent(id, state.nodes);
+                if (!result.node) continue;
+                const sourceCollection = result.parent ? ensureChildrenArray(result.parent) : state.nodes;
+                const [removed] = sourceCollection.splice(result.index, 1);
+                if (removed) {
+                    extracted.push(removed);
+                }
+                sourceCollection.forEach((child, index) => {
+                    child.sort_order = index;
+                });
+            }
+
+            let targetCollection: Node[];
+            let insertIndex: number;
+
+            if (position === 'inside') {
+                const targetInfo = targetId ? findNodeWithParent(targetId, state.nodes) : { node: null, parent: null, index: -1 };
+                const targetNode = targetInfo.node;
+                targetCollection = targetNode ? ensureChildrenArray(targetNode) : state.nodes;
+                insertIndex = targetCollection.length;
+                const parentId = targetNode ? targetNode.node_id : null;
+                for (const node of extracted) {
+                    node.parent_id = parentId;
+                }
+            } else {
+                const targetInfo = targetId ? findNodeWithParent(targetId, state.nodes) : { node: null, parent: null, index: -1 };
+                targetCollection = targetInfo.parent ? ensureChildrenArray(targetInfo.parent) : state.nodes;
+                if (!targetInfo.node) {
+                    insertIndex = targetCollection.length;
+                } else {
+                    insertIndex = position === 'before' ? targetInfo.index : targetInfo.index + 1;
+                }
+                const parentId = targetInfo.parent ? targetInfo.parent.node_id : null;
+                for (const node of extracted) {
+                    node.parent_id = parentId;
+                }
+            }
+
+            targetCollection.splice(insertIndex, 0, ...extracted);
+            targetCollection.forEach((node, index) => {
+                node.sort_order = index;
+            });
+            persistBrowserState(state);
+            return;
+        }
         const parentId = position === 'inside'
             ? targetId
             : (targetId ? (await window.electronAPI!.dbGet(`SELECT parent_id FROM nodes WHERE node_id = ?`, [targetId]))?.parent_id ?? null : null);
-    
+
         const siblings = await window.electronAPI!.dbQuery(
             `SELECT node_id, sort_order FROM nodes WHERE parent_id ${parentId ? '= ?' : 'IS NULL'} ORDER BY sort_order`,
             parentId ? [parentId] : []
@@ -381,6 +853,13 @@ export const repository = {
     },
     
     async getVersionsForNode(nodeId: string): Promise<DocVersion[]> {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const { node } = findNodeWithParent(nodeId, state.nodes);
+            if (!node || !node.document) return [];
+            const versions = state.docVersions[node.document.document_id] ?? [];
+            return cloneDocVersions(versions).sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+        }
         return window.electronAPI!.dbQuery(`
             SELECT dv.version_id, dv.document_id, dv.created_at, dv.content_id, cs.text_content as content
             FROM doc_versions dv
@@ -393,6 +872,21 @@ export const repository = {
 
     async deleteDocVersions(documentId: number, versionIds: number[]): Promise<void> {
         if (versionIds.length === 0) return;
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const existing = state.docVersions[documentId] ?? [];
+            state.docVersions[documentId] = existing.filter(version => !versionIds.includes(version.version_id));
+            const remaining = state.docVersions[documentId];
+            mapNodeTree(state.nodes, node => {
+                if (node.document?.document_id === documentId) {
+                    const latest = remaining[remaining.length - 1] ?? null;
+                    node.document.current_version_id = latest ? latest.version_id : null;
+                    node.document.content = latest?.content;
+                }
+            });
+            persistBrowserState(state);
+            return;
+        }
         if (!window.electronAPI?.dbDeleteVersions) {
             throw new Error("Version deletion is not supported in this environment.");
         }
@@ -403,10 +897,27 @@ export const repository = {
     },
     
     async getAllTemplates(): Promise<DocumentTemplate[]> {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            return state.templates.map(template => ({ ...template }));
+        }
         return window.electronAPI!.dbQuery(`SELECT * FROM templates ORDER BY title`);
     },
-    
+
     async addTemplate(templateData: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>): Promise<DocumentTemplate> {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const now = new Date().toISOString();
+            const template: DocumentTemplate = {
+                ...templateData,
+                template_id: uuidv4(),
+                created_at: now,
+                updated_at: now,
+            };
+            state.templates.push(template);
+            persistBrowserState(state);
+            return { ...template };
+        }
         const newId = uuidv4();
         const now = new Date().toISOString();
         await window.electronAPI!.dbRun(
@@ -415,27 +926,52 @@ export const repository = {
         );
         return { ...templateData, template_id: newId, created_at: now, updated_at: now };
     },
-    
+
     async updateTemplate(templateId: string, updates: Partial<Omit<DocumentTemplate, 'template_id'>>) {
-         const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
-         if(fields.length === 0) return;
-         await window.electronAPI!.dbRun(
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const template = state.templates.find(t => t.template_id === templateId);
+            if (!template || Object.keys(updates).length === 0) return;
+            Object.assign(template, updates);
+            template.updated_at = new Date().toISOString();
+            persistBrowserState(state);
+            return;
+        }
+        const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+        if(fields.length === 0) return;
+        await window.electronAPI!.dbRun(
             `UPDATE templates SET ${fields}, updated_at = ? WHERE template_id = ?`,
             [...Object.values(updates), new Date().toISOString(), templateId]
         );
     },
-    
+
     async deleteTemplate(templateId: string) {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            state.templates = state.templates.filter(t => t.template_id !== templateId);
+            persistBrowserState(state);
+            return;
+        }
         await window.electronAPI!.dbRun(`DELETE FROM templates WHERE template_id = ?`, [templateId]);
     },
 
     async deleteTemplates(templateIds: string[]) {
         if (templateIds.length === 0) return;
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            state.templates = state.templates.filter(t => !templateIds.includes(t.template_id));
+            persistBrowserState(state);
+            return;
+        }
         const placeholders = templateIds.map(() => '?').join(',');
         await window.electronAPI!.dbRun(`DELETE FROM templates WHERE template_id IN (${placeholders})`, templateIds);
     },
 
     async getAllSettings(): Promise<Settings> {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            return { ...state.settings };
+        }
         const rows = await window.electronAPI!.dbQuery(`SELECT key, value FROM settings`);
         const settings: any = {};
         for (const row of rows) {
@@ -449,6 +985,12 @@ export const repository = {
     },
 
     async saveAllSettings(settings: Settings) {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            state.settings = { ...settings };
+            persistBrowserState(state);
+            return;
+        }
         for (const [key, value] of Object.entries(settings)) {
             await window.electronAPI!.dbRun(
                 `INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`,
