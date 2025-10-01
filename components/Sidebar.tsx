@@ -184,6 +184,14 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   }, [documentTree, props.onMoveNode]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (target) {
+      const interactiveElement = target.closest('input, textarea, select, [contenteditable="true"]');
+      if (interactiveElement) {
+        return;
+      }
+    }
+
     if (navigableItems.length === 0) return;
     const key = e.key;
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
