@@ -62,4 +62,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }),
   
   readDoc: (filename: string) => ipcRenderer.invoke('docs:read', filename),
+
+  // --- Python execution & environments ---
+  pythonListEnvironments: () => ipcRenderer.invoke('python:list-envs'),
+  pythonDetectInterpreters: () => ipcRenderer.invoke('python:detect-interpreters'),
+  pythonCreateEnvironment: (options: any) => ipcRenderer.invoke('python:create-env', options),
+  pythonUpdateEnvironment: (envId: string, updates: any) => ipcRenderer.invoke('python:update-env', envId, updates),
+  pythonDeleteEnvironment: (envId: string) => ipcRenderer.invoke('python:delete-env', envId),
+  pythonGetNodeSettings: (nodeId: string) => ipcRenderer.invoke('python:get-node-settings', nodeId),
+  pythonSetNodeSettings: (nodeId: string, envId: string | null, autoDetect: boolean) => ipcRenderer.invoke('python:set-node-settings', nodeId, envId, autoDetect),
+  pythonEnsureNodeEnv: (nodeId: string, defaults: any, interpreters?: any[]) => ipcRenderer.invoke('python:ensure-node-env', nodeId, defaults, interpreters),
+  pythonRunScript: (payload: any) => ipcRenderer.invoke('python:run-script', payload),
+  pythonGetRunsForNode: (nodeId: string, limit?: number) => ipcRenderer.invoke('python:get-runs-for-node', nodeId, limit),
+  pythonGetRunLogs: (runId: string) => ipcRenderer.invoke('python:get-run-logs', runId),
+  pythonGetRun: (runId: string) => ipcRenderer.invoke('python:get-run', runId),
+  onPythonRunLog: (callback: (payload: any) => void) => {
+    const handler = (_: IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on('python:run-log', handler);
+    return () => ipcRenderer.removeListener('python:run-log', handler);
+  },
+  onPythonRunStatus: (callback: (payload: any) => void) => {
+    const handler = (_: IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on('python:run-status', handler);
+    return () => ipcRenderer.removeListener('python:run-status', handler);
+  },
 });

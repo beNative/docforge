@@ -163,14 +163,18 @@ export const repository = {
     async getNodeTree(): Promise<Node[]> {
         if (!window.electronAPI) return [];
         const flatNodes = await window.electronAPI.dbQuery(`
-            SELECT 
-                n.*, 
+            SELECT
+                n.*,
                 d.document_id, d.doc_type, d.language_hint, d.default_view_mode, d.current_version_id,
-                cs.text_content as content
+                cs.text_content as content,
+                ps.env_id as python_env_id,
+                ps.auto_detect_env as python_auto_detect_env,
+                ps.last_run_id as python_last_run_id
             FROM nodes n
             LEFT JOIN documents d ON n.node_id = d.node_id
             LEFT JOIN doc_versions dv ON d.current_version_id = dv.version_id
             LEFT JOIN content_store cs ON dv.content_id = cs.content_id
+            LEFT JOIN node_python_settings ps ON n.node_id = ps.node_id
             ORDER BY n.sort_order
         `);
         
@@ -195,6 +199,12 @@ export const repository = {
                     default_view_mode: record.default_view_mode,
                     current_version_id: record.current_version_id,
                     content: record.content,
+                } : undefined,
+                pythonSettings: record.python_env_id !== null || record.python_auto_detect_env !== null || record.python_last_run_id !== null ? {
+                    nodeId: record.node_id,
+                    envId: record.python_env_id,
+                    autoDetectEnvironment: record.python_auto_detect_env === null ? true : Boolean(record.python_auto_detect_env),
+                    lastUsedRunId: record.python_last_run_id,
                 } : undefined,
             };
             nodesById.set(node.node_id, node);
