@@ -60,19 +60,36 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const isSyncing = useRef(false);
   const syncTimeout = useRef<number | null>(null);
   const isInitialMount = useRef(true);
+  const prevDocumentIdRef = useRef<string | null>(null);
+  const prevDocumentContentRef = useRef<string | undefined>(undefined);
 
-  // Reset content and view when the document changes.
+  // Keep local editor state in sync with document updates without clobbering unsaved edits.
   useEffect(() => {
-    const nextContent = documentNode.content || '';
-    setContent(nextContent);
-    setBaselineContent(nextContent);
-    setViewMode(documentNode.default_view_mode || 'edit');
-    setSplitSize(50);
-    isContentInitialized.current = true;
-    setIsDirty(false);
-    setIsSaving(false);
-    setIsDiffMode(false);
-  }, [documentNode.id, documentNode.default_view_mode, documentNode.title, documentNode.content]);
+    const nextContent = documentNode.content ?? '';
+
+    if (documentNode.id !== prevDocumentIdRef.current) {
+        setTitle(documentNode.title);
+        setContent(nextContent);
+        setBaselineContent(nextContent);
+        setViewMode(documentNode.default_view_mode || 'edit');
+        setSplitSize(50);
+        isContentInitialized.current = true;
+        setIsDirty(false);
+        setIsSaving(false);
+        setIsDiffMode(false);
+        prevDocumentIdRef.current = documentNode.id;
+        prevDocumentContentRef.current = documentNode.content;
+        return;
+    }
+
+    if (documentNode.content !== prevDocumentContentRef.current) {
+        prevDocumentContentRef.current = documentNode.content;
+        setBaselineContent(nextContent);
+        if (!isDirty) {
+            setContent(nextContent);
+        }
+    }
+  }, [documentNode.id, documentNode.content, documentNode.default_view_mode, documentNode.title, isDirty]);
 
   useEffect(() => {
     setTitle(documentNode.title);
