@@ -247,16 +247,18 @@ const FontFamilySelector: React.FC<FontFamilySelectorProps> = ({
             Reset to default
           </button>
         </div>
-      </div>
-    </SettingRow>
-  );
-};
+    if (!mainPanelRef.current) {
+      return;
+    }
 
+    const sections = Object.values(sectionRefs.current).filter(
+      (section): section is HTMLDivElement => Boolean(section)
+    );
+    sections.forEach((section) => observer.observe(section));
 
-const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discoveredServices, onDetectServices, isDetecting, commands }) => {
-  const [currentSettings, setCurrentSettings] = useState<Settings>(settings);
-  const [isDirty, setIsDirty] = useState(false);
-  const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
+    return () => {
+      sections.forEach((section) => observer.unobserve(section));
+      observer.disconnect();
   const { addLog } = useLogger();
   const [pythonValidationError, setPythonValidationError] = useState<string | null>(null);
 
