@@ -29,6 +29,7 @@ interface MermaidDiagramProps {
 const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
   const renderIdRef = useRef(`mermaid-${Math.random().toString(36).slice(2, 10)}`);
 
   useEffect(() => {
@@ -45,6 +46,7 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
       if (!trimmed) {
         target.innerHTML = '';
         setError(null);
+        setErrorDetails(null);
         return;
       }
 
@@ -58,11 +60,16 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
         const { svg } = await mermaid.render(renderIdRef.current, trimmed);
         if (!cancelled) {
           target.innerHTML = svg;
+          setError(null);
+          setErrorDetails(null);
         }
       } catch (err) {
         if (!cancelled) {
           target.innerHTML = '';
-          setError(err instanceof Error ? err.message : 'Failed to render Mermaid diagram');
+          const details = err instanceof Error ? err.message : String(err);
+          console.error('[MermaidDiagram] Failed to render diagram', err);
+          setError('Unable to render the Mermaid diagram. Please verify the diagram syntax.');
+          setErrorDetails(details);
         }
       }
     };
@@ -77,7 +84,17 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
   return (
     <div className="df-mermaid">
       <div ref={containerRef} role="img" aria-label="Mermaid diagram" />
-      {error && <div className="df-mermaid-error">{error}</div>}
+      {error && (
+        <div className="df-mermaid-error" role="alert">
+          <div className="df-mermaid-error__message">{error}</div>
+          {errorDetails && (
+            <details className="df-mermaid-error__details">
+              <summary>Technical details</summary>
+              <code>{errorDetails}</code>
+            </details>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -611,6 +628,41 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           margin-top: 0.75rem;
           font-size: 0.9rem;
           color: rgb(var(--color-destructive-text));
+        }
+
+        .df-mermaid-error {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          align-items: flex-start;
+          text-align: left;
+        }
+
+        .df-mermaid-error__message {
+          font-weight: 600;
+        }
+
+        .df-mermaid-error__details {
+          width: 100%;
+          border: 1px solid rgba(var(--color-border), 0.6);
+          border-radius: 0.5rem;
+          padding: 0.75rem 0.85rem;
+          background: rgba(var(--color-background), 0.6);
+          color: rgba(var(--color-text-secondary), 0.95);
+        }
+
+        .df-mermaid-error__details > summary {
+          cursor: pointer;
+          font-weight: 600;
+          color: rgb(var(--color-destructive-text));
+        }
+
+        .df-mermaid-error__details code {
+          display: block;
+          margin-top: 0.5rem;
+          word-break: break-word;
+          font-size: 0.85rem;
+          color: rgba(var(--color-text), 0.95);
         }
 
         .df-markdown .katex {
