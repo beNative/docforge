@@ -52,6 +52,21 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     addLog,
   });
   
+  const pythonPanelMinHeight = 180;
+  const [pythonPanelHeight, setPythonPanelHeight] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('docforge.python.panelHeight');
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!Number.isNaN(parsed)) {
+          const maxHeight = Math.max(pythonPanelMinHeight, window.innerHeight - 220);
+          return Math.min(Math.max(parsed, pythonPanelMinHeight), maxHeight);
+        }
+      }
+    }
+    return 260;
+  });
+
   const isResizing = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
@@ -63,6 +78,21 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const isInitialMount = useRef(true);
   const prevDocumentIdRef = useRef<string | null>(null);
   const prevDocumentContentRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('docforge.python.panelHeight', String(Math.round(pythonPanelHeight)));
+  }, [pythonPanelHeight]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleWindowResize = () => {
+      const maxHeight = Math.max(pythonPanelMinHeight, window.innerHeight - 220);
+      setPythonPanelHeight((current) => Math.min(Math.max(current, pythonPanelMinHeight), maxHeight));
+    };
+    window.addEventListener('resize', handleWindowResize);
+    return () => window.removeEventListener('resize', handleWindowResize);
+  }, [pythonPanelMinHeight]);
 
   // Keep local editor state in sync with document updates without clobbering unsaved edits.
   useEffect(() => {
@@ -326,6 +356,51 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     ...settings.pythonDefaults,
     workingDirectory: settings.pythonWorkingDirectory ?? settings.pythonDefaults.workingDirectory ?? null,
   }), [settings.pythonDefaults, settings.pythonWorkingDirectory]);
+
+  const handlePythonPanelResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const startY = event.clientY;
+    const startHeight = pythonPanelHeight;
+    const pointerId = event.pointerId;
+    const target = event.currentTarget;
+
+    const getMaxHeight = () => {
+      if (typeof window === 'undefined') return startHeight;
+      return Math.max(pythonPanelMinHeight, window.innerHeight - 220);
+    };
+
+    const handlePointerMove = (pointerEvent: PointerEvent) => {
+      const delta = startY - pointerEvent.clientY;
+      const maxHeight = getMaxHeight();
+      const nextHeight = Math.min(Math.max(startHeight + delta, pythonPanelMinHeight), maxHeight);
+      setPythonPanelHeight(nextHeight);
+    };
+
+    const cleanup = () => {
+      target.removeEventListener('pointermove', handlePointerMove);
+      target.removeEventListener('pointerup', handlePointerUp);
+      target.removeEventListener('pointercancel', handlePointerCancel);
+      try {
+        target.releasePointerCapture(pointerId);
+      } catch {}
+    };
+
+    const handlePointerUp = () => {
+      cleanup();
+    };
+
+    const handlePointerCancel = () => {
+      cleanup();
+    };
+
+    try {
+      target.setPointerCapture(pointerId);
+    } catch {}
+    target.addEventListener('pointermove', handlePointerMove);
+    target.addEventListener('pointerup', handlePointerUp);
+    target.addEventListener('pointercancel', handlePointerCancel);
+  }, [pythonPanelHeight, pythonPanelMinHeight]);
   
   const renderContent = () => {
     const editor = isDiffMode
@@ -435,13 +510,24 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
       </div>
       <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>
       {isPythonDocument && (
-        <div className="px-4 pb-4">
-          <PythonExecutionPanel
-            nodeId={documentNode.id}
-            code={content}
-            defaults={pythonDefaults}
-            consoleTheme={settings.pythonConsoleTheme}
+        <div
+          className="flex-shrink-0 flex flex-col bg-secondary"
+          style={{ height: pythonPanelHeight }}
+        >
+          <div
+            className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
+            onPointerDown={handlePythonPanelResizeStart}
           />
+          <div className="flex-1 overflow-hidden">
+            <div className="h-full overflow-auto px-4 pb-4">
+              <PythonExecutionPanel
+                nodeId={documentNode.id}
+                code={content}
+                defaults={pythonDefaults}
+                consoleTheme={settings.pythonConsoleTheme}
+              />
+            </div>
+          </div>
         </div>
       )}
       {error && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-destructive-text p-3 bg-destructive-bg rounded-md shadow-lg z-20">{error}</div>}
