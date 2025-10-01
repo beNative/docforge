@@ -49,8 +49,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
   };
 
   const selectStyles: React.CSSProperties = {
-      maxWidth: '200px', 
-      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+      maxWidth: '200px',
+      backgroundImage: 'var(--select-arrow-background)',
       backgroundPosition: 'right 0.2rem center',
       backgroundRepeat: 'no-repeat',
       backgroundSize: '1.2em 1.2em',
