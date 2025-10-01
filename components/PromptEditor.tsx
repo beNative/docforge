@@ -99,26 +99,26 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     const nextContent = documentNode.content ?? '';
 
     if (documentNode.id !== prevDocumentIdRef.current) {
-        setTitle(documentNode.title);
-        setContent(nextContent);
-        setBaselineContent(nextContent);
-        setViewMode(documentNode.default_view_mode || 'edit');
-        setSplitSize(50);
-        isContentInitialized.current = true;
-        setIsDirty(false);
-        setIsSaving(false);
-        setIsDiffMode(false);
-        prevDocumentIdRef.current = documentNode.id;
-        prevDocumentContentRef.current = documentNode.content;
-        return;
+      setTitle(documentNode.title);
+      setContent(nextContent);
+      setBaselineContent(nextContent);
+      setViewMode(documentNode.default_view_mode || 'edit');
+      setSplitSize(50);
+      isContentInitialized.current = true;
+      setIsDirty(false);
+      setIsSaving(false);
+      setIsDiffMode(false);
+      prevDocumentIdRef.current = documentNode.id;
+      prevDocumentContentRef.current = documentNode.content;
+      return;
     }
 
     if (documentNode.content !== prevDocumentContentRef.current) {
-        prevDocumentContentRef.current = documentNode.content;
-        setBaselineContent(nextContent);
-        if (!isDirty) {
-            setContent(nextContent);
-        }
+      prevDocumentContentRef.current = documentNode.content;
+      setBaselineContent(nextContent);
+      if (!isDirty) {
+        setContent(nextContent);
+      }
     }
   }, [documentNode.id, documentNode.content, documentNode.default_view_mode, documentNode.title, isDirty]);
 
@@ -128,28 +128,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
 
   useEffect(() => {
     if (viewMode === 'preview' && isDiffMode) {
-        setIsDiffMode(false);
+      setIsDiffMode(false);
     }
   }, [viewMode, isDiffMode]);
 
   useEffect(() => {
     // Only mark as dirty after the initial content has been loaded.
     if (isContentInitialized.current) {
-        setIsDirty(content !== documentNode.content);
+      setIsDirty(content !== documentNode.content);
     }
   }, [content, documentNode.content]);
-
-  useEffect(() => {
-  }, [content]);
-
-  useEffect(() => {
-  }, [title]);
-
-  useEffect(() => {
-  }, [isDirty]);
-
-  useEffect(() => {
-  }, [isSaving]);
 
   // Debounced auto-save for title only
   useEffect(() => {
@@ -163,11 +151,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   // Triggered by command palette
   useEffect(() => {
     if (isInitialMount.current) {
-        isInitialMount.current = false;
-        return;
+      isInitialMount.current = false;
+      return;
     }
     if (formatTrigger > 0) {
-        editorRef.current?.format();
+      editorRef.current?.format();
     }
   }, [formatTrigger]);
 
@@ -175,18 +163,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const handleSplitterMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
-    // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
-    document.body.style.userSelect = 'none';
-    // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
-    document.body.style.cursor = viewMode === 'split-vertical' ? 'col-resize' : 'row-resize';
+    if (typeof document !== 'undefined') {
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = viewMode === 'split-vertical' ? 'col-resize' : 'row-resize';
+    }
   };
 
   const handleGlobalMouseUp = useCallback(() => {
     isResizing.current = false;
-    // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
-    document.body.style.userSelect = 'auto';
-    // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
-    document.body.style.cursor = 'default';
+    if (typeof document !== 'undefined') {
+      document.body.style.removeProperty('user-select');
+      document.body.style.cursor = '';
+    }
   }, []);
 
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
@@ -202,11 +190,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   }, [viewMode]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     window.addEventListener('mousemove', handleGlobalMouseMove);
     window.addEventListener('mouseup', handleGlobalMouseUp);
     return () => {
-        window.removeEventListener('mousemove', handleGlobalMouseMove);
-        window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
   }, [handleGlobalMouseMove, handleGlobalMouseUp]);
 
@@ -377,6 +366,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
       setPythonPanelHeight(nextHeight);
     };
 
+    const body = typeof document !== 'undefined' ? document.body : null;
+    if (body) {
+      body.style.userSelect = 'none';
+      body.style.cursor = 'row-resize';
+    }
+
     const cleanup = () => {
       target.removeEventListener('pointermove', handlePointerMove);
       target.removeEventListener('pointerup', handlePointerUp);
@@ -384,6 +379,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
       try {
         target.releasePointerCapture(pointerId);
       } catch {}
+      if (body) {
+        body.style.removeProperty('user-select');
+        body.style.cursor = '';
+      }
     };
 
     const handlePointerUp = () => {
@@ -427,25 +426,43 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
         );
     const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} />;
     
-    switch(viewMode) {
-        case 'edit': return editor;
-        case 'preview': return supportsPreview ? preview : editor;
-        case 'split-vertical':
-            return (
-                <div ref={splitContainerRef} className="grid h-full" style={{ gridTemplateColumns: `${splitSize}% 1px minmax(0, 1fr)` }}>
-                    <div className="h-full overflow-hidden min-w-0">{editor}</div>
-                    <div onMouseDown={handleSplitterMouseDown} className="h-full bg-border-color/50 hover:bg-primary cursor-col-resize transition-colors"/>
-                    <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
-                </div>
-            );
-        case 'split-horizontal':
-            return (
-                <div ref={splitContainerRef} className="grid w-full h-full" style={{ gridTemplateRows: `${splitSize}% 1px minmax(0, 1fr)` }}>
-                    <div className="w-full overflow-hidden min-h-0">{editor}</div>
-                    <div onMouseDown={handleSplitterMouseDown} className="w-full bg-border-color/50 hover:bg-primary cursor-row-resize transition-colors"/>
-                    <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
-                </div>
-            );
+    switch (viewMode) {
+      case 'edit':
+        return editor;
+      case 'preview':
+        return supportsPreview ? preview : editor;
+      case 'split-vertical':
+        return (
+          <div
+            ref={splitContainerRef}
+            className="grid h-full"
+            style={{ gridTemplateColumns: `${splitSize}% 1px minmax(0, 1fr)` }}
+          >
+            <div className="h-full overflow-hidden min-w-0">{editor}</div>
+            <div
+              onMouseDown={handleSplitterMouseDown}
+              className="h-full bg-border-color/50 hover:bg-primary cursor-col-resize transition-colors"
+            />
+            <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
+          </div>
+        );
+      case 'split-horizontal':
+        return (
+          <div
+            ref={splitContainerRef}
+            className="grid w-full h-full"
+            style={{ gridTemplateRows: `${splitSize}% 1px minmax(0, 1fr)` }}
+          >
+            <div className="w-full overflow-hidden min-h-0">{editor}</div>
+            <div
+              onMouseDown={handleSplitterMouseDown}
+              className="w-full bg-border-color/50 hover:bg-primary cursor-row-resize transition-colors"
+            />
+            <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
+          </div>
+        );
+      default:
+        return editor;
     }
   }
 

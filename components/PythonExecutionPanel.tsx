@@ -211,34 +211,43 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
 
   return (
     <div className="h-full flex flex-col text-[11px] text-text-main">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-border-color/60">
-        <div className="flex items-center gap-1.5 text-[12px] font-semibold">
-          <TerminalIcon className="w-4 h-4" />
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
+        <div className="flex items-center gap-1.5 text-[12px] font-semibold text-text-secondary">
+          <TerminalIcon className="w-4 h-4 text-text-main" />
           <span>Python Execution</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Button
             variant="secondary"
-            onClick={() => { refreshEnvironments(); refreshInterpreters(); }}
+            onClick={() => {
+              refreshEnvironments();
+              refreshInterpreters();
+            }}
             isLoading={isLoading || isDetecting}
+            className="h-7 px-2 text-[11px]"
           >
             <RefreshIcon className="w-4 h-4 mr-1" /> Refresh
           </Button>
-          <Button onClick={handleRun} isLoading={isRunning || isEnsuringEnv} disabled={!code.trim()}>
+          <Button
+            onClick={handleRun}
+            isLoading={isRunning || isEnsuringEnv}
+            disabled={!code.trim()}
+            className="h-7 px-2 text-[11px]"
+          >
             <TerminalIcon className="w-4 h-4 mr-1" /> Run Script
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto pt-3">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,260px)_1fr] md:items-start">
-          <div className="space-y-4">
-            <div className="space-y-2">
+      <div className="flex-1 overflow-auto">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,240px)_1fr] lg:items-start">
+          <div className="space-y-3">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between text-[10px] font-semibold text-text-secondary uppercase tracking-wide">
                 <span>Virtual Environment</span>
                 {isRunning && <span className="text-primary text-[11px] font-semibold normal-case">Running…</span>}
               </div>
               <select
-                className="w-full bg-background border border-border-color/60 rounded-md px-3 py-1.5 text-[11px] text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-md bg-secondary/60 px-3 py-1.5 text-[11px] text-text-main focus:outline-none focus:ring-1 focus:ring-primary focus:bg-secondary"
                 value={selectedEnvId ?? AUTO_OPTION_VALUE}
                 onChange={handleEnvironmentChange}
               >
@@ -247,14 +256,14 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
-              {ensureError && <p className="text-[10px] text-destructive-text">{ensureError}</p>}
-              {runError && <p className="text-[10px] text-destructive-text">{runError}</p>}
+              {ensureError && <p className="text-[10px] text-destructive-text leading-snug">{ensureError}</p>}
+              {runError && <p className="text-[10px] text-destructive-text leading-snug">{runError}</p>}
             </div>
 
-            <div className="space-y-2">
-              <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide block">Console Display</span>
+            <div className="space-y-1.5">
+              <span className="block text-[10px] font-semibold text-text-secondary uppercase tracking-wide">Console Display</span>
               <select
-                className="w-full bg-background border border-border-color/60 rounded-md px-3 py-1.5 text-[11px] text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-md bg-secondary/60 px-3 py-1.5 text-[11px] text-text-main focus:outline-none focus:ring-1 focus:ring-primary focus:bg-secondary"
                 value={consoleBehavior}
                 onChange={(event) => {
                   const value = event.target.value as PythonConsoleBehavior;
@@ -271,20 +280,22 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
                 </option>
               </select>
               {!isWindows && consoleBehavior === 'windows-terminal' && (
-                <p className="text-[10px] text-destructive-text">
+                <p className="text-[10px] text-destructive-text leading-snug">
                   Windows Terminal execution is only available on Windows. Please select a different console option.
                 </p>
               )}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between text-[10px] font-semibold text-text-secondary uppercase tracking-wide">
                 <span>Recent Runs</span>
                 {runHistory.length > 0 && (
                   <button
                     type="button"
-                    className="text-[10px] text-primary hover:underline"
-                    onClick={() => { refreshRuns(selectedRunId).catch(() => undefined); }}
+                    className="text-[10px] font-semibold text-primary hover:text-primary/80"
+                    onClick={() => {
+                      refreshRuns(selectedRunId).catch(() => undefined);
+                    }}
                   >
                     Refresh
                   </button>
@@ -293,18 +304,18 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
               {runHistory.length === 0 ? (
                 <p className="text-[11px] text-text-secondary">No runs recorded yet.</p>
               ) : (
-                <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
                   {runHistory.map((run) => (
                     <button
                       key={run.runId}
-                      className={`w-full text-left rounded-md px-3 py-2 text-[11px] transition-colors border ${run.runId === selectedRunId ? 'border-primary bg-primary/10' : 'border-border-color/60 hover:border-primary/60 bg-background/60'}`}
+                      className={`w-full text-left rounded-md px-2.5 py-1.5 text-[11px] transition-colors ${run.runId === selectedRunId ? 'bg-primary/10 ring-1 ring-primary/50' : 'hover:bg-secondary/70'}`}
                       onClick={() => setSelectedRunId(run.runId)}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-text-main">{run.status.toUpperCase()}</span>
+                        <span className="font-semibold">{run.status.toUpperCase()}</span>
                         <span className="text-text-secondary">{formatTimestamp(run.startedAt)}</span>
                       </div>
-                      <div className="mt-1 text-text-secondary">
+                      <div className="mt-0.5 text-text-secondary">
                         Exit Code: {run.exitCode ?? '—'}
                         {run.errorMessage && <span className="ml-2 text-destructive-text">{run.errorMessage}</span>}
                       </div>
@@ -315,12 +326,12 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 min-h-[180px]">
+          <div className="flex flex-col gap-1.5 min-h-[180px]">
             <div className="flex items-center justify-between text-[10px] font-semibold text-text-secondary uppercase tracking-wide">
               <span>Execution Log</span>
               {currentRun && <span className="text-text-secondary text-[10px]">Run ID: {currentRun.runId.slice(0, 8)}</span>}
             </div>
-            <div className="flex-1 overflow-auto rounded-md border border-border-color/60 bg-background/80 p-3 font-mono text-[11px] space-y-1">
+            <div className="flex-1 overflow-auto rounded-md bg-secondary/60 px-3 py-2 font-mono text-[11px] leading-relaxed shadow-inner">
               {!currentRun ? (
                 <div className="text-text-secondary">Select a run to view its output.</div>
               ) : logEntries.length === 0 ? (
