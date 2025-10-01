@@ -66,7 +66,7 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, activeTemplateId
                     onChange={(e) => setRenameValue(e.target.value)}
                     onBlur={handleRenameSubmit}
                     onKeyDown={handleRenameKeyDown}
-                    className="w-full text-left text-xs p-1.5 rounded-md bg-background text-text-main ring-2 ring-primary focus:outline-none"
+                    className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 </div>
             ) : (
