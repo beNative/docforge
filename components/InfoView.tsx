@@ -74,32 +74,29 @@ const InfoView: React.FC = () => {
   }, []);
 
   return (
-    <div className="flex-1 flex flex-col bg-background overflow-hidden h-full">
-      <h1 className="text-xl font-semibold text-text-main mb-4 px-6 pt-6">Application Information</h1>
-      <div className="flex border-b border-border-color mb-4 px-6">
-        {(Object.keys(docFiles) as DocTab[]).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors border-b-2 -mb-px ${
-              activeTab === tab
-                ? 'border-primary text-primary'
-                : 'border-transparent text-text-secondary hover:text-text-main'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-      {error && <div className="mx-6 mb-4 text-destructive-text p-3 bg-destructive-bg rounded-md">{error}</div>}
-      <div className="flex-1 bg-secondary overflow-y-auto">
+    <div className="flex-1 flex flex-col bg-background overflow-hidden min-h-0">
+      <header className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-border-color">
+        <h1 className="text-sm font-semibold text-text-main tracking-wide">Application Information</h1>
+        <nav className="flex flex-wrap gap-1">
+          {(Object.keys(docFiles) as DocTab[]).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-2 py-0.5 text-[11px] font-medium transition-colors border-b-2 ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-text-secondary hover:text-text-main'}`}>
+              {tab}
+            </button>
+          ))}
+        </nav>
+      </header>
+      {error && <div className="mx-4 mt-3 text-[11px] text-destructive-text p-2 bg-destructive-bg/80 rounded-md">{error}</div>}
+      <div className="flex-1 bg-secondary overflow-y-auto mt-2 border-t border-border-color">
         {documents[activeTab] === 'Loading...' ? (
-            <div className="flex items-center justify-center h-full text-text-secondary">
-                <Spinner />
-                <span className="ml-2">Loading documentation...</span>
-            </div>
+          <div className="flex items-center justify-center h-full text-text-secondary gap-2 text-[11px]">
+            <Spinner />
+            <span>Loading documentation...</span>
+          </div>
         ) : (
-            <PreviewPane content={documents[activeTab]} language="markdown" addLog={addLog} />
+          <PreviewPane content={documents[activeTab]} language="markdown" addLog={addLog} />
         )}
       </div>
     </div>

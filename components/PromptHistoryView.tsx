@@ -300,11 +300,9 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
             <div onMouseDown={handleMouseDown} className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200" />
             <main className="flex-1 flex flex-col overflow-hidden">
                 <div className="flex justify-between items-center flex-shrink-0 h-7 px-4 border-b border-border-color">
-                    <div>
-                        <h3 className="text-xs font-semibold">Comparison</h3>
-                        <p className="text-[11px] text-text-secondary">
-                           Comparing A (<span className="font-semibold text-text-main">{formatDate(newerVersion.createdAt)}</span>) with B (<span className="font-semibold text-text-main">{olderVersion ? formatDate(olderVersion.createdAt) : 'None'}</span>)
-                        </p>
+                    <div className="flex items-baseline gap-2 text-[11px] text-text-secondary flex-wrap">
+                        <h3 className="text-xs font-semibold text-text-main m-0">Comparison</h3>
+                        <span>Comparing A (<span className="font-semibold text-text-main">{formatDate(newerVersion.createdAt)}</span>) with B (<span className="font-semibold text-text-main">{olderVersion ? formatDate(olderVersion.createdAt) : 'None'}</span>)</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-0.5 bg-background border border-border-color rounded-md px-1 py-0.5">
