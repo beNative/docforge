@@ -292,7 +292,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(language);
   
   const renderContent = () => {
-    const editor = <MonacoEditor ref={editorRef} content={content} language={language} onChange={setContent} onScroll={handleEditorScroll} />;
+    const editor = <MonacoEditor ref={editorRef} content={content} language={language} onChange={setContent} onScroll={handleEditorScroll} customShortcuts={settings.customShortcuts} />;
     const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} />;
     
     switch(viewMode) {

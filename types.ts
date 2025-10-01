@@ -175,6 +175,7 @@ export interface Command {
   icon: React.FC<{ className?: string }>;
   shortcut?: string[];
   shortcutString?: string;
+  monacoCommandId?: string;
 }
 
 export interface DiscoveredLLMService {
