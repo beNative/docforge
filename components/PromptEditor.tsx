@@ -515,11 +515,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
           style={{ height: pythonPanelHeight }}
         >
           <div
-            className="flex items-center justify-center h-2 cursor-row-resize select-none text-border-color hover:text-primary transition-colors"
+            className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
             onPointerDown={handlePythonPanelResizeStart}
-          >
-            <div className="h-0.5 w-14 rounded-full bg-current" />
-          </div>
+          />
           <div className="flex-1 overflow-hidden">
             <div className="h-full overflow-auto px-4 pb-4">
               <PythonExecutionPanel
