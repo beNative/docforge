@@ -54,6 +54,12 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const initializeApp = async () => {
+            if (!isElectron) {
+                addLog('WARN', 'Running in browser preview mode. Database features are disabled.');
+                setIsInitialized(true);
+                return;
+            }
+
             try {
                 await repository.init();
                 addLog('INFO', 'Application repository initialized successfully.');
