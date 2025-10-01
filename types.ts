@@ -146,6 +146,13 @@ export interface Settings {
   markdownFontSize: number;
   markdownLineHeight: number;
   markdownMaxWidth: number;
+  markdownHeadingSpacing: number;
+  markdownCodeFontSize: number;
+  markdownBodyFontFamily: string;
+  markdownHeadingFontFamily: string;
+  markdownCodeFontFamily: string;
+  markdownContentPadding: number;
+  markdownParagraphSpacing: number;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';

@@ -5,6 +5,7 @@ import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, Pen
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
+import { useDocumentAutoSave } from '../hooks/useDocumentAutoSave';
 import IconButton from './IconButton';
 import Button from './Button';
 import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
@@ -14,7 +15,7 @@ import { SUPPORTED_LANGUAGES } from '../services/languageService';
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
   onSave: (prompt: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => void;
-  onCommitVersion: (content: string) => void;
+  onCommitVersion: (content: string) => Promise<void> | void;
   onDelete: (id: string) => void;
   settings: Settings;
   onShowHistory: () => void;
@@ -31,11 +32,21 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const [error, setError] = useState<string | null>(null);
   const [refinedContent, setRefinedContent] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(documentNode.default_view_mode || 'edit');
   const [splitSize, setSplitSize] = useState(50);
   const { addLog } = useLogger();
+  const { skipNextAutoSave } = useDocumentAutoSave({
+    documentId: documentNode.id,
+    content,
+    title,
+    isDirty,
+    isSaving,
+    onCommitVersion,
+    addLog,
+  });
   
   const isResizing = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
@@ -53,7 +64,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     setViewMode(documentNode.default_view_mode || 'edit');
     setSplitSize(50);
     isContentInitialized.current = true;
-  }, [documentNode.id, documentNode.default_view_mode]);
+    setIsDirty(false);
+    setIsSaving(false);
+  }, [documentNode.id, documentNode.default_view_mode, documentNode.title, documentNode.content]);
 
   useEffect(() => {
     setTitle(documentNode.title);
@@ -65,6 +78,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
         setIsDirty(content !== documentNode.content);
     }
   }, [content, documentNode.content]);
+
+  useEffect(() => {
+  }, [content]);
+
+  useEffect(() => {
+  }, [title]);
+
+  useEffect(() => {
+  }, [isDirty]);
+
+  useEffect(() => {
+  }, [isSaving]);
 
   // Debounced auto-save for title only
   useEffect(() => {
@@ -173,12 +198,34 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   }, [viewMode]);
 
 
+
+
   // --- Action Handlers ---
   const handleManualSave = () => {
-    addLog('INFO', `User action: Manually save version for document "${title}".`);
-    if (isDirty) {
-      onCommitVersion(content);
+    if (!isDirty || isRefining || isSaving) {
+      return;
     }
+    addLog('INFO', `User action: Manually save version for document "${title}".`);
+    setIsSaving(true);
+    const commitPromise = Promise.resolve(onCommitVersion(content));
+    commitPromise
+      .then(() => {
+        setIsDirty(false);
+      })
+      .catch((err) => {
+        const message = err instanceof Error ? err.message : 'Failed to save document version.';
+        setError(message);
+        addLog('ERROR', `Manual save failed for document "${title}": ${message}`);
+      })
+      .finally(() => {
+        setIsSaving(false);
+      });
+  };
+
+  const handleDeleteDocument = () => {
+    skipNextAutoSave();
+    addLog('INFO', `User action: Delete document "${title}".`);
+    onDelete(documentNode.id);
   };
 
   const handleViewModeButton = (newMode: ViewMode) => {
@@ -301,10 +348,22 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             )}
             <IconButton onClick={onShowHistory} tooltip="View Version History" size="xs" variant="ghost"><HistoryIcon className="w-4 h-4" /></IconButton>
             <div className="h-5 w-px bg-border-color mx-1"></div>
-            <IconButton onClick={handleManualSave} disabled={!isDirty || isRefining} tooltip="Save Version" size="xs" variant="ghost"><SaveIcon className={`w-4 h-4 ${isDirty ? 'text-primary' : ''}`} /></IconButton>
+            <IconButton
+              onClick={handleManualSave}
+              disabled={!isDirty || isRefining || isSaving}
+              tooltip={isSaving ? 'Saving...' : 'Save Version'}
+              size="xs"
+              variant="ghost"
+            >
+              {isSaving ? (
+                <Spinner />
+              ) : (
+                <SaveIcon className={`w-4 h-4 ${isDirty ? 'text-primary' : ''}`} />
+              )}
+            </IconButton>
             <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
             {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
-            <IconButton onClick={() => onDelete(documentNode.id)} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
+            <IconButton onClick={handleDeleteDocument} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
         </div>
       </div>
       <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>

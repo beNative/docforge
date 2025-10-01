@@ -29,6 +29,13 @@ export const DEFAULT_SETTINGS: Settings = {
   markdownFontSize: 16,
   markdownLineHeight: 1.7,
   markdownMaxWidth: 800,
+  markdownHeadingSpacing: 1.8,
+  markdownCodeFontSize: 14,
+  markdownBodyFontFamily: 'Inter, sans-serif',
+  markdownHeadingFontFamily: 'Inter, sans-serif',
+  markdownCodeFontFamily: '\'JetBrains Mono\', monospace',
+  markdownContentPadding: 48,
+  markdownParagraphSpacing: 0.75,
 };
 
 export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [

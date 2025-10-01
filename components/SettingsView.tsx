@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { Settings, DiscoveredLLMService, DiscoveredLLMModel, DatabaseStats, Command } from '../types';
 import { llmDiscoveryService } from '../services/llmDiscoveryService';
+import { DEFAULT_SETTINGS } from '../constants';
 import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon } from './Icons';
 import * as HeroIcons from './iconsets/Heroicons';
 import * as LucideIcons from './iconsets/Lucide';
@@ -36,6 +37,162 @@ const categories: { id: SettingsCategory; label: string; icon: React.FC<{classNa
   { id: 'database', label: 'Database', icon: DatabaseIcon },
   { id: 'advanced', label: 'Advanced', icon: FileIcon },
 ];
+
+
+type FontField = 'markdownBodyFontFamily' | 'markdownHeadingFontFamily' | 'markdownCodeFontFamily';
+type PlatformId = 'mac' | 'windows' | 'linux' | 'generic';
+
+interface FontOption {
+  label: string;
+  value: string;
+}
+
+const detectPlatform = (): PlatformId => {
+  if (typeof navigator === 'undefined') {
+    return 'generic';
+  }
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes('mac')) return 'mac';
+  if (ua.includes('win')) return 'windows';
+  if (ua.includes('linux')) return 'linux';
+  return 'generic';
+};
+
+const FONT_PRESETS: Record<FontField, Record<PlatformId, string[]>> = {
+  markdownBodyFontFamily: {
+    generic: ['Inter, sans-serif', 'System UI, sans-serif', 'Georgia, serif'],
+    mac: ['SF Pro Text, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif'],
+    windows: ['Segoe UI, sans-serif', 'Calibri, sans-serif'],
+    linux: ['Ubuntu, sans-serif', 'Cantarell, sans-serif'],
+  },
+  markdownHeadingFontFamily: {
+    generic: ['Inter, sans-serif', 'Source Serif Pro, serif'],
+    mac: ['SF Pro Display, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif'],
+    windows: ['Segoe UI Semibold, sans-serif', 'Cambria, serif'],
+    linux: ['Ubuntu Condensed, sans-serif', 'Cantarell, sans-serif'],
+  },
+  markdownCodeFontFamily: {
+    generic: ['"JetBrains Mono", monospace', '"Fira Code", monospace'],
+    mac: ['"SF Mono", monospace', '"Menlo", monospace'],
+    windows: ['"Cascadia Code", monospace', '"Consolas", monospace'],
+    linux: ['"Ubuntu Mono", monospace', '"DejaVu Sans Mono", monospace'],
+  },
+};
+
+const buildFontOptions = (field: FontField, platform: PlatformId): FontOption[] => {
+  const presets = FONT_PRESETS[field];
+  const ordered = [
+    DEFAULT_SETTINGS[field],
+    ...(presets?.generic ?? []),
+    ...(presets?.[platform] ?? []),
+  ].filter(Boolean);
+
+  const unique: string[] = [];
+  ordered.forEach((value) => {
+    const normalized = value.trim();
+    if (normalized && !unique.includes(normalized)) {
+      unique.push(normalized);
+    }
+  });
+
+  return unique.map((value) => {
+    const primary = value.split(',')[0].replace(/["']/g, '').trim();
+    return { label: primary || value, value };
+  });
+};
+
+interface FontFamilySelectorProps {
+  id: string;
+  label: string;
+  description: string;
+  value: string;
+  placeholder: string;
+  helperText?: string;
+  options: FontOption[];
+  defaultValue: string;
+  onChange: (font: string) => void;
+}
+
+const FontFamilySelector: React.FC<FontFamilySelectorProps> = ({
+  id,
+  label,
+  description,
+  value,
+  placeholder,
+  helperText,
+  options,
+  defaultValue,
+  onChange,
+}) => {
+  const normalizedValue = (value || '').trim();
+  const matchingOption = options.find((option) => option.value === normalizedValue);
+  const previewFamily = normalizedValue || placeholder || defaultValue;
+
+  const handleSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const next = event.target.value;
+    if (next) {
+      onChange(next.trim());
+    }
+  };
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(event.target.value);
+  };
+
+  return (
+    <SettingRow label={label} description={description}>
+      <div className="flex flex-col gap-4 md:flex-row">
+        <div className="flex-1 space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary mb-1" htmlFor={`${id}-recommended`}>Recommended</label>
+            <select
+              id={`${id}-recommended`}
+              value={matchingOption ? matchingOption.value : ''}
+              onChange={handleSelect}
+              className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
+            >
+              <option value="">Choose a font…</option>
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary mb-1" htmlFor={`${id}-custom`}>Custom value</label>
+            <input
+              id={`${id}-custom`}
+              type="text"
+              value={value}
+              onChange={handleInputChange}
+              placeholder={placeholder}
+              className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            {helperText && <p className="text-xs text-text-secondary mt-1">{helperText}</p>}
+          </div>
+        </div>
+        <div className="md:w-64 bg-secondary/60 border border-border-color rounded-lg p-4 space-y-3">
+          <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Preview</div>
+          <div
+            className="rounded-md bg-background border border-border-color px-3 py-3 text-sm text-text-main"
+            style={{ fontFamily: previewFamily }}
+          >
+            The quick brown fox jumps over the lazy dog 0123456789.
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange(defaultValue)}
+            className="text-xs font-semibold text-primary hover:text-primary-hover transition-colors"
+          >
+            Reset to default
+          </button>
+        </div>
+      </div>
+    </SettingRow>
+  );
+};
+
 
 const SettingsView: React.FC<SettingsViewProps> = ({ settings, onSave, discoveredServices, onDetectServices, isDetecting, commands }) => {
   const [currentSettings, setCurrentSettings] = useState<Settings>(settings);
@@ -252,6 +409,7 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
 
 const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
     const CardButton: React.FC<{name: string, value: any, children: React.ReactNode, onClick: (value: any) => void, isSelected: boolean}> = ({ name, value, children, onClick, isSelected }) => (
+
         <button
             onClick={() => onClick(value)}
             className={`p-3 rounded-lg border-2 text-center transition-all w-full flex-1 ${ isSelected ? 'border-primary bg-primary/5' : 'border-border-color bg-secondary hover:border-primary/50' }`}
@@ -262,6 +420,15 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
             <h4 className="font-semibold text-text-main text-xs">{name}</h4>
         </button>
     );
+    const platform = useMemo(detectPlatform, []);
+    const handleFontChange = useCallback((field: FontField, fontFamily: string) => {
+        setCurrentSettings(prev => ({ ...prev, [field]: fontFamily.trim() }));
+    }, [setCurrentSettings]);
+    const bodyFontOptions = useMemo(() => buildFontOptions('markdownBodyFontFamily', platform), [platform]);
+    const headingFontOptions = useMemo(() => buildFontOptions('markdownHeadingFontFamily', platform), [platform]);
+    const codeFontOptions = useMemo(() => buildFontOptions('markdownCodeFontFamily', platform), [platform]);
+
+
 
     return (
         <div id="appearance" ref={sectionRef} className="py-6">
@@ -306,8 +473,8 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <input
                             id="markdownFontSize"
                             type="range"
-                            min="12"
-                            max="24"
+                            min="7"
+                            max="40"
                             step="1"
                             value={settings.markdownFontSize}
                             onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownFontSize: Number(e.target.value) }))}
@@ -331,13 +498,43 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownLineHeight.toFixed(1)}</span>
                     </div>
                 </SettingRow>
+                <SettingRow label="Markdown Heading Spacing" description="Control the vertical space above headings to tighten or relax sections.">
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="markdownHeadingSpacing"
+                            type="range"
+                            min="1.0"
+                            max="4.0"
+                            step="0.1"
+                            value={settings.markdownHeadingSpacing}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownHeadingSpacing: Number(e.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownHeadingSpacing.toFixed(1)}x</span>
+                    </div>
+                </SettingRow>
+                <SettingRow label="Markdown Paragraph Spacing" description="Adjust the space between paragraphs and block elements.">
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="markdownParagraphSpacing"
+                            type="range"
+                            min="0.4"
+                            max="2.0"
+                            step="0.05"
+                            value={settings.markdownParagraphSpacing}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownParagraphSpacing: Number(e.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownParagraphSpacing.toFixed(2)}x</span>
+                    </div>
+                </SettingRow>
                 <SettingRow label="Markdown Max Width" description="Set the maximum width of the text content to improve line length.">
                     <div className="flex items-center gap-4 w-60">
                         <input
                             id="markdownMaxWidth"
                             type="range"
                             min="500"
-                            max="1200"
+                            max="4000"
                             step="20"
                             value={settings.markdownMaxWidth}
                             onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownMaxWidth: Number(e.target.value) }))}
@@ -346,6 +543,69 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownMaxWidth}px</span>
                     </div>
                 </SettingRow>
+                <SettingRow label="Document Vertical Padding" description="Control the padding above and below the rendered document.">
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="markdownContentPadding"
+                            type="range"
+                            min="0"
+                            max="240"
+                            step="4"
+                            value={settings.markdownContentPadding}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownContentPadding: Number(e.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownContentPadding}px</span>
+                    </div>
+                </SettingRow>
+                <SettingRow label="Code Block Font Size" description="Adjust the font size used inside fenced code blocks.">
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="markdownCodeFontSize"
+                            type="range"
+                            min="8"
+                            max="32"
+                            step="1"
+                            value={settings.markdownCodeFontSize}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownCodeFontSize: Number(e.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownCodeFontSize}px</span>
+                    </div>
+                </SettingRow>
+                                <FontFamilySelector
+                  id="markdownBodyFontFamily"
+                  label="Body Font Family"
+                  description="Typography used for paragraphs and general text."
+                  value={settings.markdownBodyFontFamily}
+                  placeholder="System UI, sans-serif"
+                  options={bodyFontOptions}
+                  defaultValue={DEFAULT_SETTINGS.markdownBodyFontFamily}
+                  onChange={(font) => handleFontChange('markdownBodyFontFamily', font)}
+                  helperText="Applies to paragraphs, lists, and regular text."
+                />
+                <FontFamilySelector
+                  id="markdownHeadingFontFamily"
+                  label="Heading Font Family"
+                  description="Choose a font family for headings or leave blank to inherit the body font."
+                  value={settings.markdownHeadingFontFamily}
+                  placeholder="Inter, sans-serif"
+                  options={headingFontOptions}
+                  defaultValue={DEFAULT_SETTINGS.markdownHeadingFontFamily}
+                  onChange={(font) => handleFontChange('markdownHeadingFontFamily', font)}
+                  helperText="Leave blank to reuse the body font."
+                />
+                <FontFamilySelector
+                  id="markdownCodeFontFamily"
+                  label="Code Font Family"
+                  description="Set the font used for inline code and code blocks."
+                  value={settings.markdownCodeFontFamily}
+                  placeholder="'JetBrains Mono', monospace"
+                  options={codeFontOptions}
+                  defaultValue={DEFAULT_SETTINGS.markdownCodeFontFamily}
+                  onChange={(font) => handleFontChange('markdownCodeFontFamily', font)}
+                  helperText="Also applies to the Markdown preview's code blocks."
+                />
             </div>
         </div>
     );

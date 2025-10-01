@@ -7,6 +7,11 @@ const sharedConfig = {
   bundle: true,
   minify: !isWatch,
   sourcemap: isWatch ? 'inline' : false,
+  loader: {
+    '.woff2': 'file',
+    '.woff': 'file',
+    '.ttf': 'file',
+  },
 };
 
 const buildOrWatch = async (name, config) => {

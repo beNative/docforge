@@ -138,8 +138,19 @@ const MainApp: React.FC = () => {
             document.documentElement.style.setProperty('--markdown-font-size', `${settings.markdownFontSize}px`);
             document.documentElement.style.setProperty('--markdown-line-height', String(settings.markdownLineHeight));
             document.documentElement.style.setProperty('--markdown-max-width', `${settings.markdownMaxWidth}px`);
+            document.documentElement.style.setProperty('--markdown-heading-spacing', String(settings.markdownHeadingSpacing));
+            document.documentElement.style.setProperty('--markdown-code-font-size', `${settings.markdownCodeFontSize}px`);
+            const bodyFontFamily = (settings.markdownBodyFontFamily || 'Inter, sans-serif').trim() || 'Inter, sans-serif';
+            const headingFontFamily = (settings.markdownHeadingFontFamily || bodyFontFamily).trim() || 'Inter, sans-serif';
+            const codeFontFamily = (settings.markdownCodeFontFamily || "'JetBrains Mono', monospace").trim() || "'JetBrains Mono', monospace";
+            document.documentElement.style.setProperty('--markdown-body-font-family', bodyFontFamily);
+            document.documentElement.style.setProperty('--markdown-heading-font-family', headingFontFamily);
+            document.documentElement.style.setProperty('--markdown-code-font-family', codeFontFamily);
+            document.documentElement.style.setProperty('--markdown-content-padding', `${settings.markdownContentPadding}px`);
+            document.documentElement.style.setProperty('--markdown-paragraph-spacing', String(settings.markdownParagraphSpacing));
         }
-    }, [settings.markdownFontSize, settings.markdownLineHeight, settings.markdownMaxWidth, settingsLoaded]);
+    }, [settings.markdownFontSize, settings.markdownLineHeight, settings.markdownMaxWidth, settings.markdownHeadingSpacing, settings.markdownCodeFontSize, settings.markdownBodyFontFamily, settings.markdownHeadingFontFamily, settings.markdownCodeFontFamily, settings.markdownContentPadding, settings.markdownParagraphSpacing, settingsLoaded]);
+
 
     const activeNode = useMemo(() => {
         return items.find(p => p.id === activeNodeId) || null;
@@ -544,11 +555,12 @@ const MainApp: React.FC = () => {
         }
     }, [activeNodeId, activeNode, updateItem, addLog]);
 
-    const handleCommitVersion = (content: string) => {
+    const handleCommitVersion = useCallback((content: string) => {
         if (activeNodeId) {
-            commitVersion(activeNodeId, content);
+            return commitVersion(activeNodeId, content);
         }
-    };
+        return Promise.resolve();
+    }, [activeNodeId, commitVersion]);
     
     const handleSaveTemplate = (updatedTemplate: Partial<Omit<DocumentTemplate, 'template_id'>>) => {
         if (activeTemplateId) {
