@@ -9,6 +9,7 @@ import { useDocumentAutoSave } from '../hooks/useDocumentAutoSave';
 import IconButton from './IconButton';
 import Button from './Button';
 import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
+import MonacoDiffEditor from './MonacoDiffEditor';
 import PreviewPane from './PreviewPane';
 import { SUPPORTED_LANGUAGES } from '../services/languageService';
 
@@ -27,6 +28,8 @@ interface DocumentEditorProps {
 const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange, onViewModeChange, formatTrigger }) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
+  const [baselineContent, setBaselineContent] = useState(documentNode.content || '');
+  const [isDiffMode, setIsDiffMode] = useState(false);
   
   const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,18 +63,27 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
 
   // Reset content and view when the document changes.
   useEffect(() => {
-    setContent(documentNode.content || '');
+    const nextContent = documentNode.content || '';
+    setContent(nextContent);
+    setBaselineContent(nextContent);
     setViewMode(documentNode.default_view_mode || 'edit');
     setSplitSize(50);
     isContentInitialized.current = true;
     setIsDirty(false);
     setIsSaving(false);
+    setIsDiffMode(false);
   }, [documentNode.id, documentNode.default_view_mode, documentNode.title, documentNode.content]);
 
   useEffect(() => {
     setTitle(documentNode.title);
   }, [documentNode.id, documentNode.title]);
-  
+
+  useEffect(() => {
+    if (viewMode === 'preview' && isDiffMode) {
+        setIsDiffMode(false);
+    }
+  }, [viewMode, isDiffMode]);
+
   useEffect(() => {
     // Only mark as dirty after the initial content has been loaded.
     if (isContentInitialized.current) {
@@ -211,6 +223,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     commitPromise
       .then(() => {
         setIsDirty(false);
+        setBaselineContent(content);
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : 'Failed to save document version.';
@@ -292,7 +305,28 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(language);
   
   const renderContent = () => {
-    const editor = <MonacoEditor ref={editorRef} content={content} language={language} onChange={setContent} onScroll={handleEditorScroll} customShortcuts={settings.customShortcuts} />;
+    const editor = isDiffMode
+      ? (
+          <MonacoDiffEditor
+            oldText={baselineContent}
+            newText={content}
+            language={language}
+            renderMode="inline"
+            readOnly={false}
+            onChange={setContent}
+            onScroll={handleEditorScroll}
+          />
+        )
+      : (
+          <MonacoEditor
+            ref={editorRef}
+            content={content}
+            language={language}
+            onChange={setContent}
+            onScroll={handleEditorScroll}
+            customShortcuts={settings.customShortcuts}
+          />
+        );
     const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} />;
     
     switch(viewMode) {
@@ -346,6 +380,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
                 <FormatIcon className="w-4 h-4" />
               </IconButton>
             )}
+            <IconButton
+              onClick={() => setIsDiffMode(prev => !prev)}
+              tooltip={isDiffMode ? 'Hide Inline Diff' : 'Show Inline Diff'}
+              size="xs"
+              variant="ghost"
+              disabled={viewMode === 'preview'}
+              className={isDiffMode ? 'bg-secondary text-primary' : ''}
+            >
+              <span className="font-semibold text-[11px] leading-none tracking-wide">Diff</span>
+            </IconButton>
             <IconButton onClick={onShowHistory} tooltip="View Version History" size="xs" variant="ghost"><HistoryIcon className="w-4 h-4" /></IconButton>
             <div className="h-5 w-px bg-border-color mx-1"></div>
             <IconButton

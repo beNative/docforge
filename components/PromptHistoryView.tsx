@@ -55,6 +55,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   
   const [compareAIndex, setCompareAIndex] = useState(0);
   const [compareBIndex, setCompareBIndex] = useState(versionsWithCurrent.length > 1 ? 1 : 0);
+  const [diffRenderMode, setDiffRenderMode] = useState<'side-by-side' | 'inline'>('side-by-side');
 
   useEffect(() => {
     setFocusedIndex(0);
@@ -306,6 +307,22 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-0.5 bg-background border border-border-color rounded-md px-1 py-0.5">
+                            <button
+                                type="button"
+                                onClick={() => setDiffRenderMode('side-by-side')}
+                                className={`text-[11px] px-1.5 py-0.5 rounded ${diffRenderMode === 'side-by-side' ? 'bg-secondary text-primary font-semibold' : 'text-text-secondary hover:text-text-main'}`}
+                            >
+                                Split
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDiffRenderMode('inline')}
+                                className={`text-[11px] px-1.5 py-0.5 rounded ${diffRenderMode === 'inline' ? 'bg-secondary text-primary font-semibold' : 'text-text-secondary hover:text-text-main'}`}
+                            >
+                                Inline
+                            </button>
+                        </div>
                         <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Selected Version"} size="sm">
                             {isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}
                         </IconButton>
@@ -321,6 +338,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         oldText={olderVersion ? olderVersion.content : ''}
                         newText={newerVersion ? newerVersion.content : ''}
                         language={document.language_hint || 'plaintext'}
+                        renderMode={diffRenderMode}
+                        readOnly
                     />
                 </div>
             </main>
