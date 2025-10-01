@@ -438,17 +438,23 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
         case 'preview': return supportsPreview ? preview : editor;
         case 'split-vertical':
             return (
-                <div ref={splitContainerRef} className="grid h-full" style={{ gridTemplateColumns: `${splitSize}% 1px minmax(0, 1fr)` }}>
+                <div ref={splitContainerRef} className="grid h-full" style={{ gridTemplateColumns: `${splitSize}% auto minmax(0, 1fr)` }}>
                     <div className="h-full overflow-hidden min-w-0">{editor}</div>
-                    <div onMouseDown={handleSplitterMouseDown} className="h-full bg-border-color/50 hover:bg-primary cursor-col-resize transition-colors"/>
+                    <div
+                      onMouseDown={handleSplitterMouseDown}
+                      className="w-1.5 h-full cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
+                    />
                     <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
                 </div>
             );
         case 'split-horizontal':
             return (
-                <div ref={splitContainerRef} className="grid w-full h-full" style={{ gridTemplateRows: `${splitSize}% 1px minmax(0, 1fr)` }}>
+                <div ref={splitContainerRef} className="grid w-full h-full" style={{ gridTemplateRows: `${splitSize}% auto minmax(0, 1fr)` }}>
                     <div className="w-full overflow-hidden min-h-0">{editor}</div>
-                    <div onMouseDown={handleSplitterMouseDown} className="w-full bg-border-color/50 hover:bg-primary cursor-row-resize transition-colors"/>
+                    <div
+                      onMouseDown={handleSplitterMouseDown}
+                      className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
+                    />
                     <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
                 </div>
             );
