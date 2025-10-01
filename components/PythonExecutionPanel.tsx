@@ -233,7 +233,9 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({
 
   return (
     <div className={`flex flex-col text-sm text-text-main ${isCollapsed ? '' : 'h-full min-h-0'}`}>
-      <div className={`flex flex-wrap items-center justify-between gap-2 pb-3 ${isCollapsed ? '' : 'border-b border-border-color/50'}`}>
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 ${isCollapsed ? 'py-2' : 'pt-2 pb-3 border-b border-border-color/50'}`}
+      >
         <div className="flex items-center gap-2 font-semibold">
           <button
             type="button"
@@ -248,24 +250,26 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({
           <TerminalIcon className="w-4 h-4" />
           <span>Python Execution</span>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => { refreshEnvironments(); refreshInterpreters(); }}
-            isLoading={isLoading || isDetecting}
-            className="px-2.5 py-1 text-[11px]"
-          >
-            <RefreshIcon className="w-3.5 h-3.5 mr-1" /> Refresh
-          </Button>
-          <Button
-            onClick={handleRun}
-            isLoading={isRunning || isEnsuringEnv}
-            disabled={!code.trim()}
-            className="px-2.5 py-1 text-[11px]"
-          >
-            <TerminalIcon className="w-3.5 h-3.5 mr-1" /> Run Script
-          </Button>
-        </div>
+        {!isCollapsed && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => { refreshEnvironments(); refreshInterpreters(); }}
+              isLoading={isLoading || isDetecting}
+              className="px-2.5 py-1 text-[11px]"
+            >
+              <RefreshIcon className="w-3.5 h-3.5 mr-1" /> Refresh
+            </Button>
+            <Button
+              onClick={handleRun}
+              isLoading={isRunning || isEnsuringEnv}
+              disabled={!code.trim()}
+              className="px-2.5 py-1 text-[11px]"
+            >
+              <TerminalIcon className="w-3.5 h-3.5 mr-1" /> Run Script
+            </Button>
+          </div>
+        )}
       </div>
       <div
         id="python-execution-panel-content"
