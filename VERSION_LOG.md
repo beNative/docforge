@@ -1,5 +1,18 @@
 # Version Log
 
+## v0.6.1 - The Release Prep Update
+
+This maintenance release focuses on preparing DocForge for distribution by polishing the release workflow and tidying up the documentation set.
+
+### 🛠 Improvements
+
+-   Added an npm `publish` script so maintainers can build and upload releases with a single command.
+-   Audited and refreshed the documentation set to ensure the README and manuals reflect the latest onboarding guidance.
+
+### 🐛 Fixes
+
+-   Addressed minor copy and formatting issues identified while reviewing the documentation for release.
+
 ## v0.6.0 - The Customization & Workflow Update
 
 This release introduces powerful new ways to customize your workspace and streamline your workflow, including fully configurable keyboard shortcuts, an advanced settings editor, and enhanced file import capabilities.

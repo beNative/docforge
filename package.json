@@ -1,12 +1,13 @@
 {
   "name": "docforge",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "An application to manage and refine documents.",
   "main": "dist/main.js",
   "scripts": {
     "start": "npm run build:css && node esbuild.config.js --watch & electron .",
     "build": "npm run build:css && node esbuild.config.js",
     "package": "npm run build && electron-builder",
+    "publish": "npm run build && electron-builder --publish always",
     "postinstall": "electron-builder install-app-deps",
     "build:css": "tailwindcss -i ./styles/tailwind.css -o ./dist/tailwind.css --minify"
   },
