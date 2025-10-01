@@ -164,6 +164,7 @@ const MainApp: React.FC = () => {
         return activeNode?.type === 'document' ? activeNode : null;
     }, [activeNode]);
 
+
     const { documentTree, navigableItems } = useMemo(() => {
         let itemsToBuildFrom = items;
         if (searchTerm.trim()) {
@@ -401,21 +402,39 @@ const MainApp: React.FC = () => {
 
 
     const getParentIdForNewItem = useCallback(() => {
+
         if (!activeNode) return null;
         return activeNode.type === 'folder' ? activeNode.id : activeNode.parentId;
     }, [activeNode]);
+
+    const ensureNodeVisible = useCallback((node: Pick<DocumentOrFolder, 'id' | 'type' | 'parentId'>) => {
+        const ancestry = new Map(items.map(item => [item.id, item.parentId ?? null]));
+        setExpandedFolderIds(prev => {
+            const next = new Set(prev);
+            let current = node.parentId;
+            while (current) {
+                next.add(current);
+                current = ancestry.get(current) ?? null;
+            }
+            if (node.type === 'folder') {
+                next.add(node.id);
+            }
+            return next;
+        });
+    }, [items]);
 
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
         const newDoc = await addDocument({ parentId: effectiveParentId });
+        ensureNodeVisible(newDoc);
         setActiveNodeId(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
         setLastClickedId(newDoc.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addDocument, getParentIdForNewItem, addLog]);
+    }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog]);
     
     const handleNewCodeFile = useCallback(async (filename: string) => {
         addLog('INFO', `User action: Create New Code File with name "${filename}".`);
@@ -427,25 +446,27 @@ const MainApp: React.FC = () => {
             doc_type: 'source_code',
             language_hint: languageHint,
         });
+        ensureNodeVisible(newDoc);
         setActiveNodeId(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
         setLastClickedId(newDoc.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addDocument, getParentIdForNewItem, addLog]);
+    }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog]);
 
     const handleNewFolder = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Folder.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
         const newFolder = await addFolder(effectiveParentId);
+        ensureNodeVisible(newFolder);
         setActiveNodeId(newFolder.id);
         setSelectedIds(new Set([newFolder.id]));
         setLastClickedId(newFolder.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addFolder, getParentIdForNewItem, addLog]);
+    }, [addFolder, getParentIdForNewItem, ensureNodeVisible, addLog]);
 
     const handleNewRootFolder = useCallback(async () => {
         addLog('INFO', 'User action: Create New Root Folder.');
@@ -480,13 +501,14 @@ const MainApp: React.FC = () => {
     const handleCreateFromTemplate = useCallback(async (title: string, content: string) => {
         addLog('INFO', `User action: Create Document from Template, title: "${title}".`);
         const newDoc = await addDocument({ parentId: null, title, content });
+        ensureNodeVisible(newDoc);
         setActiveNodeId(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
         setLastClickedId(newDoc.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addDocument, addLog]);
+    }, [addDocument, ensureNodeVisible, addLog]);
 
     const handleSelectNode = useCallback((id: string, e: React.MouseEvent) => {
         if (activeNodeId !== id) {
