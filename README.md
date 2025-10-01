@@ -33,3 +33,11 @@ DocForge is a desktop application designed to streamline the process of creating
 4.  **Create:** Start creating, organizing, and refining your documents!
 
 For detailed instructions on usage and features, please refer to the [Functional Manual](./FUNCTIONAL_MANUAL.md).
+
+## Release Preparation
+
+To create a new public build of DocForge:
+
+1. Update the version in `package.json` and regenerate the lockfile with `npm version <new-version> --no-git-tag-version`.
+2. Review the Markdown documentation (README, manuals, and version log) so the release notes accurately reflect recent changes.
+3. Run `npm run publish` to build the application and publish the artifacts to the configured GitHub release target via Electron Builder.

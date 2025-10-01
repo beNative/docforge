@@ -108,3 +108,19 @@ This module handles all communication with the external Large Language Model. It
 -   **`DocumentEditor.tsx`:** The primary user-facing editor component. It serves as a layout controller, managing the view mode (editor, preview, split-screen) and containing both the `CodeEditor` (Monaco) and `PreviewPane` components. It orchestrates the flow of data between the editor and the preview.
 -   **`SettingsView.tsx`:** Manages all application settings, which are now read from and saved to the `settings` table in the database.
 -   **`DocumentHistoryView.tsx`:** This view now fetches version history for a document directly from the database, providing a reliable timeline of changes.
+
+---
+
+## 5. Build & Release Workflow
+
+Electron Builder manages the packaging and publishing workflow for DocForge. The most relevant npm scripts are:
+
+-   `npm run build` — Bundles the renderer and preload scripts and prepares assets in `dist/`.
+-   `npm run package` — Produces distributable builds without uploading them.
+-   `npm run publish` — Builds the application and publishes artifacts using Electron Builder's configured GitHub target.
+
+### Publishing a Release
+
+1. Run `npm version <new-version> --no-git-tag-version` to bump the version in both `package.json` and `package-lock.json` without creating a Git tag.
+2. Review and update the Markdown documentation (README, manuals, version logs) so the release notes accurately describe the changes.
+3. Execute `npm run publish` to package the application and upload the release artifacts to GitHub.
