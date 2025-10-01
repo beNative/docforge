@@ -9,7 +9,7 @@ import type {
   PythonConsoleBehavior,
 } from '../types';
 import Button from './Button';
-import { TerminalIcon, RefreshIcon } from './Icons';
+import { TerminalIcon, RefreshIcon, ChevronDownIcon } from './Icons';
 import { pythonService } from '../services/pythonService';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
 import { useLogger } from '../hooks/useLogger';
@@ -54,6 +54,12 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
     }
     return 'in-app';
   });
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('docforge.python.panelCollapsed') === 'true';
+    }
+    return false;
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -61,6 +67,11 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
       window.electronAPI.getPlatform().then(setPlatform).catch(() => setPlatform(''));
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('docforge.python.panelCollapsed', isCollapsed ? 'true' : 'false');
+  }, [isCollapsed]);
 
   const isWindows = platform === 'win32';
 
@@ -210,9 +221,19 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
   }, [environments]);
 
   return (
-    <div className="h-full flex flex-col text-sm text-text-main">
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border-color/50">
+    <div className={`flex flex-col text-sm text-text-main ${isCollapsed ? '' : 'h-full'}`}>
+      <div className={`flex flex-wrap items-center justify-between gap-2 pb-3 ${isCollapsed ? '' : 'border-b border-border-color/50'}`}>
         <div className="flex items-center gap-2 font-semibold">
+          <button
+            type="button"
+            onClick={() => setIsCollapsed((prev) => !prev)}
+            className="flex items-center justify-center w-6 h-6 rounded-md text-text-secondary hover:text-text-main hover:bg-border-color transition-colors"
+            aria-expanded={!isCollapsed}
+            aria-controls="python-execution-panel-content"
+            aria-label={isCollapsed ? 'Expand Python execution panel' : 'Collapse Python execution panel'}
+          >
+            <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
+          </button>
           <TerminalIcon className="w-4 h-4" />
           <span>Python Execution</span>
         </div>
@@ -221,15 +242,25 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
             variant="secondary"
             onClick={() => { refreshEnvironments(); refreshInterpreters(); }}
             isLoading={isLoading || isDetecting}
+            className="px-2.5 py-1 text-[11px]"
           >
-            <RefreshIcon className="w-4 h-4 mr-1" /> Refresh
+            <RefreshIcon className="w-3.5 h-3.5 mr-1" /> Refresh
           </Button>
-          <Button onClick={handleRun} isLoading={isRunning || isEnsuringEnv} disabled={!code.trim()}>
-            <TerminalIcon className="w-4 h-4 mr-1" /> Run Script
+          <Button
+            onClick={handleRun}
+            isLoading={isRunning || isEnsuringEnv}
+            disabled={!code.trim()}
+            className="px-2.5 py-1 text-[11px]"
+          >
+            <TerminalIcon className="w-3.5 h-3.5 mr-1" /> Run Script
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-auto pt-3">
+      <div
+        id="python-execution-panel-content"
+        className={`flex-1 overflow-auto pt-3 ${isCollapsed ? 'hidden' : ''}`}
+        aria-hidden={isCollapsed}
+      >
         <div className="grid gap-4 md:grid-cols-[minmax(0,260px)_1fr] md:items-start">
           <div className="space-y-4">
             <div className="space-y-2">
@@ -238,7 +269,7 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
                 {isRunning && <span className="text-primary normal-case">Running…</span>}
               </div>
               <select
-                className="w-full bg-background border border-border-color/60 rounded-md px-3 py-1.5 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full bg-background border border-border-color/60 rounded-md px-2.5 py-1 text-xs text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
                 value={selectedEnvId ?? AUTO_OPTION_VALUE}
                 onChange={handleEnvironmentChange}
               >
@@ -254,7 +285,7 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
             <div className="space-y-2">
               <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wide block">Console Display</span>
               <select
-                className="w-full bg-background border border-border-color/60 rounded-md px-3 py-1.5 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full bg-background border border-border-color/60 rounded-md px-2.5 py-1 text-xs text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
                 value={consoleBehavior}
                 onChange={(event) => {
                   const value = event.target.value as PythonConsoleBehavior;
