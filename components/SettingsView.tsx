@@ -203,52 +203,93 @@ const FontFamilySelector: React.FC<FontFamilySelectorProps> = ({
       <div className="flex flex-col gap-4 md:flex-row">
         <div className="flex-1 space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-text-secondary mb-1" htmlFor={`${id}-recommended`}>Recommended</label>
+            <label className="block text-xs font-semibold text-text-secondary mb-1" htmlFor={`${id}-recommended`}>
+              Recommended
+            </label>
             <select
               id={`${id}-recommended`}
               value={matchingOption ? matchingOption.value : ''}
               onChange={handleSelect}
               className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
             >
-              <option value="">Choose a font</option>
-              {options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary mb-1" htmlFor={`${id}-custom`}>Custom value</label>
-            <input
-              id={`${id}-custom`}
-              type="text"
-              value={value}
-              onChange={handleInputChange}
-              placeholder={placeholder}
-              className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            {helperText && <p className="text-xs text-text-secondary mt-1">{helperText}</p>}
-          </div>
-        </div>
-        <div className="md:w-64 bg-secondary/60 border border-border-color rounded-lg p-4 space-y-3">
-          <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Preview</div>
-          <div
-            className="rounded-md bg-background border border-border-color px-3 py-3 text-sm text-text-main"
-            style={{ fontFamily: previewFamily }}
-          >
-            The quick brown fox jumps over the lazy dog 0123456789.
-          </div>
-          <button
-            type="button"
-            onClick={() => onChange(defaultValue)}
-            className="text-xs font-semibold text-primary hover:text-primary-hover transition-colors"
-          >
-            Reset to default
-          </button>
-        </div>
+              <option value="">Choose a font</option>
+            <label className="block text-xs font-semibold text-text-secondary mb-1" htmlFor={`${id}-custom`}>
+              Custom value
+            </label>
+      </div>
+    </SettingRow>
+  );
+};
+const SettingsView: React.FC<SettingsViewProps> = ({
+  settings,
+  onSave,
+  discoveredServices,
+  onDetectServices,
+  isDetecting,
+  commands,
+}) => {
+  const [currentSettings, setCurrentSettings] = useState<Settings>(() => settings);
+  const [isDirty, setIsDirty] = useState(false);
+  const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
+  // Use Partial for the record type to allow an empty object as the initial value for the ref.
     if (!mainPanelRef.current) {
       return;
+    }
+
+    const sections = Object.values(sectionRefs.current).filter(
+      (section): section is HTMLDivElement => Boolean(section)
+    );
+    sections.forEach((section) => observer.observe(section));
+
+    return () => {
+      sections.forEach((section) => observer.unobserve(section));
+      observer.disconnect();
+
+          <Button onClick={handleSave} disabled={isSaveDisabled} variant="primary">
+            <ProviderSettingsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                discoveredServices,
+                onDetectServices,
+                isDetecting,
+                sectionRef: (el) => (sectionRefs.current.provider = el),
+              }}
+            />
+            <AppearanceSettingsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                sectionRef: (el) => (sectionRefs.current.appearance = el),
+              }}
+            />
+            <KeyboardShortcutsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                commands,
+                sectionRef: (el) => (sectionRefs.current.shortcuts = el),
+              }}
+            />
+                sectionRef: (el) => (sectionRefs.current.python = el),
+            <GeneralSettingsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                sectionRef: (el) => (sectionRefs.current.general = el),
+              }}
+            />
+            <DatabaseSettingsSection {...{ sectionRef: (el) => (sectionRefs.current.database = el) }} />
+            <AdvancedSettingsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                sectionRef: (el) => (sectionRefs.current.advanced = el),
+              }}
+            />
+  settings: Settings;
+  setCurrentSettings: React.Dispatch<React.SetStateAction<Settings>>;
+  sectionRef: (el: HTMLDivElement | null) => void;
     }
 
     const sections = Object.values(sectionRefs.current).filter(
