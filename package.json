@@ -15,7 +15,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/TimSirmov/prompt-forge.git"
+    "url": "https://github.com/TimSirmov/docforge.git"
   },
   "dependencies": {
     "better-sqlite3": "^11.1.2",
