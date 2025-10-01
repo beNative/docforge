@@ -53,6 +53,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   });
   
   const pythonPanelMinHeight = 180;
+  const [isPythonPanelCollapsed, setIsPythonPanelCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('docforge.python.panelCollapsed') === 'true';
+    }
+    return false;
+  });
   const [pythonPanelHeight, setPythonPanelHeight] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = window.localStorage.getItem('docforge.python.panelHeight');
@@ -512,7 +518,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
       {isPythonDocument && (
         <div
           className="flex-shrink-0 flex flex-col bg-secondary"
-          style={{ height: pythonPanelHeight }}
+          style={{ height: isPythonPanelCollapsed ? 'auto' : pythonPanelHeight }}
         >
           <div
             className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
@@ -525,6 +531,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
                 code={content}
                 defaults={pythonDefaults}
                 consoleTheme={settings.pythonConsoleTheme}
+                onCollapseChange={setIsPythonPanelCollapsed}
               />
             </div>
           </div>

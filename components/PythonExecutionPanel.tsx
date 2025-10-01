@@ -19,6 +19,7 @@ interface PythonExecutionPanelProps {
   code: string;
   defaults: PythonEnvironmentDefaults;
   consoleTheme: 'light' | 'dark';
+  onCollapseChange?: (isCollapsed: boolean) => void;
 }
 
 const AUTO_OPTION_VALUE = '__auto__';
@@ -33,7 +34,13 @@ const formatTimestamp = (iso: string | null) => {
   }
 };
 
-const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, code, defaults, consoleTheme }) => {
+const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({
+  nodeId,
+  code,
+  defaults,
+  consoleTheme,
+  onCollapseChange,
+}) => {
   const { addLog } = useLogger();
   const { environments, interpreters, isLoading, isDetecting, refreshEnvironments, refreshInterpreters } = usePythonEnvironments();
   const [settings, setSettings] = useState<NodePythonSettings | null>(null);
@@ -60,6 +67,10 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
     }
     return false;
   });
+
+  useEffect(() => {
+    onCollapseChange?.(isCollapsed);
+  }, [isCollapsed, onCollapseChange]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -221,7 +232,7 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
   }, [environments]);
 
   return (
-    <div className="h-full flex flex-col text-sm text-text-main">
+    <div className={`flex flex-col text-sm text-text-main ${isCollapsed ? '' : 'h-full min-h-0'}`}>
       <div className={`flex flex-wrap items-center justify-between gap-2 pb-3 ${isCollapsed ? '' : 'border-b border-border-color/50'}`}>
         <div className="flex items-center gap-2 font-semibold">
           <button
@@ -258,7 +269,7 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
       </div>
       <div
         id="python-execution-panel-content"
-        className={`flex-1 overflow-auto pt-3 ${isCollapsed ? 'hidden' : ''}`}
+        className={`pt-3 ${isCollapsed ? 'hidden' : 'flex-1 overflow-auto'}`}
         aria-hidden={isCollapsed}
       >
         <div className="grid gap-4 md:grid-cols-[minmax(0,260px)_1fr] md:items-start">
