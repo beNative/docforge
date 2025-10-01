@@ -520,12 +520,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
           className="flex-shrink-0 flex flex-col bg-secondary"
           style={{ height: isPythonPanelCollapsed ? 'auto' : pythonPanelHeight }}
         >
-          <div
-            className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
-            onPointerDown={handlePythonPanelResizeStart}
-          />
-          <div className="flex-1 overflow-hidden">
-            <div className="h-full overflow-auto px-4 pb-4">
+          {!isPythonPanelCollapsed && (
+            <div
+              className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
+              onPointerDown={handlePythonPanelResizeStart}
+            />
+          )}
+          <div className={`${isPythonPanelCollapsed ? 'flex-shrink-0' : 'flex-1'} overflow-hidden`}>
+            <div className={`px-4 ${isPythonPanelCollapsed ? 'py-2' : 'pb-4 h-full overflow-auto'}`}>
               <PythonExecutionPanel
                 nodeId={documentNode.id}
                 code={content}
