@@ -3,6 +3,7 @@ import path from 'path';
 import { promises as fsPromises, constants as fsConstants } from 'fs';
 import { existsSync } from 'fs';
 import { spawn, execFile } from 'child_process';
+import type { ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import os from 'os';
 import { EventEmitter } from 'events';
@@ -17,6 +18,7 @@ import type {
   PythonEnvironmentDefaults,
   PythonInterpreterInfo,
   PythonExecutionStatus,
+  PythonConsoleBehavior,
 } from '../types';
 
 const execFileAsync = promisify(execFile);
@@ -51,6 +53,7 @@ interface RunScriptOptions {
   code: string;
   environment: PythonEnvironmentConfig;
   consoleTheme: 'light' | 'dark';
+  consoleBehavior: PythonConsoleBehavior;
 }
 
 const VENV_ROOT = () => path.join(app.getPath('userData'), 'python-envs');
@@ -205,6 +208,7 @@ const sanitizeEnvironmentVariables = (
 ): NodeJS.ProcessEnv => {
   const envDir = path.dirname(pythonExecutable);
   const sanitized: NodeJS.ProcessEnv = {
+    ...process.env,
     PATH: envDir + path.delimiter + (process.env.PATH ?? ''),
     PYTHONUNBUFFERED: '1',
     PYTHONIOENCODING: 'utf-8',
@@ -588,7 +592,7 @@ export const pythonManager = {
   },
 
   async runScript(options: RunScriptOptions): Promise<PythonExecutionRun> {
-    const { nodeId, code, environment, consoleTheme } = options;
+    const { nodeId, code, environment, consoleTheme, consoleBehavior } = options;
     const runId = uuidv4();
     const startedAt = new Date().toISOString();
 
@@ -606,7 +610,13 @@ export const pythonManager = {
     );
 
     appendRunLog(runId, 'INFO', 'Starting Python script execution.');
-    createConsoleWindow(runId, consoleTheme);
+    if (consoleBehavior === 'in-app') {
+      createConsoleWindow(runId, consoleTheme);
+    } else if (consoleBehavior === 'windows-terminal') {
+      appendRunLog(runId, 'INFO', 'Launching Windows Terminal for interactive execution.');
+    } else {
+      appendRunLog(runId, 'INFO', 'Running script without opening a console window.');
+    }
 
     const envVars = sanitizeEnvironmentVariables(environment.pythonExecutable, environment.environmentVariables);
 
@@ -630,6 +640,12 @@ export const pythonManager = {
       await cleanupTempDir(dir);
     };
 
+    if (consoleBehavior === 'windows-terminal' && process.platform !== 'win32') {
+      const message = 'Windows Terminal execution is only available on Windows.';
+      await finalize('failed', null, message);
+      throw new Error(message);
+    }
+
     const processOutput = (data: Buffer, level: 'INFO' | 'ERROR') => {
       const text = data.toString('utf-8');
       const lines = text.split(/\r?\n/).filter((line) => line.length > 0);
@@ -646,14 +662,26 @@ export const pythonManager = {
       finalize(status, exitCode, message).catch((err) => log.error('Failed to finalize python execution:', err));
     };
 
-    const child = spawn(environment.pythonExecutable, ['-I', filePath], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      env: envVars,
-      cwd: environment.workingDirectory ?? dir,
-    });
-
-    child.stdout?.on('data', (chunk) => processOutput(Buffer.from(chunk), 'INFO'));
-    child.stderr?.on('data', (chunk) => processOutput(Buffer.from(chunk), 'ERROR'));
+    let child: ChildProcess;
+    if (consoleBehavior === 'windows-terminal') {
+      const title = `DocForge Python (${runId.slice(0, 8)})`;
+      const args = ['-w', '_new', '--title', title, '--', environment.pythonExecutable, '-I', filePath];
+      child = spawn('wt.exe', args, {
+        stdio: 'ignore',
+        env: envVars,
+        cwd: environment.workingDirectory ?? dir,
+        windowsHide: false,
+      });
+      appendRunLog(runId, 'INFO', 'Windows Terminal window opened. Close it to finish the run.');
+    } else {
+      child = spawn(environment.pythonExecutable, ['-I', filePath], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: envVars,
+        cwd: environment.workingDirectory ?? dir,
+      });
+      child.stdout?.on('data', (chunk) => processOutput(Buffer.from(chunk), 'INFO'));
+      child.stderr?.on('data', (chunk) => processOutput(Buffer.from(chunk), 'ERROR'));
+    }
 
     child.on('error', (error) => {
       const message = `Execution failed: ${error instanceof Error ? error.message : String(error)}`;

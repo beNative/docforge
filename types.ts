@@ -148,11 +148,14 @@ export interface PythonExecutionLogEntry {
   message: string;
 }
 
+export type PythonConsoleBehavior = 'in-app' | 'windows-terminal' | 'hidden';
+
 export interface PythonRunRequestPayload {
   nodeId: string;
   code: string;
   environment: PythonEnvironmentConfig;
   consoleTheme: 'light' | 'dark';
+  consoleBehavior: PythonConsoleBehavior;
 }
 
 export interface Node {

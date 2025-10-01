@@ -6,6 +6,7 @@ import type {
   PythonExecutionRun,
   PythonExecutionLogEntry,
   PythonInterpreterInfo,
+  PythonConsoleBehavior,
 } from '../types';
 import Button from './Button';
 import { TerminalIcon, RefreshIcon } from './Icons';
@@ -43,6 +44,25 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
   const [isRunning, setIsRunning] = useState(false);
   const [ensureError, setEnsureError] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+  const [platform, setPlatform] = useState('');
+  const [consoleBehavior, setConsoleBehavior] = useState<PythonConsoleBehavior>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem('docforge.python.consoleBehavior');
+      if (stored === 'in-app' || stored === 'windows-terminal' || stored === 'hidden') {
+        return stored;
+      }
+    }
+    return 'in-app';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.electronAPI?.getPlatform) {
+      window.electronAPI.getPlatform().then(setPlatform).catch(() => setPlatform(''));
+    }
+  }, []);
+
+  const isWindows = platform === 'win32';
 
   const loadSettings = useCallback(async () => {
     try {
@@ -161,8 +181,11 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
     setRunError(null);
     try {
       setIsRunning(true);
+      if (!isWindows && consoleBehavior === 'windows-terminal') {
+        throw new Error('Windows Terminal execution is only available on Windows.');
+      }
       const environment = await ensureEnvironment();
-      const run = await pythonService.runScript({ nodeId, code, environment, consoleTheme });
+      const run = await pythonService.runScript({ nodeId, code, environment, consoleTheme, consoleBehavior });
       setSelectedRunId(run.runId);
       setLogEntries([]);
       setRunHistory((prev) => [run, ...prev]);
@@ -173,7 +196,7 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
       setIsRunning(false);
       addLog('ERROR', `Python execution failed to start: ${message}`);
     }
-  }, [ensureEnvironment, nodeId, code, consoleTheme, addLog]);
+  }, [ensureEnvironment, nodeId, code, consoleTheme, consoleBehavior, addLog, isWindows]);
 
   const currentRun = useMemo(() => {
     if (!selectedRunId) return null;
@@ -221,6 +244,32 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({ nodeId, cod
           </select>
           {ensureError && <p className="text-xs text-destructive-text">{ensureError}</p>}
           {runError && <p className="text-xs text-destructive-text">{runError}</p>}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="text-xs font-semibold text-text-secondary">Console Display</label>
+          <select
+            className="bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+            value={consoleBehavior}
+            onChange={(event) => {
+              const value = event.target.value as PythonConsoleBehavior;
+              setConsoleBehavior(value);
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem('docforge.python.consoleBehavior', value);
+              }
+            }}
+          >
+            <option value="in-app">In-app console window</option>
+            <option value="hidden">Hidden (no console window)</option>
+            <option value="windows-terminal" disabled={!isWindows}>
+              {isWindows ? 'Windows Terminal (interactive)' : 'Windows Terminal (Windows only)'}
+            </option>
+          </select>
+          {!isWindows && consoleBehavior === 'windows-terminal' && (
+            <p className="text-xs text-destructive-text">
+              Windows Terminal execution is only available on Windows. Please select a different console option.
+            </p>
+          )}
         </div>
 
         <div>
