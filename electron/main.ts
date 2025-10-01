@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 import { createReadStream, createWriteStream } from 'fs';
 import { autoUpdater } from 'electron-updater';
 import { databaseService } from './database';
+import { pythonManager } from './pythonManager';
 import log from 'electron-log/main';
 import * as zlib from 'zlib';
 import * as os from 'os';
@@ -44,6 +45,20 @@ log.catchErrors({
 console.log(`Log file will be written to: ${log.transports.file.getFile().path}`);
 
 let mainWindow: BrowserWindow | null;
+
+const broadcastPythonEvent = (channel: string, payload: any) => {
+  const targets = BrowserWindow.getAllWindows();
+  for (const window of targets) {
+    try {
+      window.webContents.send(channel, payload);
+    } catch (error) {
+      console.error(`Failed to forward Python event ${channel}:`, error);
+    }
+  }
+};
+
+pythonManager.events.on('run-log', (payload) => broadcastPythonEvent('python:run-log', payload));
+pythonManager.events.on('run-status', (payload) => broadcastPythonEvent('python:run-status', payload));
 
 // --- Auto Updater Setup ---
 // Note: For auto-updates to work, you need to configure `electron-builder` in package.json
@@ -319,4 +334,57 @@ ipcMain.handle('docs:read', async (_, filename: string) => {
         console.error(`Failed to read doc: ${filename}`, error);
         return { success: false, error: error instanceof Error ? error.message : `Could not read ${filename}` };
     }
+});
+
+// Python environments & execution
+ipcMain.handle('python:list-envs', async () => {
+    return pythonManager.listEnvironments();
+});
+
+ipcMain.handle('python:detect-interpreters', async () => {
+    return pythonManager.detectPythonInstallations();
+});
+
+ipcMain.handle('python:create-env', async (_, options) => {
+    return pythonManager.createEnvironment(options);
+});
+
+ipcMain.handle('python:update-env', async (_, envId, updates) => {
+    return pythonManager.updateEnvironment(envId, updates);
+});
+
+ipcMain.handle('python:delete-env', async (_, envId: string) => {
+    await pythonManager.deleteEnvironment(envId);
+    return { success: true };
+});
+
+ipcMain.handle('python:get-node-settings', async (_, nodeId: string) => {
+    return pythonManager.getNodeSettings(nodeId);
+});
+
+ipcMain.handle('python:set-node-settings', async (_, nodeId: string, envId: string | null, autoDetect: boolean) => {
+    return pythonManager.setNodeSettings(nodeId, envId, autoDetect);
+});
+
+ipcMain.handle('python:ensure-node-env', async (_, nodeId: string, defaults, interpreters) => {
+    const resolvedInterpreters = Array.isArray(interpreters) && interpreters.length
+        ? interpreters
+        : await pythonManager.detectPythonInstallations();
+    return pythonManager.ensureEnvironmentForNode(nodeId, defaults, resolvedInterpreters);
+});
+
+ipcMain.handle('python:run-script', async (_, payload) => {
+    return pythonManager.runScript(payload);
+});
+
+ipcMain.handle('python:get-runs-for-node', async (_, nodeId: string, limit = 20) => {
+    return pythonManager.getRunsForNode(nodeId, limit);
+});
+
+ipcMain.handle('python:get-run-logs', async (_, runId: string) => {
+    return pythonManager.getRunLogs(runId);
+});
+
+ipcMain.handle('python:get-run', async (_, runId: string) => {
+    return pythonManager.getRun(runId);
 });

@@ -36,6 +36,21 @@ export const DEFAULT_SETTINGS: Settings = {
   markdownCodeFontFamily: '\'JetBrains Mono\', monospace',
   markdownContentPadding: 48,
   markdownParagraphSpacing: 0.75,
+  pythonDefaults: {
+    targetPythonVersion: '3.11',
+    basePackages: [
+      { name: 'pip', version: 'latest' },
+      { name: 'setuptools', version: 'latest' },
+      { name: 'wheel', version: 'latest' },
+      { name: 'numpy' },
+      { name: 'pandas' },
+      { name: 'requests' },
+    ],
+    environmentVariables: {},
+    workingDirectory: null,
+  },
+  pythonWorkingDirectory: null,
+  pythonConsoleTheme: 'dark',
 };
 
 export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [

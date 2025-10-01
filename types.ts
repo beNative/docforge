@@ -35,6 +35,20 @@ declare global {
       settingsExport: (content: string) => Promise<{ success: boolean; error?: string }>;
       settingsImport: () => Promise<{ success: boolean; content?: string; error?: string }>;
       readDoc: (filename: string) => Promise<{ success: true; content: string } | { success: false; error: string }>;
+      pythonListEnvironments: () => Promise<PythonEnvironmentConfig[]>;
+      pythonDetectInterpreters: () => Promise<PythonInterpreterInfo[]>;
+      pythonCreateEnvironment: (options: CreatePythonEnvironmentPayload) => Promise<PythonEnvironmentConfig>;
+      pythonUpdateEnvironment: (envId: string, updates: UpdatePythonEnvironmentPayload) => Promise<PythonEnvironmentConfig>;
+      pythonDeleteEnvironment: (envId: string) => Promise<{ success: boolean }>;
+      pythonGetNodeSettings: (nodeId: string) => Promise<NodePythonSettings>;
+      pythonSetNodeSettings: (nodeId: string, envId: string | null, autoDetect: boolean) => Promise<NodePythonSettings>;
+      pythonEnsureNodeEnv: (nodeId: string, defaults: PythonEnvironmentDefaults, interpreters?: PythonInterpreterInfo[]) => Promise<PythonEnvironmentConfig>;
+      pythonRunScript: (payload: PythonRunRequestPayload) => Promise<PythonExecutionRun>;
+      pythonGetRunsForNode: (nodeId: string, limit?: number) => Promise<PythonExecutionRun[]>;
+      pythonGetRunLogs: (runId: string) => Promise<PythonExecutionLogEntry[]>;
+      pythonGetRun: (runId: string) => Promise<PythonExecutionRun | null>;
+      onPythonRunLog: (callback: (payload: { runId: string; entry: PythonExecutionLogEntry }) => void) => () => void;
+      onPythonRunStatus: (callback: (payload: { runId: string; status: PythonExecutionStatus }) => void) => () => void;
     };
   }
   // This is for the Electron main process, to add properties attached by Electron.
@@ -53,6 +67,94 @@ export type NodeType = 'folder' | 'document';
 export type DocType = 'prompt' | 'source_code';
 export type ViewMode = 'edit' | 'preview' | 'split-vertical' | 'split-horizontal';
 
+export type PythonExecutionStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
+
+export interface PythonPackageSpec {
+  name: string;
+  version?: string;
+}
+
+export interface PythonEnvironmentConfig {
+  envId: string;
+  name: string;
+  pythonExecutable: string;
+  pythonVersion: string;
+  managed: boolean;
+  createdAt: string;
+  updatedAt: string;
+  packages: PythonPackageSpec[];
+  environmentVariables: Record<string, string>;
+  workingDirectory: string | null;
+  description?: string | null;
+}
+
+export interface PythonEnvironmentDefaults {
+  targetPythonVersion: string;
+  basePackages: PythonPackageSpec[];
+  environmentVariables: Record<string, string>;
+  workingDirectory?: string | null;
+}
+
+export interface CreatePythonEnvironmentPayload {
+  name: string;
+  pythonExecutable: string;
+  pythonVersion?: string;
+  packages: PythonPackageSpec[];
+  environmentVariables: Record<string, string>;
+  workingDirectory?: string | null;
+  description?: string | null;
+  managed?: boolean;
+}
+
+export interface UpdatePythonEnvironmentPayload {
+  name?: string;
+  packages?: PythonPackageSpec[];
+  environmentVariables?: Record<string, string>;
+  workingDirectory?: string | null;
+  description?: string | null;
+}
+
+export interface PythonInterpreterInfo {
+  path: string;
+  version: string;
+  displayName: string;
+  isDefault: boolean;
+}
+
+export interface NodePythonSettings {
+  nodeId: string;
+  envId: string | null;
+  autoDetectEnvironment: boolean;
+  lastUsedRunId: string | null;
+}
+
+export interface PythonExecutionRun {
+  runId: string;
+  nodeId: string;
+  envId: string | null;
+  status: PythonExecutionStatus;
+  startedAt: string;
+  finishedAt: string | null;
+  exitCode: number | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+}
+
+export interface PythonExecutionLogEntry {
+  logId: number;
+  runId: string;
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+}
+
+export interface PythonRunRequestPayload {
+  nodeId: string;
+  code: string;
+  environment: PythonEnvironmentConfig;
+  consoleTheme: 'light' | 'dark';
+}
+
 export interface Node {
   node_id: string;
   parent_id: string | null;
@@ -65,6 +167,7 @@ export interface Node {
   children?: Node[];
   // For documents, this will be attached
   document?: Document;
+  pythonSettings?: NodePythonSettings;
 }
 
 export interface Document {
@@ -153,6 +256,9 @@ export interface Settings {
   markdownCodeFontFamily: string;
   markdownContentPadding: number;
   markdownParagraphSpacing: number;
+  pythonDefaults: PythonEnvironmentDefaults;
+  pythonWorkingDirectory: string | null;
+  pythonConsoleTheme: 'light' | 'dark';
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';

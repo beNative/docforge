@@ -12,6 +12,7 @@ import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
 import MonacoDiffEditor from './MonacoDiffEditor';
 import PreviewPane from './PreviewPane';
 import { SUPPORTED_LANGUAGES } from '../services/languageService';
+import PythonExecutionPanel from './PythonExecutionPanel';
 
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
@@ -320,6 +321,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const supportsAiTools = ['markdown', 'plaintext'].includes(language);
   const supportsPreview = ['markdown', 'html'].includes(language);
   const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(language);
+  const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (language === 'python');
+  const pythonDefaults = useMemo(() => ({
+    ...settings.pythonDefaults,
+    workingDirectory: settings.pythonWorkingDirectory ?? settings.pythonDefaults.workingDirectory ?? null,
+  }), [settings.pythonDefaults, settings.pythonWorkingDirectory]);
   
   const renderContent = () => {
     const editor = isDiffMode
@@ -428,6 +434,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
         </div>
       </div>
       <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>
+      {isPythonDocument && (
+        <div className="px-4 pb-4">
+          <PythonExecutionPanel
+            nodeId={documentNode.id}
+            code={content}
+            defaults={pythonDefaults}
+            consoleTheme={settings.pythonConsoleTheme}
+          />
+        </div>
+      )}
       {error && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-destructive-text p-3 bg-destructive-bg rounded-md shadow-lg z-20">{error}</div>}
       {refinedContent && (
         <Modal onClose={() => setRefinedContent(null)} title="AI Refinement Suggestion" initialFocusRef={acceptButtonRef}>

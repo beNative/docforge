@@ -53,7 +53,7 @@ export const databaseService = {
       console.log('Database does not exist, creating new one...');
       db.exec(INITIAL_SCHEMA);
       // Set PRAGMAs for a new database
-      db.pragma('user_version = 1');
+      db.pragma('user_version = 2');
       db.exec('PRAGMA journal_mode = WAL;');
       db.exec('PRAGMA foreign_keys = ON;');
       console.log('Database created and schema applied.');
@@ -80,6 +80,72 @@ export const databaseService = {
           console.log('Migration to version 1 complete.');
         } catch (e) {
           console.error('Fatal: Failed to migrate database to version 1:', e);
+        }
+      }
+
+      if (currentVersion < 2) {
+        console.log(`Migrating schema from version ${currentVersion} to 2...`);
+        try {
+          const transaction = db.transaction(() => {
+            db.exec(`
+              CREATE TABLE IF NOT EXISTS python_environments (
+                env_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                python_executable TEXT NOT NULL,
+                python_version TEXT NOT NULL,
+                managed INTEGER NOT NULL DEFAULT 1,
+                config_json TEXT NOT NULL,
+                working_directory TEXT,
+                description TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+              );
+            `);
+
+            db.exec(`
+              CREATE TABLE IF NOT EXISTS python_execution_runs (
+                run_id TEXT PRIMARY KEY,
+                node_id TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
+                env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
+                status TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                exit_code INTEGER,
+                error_message TEXT,
+                duration_ms INTEGER
+              );
+            `);
+
+            db.exec(`
+              CREATE TABLE IF NOT EXISTS python_execution_logs (
+                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id TEXT NOT NULL REFERENCES python_execution_runs(run_id) ON DELETE CASCADE,
+                timestamp TEXT NOT NULL,
+                level TEXT NOT NULL,
+                message TEXT NOT NULL
+              );
+            `);
+
+            db.exec(`
+              CREATE TABLE IF NOT EXISTS node_python_settings (
+                node_id TEXT PRIMARY KEY REFERENCES nodes(node_id) ON DELETE CASCADE,
+                env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
+                auto_detect_env INTEGER NOT NULL DEFAULT 1,
+                last_run_id TEXT REFERENCES python_execution_runs(run_id) ON DELETE SET NULL,
+                updated_at TEXT NOT NULL
+              );
+            `);
+
+            db.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_node ON python_execution_runs(node_id);');
+            db.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_env ON python_execution_runs(env_id);');
+            db.exec('CREATE INDEX IF NOT EXISTS idx_python_logs_run ON python_execution_logs(run_id);');
+
+            db.pragma('user_version = 2');
+          });
+          transaction();
+          console.log('Migration to version 2 complete.');
+        } catch (e) {
+          console.error('Fatal: Failed to migrate database to version 2:', e);
         }
       }
     }
