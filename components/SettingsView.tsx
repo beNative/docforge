@@ -206,16 +206,60 @@ const FontFamilySelector: React.FC<FontFamilySelectorProps> = ({
             <label className="block text-xs font-semibold text-text-secondary mb-1" htmlFor={`${id}-recommended`}>
               Recommended
             </label>
-            <select
-              id={`${id}-recommended`}
-              value={matchingOption ? matchingOption.value : ''}
-              onChange={handleSelect}
-              className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary appearance-none"
-            >
-              <option value="">Choose a font</option>
+            <div className="relative">
+              <select
+                id={`${id}-recommended`}
+                value={matchingOption ? matchingOption.value : ''}
+                onChange={handleSelect}
+                className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-8"
+              >
+                <option value="">Choose a font</option>
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-text-secondary text-xs">
+                ▼
+              </span>
+            </div>
+          </div>
+          <div>
             <label className="block text-xs font-semibold text-text-secondary mb-1" htmlFor={`${id}-custom`}>
               Custom value
             </label>
+            <input
+              id={`${id}-custom`}
+              type="text"
+              value={value}
+              onChange={handleInputChange}
+              placeholder={placeholder || defaultValue}
+              className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            {helperText && (
+              <p className="text-xs text-text-secondary mt-1">{helperText}</p>
+            )}
+          </div>
+        </div>
+        <div className="md:w-64 border border-border-color rounded-lg p-4 bg-secondary/40 space-y-3">
+          <p className="text-xs font-semibold text-text-secondary tracking-[0.2em] uppercase">Preview</p>
+          <div className="rounded-md bg-background border border-border-color px-3 py-3">
+            <p className="text-sm text-text-main" style={{ fontFamily: previewFamily }}>
+              The quick brown fox jumps over the lazy dog.
+            </p>
+            <p className="text-xs text-text-secondary mt-2" style={{ fontFamily: previewFamily }}>
+              0123456789 • Aa Bb Cc
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange(defaultValue)}
+            className="text-xs font-semibold text-primary hover:text-primary-hover transition-colors"
+          >
+            Reset to default
+          </button>
+        </div>
       </div>
     </SettingRow>
   );
@@ -228,82 +272,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   isDetecting,
   commands,
 }) => {
-  const [currentSettings, setCurrentSettings] = useState<Settings>(() => settings);
+  const [currentSettings, setCurrentSettings] = useState<Settings>(settings);
   const [isDirty, setIsDirty] = useState(false);
   const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
-  // Use Partial for the record type to allow an empty object as the initial value for the ref.
-    if (!mainPanelRef.current) {
-      return;
-    }
-
-    const sections = Object.values(sectionRefs.current).filter(
-      (section): section is HTMLDivElement => Boolean(section)
-    );
-    sections.forEach((section) => observer.observe(section));
-
-    return () => {
-      sections.forEach((section) => observer.unobserve(section));
-      observer.disconnect();
-
-          <Button onClick={handleSave} disabled={isSaveDisabled} variant="primary">
-            <ProviderSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                discoveredServices,
-                onDetectServices,
-                isDetecting,
-                sectionRef: (el) => (sectionRefs.current.provider = el),
-              }}
-            />
-            <AppearanceSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.appearance = el),
-              }}
-            />
-            <KeyboardShortcutsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                commands,
-                sectionRef: (el) => (sectionRefs.current.shortcuts = el),
-              }}
-            />
-                sectionRef: (el) => (sectionRefs.current.python = el),
-            <GeneralSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.general = el),
-              }}
-            />
-            <DatabaseSettingsSection {...{ sectionRef: (el) => (sectionRefs.current.database = el) }} />
-            <AdvancedSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.advanced = el),
-              }}
-            />
-  settings: Settings;
-  setCurrentSettings: React.Dispatch<React.SetStateAction<Settings>>;
-  sectionRef: (el: HTMLDivElement | null) => void;
-    }
-
-    const sections = Object.values(sectionRefs.current).filter(
-      (section): section is HTMLDivElement => Boolean(section)
-    );
-    sections.forEach((section) => observer.observe(section));
-
-    return () => {
-      sections.forEach((section) => observer.unobserve(section));
-      observer.disconnect();
   const { addLog } = useLogger();
   const [pythonValidationError, setPythonValidationError] = useState<string | null>(null);
 
-  // Fix: Use Partial for the record type to allow an empty object as the initial value for the ref.
   const sectionRefs = useRef<Partial<Record<SettingsCategory, HTMLDivElement | null>>>({});
   const mainPanelRef = useRef<HTMLElement>(null);
 
@@ -316,6 +290,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   }, [settings, currentSettings]);
 
   useEffect(() => {
+    const panel = mainPanelRef.current;
+    if (!panel) {
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -325,33 +304,32 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         });
       },
       {
-        root: mainPanelRef.current,
+        root: panel,
         rootMargin: '-40% 0px -60% 0px',
         threshold: 0,
       }
     );
 
-      <header className="flex items-center justify-between px-4 h-7 border-b border-border-color bg-secondary flex-shrink-0">
-        <h1 className="text-xs font-semibold text-text-secondary tracking-[0.2em] uppercase">Settings</h1>
-        <div className="flex items-center gap-3">
-          {pythonValidationError && (
-            <p className="text-[11px] text-destructive-text max-w-xs text-right leading-snug">
-              Python settings error: {pythonValidationError}
-            </p>
-          )}
-            className="h-7"
-      });
+    const sections = Object.values(sectionRefs.current).filter(
+      (section): section is HTMLDivElement => Boolean(section)
+    );
+    sections.forEach((section) => observer.observe(section));
+
+    return () => {
+      sections.forEach((section) => observer.unobserve(section));
+      observer.disconnect();
     };
   }, []);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     addLog('INFO', 'User action: Save settings.');
     onSave(currentSettings);
-  };
-  
-  const handleNavClick = (id: SettingsCategory) => {
+  }, [addLog, onSave, currentSettings]);
+
+  const handleNavClick = useCallback((id: SettingsCategory) => {
     sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+    setVisibleCategory(id);
+  }, []);
 
   const isSaveDisabled = !isDirty || !!pythonValidationError;
 
@@ -360,11 +338,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <header className="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0">
         <h1 className="text-xl font-semibold text-text-main">Settings</h1>
         <div className="flex flex-col items-end gap-1">
-          <Button
-            onClick={handleSave}
-            disabled={isSaveDisabled}
-            variant="primary"
-          >
+          <Button onClick={handleSave} disabled={isSaveDisabled} variant="primary">
             {isDirty ? 'Save Changes' : 'Saved'}
           </Button>
           {pythonValidationError && (
@@ -396,20 +370,54 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </nav>
         <main ref={mainPanelRef} className="flex-1 overflow-y-auto">
           <div className="max-w-4xl mx-auto px-8 divide-y divide-border-color/50">
-            <ProviderSettingsSection {...{ settings: currentSettings, setCurrentSettings, discoveredServices, onDetectServices, isDetecting, sectionRef: el => sectionRefs.current.provider = el }} />
-            <AppearanceSettingsSection {...{ settings: currentSettings, setCurrentSettings, sectionRef: el => sectionRefs.current.appearance = el }} />
-            <KeyboardShortcutsSection {...{ settings: currentSettings, setCurrentSettings, commands, sectionRef: el => sectionRefs.current.shortcuts = el }} />
+            <ProviderSettingsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                discoveredServices,
+                onDetectServices,
+                isDetecting,
+                sectionRef: (el) => (sectionRefs.current.provider = el),
+              }}
+            />
+            <AppearanceSettingsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                sectionRef: (el) => (sectionRefs.current.appearance = el),
+              }}
+            />
+            <KeyboardShortcutsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                commands,
+                sectionRef: (el) => (sectionRefs.current.shortcuts = el),
+              }}
+            />
             <PythonSettingsSection
               {...{
                 settings: currentSettings,
                 setCurrentSettings,
-                sectionRef: el => sectionRefs.current.python = el,
+                sectionRef: (el) => (sectionRefs.current.python = el),
                 onValidationChange: setPythonValidationError,
               }}
             />
-            <GeneralSettingsSection {...{ settings: currentSettings, setCurrentSettings, sectionRef: el => sectionRefs.current.general = el }} />
-            <DatabaseSettingsSection {...{ sectionRef: el => sectionRefs.current.database = el }} />
-            <AdvancedSettingsSection {...{ settings: currentSettings, setCurrentSettings, sectionRef: el => sectionRefs.current.advanced = el }} />
+            <GeneralSettingsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                sectionRef: (el) => (sectionRefs.current.general = el),
+              }}
+            />
+            <DatabaseSettingsSection {...{ sectionRef: (el) => (sectionRefs.current.database = el) }} />
+            <AdvancedSettingsSection
+              {...{
+                settings: currentSettings,
+                setCurrentSettings,
+                sectionRef: (el) => (sectionRefs.current.advanced = el),
+              }}
+            />
           </div>
         </main>
       </div>
