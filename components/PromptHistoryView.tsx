@@ -220,8 +220,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                     History for "{document.title}"
                 </h1>
             </div>
-            <div className="flex items-center gap-2">
-                <IconButton onClick={() => { addLog('INFO', `User action: Back to editor from history for document "${document.title}".`); onBackToEditor(); }} variant="ghost" size="sm" tooltip="Back to Editor">
+            <div className="flex items-center gap-1">
+                <IconButton onClick={() => { addLog('INFO', `User action: Back to editor from history for document "${document.title}".`); onBackToEditor(); }} variant="ghost" size="xs" tooltip="Back to Editor">
                     <ArrowLeftIcon className="w-4 h-4" />
                 </IconButton>
             </div>
@@ -304,7 +304,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         <h3 className="text-xs font-semibold text-text-main m-0">Comparison</h3>
                         <span>Comparing A (<span className="font-semibold text-text-main">{formatDate(newerVersion.createdAt)}</span>) with B (<span className="font-semibold text-text-main">{olderVersion ? formatDate(olderVersion.createdAt) : 'None'}</span>)</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         <div className="flex items-center gap-0.5 bg-background border border-border-color rounded-md px-1 py-0.5">
                             <button
                                 type="button"
@@ -321,7 +321,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                                 Inline
                             </button>
                         </div>
-                        <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Selected Version"} size="sm">
+                        <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Selected Version"} size="xs">
                             {isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}
                         </IconButton>
                         <Button onClick={() => { addLog('INFO', `User action: Restore version for document "${document.title}".`); onRestore(focusedVersion.content); }} disabled={focusedIndex === 0} variant="secondary" className="px-1.5 py-0.5 text-[11px]">
