@@ -34,6 +34,9 @@ export const DEFAULT_SETTINGS: Settings = {
   markdownBodyFontFamily: 'Inter, sans-serif',
   markdownHeadingFontFamily: 'Inter, sans-serif',
   markdownCodeFontFamily: '\'JetBrains Mono\', monospace',
+  editorFontFamily: 'Consolas, "Courier New", monospace',
+  markdownCodeBlockBackgroundLight: '#f5f5f5',
+  markdownCodeBlockBackgroundDark: '#1f2933',
   markdownContentPadding: 48,
   markdownParagraphSpacing: 0.75,
   pythonDefaults: {

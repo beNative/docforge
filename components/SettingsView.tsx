@@ -42,7 +42,7 @@ const categories: { id: SettingsCategory; label: string; icon: React.FC<{classNa
 ];
 
 
-type FontField = 'markdownBodyFontFamily' | 'markdownHeadingFontFamily' | 'markdownCodeFontFamily';
+type FontField = 'markdownBodyFontFamily' | 'markdownHeadingFontFamily' | 'markdownCodeFontFamily' | 'editorFontFamily';
 type PlatformId = 'mac' | 'windows' | 'linux' | 'generic';
 
 interface FontOption {
@@ -78,6 +78,12 @@ const FONT_PRESETS: Record<FontField, Record<PlatformId, string[]>> = {
     generic: ['"JetBrains Mono", monospace', '"Fira Code", monospace'],
     mac: ['"SF Mono", monospace', '"Menlo", monospace'],
     windows: ['"Cascadia Code", monospace', '"Consolas", monospace'],
+    linux: ['"Ubuntu Mono", monospace', '"DejaVu Sans Mono", monospace'],
+  },
+  editorFontFamily: {
+    generic: ['"Fira Code", monospace', '"Source Code Pro", monospace'],
+    mac: ['"SF Mono", monospace', '"Menlo", monospace'],
+    windows: ['"Consolas", monospace', '"Cascadia Code", monospace'],
     linux: ['"Ubuntu Mono", monospace', '"DejaVu Sans Mono", monospace'],
   },
 };
@@ -556,6 +562,9 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
     const bodyFontOptions = useMemo(() => buildFontOptions('markdownBodyFontFamily', platform), [platform]);
     const headingFontOptions = useMemo(() => buildFontOptions('markdownHeadingFontFamily', platform), [platform]);
     const codeFontOptions = useMemo(() => buildFontOptions('markdownCodeFontFamily', platform), [platform]);
+    const editorFontOptions = useMemo(() => buildFontOptions('editorFontFamily', platform), [platform]);
+    const lightCodeBlockBackground = settings.markdownCodeBlockBackgroundLight.trim() || DEFAULT_SETTINGS.markdownCodeBlockBackgroundLight;
+    const darkCodeBlockBackground = settings.markdownCodeBlockBackgroundDark.trim() || DEFAULT_SETTINGS.markdownCodeBlockBackgroundDark;
 
 
 
@@ -735,6 +744,69 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                   onChange={(font) => handleFontChange('markdownCodeFontFamily', font)}
                   helperText="Also applies to the Markdown preview's code blocks."
                 />
+                <FontFamilySelector
+                  id="editorFontFamily"
+                  label="Editor Font Family"
+                  description="Choose the default font used in the Monaco-powered text editors."
+                  value={settings.editorFontFamily}
+                  placeholder="Consolas, 'Courier New', monospace"
+                  options={editorFontOptions}
+                  defaultValue={DEFAULT_SETTINGS.editorFontFamily}
+                  onChange={(font) => handleFontChange('editorFontFamily', font)}
+                  helperText="Affects both the primary editor and diff viewer."
+                />
+                <SettingRow
+                  label="Code Block Background (Light Theme)"
+                  description="Adjust the background color for Markdown code blocks when using the light theme."
+                  htmlFor="markdownCodeBlockBackgroundLight"
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="markdownCodeBlockBackgroundLight"
+                      type="color"
+                      value={lightCodeBlockBackground}
+                      onChange={(event) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundLight: event.target.value }))}
+                      className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
+                    />
+                    <span className="font-mono text-xs text-text-secondary">
+                      {lightCodeBlockBackground.toUpperCase()}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-2 py-1 text-xs"
+                      onClick={() => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundLight: DEFAULT_SETTINGS.markdownCodeBlockBackgroundLight }))}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </SettingRow>
+                <SettingRow
+                  label="Code Block Background (Dark Theme)"
+                  description="Adjust the background color for Markdown code blocks when using the dark theme."
+                  htmlFor="markdownCodeBlockBackgroundDark"
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="markdownCodeBlockBackgroundDark"
+                      type="color"
+                      value={darkCodeBlockBackground}
+                      onChange={(event) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundDark: event.target.value }))}
+                      className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
+                    />
+                    <span className="font-mono text-xs text-text-secondary">
+                      {darkCodeBlockBackground.toUpperCase()}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-2 py-1 text-xs"
+                      onClick={() => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundDark: DEFAULT_SETTINGS.markdownCodeBlockBackgroundDark }))}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </SettingRow>
             </div>
         </div>
     );
