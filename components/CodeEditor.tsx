@@ -1,6 +1,7 @@
-import React, { useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
+import React, { useRef, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { MONACO_KEYBINDING_DEFINITIONS } from '../services/editor/monacoKeybindings';
+import { DEFAULT_SETTINGS } from '../constants';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -11,6 +12,7 @@ interface CodeEditorProps {
   onChange: (newContent: string) => void;
   onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number; }) => void;
   customShortcuts?: Record<string, string[]>;
+  fontFamily?: string;
 }
 
 export interface CodeEditorHandle {
@@ -108,13 +110,17 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
     return keybinding | primaryKey;
 };
 
-const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {} }, ref) => {
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const { theme } = useTheme();
     const contentRef = useRef(content);
     const customShortcutsRef = useRef<Record<string, string[]>>({});
     const actionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const computedFontFamily = useMemo(() => {
+        const candidate = (fontFamily ?? '').trim();
+        return candidate || DEFAULT_SETTINGS.editorFontFamily;
+    }, [fontFamily]);
 
     useImperativeHandle(ref, () => ({
         format() {
@@ -227,7 +233,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                         theme: theme === 'dark' ? 'vs-dark' : 'vs',
                         automaticLayout: true,
                         fontSize: 12,
-                        fontFamily: 'JetBrains Mono, monospace',
+                        fontFamily: computedFontFamily,
                         minimap: {
                             enabled: true,
                         },
@@ -269,7 +275,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 monacoInstanceRef.current = null;
             }
         };
-    }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts]);
+    }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, computedFontFamily]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {
@@ -289,6 +295,12 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
             monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
         }
     }, [theme]);
+
+    useEffect(() => {
+        if (monacoInstanceRef.current) {
+            monacoInstanceRef.current.updateOptions({ fontFamily: computedFontFamily });
+        }
+    }, [computedFontFamily]);
     
     // Effect to update language
     useEffect(() => {

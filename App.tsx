@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { useDocuments } from './hooks/usePrompts';
 import { useTemplates } from './hooks/useTemplates';
 import { useSettings } from './hooks/useSettings';
+import { useTheme } from './hooks/useTheme';
 import { useLLMStatus } from './hooks/useLLMStatus';
 import { useLogger } from './hooks/useLogger';
 import Sidebar from './components/Sidebar';
@@ -28,7 +29,7 @@ import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, Discove
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
-import { LOCAL_STORAGE_KEYS } from './constants';
+import { LOCAL_STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 import { repository } from './services/repository';
 import { DocumentNode } from './components/PromptTreeItem';
 import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './services/shortcutService';
@@ -88,6 +89,7 @@ const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
     const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
+    const { theme } = useTheme();
     
     const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState(new Set<string>());
@@ -144,13 +146,27 @@ const MainApp: React.FC = () => {
             const bodyFontFamily = (settings.markdownBodyFontFamily || 'Inter, sans-serif').trim() || 'Inter, sans-serif';
             const headingFontFamily = (settings.markdownHeadingFontFamily || bodyFontFamily).trim() || 'Inter, sans-serif';
             const codeFontFamily = (settings.markdownCodeFontFamily || "'JetBrains Mono', monospace").trim() || "'JetBrains Mono', monospace";
+            const lightCodeBlockBackground = settings.markdownCodeBlockBackgroundLight.trim() || DEFAULT_SETTINGS.markdownCodeBlockBackgroundLight;
+            const darkCodeBlockBackground = settings.markdownCodeBlockBackgroundDark.trim() || DEFAULT_SETTINGS.markdownCodeBlockBackgroundDark;
             document.documentElement.style.setProperty('--markdown-body-font-family', bodyFontFamily);
             document.documentElement.style.setProperty('--markdown-heading-font-family', headingFontFamily);
             document.documentElement.style.setProperty('--markdown-code-font-family', codeFontFamily);
             document.documentElement.style.setProperty('--markdown-content-padding', `${settings.markdownContentPadding}px`);
             document.documentElement.style.setProperty('--markdown-paragraph-spacing', String(settings.markdownParagraphSpacing));
+            document.documentElement.style.setProperty('--markdown-code-block-background-light', lightCodeBlockBackground);
+            document.documentElement.style.setProperty('--markdown-code-block-background-dark', darkCodeBlockBackground);
         }
-    }, [settings.markdownFontSize, settings.markdownLineHeight, settings.markdownMaxWidth, settings.markdownHeadingSpacing, settings.markdownCodeFontSize, settings.markdownBodyFontFamily, settings.markdownHeadingFontFamily, settings.markdownCodeFontFamily, settings.markdownContentPadding, settings.markdownParagraphSpacing, settingsLoaded]);
+    }, [settings.markdownFontSize, settings.markdownLineHeight, settings.markdownMaxWidth, settings.markdownHeadingSpacing, settings.markdownCodeFontSize, settings.markdownBodyFontFamily, settings.markdownHeadingFontFamily, settings.markdownCodeFontFamily, settings.markdownContentPadding, settings.markdownParagraphSpacing, settings.markdownCodeBlockBackgroundLight, settings.markdownCodeBlockBackgroundDark, settingsLoaded]);
+
+    useEffect(() => {
+        if (!settingsLoaded) {
+            return;
+        }
+        const lightCodeBlockBackground = settings.markdownCodeBlockBackgroundLight.trim() || DEFAULT_SETTINGS.markdownCodeBlockBackgroundLight;
+        const darkCodeBlockBackground = settings.markdownCodeBlockBackgroundDark.trim() || DEFAULT_SETTINGS.markdownCodeBlockBackgroundDark;
+        const activeBackground = theme === 'dark' ? darkCodeBlockBackground : lightCodeBlockBackground;
+        document.documentElement.style.setProperty('--markdown-code-block-background', activeBackground);
+    }, [theme, settings.markdownCodeBlockBackgroundLight, settings.markdownCodeBlockBackgroundDark, settingsLoaded]);
 
 
     const activeNode = useMemo(() => {

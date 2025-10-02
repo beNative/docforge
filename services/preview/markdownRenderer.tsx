@@ -420,7 +420,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-code-block {
-          background: rgba(var(--color-text-secondary), 0.08);
+          background: var(--markdown-code-block-background, rgba(var(--color-text-secondary), 0.08));
           border: 1px solid rgba(var(--color-border), 0.95);
           border-radius: 0.9rem;
           padding: 1.25rem 1.5rem;

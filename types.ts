@@ -257,6 +257,9 @@ export interface Settings {
   markdownBodyFontFamily: string;
   markdownHeadingFontFamily: string;
   markdownCodeFontFamily: string;
+  editorFontFamily: string;
+  markdownCodeBlockBackgroundLight: string;
+  markdownCodeBlockBackgroundDark: string;
   markdownContentPadding: number;
   markdownParagraphSpacing: number;
   pythonDefaults: PythonEnvironmentDefaults;

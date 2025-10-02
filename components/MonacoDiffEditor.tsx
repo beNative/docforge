@@ -1,5 +1,6 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTheme } from '../hooks/useTheme';
+import { DEFAULT_SETTINGS } from '../constants';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -12,15 +13,20 @@ interface MonacoDiffEditorProps {
   readOnly?: boolean;
   onChange?: (value: string) => void;
   onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number }) => void;
+  fontFamily?: string;
 }
 
-const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll }) => {
+const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const editorInstanceRef = useRef<any>(null);
     const { theme } = useTheme();
     const modelsRef = useRef<{ original: any; modified: any } | null>(null);
     const changeListenerRef = useRef<{ dispose: () => void } | null>(null);
     const scrollListenerRef = useRef<{ dispose: () => void } | null>(null);
+    const computedFontFamily = useMemo(() => {
+        const candidate = (fontFamily ?? '').trim();
+        return candidate || DEFAULT_SETTINGS.editorFontFamily;
+    }, [fontFamily]);
 
     const disposeListeners = useCallback(() => {
         if (changeListenerRef.current) {
@@ -49,7 +55,7 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
                     readOnly,
                     automaticLayout: true,
                     fontSize: 12,
-                    fontFamily: 'JetBrains Mono, monospace',
+                    fontFamily: computedFontFamily,
                     wordWrap: 'on',
                     renderSideBySide: renderMode !== 'inline',
                     minimap: { enabled: false },
@@ -62,6 +68,7 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
                 readOnly,
                 renderSideBySide: renderMode !== 'inline',
                 diffWordWrap: 'on',
+                fontFamily: computedFontFamily,
             });
 
             monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
@@ -103,7 +110,13 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
         return () => {
             isCancelled = true;
         };
-    }, [oldText, newText, language, theme, renderMode, readOnly, onChange, onScroll, disposeListeners]);
+    }, [oldText, newText, language, theme, renderMode, readOnly, onChange, onScroll, disposeListeners, computedFontFamily]);
+
+    useEffect(() => {
+        if (editorInstanceRef.current) {
+            editorInstanceRef.current.updateOptions({ fontFamily: computedFontFamily });
+        }
+    }, [computedFontFamily]);
 
     // Final cleanup on unmount
     useEffect(() => {
