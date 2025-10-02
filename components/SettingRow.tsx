@@ -1,23 +1,49 @@
 import React from 'react';
 
 interface SettingRowProps {
-  label: string;
-  description: string;
+  label: React.ReactNode;
+  description?: React.ReactNode;
+  inlineDescription?: React.ReactNode;
   children: React.ReactNode;
   htmlFor?: string;
+  className?: string;
+  contentClassName?: string;
 }
 
-const SettingRow: React.FC<SettingRowProps> = ({ label, description, children, htmlFor }) => {
+const SettingRow: React.FC<SettingRowProps> = ({
+  label,
+  description,
+  inlineDescription,
+  children,
+  htmlFor,
+  className,
+  contentClassName,
+}) => {
+  const containerClass = [
+    'grid grid-cols-1 gap-y-3 gap-x-6',
+    'md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const contentContainerClass = ['flex flex-col items-start gap-2', contentClassName]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 items-start gap-x-8 gap-y-3">
-      <div className="md:col-span-1">
-        <label htmlFor={htmlFor} className="font-semibold text-text-main leading-tight cursor-pointer">
+    <div className={containerClass}>
+      <div className="space-y-1">
+        <label htmlFor={htmlFor} className="block font-semibold text-text-main leading-tight">
           {label}
         </label>
-        <p className="text-xs text-text-secondary mt-1">{description}</p>
+        {description && <div className="text-xs text-text-secondary">{description}</div>}
       </div>
-      <div className="md:col-span-2 flex justify-start md:justify-end items-center w-full">
+      <div className={contentContainerClass}>
         {children}
+        {inlineDescription && (
+          <div className="text-xs text-text-secondary leading-relaxed">{inlineDescription}</div>
+        )}
       </div>
     </div>
   );

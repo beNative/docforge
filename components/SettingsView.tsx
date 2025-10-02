@@ -270,6 +270,57 @@ const FontFamilySelector: React.FC<FontFamilySelectorProps> = ({
     </SettingRow>
   );
 };
+
+interface SettingsGroupCardProps {
+  title: string;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}
+
+const SettingsGroupCard: React.FC<SettingsGroupCardProps> = ({
+  title,
+  description,
+  actions,
+  children,
+  className,
+}) => {
+  const containerClass = [
+    'rounded-xl border border-border-color bg-secondary/30 shadow-sm',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const headerActions = actions ? (
+    <div className="flex flex-wrap items-center gap-2">{actions}</div>
+  ) : null;
+
+  const content = React.Children.toArray(children).filter(Boolean);
+
+  return (
+    <section className={containerClass}>
+      <div className="flex flex-col gap-2 border-b border-border-color bg-secondary/60 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-text-main">{title}</h3>
+          {description && (
+            <p className="text-xs text-text-secondary leading-relaxed">{description}</p>
+          )}
+        </div>
+        {headerActions}
+      </div>
+      <div className="flex flex-col divide-y divide-border-color/60">
+        {content.map((child, index) => (
+          <div key={index} className="px-4 py-5">
+            {child}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
   onSave,
@@ -495,50 +546,82 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
     const selectedService = discoveredServices.find(s => s.generateUrl === settings.llmProviderUrl);
 
     return (
-        <div id="provider" ref={sectionRef} className="py-6">
+        <section id="provider" ref={sectionRef} className="py-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">LLM Provider</h2>
             <div className="space-y-6">
-                <SettingRow label="Detect Services" description="Scan for locally running LLM services like Ollama and LM Studio.">
-                    <div className="w-60">
-                        <Button onClick={onDetectServices} disabled={isDetecting} variant="secondary" isLoading={isDetecting} className="w-full">
-                            {isDetecting ? 'Detecting...' : 'Re-Detect Services'}
-                        </Button>
-                        {detectionError && <p className="text-center text-xs text-destructive-text mt-2">{detectionError}</p>}
-                    </div>
-                </SettingRow>
-                <SettingRow label="Detected Service" description="Choose a running service to connect to for AI features.">
-                    <select
-                        id="llmService"
-                        value={selectedService?.id || ''}
-                        onChange={(e) => handleServiceChange(e.target.value)}
-                        disabled={discoveredServices.length === 0}
-                        className="w-60 p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+                <SettingsGroupCard
+                    title="Connect to local providers"
+                    description="Discover running LLM services and select the default model DocForge should call."
+                >
+                    <SettingRow
+                        label="Detect Services"
+                        description="Scan for locally running LLM services like Ollama and LM Studio."
+                        inlineDescription={
+                            detectionError
+                                ? <span className="text-destructive-text">{detectionError}</span>
+                                : 'DocForge remembers the most recent provider you connect to.'
+                        }
                     >
-                        <option value="" disabled>{discoveredServices.length > 0 ? 'Select a service' : 'No services detected'}</option>
-                        {discoveredServices.map(service => (
-                            <option key={service.id} value={service.id}>{service.name}</option>
-                        ))}
-                    </select>
-                </SettingRow>
-                <SettingRow label="Model Name" description="Select which model to use for generating titles and refining documents.">
-                     <div className="relative w-60">
-                       <select
-                            id="llmModelName"
-                            value={settings.llmModelName}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, llmModelName: e.target.value }))}
-                            disabled={!selectedService || availableModels.length === 0}
-                            className="w-full p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+                        <Button
+                            onClick={onDetectServices}
+                            disabled={isDetecting}
+                            variant="secondary"
+                            isLoading={isDetecting}
+                            className="w-full sm:w-auto"
                         >
-                            <option value="" disabled>{!selectedService ? 'Select service first' : 'Select a model'}</option>
-                            {availableModels.map(model => (
-                            <option key={model.id} value={model.id}>{model.name}</option>
+                            {isDetecting ? 'Detecting…' : 'Re-detect services'}
+                        </Button>
+                    </SettingRow>
+                    <SettingRow
+                        label="Detected Service"
+                        description="Choose a running service to connect to for AI features."
+                        inlineDescription={
+                            discoveredServices.length === 0
+                                ? 'Run a compatible service and detect again to populate this list.'
+                                : undefined
+                        }
+                    >
+                        <select
+                            id="llmService"
+                            value={selectedService?.id || ''}
+                            onChange={(e) => handleServiceChange(e.target.value)}
+                            disabled={discoveredServices.length === 0}
+                            className="w-full sm:w-72 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+                        >
+                            <option value="" disabled>{discoveredServices.length > 0 ? 'Select a service' : 'No services detected'}</option>
+                            {discoveredServices.map(service => (
+                                <option key={service.id} value={service.id}>{service.name}</option>
                             ))}
                         </select>
-                        {isFetchingModels && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Spinner /></div>}
-                    </div>
-                </SettingRow>
+                    </SettingRow>
+                    <SettingRow
+                        label="Model Name"
+                        description="Select which model to use for generating titles and refining documents."
+                        inlineDescription={
+                            selectedService && availableModels.length === 0
+                                ? 'Model metadata will appear here once DocForge fetches the catalog.'
+                                : undefined
+                        }
+                    >
+                        <div className="relative w-full sm:w-72">
+                            <select
+                                id="llmModelName"
+                                value={settings.llmModelName}
+                                onChange={(e) => setCurrentSettings(prev => ({ ...prev, llmModelName: e.target.value }))}
+                                disabled={!selectedService || availableModels.length === 0}
+                                className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+                            >
+                                <option value="" disabled>{!selectedService ? 'Select service first' : 'Select a model'}</option>
+                                {availableModels.map(model => (
+                                    <option key={model.id} value={model.id}>{model.name}</option>
+                                ))}
+                            </select>
+                            {isFetchingModels && <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"><Spinner /></div>}
+                        </div>
+                    </SettingRow>
+                </SettingsGroupCard>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -546,13 +629,14 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
     const CardButton: React.FC<{name: string, value: any, children: React.ReactNode, onClick: (value: any) => void, isSelected: boolean}> = ({ name, value, children, onClick, isSelected }) => (
 
         <button
+            type="button"
             onClick={() => onClick(value)}
-            className={`p-3 rounded-lg border-2 text-center transition-all w-full flex-1 ${ isSelected ? 'border-primary bg-primary/5' : 'border-border-color bg-secondary hover:border-primary/50' }`}
+            className={`flex h-full w-full flex-col items-center justify-between rounded-lg border-2 p-3 text-center transition-all ${ isSelected ? 'border-primary bg-primary/5 shadow-sm' : 'border-border-color bg-secondary hover:border-primary/60' }`}
         >
-            <div className="flex items-center justify-around text-text-secondary p-2 bg-background rounded-md mb-2">
+            <div className="mb-3 flex w-full items-center justify-center gap-2 rounded-md bg-background p-2 text-text-secondary">
                 {children}
             </div>
-            <h4 className="font-semibold text-text-main text-xs">{name}</h4>
+            <h4 className="text-xs font-semibold text-text-main">{name}</h4>
         </button>
     );
     const platform = useMemo(detectPlatform, []);
@@ -569,246 +653,319 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
 
 
     return (
-        <div id="appearance" ref={sectionRef} className="py-6">
+        <section id="appearance" ref={sectionRef} className="py-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Appearance</h2>
             <div className="space-y-6">
-                <SettingRow label="Interface Scale" description="Adjust the size of all UI elements in the application.">
-                    <div className="flex items-center gap-4 w-60">
-                        <input
-                            id="uiScale"
-                            type="range"
-                            min="50"
-                            max="200"
-                            step="10"
-                            value={settings.uiScale}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, uiScale: Number(e.target.value) }))}
-                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
-                        />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.uiScale}%</span>
-                    </div>
-                </SettingRow>
-                <SettingRow label="Icon Set" description="Customize the look of icons throughout the application.">
-                    <div className="grid grid-cols-3 gap-3 w-80">
-                         <CardButton name="Heroicons" value="heroicons" isSelected={settings.iconSet === 'heroicons'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
-                            <HeroIcons.PlusIcon className="w-5 h-5" /> <HeroIcons.SparklesIcon className="w-5 h-5" /> <HeroIcons.FolderIcon className="w-5 h-5" />
-                        </CardButton>
-                        <CardButton name="Lucide" value="lucide" isSelected={settings.iconSet === 'lucide'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
-                            <LucideIcons.PlusIcon className="w-5 h-5" /> <LucideIcons.SparklesIcon className="w-5 h-5" /> <LucideIcons.FolderIcon className="w-5 h-5" />
-                        </CardButton>
-                        <CardButton name="Feather" value="feather" isSelected={settings.iconSet === 'feather'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
-                            <FeatherIcons.PlusIcon className="w-5 h-5" /> <FeatherIcons.SparklesIcon className="w-5 h-5" /> <FeatherIcons.FolderIcon className="w-5 h-5" />
-                        </CardButton>
-                        <CardButton name="Tabler" value="tabler" isSelected={settings.iconSet === 'tabler'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
-                            <TablerIcons.PlusIcon className="w-5 h-5" /> <TablerIcons.SparklesIcon className="w-5 h-5" /> <TablerIcons.FolderIcon className="w-5 h-5" />
-                        </CardButton>
-                        <CardButton name="Material" value="material" isSelected={settings.iconSet === 'material'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
-                             <MaterialIcons.PlusIcon className="w-5 h-5" /> <MaterialIcons.SparklesIcon className="w-5 h-5" /> <MaterialIcons.FolderIcon className="w-5 h-5" />
-                        </CardButton>
-                    </div>
-                </SettingRow>
-                <SettingRow label="Markdown Font Size" description="Adjust the base font size for the Markdown preview.">
-                    <div className="flex items-center gap-4 w-60">
-                        <input
-                            id="markdownFontSize"
-                            type="range"
-                            min="7"
-                            max="40"
-                            step="1"
-                            value={settings.markdownFontSize}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownFontSize: Number(e.target.value) }))}
-                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
-                        />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownFontSize}px</span>
-                    </div>
-                </SettingRow>
-                <SettingRow label="Markdown Line Height" description="Control the spacing between lines of text for better readability.">
-                    <div className="flex items-center gap-4 w-60">
-                        <input
-                            id="markdownLineHeight"
-                            type="range"
-                            min="1.2"
-                            max="2.2"
-                            step="0.1"
-                            value={settings.markdownLineHeight}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownLineHeight: Number(e.target.value) }))}
-                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
-                        />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownLineHeight.toFixed(1)}</span>
-                    </div>
-                </SettingRow>
-                <SettingRow label="Markdown Heading Spacing" description="Control the vertical space above headings to tighten or relax sections.">
-                    <div className="flex items-center gap-4 w-60">
-                        <input
-                            id="markdownHeadingSpacing"
-                            type="range"
-                            min="1.0"
-                            max="4.0"
-                            step="0.1"
-                            value={settings.markdownHeadingSpacing}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownHeadingSpacing: Number(e.target.value) }))}
-                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
-                        />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownHeadingSpacing.toFixed(1)}x</span>
-                    </div>
-                </SettingRow>
-                <SettingRow label="Markdown Paragraph Spacing" description="Adjust the space between paragraphs and block elements.">
-                    <div className="flex items-center gap-4 w-60">
-                        <input
-                            id="markdownParagraphSpacing"
-                            type="range"
-                            min="0.4"
-                            max="2.0"
-                            step="0.05"
-                            value={settings.markdownParagraphSpacing}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownParagraphSpacing: Number(e.target.value) }))}
-                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
-                        />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownParagraphSpacing.toFixed(2)}x</span>
-                    </div>
-                </SettingRow>
-                <SettingRow label="Markdown Max Width" description="Set the maximum width of the text content to improve line length.">
-                    <div className="flex items-center gap-4 w-60">
-                        <input
-                            id="markdownMaxWidth"
-                            type="range"
-                            min="500"
-                            max="4000"
-                            step="20"
-                            value={settings.markdownMaxWidth}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownMaxWidth: Number(e.target.value) }))}
-                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
-                        />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownMaxWidth}px</span>
-                    </div>
-                </SettingRow>
-                <SettingRow label="Document Vertical Padding" description="Control the padding above and below the rendered document.">
-                    <div className="flex items-center gap-4 w-60">
-                        <input
-                            id="markdownContentPadding"
-                            type="range"
-                            min="0"
-                            max="240"
-                            step="4"
-                            value={settings.markdownContentPadding}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownContentPadding: Number(e.target.value) }))}
-                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
-                        />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownContentPadding}px</span>
-                    </div>
-                </SettingRow>
-                <SettingRow label="Code Block Font Size" description="Adjust the font size used inside fenced code blocks.">
-                    <div className="flex items-center gap-4 w-60">
-                        <input
-                            id="markdownCodeFontSize"
-                            type="range"
-                            min="8"
-                            max="32"
-                            step="1"
-                            value={settings.markdownCodeFontSize}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownCodeFontSize: Number(e.target.value) }))}
-                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
-                        />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownCodeFontSize}px</span>
-                    </div>
-                </SettingRow>
-                                <FontFamilySelector
-                  id="markdownBodyFontFamily"
-                  label="Body Font Family"
-                  description="Typography used for paragraphs and general text."
-                  value={settings.markdownBodyFontFamily}
-                  placeholder="System UI, sans-serif"
-                  options={bodyFontOptions}
-                  defaultValue={DEFAULT_SETTINGS.markdownBodyFontFamily}
-                  onChange={(font) => handleFontChange('markdownBodyFontFamily', font)}
-                  helperText="Applies to paragraphs, lists, and regular text."
-                />
-                <FontFamilySelector
-                  id="markdownHeadingFontFamily"
-                  label="Heading Font Family"
-                  description="Choose a font family for headings or leave blank to inherit the body font."
-                  value={settings.markdownHeadingFontFamily}
-                  placeholder="Inter, sans-serif"
-                  options={headingFontOptions}
-                  defaultValue={DEFAULT_SETTINGS.markdownHeadingFontFamily}
-                  onChange={(font) => handleFontChange('markdownHeadingFontFamily', font)}
-                  helperText="Leave blank to reuse the body font."
-                />
-                <FontFamilySelector
-                  id="markdownCodeFontFamily"
-                  label="Code Font Family"
-                  description="Set the font used for inline code and code blocks."
-                  value={settings.markdownCodeFontFamily}
-                  placeholder="'JetBrains Mono', monospace"
-                  options={codeFontOptions}
-                  defaultValue={DEFAULT_SETTINGS.markdownCodeFontFamily}
-                  onChange={(font) => handleFontChange('markdownCodeFontFamily', font)}
-                  helperText="Also applies to the Markdown preview's code blocks."
-                />
-                <FontFamilySelector
-                  id="editorFontFamily"
-                  label="Editor Font Family"
-                  description="Choose the default font used in the Monaco-powered text editors."
-                  value={settings.editorFontFamily}
-                  placeholder="Consolas, 'Courier New', monospace"
-                  options={editorFontOptions}
-                  defaultValue={DEFAULT_SETTINGS.editorFontFamily}
-                  onChange={(font) => handleFontChange('editorFontFamily', font)}
-                  helperText="Affects both the primary editor and diff viewer."
-                />
-                <SettingRow
-                  label="Code Block Background (Light Theme)"
-                  description="Adjust the background color for Markdown code blocks when using the light theme."
-                  htmlFor="markdownCodeBlockBackgroundLight"
+                <SettingsGroupCard
+                    title="Interface personalization"
+                    description="Tune DocForge's UI density and iconography so the workspace matches your preferences."
                 >
-                  <div className="flex items-center gap-3">
-                    <input
-                      id="markdownCodeBlockBackgroundLight"
-                      type="color"
-                      value={lightCodeBlockBackground}
-                      onChange={(event) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundLight: event.target.value }))}
-                      className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
-                    />
-                    <span className="font-mono text-xs text-text-secondary">
-                      {lightCodeBlockBackground.toUpperCase()}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="px-2 py-1 text-xs"
-                      onClick={() => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundLight: DEFAULT_SETTINGS.markdownCodeBlockBackgroundLight }))}
+                    <SettingRow
+                        label="Scale & Icons"
+                        description="Adjust the global interface scale and choose an icon set."
+                        inlineDescription="These changes apply instantly across every panel."
                     >
-                      Reset
-                    </Button>
-                  </div>
-                </SettingRow>
-                <SettingRow
-                  label="Code Block Background (Dark Theme)"
-                  description="Adjust the background color for Markdown code blocks when using the dark theme."
-                  htmlFor="markdownCodeBlockBackgroundDark"
+                        <div className="flex w-full flex-col gap-6 xl:flex-row">
+                            <div className="flex flex-1 flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Interface scale</p>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        id="uiScale"
+                                        type="range"
+                                        min="50"
+                                        max="200"
+                                        step="10"
+                                        value={settings.uiScale}
+                                        onChange={(e) => setCurrentSettings(prev => ({ ...prev, uiScale: Number(e.target.value) }))}
+                                        className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                                    />
+                                    <span className="min-w-[3rem] text-right text-xs font-semibold text-text-main tabular-nums">{settings.uiScale}%</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-1 flex-col gap-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Icon set</p>
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                                    <CardButton name="Heroicons" value="heroicons" isSelected={settings.iconSet === 'heroicons'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
+                                        <HeroIcons.PlusIcon className="h-5 w-5" />
+                                        <HeroIcons.SparklesIcon className="h-5 w-5" />
+                                        <HeroIcons.FolderIcon className="h-5 w-5" />
+                                    </CardButton>
+                                    <CardButton name="Lucide" value="lucide" isSelected={settings.iconSet === 'lucide'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
+                                        <LucideIcons.PlusIcon className="h-5 w-5" />
+                                        <LucideIcons.SparklesIcon className="h-5 w-5" />
+                                        <LucideIcons.FolderIcon className="h-5 w-5" />
+                                    </CardButton>
+                                    <CardButton name="Feather" value="feather" isSelected={settings.iconSet === 'feather'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
+                                        <FeatherIcons.PlusIcon className="h-5 w-5" />
+                                        <FeatherIcons.SparklesIcon className="h-5 w-5" />
+                                        <FeatherIcons.FolderIcon className="h-5 w-5" />
+                                    </CardButton>
+                                    <CardButton name="Tabler" value="tabler" isSelected={settings.iconSet === 'tabler'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
+                                        <TablerIcons.PlusIcon className="h-5 w-5" />
+                                        <TablerIcons.SparklesIcon className="h-5 w-5" />
+                                        <TablerIcons.FolderIcon className="h-5 w-5" />
+                                    </CardButton>
+                                    <CardButton name="Material" value="material" isSelected={settings.iconSet === 'material'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
+                                        <MaterialIcons.PlusIcon className="h-5 w-5" />
+                                        <MaterialIcons.SparklesIcon className="h-5 w-5" />
+                                        <MaterialIcons.FolderIcon className="h-5 w-5" />
+                                    </CardButton>
+                                </div>
+                            </div>
+                        </div>
+                    </SettingRow>
+                </SettingsGroupCard>
+
+                <SettingsGroupCard
+                    title="Markdown layout"
+                    description="Control the typography rhythm, spacing, and bounds of rendered Markdown."
                 >
-                  <div className="flex items-center gap-3">
-                    <input
-                      id="markdownCodeBlockBackgroundDark"
-                      type="color"
-                      value={darkCodeBlockBackground}
-                      onChange={(event) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundDark: event.target.value }))}
-                      className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
-                    />
-                    <span className="font-mono text-xs text-text-secondary">
-                      {darkCodeBlockBackground.toUpperCase()}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="px-2 py-1 text-xs"
-                      onClick={() => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundDark: DEFAULT_SETTINGS.markdownCodeBlockBackgroundDark }))}
+                    <SettingRow
+                        label="Typography scale"
+                        description="Adjust body size and line height together to balance readability."
+                        inlineDescription="Fine-tuning both options keeps paragraphs consistent when switching monitors."
                     >
-                      Reset
-                    </Button>
-                  </div>
-                </SettingRow>
+                        <div className="grid w-full gap-4 md:grid-cols-2">
+                            <div className="flex flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Font size</p>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        id="markdownFontSize"
+                                        type="range"
+                                        min="7"
+                                        max="40"
+                                        step="1"
+                                        value={settings.markdownFontSize}
+                                        onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownFontSize: Number(e.target.value) }))}
+                                        className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                                    />
+                                    <span className="min-w-[3rem] text-right text-xs font-semibold text-text-main tabular-nums">{settings.markdownFontSize}px</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Line height</p>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        id="markdownLineHeight"
+                                        type="range"
+                                        min="1.2"
+                                        max="2.2"
+                                        step="0.1"
+                                        value={settings.markdownLineHeight}
+                                        onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownLineHeight: Number(e.target.value) }))}
+                                        className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                                    />
+                                    <span className="min-w-[3rem] text-right text-xs font-semibold text-text-main tabular-nums">{settings.markdownLineHeight.toFixed(1)}x</span>
+                                </div>
+                            </div>
+                        </div>
+                    </SettingRow>
+                    <SettingRow
+                        label="Spacing rhythm"
+                        description="Coordinate vertical spacing between headings and paragraphs."
+                        inlineDescription="Helpful when you want dense outlines or more airy reading modes."
+                    >
+                        <div className="grid w-full gap-4 md:grid-cols-2">
+                            <div className="flex flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Heading spacing</p>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        id="markdownHeadingSpacing"
+                                        type="range"
+                                        min="1.0"
+                                        max="4.0"
+                                        step="0.1"
+                                        value={settings.markdownHeadingSpacing}
+                                        onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownHeadingSpacing: Number(e.target.value) }))}
+                                        className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                                    />
+                                    <span className="min-w-[3rem] text-right text-xs font-semibold text-text-main tabular-nums">{settings.markdownHeadingSpacing.toFixed(1)}x</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Paragraph spacing</p>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        id="markdownParagraphSpacing"
+                                        type="range"
+                                        min="0.4"
+                                        max="2.0"
+                                        step="0.05"
+                                        value={settings.markdownParagraphSpacing}
+                                        onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownParagraphSpacing: Number(e.target.value) }))}
+                                        className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                                    />
+                                    <span className="min-w-[3rem] text-right text-xs font-semibold text-text-main tabular-nums">{settings.markdownParagraphSpacing.toFixed(2)}x</span>
+                                </div>
+                            </div>
+                        </div>
+                    </SettingRow>
+                    <SettingRow
+                        label="Canvas bounds"
+                        description="Define the maximum width and vertical padding of the Markdown preview."
+                    >
+                        <div className="grid w-full gap-4 md:grid-cols-2">
+                            <div className="flex flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Max width</p>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        id="markdownMaxWidth"
+                                        type="range"
+                                        min="500"
+                                        max="4000"
+                                        step="20"
+                                        value={settings.markdownMaxWidth}
+                                        onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownMaxWidth: Number(e.target.value) }))}
+                                        className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                                    />
+                                    <span className="min-w-[3rem] text-right text-xs font-semibold text-text-main tabular-nums">{settings.markdownMaxWidth}px</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Vertical padding</p>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        id="markdownContentPadding"
+                                        type="range"
+                                        min="0"
+                                        max="240"
+                                        step="4"
+                                        value={settings.markdownContentPadding}
+                                        onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownContentPadding: Number(e.target.value) }))}
+                                        className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                                    />
+                                    <span className="min-w-[3rem] text-right text-xs font-semibold text-text-main tabular-nums">{settings.markdownContentPadding}px</span>
+                                </div>
+                            </div>
+                        </div>
+                    </SettingRow>
+                </SettingsGroupCard>
+
+                <SettingsGroupCard
+                    title="Code presentation"
+                    description="Style the typography and backgrounds used for inline and block code."
+                >
+                    <SettingRow
+                        label="Code styling"
+                        description="Adjust font size and theme colors for code blocks across light and dark modes."
+                        inlineDescription="Use the reset buttons to quickly revert to DocForge defaults."
+                    >
+                        <div className="grid w-full gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                            <div className="flex flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Font size</p>
+                                <div className="flex items-center gap-4">
+                                    <input
+                                        id="markdownCodeFontSize"
+                                        type="range"
+                                        min="8"
+                                        max="32"
+                                        step="1"
+                                        value={settings.markdownCodeFontSize}
+                                        onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownCodeFontSize: Number(e.target.value) }))}
+                                        className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                                    />
+                                    <span className="min-w-[3rem] text-right text-xs font-semibold text-text-main tabular-nums">{settings.markdownCodeFontSize}px</span>
+                                </div>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="flex flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Light theme</p>
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <input
+                                            id="markdownCodeBlockBackgroundLight"
+                                            type="color"
+                                            value={lightCodeBlockBackground}
+                                            onChange={(event) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundLight: event.target.value }))}
+                                            className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
+                                        />
+                                        <span className="font-mono text-xs text-text-secondary">{lightCodeBlockBackground.toUpperCase()}</span>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="px-2 py-1 text-xs"
+                                            onClick={() => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundLight: DEFAULT_SETTINGS.markdownCodeBlockBackgroundLight }))}
+                                        >
+                                            Reset
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-3 rounded-lg border border-border-color bg-secondary/30 p-4">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Dark theme</p>
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <input
+                                            id="markdownCodeBlockBackgroundDark"
+                                            type="color"
+                                            value={darkCodeBlockBackground}
+                                            onChange={(event) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundDark: event.target.value }))}
+                                            className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
+                                        />
+                                        <span className="font-mono text-xs text-text-secondary">{darkCodeBlockBackground.toUpperCase()}</span>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="px-2 py-1 text-xs"
+                                            onClick={() => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundDark: DEFAULT_SETTINGS.markdownCodeBlockBackgroundDark }))}
+                                        >
+                                            Reset
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </SettingRow>
+                </SettingsGroupCard>
+
+                <SettingsGroupCard
+                    title="Font families"
+                    description="Pick fallback stacks for body copy, headings, code, and the editor."
+                >
+                    <FontFamilySelector
+                      id="markdownBodyFontFamily"
+                      label="Body Font Family"
+                      description="Typography used for paragraphs and general text."
+                      value={settings.markdownBodyFontFamily}
+                      placeholder="System UI, sans-serif"
+                      options={bodyFontOptions}
+                      defaultValue={DEFAULT_SETTINGS.markdownBodyFontFamily}
+                      onChange={(font) => handleFontChange('markdownBodyFontFamily', font)}
+                      helperText="Applies to paragraphs, lists, and regular text."
+                    />
+                    <FontFamilySelector
+                      id="markdownHeadingFontFamily"
+                      label="Heading Font Family"
+                      description="Choose a font family for headings or leave blank to inherit the body font."
+                      value={settings.markdownHeadingFontFamily}
+                      placeholder="Inter, sans-serif"
+                      options={headingFontOptions}
+                      defaultValue={DEFAULT_SETTINGS.markdownHeadingFontFamily}
+                      onChange={(font) => handleFontChange('markdownHeadingFontFamily', font)}
+                      helperText="Leave blank to reuse the body font."
+                    />
+                    <FontFamilySelector
+                      id="markdownCodeFontFamily"
+                      label="Code Font Family"
+                      description="Set the font used for inline code and code blocks."
+                      value={settings.markdownCodeFontFamily}
+                      placeholder="'JetBrains Mono', monospace"
+                      options={codeFontOptions}
+                      defaultValue={DEFAULT_SETTINGS.markdownCodeFontFamily}
+                      onChange={(font) => handleFontChange('markdownCodeFontFamily', font)}
+                      helperText="Also applies to the Markdown preview's code blocks."
+                    />
+                    <FontFamilySelector
+                      id="editorFontFamily"
+                      label="Editor Font Family"
+                      description="Choose the default font used in the Monaco-powered text editors."
+                      value={settings.editorFontFamily}
+                      placeholder="Consolas, 'Courier New', monospace"
+                      options={editorFontOptions}
+                      defaultValue={DEFAULT_SETTINGS.editorFontFamily}
+                      onChange={(font) => handleFontChange('editorFontFamily', font)}
+                      helperText="Affects both the primary editor and diff viewer."
+                    />
+                </SettingsGroupCard>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -1048,14 +1205,22 @@ const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurr
   const interpreterValue = formState.useCustomInterpreter ? 'custom' : formState.interpreterPath;
 
   return (
-    <div id="python" ref={sectionRef} className="py-6">
+    <section id="python" ref={sectionRef} className="py-6">
       <h2 className="text-lg font-semibold text-text-main mb-4">Python Execution</h2>
       <p className="text-xs text-text-secondary max-w-3xl mb-6">
         Configure how DocForge prepares isolated Python environments. These defaults are applied when auto-creating a virtual
         environment for a document and can be overridden per environment.
       </p>
       <div className="space-y-6">
-        <SettingRow label="Target Python Version" description="Preferred Python version when creating new virtual environments.">
+        <SettingsGroupCard
+          title="Defaults for new environments"
+          description="Control interpreter versions, packages, and other defaults DocForge applies when provisioning environments."
+        >
+          <SettingRow
+            label="Target Python Version"
+            description="Preferred Python version when creating new virtual environments."
+            inlineDescription="DocForge selects the closest interpreter match when provisioning."
+          >
           <input
             type="text"
             value={settings.pythonDefaults.targetPythonVersion}
@@ -1066,35 +1231,46 @@ const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurr
             className="w-40 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="3.11"
           />
-        </SettingRow>
-        <SettingRow label="Default Packages" description="One package per line. Versions can use ==, >=, <=, etc.">
-          <textarea
-            value={packagesInput}
-            onChange={(e) => handlePackagesChange(e.target.value)}
-            className="w-full h-28 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary font-mono"
-            placeholder="numpy
+          </SettingRow>
+          <SettingRow
+            label="Default Packages"
+            description="Seed every environment with these packages."
+            inlineDescription="Enter one package per line. Versions support ==, >=, <=, and other pip specifiers."
+          >
+            <textarea
+              value={packagesInput}
+              onChange={(e) => handlePackagesChange(e.target.value)}
+              className="w-full h-28 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+              placeholder="numpy
 pandas
 requests"
-          />
-        </SettingRow>
-        <SettingRow label="Default Environment Variables" description="JSON object defining environment variables applied to every run.">
-          <textarea
-            value={envVarJson}
-            onChange={(e) => handleEnvVarChange(e.target.value)}
-            className="w-full h-32 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary font-mono"
-          />
-          {envVarError && <p className="text-xs text-destructive-text mt-2">{envVarError}</p>}
-        </SettingRow>
-        <SettingRow label="Default Working Directory" description="Optional directory used when running scripts if no environment-specific directory is set.">
-          <input
-            type="text"
-            value={settings.pythonWorkingDirectory ?? ''}
-            onChange={(e) => handleWorkingDirectoryChange(e.target.value)}
-            className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
-            placeholder="/path/to/projects"
-          />
-        </SettingRow>
-        <SettingRow label="Console Theme" description="Theme used for the dedicated Python output window.">
+            />
+          </SettingRow>
+          <SettingRow
+            label="Default Environment Variables"
+            description="JSON object defining environment variables applied to every run."
+            inlineDescription={envVarError ? <span className="text-destructive-text">{envVarError}</span> : 'Leave blank if no shared environment variables are required.'}
+          >
+            <textarea
+              value={envVarJson}
+              onChange={(e) => handleEnvVarChange(e.target.value)}
+              className="w-full h-32 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+            />
+          </SettingRow>
+          <SettingRow
+            label="Default Working Directory"
+            description="Optional directory used when running scripts if no environment-specific directory is set."
+            inlineDescription="DocForge falls back to the document folder when this is empty."
+          >
+            <input
+              type="text"
+              value={settings.pythonWorkingDirectory ?? ''}
+              onChange={(e) => handleWorkingDirectoryChange(e.target.value)}
+              className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="/path/to/projects"
+            />
+          </SettingRow>
+          <SettingRow label="Console Theme" description="Theme used for the dedicated Python output window.">
           <select
             value={settings.pythonConsoleTheme}
             onChange={(e) => handleConsoleThemeChange(e.target.value as 'light' | 'dark')}
@@ -1103,39 +1279,54 @@ requests"
             <option value="dark">Dark</option>
             <option value="light">Light</option>
           </select>
-        </SettingRow>
-        <div className="border border-border-color rounded-lg">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border-color bg-secondary/40">
-            <div>
-              <p className="text-sm font-semibold text-text-main">Managed Environments</p>
-              <p className="text-xs text-text-secondary">Create reusable Python virtual environments with curated packages.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" onClick={() => { refreshEnvironments(); refreshInterpreters(); }} isLoading={isLoading || isDetecting}>
-                <RefreshIcon className="w-4 h-4 mr-1" /> Refresh
+          </SettingRow>
+        </SettingsGroupCard>
+        <SettingsGroupCard
+          title="Managed environments"
+          description="Create reusable Python virtual environments with curated packages."
+          actions={(
+            <>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  refreshEnvironments();
+                  refreshInterpreters();
+                }}
+                isLoading={isLoading || isDetecting}
+              >
+                <RefreshIcon className="mr-1 h-4 w-4" /> Refresh
               </Button>
-              <Button onClick={openCreateModal}><PlusIcon className="w-4 h-4 mr-1" /> New Environment</Button>
-            </div>
-          </div>
-          <div className="p-4 space-y-3">
+              <Button onClick={openCreateModal}>
+                <PlusIcon className="mr-1 h-4 w-4" /> New Environment
+              </Button>
+            </>
+          )}
+        >
+          <div className="space-y-3">
             {environments.length === 0 ? (
               <p className="text-xs text-text-secondary">No environments configured yet.</p>
             ) : (
               environments.map((env) => (
-                <div key={env.envId} className="border border-border-color rounded-md p-3">
+                <div key={env.envId} className="rounded-md border border-border-color p-3">
                   <div className="flex flex-wrap justify-between gap-2">
                     <div>
-                      <p className="font-semibold text-sm text-text-main">{env.name}</p>
-                      <p className="text-xs text-text-secondary">Python {env.pythonVersion} • {env.managed ? 'Managed' : 'External'}</p>
-                      <p className="text-xs text-text-secondary break-all mt-1">{env.pythonExecutable}</p>
+                      <p className="text-sm font-semibold text-text-main">{env.name}</p>
+                      <p className="text-xs text-text-secondary">
+                        Python {env.pythonVersion} • {env.managed ? 'Managed' : 'External'}
+                      </p>
+                      <p className="mt-1 break-all text-xs text-text-secondary">{env.pythonExecutable}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="secondary" onClick={() => openEditModal(env)}>Configure</Button>
-                      <Button variant="destructive" onClick={() => handleDeleteEnvironment(env)}>Delete</Button>
+                      <Button variant="secondary" onClick={() => openEditModal(env)}>
+                        Configure
+                      </Button>
+                      <Button variant="destructive" onClick={() => handleDeleteEnvironment(env)}>
+                        Delete
+                      </Button>
                     </div>
                   </div>
                   {(env.description || env.workingDirectory) && (
-                    <div className="mt-2 text-xs text-text-secondary space-y-1">
+                    <div className="mt-2 space-y-1 text-xs text-text-secondary">
                       {env.description && <p>{env.description}</p>}
                       {env.workingDirectory && <p>Working directory: {env.workingDirectory}</p>}
                     </div>
@@ -1144,8 +1335,8 @@ requests"
               ))
             )}
           </div>
+        </SettingsGroupCard>
         </div>
-      </div>
 
       {isCreateOpen && (
         <Modal title="Create Python Environment" onClose={closeModals}>
@@ -1313,23 +1504,38 @@ requests"
           </form>
         </Modal>
       )}
-    </div>
+    </section>
   );
 };
 
 const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
     return (
-         <div id="general" ref={sectionRef} className="py-6">
+         <section id="general" ref={sectionRef} className="py-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">General</h2>
             <div className="space-y-6">
-                 <SettingRow htmlFor="allowPrerelease" label="Receive Pre-releases" description="Get notified about new beta versions and test features early.">
-                    <ToggleSwitch id="allowPrerelease" checked={settings.allowPrerelease} onChange={(val) => setCurrentSettings(s => ({...s, allowPrerelease: val}))} />
+              <SettingsGroupCard
+                title="Updates & diagnostics"
+                description="Control prerelease notifications and background log archiving."
+              >
+                <SettingRow
+                  label="Release & logging"
+                  description="Manage opt-in updates and automatic log backups."
+                  inlineDescription="Enable both to preview new features early and keep troubleshooting data handy."
+                >
+                  <div className="flex flex-wrap items-center gap-6">
+                    <div className="flex items-center gap-3">
+                      <ToggleSwitch id="allowPrerelease" checked={settings.allowPrerelease} onChange={(val) => setCurrentSettings(s => ({...s, allowPrerelease: val}))} />
+                      <label htmlFor="allowPrerelease" className="text-sm text-text-main">Receive pre-releases</label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <ToggleSwitch id="autoSaveLogs" checked={settings.autoSaveLogs} onChange={(val) => setCurrentSettings(s => ({...s, autoSaveLogs: val}))} />
+                      <label htmlFor="autoSaveLogs" className="text-sm text-text-main">Auto-save logs</label>
+                    </div>
+                  </div>
                 </SettingRow>
-                 <SettingRow htmlFor="autoSaveLogs" label="Auto-save Logs" description="Automatically save all logs to a daily file on your computer for debugging.">
-                    <ToggleSwitch id="autoSaveLogs" checked={settings.autoSaveLogs} onChange={(val) => setCurrentSettings(s => ({...s, autoSaveLogs: val}))} />
-                </SettingRow>
+              </SettingsGroupCard>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -1404,60 +1610,88 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
     };
     
     return (
-         <div id="database" ref={sectionRef} className="py-6">
+         <section id="database" ref={sectionRef} className="py-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Database Management</h2>
             <div className="space-y-6">
-                 <SettingRow label="Database File" description="This file contains all your documents, folders, and history.">
-                    <div className="text-sm text-text-main bg-background px-3 py-2 rounded-md border border-border-color w-full font-mono text-xs select-all break-all">
-                        {dbPath}
-                    </div>
+              <SettingsGroupCard
+                title="Database location"
+                description="DocForge stores content in a local SQLite database file."
+              >
+                <SettingRow
+                  label="Database file"
+                  description="This file contains all your documents, folders, and history."
+                  inlineDescription="Copy this path before moving DocForge to a new machine or creating manual backups."
+                >
+                  <div className="w-full select-all break-all rounded-md border border-border-color bg-background px-3 py-2 font-mono text-xs text-text-main">
+                    {dbPath}
+                  </div>
                 </SettingRow>
-                <SettingRow label="Operations" description="Perform maintenance tasks on the application database.">
-                    <div className="flex flex-col items-end w-full gap-2">
-                        <div className="flex items-center gap-2">
-                            <Button onClick={handleBackup} variant="secondary" isLoading={operation?.name === 'backup' && operation.status === 'running'}><SaveIcon className="w-4 h-4 mr-2" /> Backup</Button>
-                            <Button onClick={handleIntegrityCheck} variant="secondary" isLoading={operation?.name === 'integrity' && operation.status === 'running'}><CheckIcon className="w-4 h-4 mr-2" /> Check Integrity</Button>
-                            <Button onClick={handleVacuum} variant="secondary" isLoading={operation?.name === 'vacuum' && operation.status === 'running'}><SparklesIcon className="w-4 h-4 mr-2" /> Vacuum</Button>
-                        </div>
-                        {operation && (
-                            <p className={`text-xs mt-2 text-right ${operation.status === 'error' ? 'text-error' : 'text-success'}`}>{operation.message}</p>
-                        )}
-                    </div>
+              </SettingsGroupCard>
+
+              <SettingsGroupCard
+                title="Maintenance & stats"
+                description="Run housekeeping jobs and inspect the health of your document store."
+              >
+                <SettingRow
+                  label="Maintenance tasks"
+                  description="Perform backups, integrity checks, and database optimization."
+                  inlineDescription={operation?.message ? (
+                    <span className={`text-xs ${operation.status === 'error' ? 'text-error' : 'text-success'}`}>
+                      {operation.message}
+                    </span>
+                  ) : 'Operations run locally and may take a few seconds to complete.'}
+                >
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={handleBackup} variant="secondary" isLoading={operation?.name === 'backup' && operation.status === 'running'}>
+                      <SaveIcon className="mr-2 h-4 w-4" /> Backup
+                    </Button>
+                    <Button onClick={handleIntegrityCheck} variant="secondary" isLoading={operation?.name === 'integrity' && operation.status === 'running'}>
+                      <CheckIcon className="mr-2 h-4 w-4" /> Check integrity
+                    </Button>
+                    <Button onClick={handleVacuum} variant="secondary" isLoading={operation?.name === 'vacuum' && operation.status === 'running'}>
+                      <SparklesIcon className="mr-2 h-4 w-4" /> Vacuum
+                    </Button>
+                  </div>
                 </SettingRow>
                 <SettingRow label="Statistics" description="An overview of the database contents and size.">
-                     {isLoadingStats ? <Spinner/> : !stats ? <p className="text-sm text-error">Could not load stats.</p> : (
-                        <div className="w-full space-y-4">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div className="bg-background p-3 rounded-md border border-border-color"><strong>File Size:</strong> {stats.fileSize}</div>
-                                <div className="bg-background p-3 rounded-md border border-border-color"><strong>Schema Version:</strong> {stats.schemaVersion}</div>
-                                <div className="bg-background p-3 rounded-md border border-border-color"><strong>Page Size:</strong> {stats.pageSize} bytes</div>
-                                <div className="bg-background p-3 rounded-md border border-border-color"><strong>Page Count:</strong> {stats.pageCount}</div>
-                            </div>
-                            <div className="w-full overflow-hidden border border-border-color rounded-md">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-background">
-                                        <tr>
-                                            <th className="p-2 font-semibold">Table</th>
-                                            <th className="p-2 font-semibold text-right">Rows</th>
-                                            <th className="p-2 font-semibold">Indexes</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border-color">
-                                        {stats.tables.map(table => (
-                                            <tr key={table.name} className="bg-secondary">
-                                                <td className="p-2 font-mono">{table.name}</td>
-                                                <td className="p-2 font-mono text-right">{table.rowCount}</td>
-                                                <td className="p-2 font-mono text-xs text-text-secondary">{table.indexes.join(', ') || 'none'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                     )}
+                  {isLoadingStats ? (
+                    <Spinner />
+                  ) : !stats ? (
+                    <p className="text-sm text-error">Could not load stats.</p>
+                  ) : (
+                    <div className="w-full space-y-4">
+                      <div className="grid gap-4 text-sm sm:grid-cols-2">
+                        <div className="rounded-md border border-border-color bg-background p-3"><strong>File Size:</strong> {stats.fileSize}</div>
+                        <div className="rounded-md border border-border-color bg-background p-3"><strong>Schema Version:</strong> {stats.schemaVersion}</div>
+                        <div className="rounded-md border border-border-color bg-background p-3"><strong>Page Size:</strong> {stats.pageSize} bytes</div>
+                        <div className="rounded-md border border-border-color bg-background p-3"><strong>Page Count:</strong> {stats.pageCount}</div>
+                      </div>
+                      <div className="w-full overflow-hidden rounded-md border border-border-color">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-background">
+                            <tr>
+                              <th className="p-2 font-semibold">Table</th>
+                              <th className="p-2 font-semibold text-right">Rows</th>
+                              <th className="p-2 font-semibold">Indexes</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border-color">
+                            {stats.tables.map(table => (
+                              <tr key={table.name} className="bg-secondary">
+                                <td className="p-2 font-mono">{table.name}</td>
+                                <td className="p-2 font-mono text-right">{table.rowCount}</td>
+                                <td className="p-2 font-mono text-xs text-text-secondary">{table.indexes.join(', ') || 'none'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </SettingRow>
+              </SettingsGroupCard>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -1502,34 +1736,43 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
     };
 
     return (
-         <div id="advanced" ref={sectionRef} className="py-6">
+         <section id="advanced" ref={sectionRef} className="py-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Advanced</h2>
             <div className="space-y-6">
-                <SettingRow label="Settings Editor" description="Edit settings using an interactive tree or raw JSON for full control.">
-                    <div className="w-full">
-                        <div className="flex justify-end mb-2">
-                            <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
-                                <button onClick={() => setMode('tree')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'tree' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
-                                    Tree
-                                </button>
-                                <button onClick={() => setMode('json')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'json' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
-                                    JSON
-                                </button>
-                            </div>
-                        </div>
-
-                        {mode === 'tree' ? (
-                            <SettingsTreeEditor settings={settings} onSettingChange={handleSettingChange} />
-                        ) : (
-                            <div>
-                                <JsonEditor value={jsonString} onChange={handleJsonChange} />
-                                {jsonError && <p className="text-sm text-destructive-text mt-2">{jsonError}</p>}
-                            </div>
-                        )}
+              <SettingsGroupCard
+                title="Settings editor"
+                description="Toggle between a visual tree and raw JSON editor for complete control."
+              >
+                <SettingRow
+                  label="Editor mode"
+                  description="Choose how you want to inspect and edit configuration values."
+                  inlineDescription="Tree mode offers guardrails while JSON mode allows direct edits."
+                >
+                  <div className="w-full">
+                    <div className="mb-2 flex justify-end">
+                      <div className="flex items-center rounded-lg border border-border-color bg-background p-1">
+                        <button onClick={() => setMode('tree')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'tree' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
+                          Tree
+                        </button>
+                        <button onClick={() => setMode('json')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'json' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
+                          JSON
+                        </button>
+                      </div>
                     </div>
+
+                    {mode === 'tree' ? (
+                      <SettingsTreeEditor settings={settings} onSettingChange={handleSettingChange} />
+                    ) : (
+                      <div>
+                        <JsonEditor value={jsonString} onChange={handleJsonChange} />
+                        {jsonError && <p className="mt-2 text-sm text-destructive-text">{jsonError}</p>}
+                      </div>
+                    )}
+                  </div>
                 </SettingRow>
+              </SettingsGroupCard>
             </div>
-        </div>
+        </section>
     );
 };
 
