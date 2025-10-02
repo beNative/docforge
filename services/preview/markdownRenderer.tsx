@@ -340,12 +340,11 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-markdown > * {
-          margin-top: calc(var(--markdown-font-size, 16px) * var(--markdown-paragraph-spacing, 0.75));
-          margin-bottom: calc(var(--markdown-font-size, 16px) * var(--markdown-paragraph-spacing, 0.75));
+          margin-top: 0;
         }
 
-        .df-markdown > :first-child {
-          margin-top: 0;
+        .df-markdown > * + * {
+          margin-top: calc(var(--markdown-font-size, 16px) * var(--markdown-paragraph-spacing, 0.75));
         }
 
         .df-markdown h1 {
