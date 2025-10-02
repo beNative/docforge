@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import IconButton from './IconButton';
-import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, SearchIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, PencilIcon } from './Icons';
+import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, SearchIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, PencilIcon, SparklesIcon } from './Icons';
 import ThemeToggleButton from './ThemeToggleButton';
 import { useLogger } from '../hooks/useLogger';
 import type { Command } from '../types';
@@ -11,6 +11,7 @@ interface CustomTitleBarProps {
   onShowEditorView: () => void;
   onToggleLogger: () => void;
   onOpenCommandPalette: () => void;
+  onOpenAbout: () => void;
   isInfoViewActive: boolean;
   isSettingsViewActive: boolean;
   isEditorViewActive: boolean;
@@ -79,8 +80,8 @@ const WindowControls: React.FC<{ platform: string, isMaximized: boolean }> = ({ 
   return <>{controls}</>;
 };
 
-const CustomTitleBar: React.FC<CustomTitleBarProps> = ({ 
-    onToggleSettingsView, onToggleInfoView, onShowEditorView, onToggleLogger, onOpenCommandPalette, 
+const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
+    onToggleSettingsView, onToggleInfoView, onShowEditorView, onToggleLogger, onOpenCommandPalette, onOpenAbout,
     isInfoViewActive, isSettingsViewActive, isEditorViewActive, commandPaletteTargetRef, commandPaletteInputRef, searchTerm, onSearchTermChange, commands
 }) => {
     const [platform, setPlatform] = useState('');
@@ -126,6 +127,9 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
                 </IconButton>
                 <IconButton onClick={onToggleInfoView} tooltip={getTooltip('toggle-info', 'Info')} size="xs" className={`not-draggable ${isInfoViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">
                     <InfoIcon className="w-4 h-4" />
+                </IconButton>
+                <IconButton onClick={onOpenAbout} tooltip={getTooltip('open-about', 'About DocForge')} size="xs" className="not-draggable" tooltipPosition="bottom">
+                    <SparklesIcon className="w-4 h-4" />
                 </IconButton>
                 <IconButton onClick={onToggleLogger} tooltip={getTooltip('toggle-logs', 'Logs')} size="xs" className="not-draggable" tooltipPosition="bottom">
                     <TerminalIcon className="w-4 h-4" />

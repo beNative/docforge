@@ -1,6 +1,6 @@
 import React from 'react';
 import IconButton from './IconButton';
-import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, PencilIcon } from './Icons';
+import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, PencilIcon, SparklesIcon } from './Icons';
 import ThemeToggleButton from './ThemeToggleButton';
 import type { Command } from '../types';
 
@@ -10,19 +10,21 @@ interface HeaderProps {
   onShowEditorView: () => void;
   onToggleLogger: () => void;
   onOpenCommandPalette: () => void;
+  onOpenAbout: () => void;
   isInfoViewActive: boolean;
   isSettingsViewActive: boolean;
   isEditorViewActive: boolean;
   commands: Command[];
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  onToggleSettingsView, 
-  onToggleInfoView, 
+const Header: React.FC<HeaderProps> = ({
+  onToggleSettingsView,
+  onToggleInfoView,
   onShowEditorView,
-  onToggleLogger, 
-  onOpenCommandPalette, 
-  isInfoViewActive, 
+  onToggleLogger,
+  onOpenCommandPalette,
+  onOpenAbout,
+  isInfoViewActive,
   isSettingsViewActive,
   isEditorViewActive,
   commands
@@ -47,6 +49,9 @@ const Header: React.FC<HeaderProps> = ({
         </IconButton>
         <IconButton onClick={onToggleInfoView} tooltip={getTooltip('toggle-info', 'Info')} className={`${isInfoViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom" size="xs">
           <InfoIcon className="w-4 h-4" />
+        </IconButton>
+        <IconButton onClick={onOpenAbout} tooltip={getTooltip('open-about', 'About DocForge')} tooltipPosition="bottom" size="xs">
+          <SparklesIcon className="w-4 h-4" />
         </IconButton>
         <IconButton onClick={onToggleLogger} tooltip={getTooltip('toggle-logs', 'Logs')} tooltipPosition="bottom" size="xs">
           <TerminalIcon className="w-4 h-4" />

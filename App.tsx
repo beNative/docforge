@@ -18,7 +18,8 @@ import InfoView from './components/InfoView';
 import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon } from './components/Icons';
+import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
@@ -105,6 +106,7 @@ const MainApp: React.FC = () => {
     const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
     const [commandPaletteSearch, setCommandPaletteSearch] = useState('');
     const [isCreateFromTemplateOpen, setCreateFromTemplateOpen] = useState(false);
+    const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isNewCodeFileModalOpen, setIsNewCodeFileModalOpen] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
     const [loggerPanelHeight, setLoggerPanelHeight] = useState(DEFAULT_LOGGER_HEIGHT);
@@ -807,6 +809,16 @@ const MainApp: React.FC = () => {
         setIsNewCodeFileModalOpen(true);
     }, [addLog]);
 
+    const handleOpenAbout = useCallback(() => {
+        addLog('INFO', 'User action: Opened About dialog.');
+        setIsAboutModalOpen(true);
+    }, [addLog]);
+
+    const handleCloseAbout = useCallback(() => {
+        addLog('INFO', 'User action: Closed About dialog.');
+        setIsAboutModalOpen(false);
+    }, [addLog]);
+
     const handleFormatDocument = useCallback(() => {
         const activeDoc = items.find(p => p.id === activeNodeId);
         if (activeDoc && activeDoc.type === 'document' && view === 'editor') {
@@ -834,8 +846,9 @@ const MainApp: React.FC = () => {
         { id: 'toggle-editor', name: 'Switch to Editor View', action: () => { addLog('INFO', 'Command: Switch to Editor View.'); setView('editor'); }, category: 'View', icon: PencilIcon, keywords: 'main document' },
         { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
+        { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -1053,6 +1066,7 @@ const MainApp: React.FC = () => {
         onShowEditorView: () => { addLog('INFO', 'User action: Switched to editor view.'); setView('editor'); },
         onToggleLogger: () => { addLog('INFO', `User action: Toggled logger panel ${isLoggerVisible ? 'off' : 'on'}.`); setIsLoggerVisible(v => !v); },
         onOpenCommandPalette: handleOpenCommandPalette,
+        onOpenAbout: handleOpenAbout,
         isInfoViewActive: view === 'info',
         isSettingsViewActive: view === 'settings',
         isEditorViewActive: view === 'editor',
@@ -1192,6 +1206,10 @@ const MainApp: React.FC = () => {
                     onClose={() => setIsNewCodeFileModalOpen(false)}
                     onCreate={handleNewCodeFile}
                 />
+            )}
+
+            {isAboutModalOpen && (
+                <AboutModal onClose={handleCloseAbout} />
             )}
 
             {updateInfo.ready && window.electronAPI?.quitAndInstallUpdate && (
