@@ -420,6 +420,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             onChange={setContent}
             onScroll={handleEditorScroll}
             fontFamily={settings.editorFontFamily}
+            fontSize={settings.editorFontSize}
           />
         )
       : (
@@ -431,6 +432,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             onScroll={handleEditorScroll}
             customShortcuts={settings.customShortcuts}
             fontFamily={settings.editorFontFamily}
+            fontSize={settings.editorFontSize}
           />
         );
     const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} />;

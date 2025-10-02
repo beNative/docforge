@@ -258,6 +258,7 @@ export interface Settings {
   markdownHeadingFontFamily: string;
   markdownCodeFontFamily: string;
   editorFontFamily: string;
+  editorFontSize: number;
   markdownCodeBlockBackgroundLight: string;
   markdownCodeBlockBackgroundDark: string;
   markdownContentPadding: number;

@@ -1037,6 +1037,7 @@ const MainApp: React.FC = () => {
                             document={activeNode}
                             onBackToEditor={() => setDocumentView('editor')}
                             onRestore={(content) => handleRestoreDocumentVersion(activeNode.id, content)}
+                            settings={settings}
                         />
                     );
                 }

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import type { DocumentOrFolder } from '../types';
+import type { DocumentOrFolder, Settings } from '../types';
 import { useDocumentHistory } from '../hooks/usePromptHistory';
 import Button from './Button';
 import MonacoDiffEditor from './MonacoDiffEditor';
@@ -12,13 +12,14 @@ interface DocumentHistoryViewProps {
   document: DocumentOrFolder;
   onBackToEditor: () => void;
   onRestore: (content: string) => void;
+  settings: Settings;
 }
 
 const MIN_VERSIONS_PANEL_WIDTH = 240;
 const MIN_COMPARISON_PANEL_WIDTH = 300;
 const DEFAULT_VERSIONS_PANEL_WIDTH = 320;
 
-const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onBackToEditor, onRestore }) => {
+const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onBackToEditor, onRestore, settings }) => {
   const { versions, deleteVersions } = useDocumentHistory(document.id);
   const [isCopied, setIsCopied] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -338,6 +339,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         language={document.language_hint || 'plaintext'}
                         renderMode={diffRenderMode}
                         readOnly
+                        fontFamily={settings.editorFontFamily}
+                        fontSize={settings.editorFontSize}
                     />
                 </div>
             </main>
