@@ -13,6 +13,7 @@ interface CodeEditorProps {
   onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number; }) => void;
   customShortcuts?: Record<string, string[]>;
   fontFamily?: string;
+  fontSize?: number;
 }
 
 export interface CodeEditorHandle {
@@ -110,7 +111,7 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
     return keybinding | primaryKey;
 };
 
-const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily }, ref) => {
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const { theme } = useTheme();
@@ -121,6 +122,13 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
         const candidate = (fontFamily ?? '').trim();
         return candidate || DEFAULT_SETTINGS.editorFontFamily;
     }, [fontFamily]);
+    const computedFontSize = useMemo(() => {
+        const candidate = typeof fontSize === 'number' ? fontSize : Number(fontSize);
+        if (Number.isFinite(candidate) && candidate > 0) {
+            return Math.min(Math.max(candidate, 8), 64);
+        }
+        return DEFAULT_SETTINGS.editorFontSize;
+    }, [fontSize]);
 
     useImperativeHandle(ref, () => ({
         format() {
@@ -232,7 +240,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                         language: language || 'plaintext',
                         theme: theme === 'dark' ? 'vs-dark' : 'vs',
                         automaticLayout: true,
-                        fontSize: 12,
+                        fontSize: computedFontSize,
                         fontFamily: computedFontFamily,
                         minimap: {
                             enabled: true,
@@ -275,7 +283,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 monacoInstanceRef.current = null;
             }
         };
-    }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, computedFontFamily]);
+    }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, computedFontFamily, computedFontSize]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {
@@ -298,9 +306,9 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
 
     useEffect(() => {
         if (monacoInstanceRef.current) {
-            monacoInstanceRef.current.updateOptions({ fontFamily: computedFontFamily });
+            monacoInstanceRef.current.updateOptions({ fontFamily: computedFontFamily, fontSize: computedFontSize });
         }
-    }, [computedFontFamily]);
+    }, [computedFontFamily, computedFontSize]);
     
     // Effect to update language
     useEffect(() => {

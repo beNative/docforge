@@ -744,6 +744,27 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                   onChange={(font) => handleFontChange('markdownCodeFontFamily', font)}
                   helperText="Also applies to the Markdown preview's code blocks."
                 />
+                <SettingRow
+                  label="Editor Font Size"
+                  description="Set the default font size for the code editor."
+                  htmlFor="editorFontSize"
+                >
+                  <div className="flex items-center gap-4 w-60">
+                    <input
+                      id="editorFontSize"
+                      type="range"
+                      min="10"
+                      max="32"
+                      step="1"
+                      value={settings.editorFontSize}
+                      onChange={(e) => setCurrentSettings((prev) => ({ ...prev, editorFontSize: Number(e.target.value) }))}
+                      className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                    />
+                    <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">
+                      {settings.editorFontSize}px
+                    </span>
+                  </div>
+                </SettingRow>
                 <FontFamilySelector
                   id="editorFontFamily"
                   label="Editor Font Family"
