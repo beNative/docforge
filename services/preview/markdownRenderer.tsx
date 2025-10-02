@@ -187,15 +187,16 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
       const language = codeChild?.props.className
         ? /language-([\w-]+)/.exec(codeChild.props.className)?.[1]
         : undefined;
+      const normalizedLanguage = language?.toLowerCase();
 
-      if (language === 'mermaid' && codeChild) {
+      if (normalizedLanguage === 'mermaid' && codeChild) {
         const raw = React.Children.toArray(codeChild.props.children)
           .map((child) => (typeof child === 'string' ? child : ''))
           .join('');
         return <MermaidDiagram code={raw} theme={viewTheme} />;
       }
 
-      if (language && PLANTUML_LANGS.includes(language.toLowerCase()) && codeChild) {
+      if (normalizedLanguage && PLANTUML_LANGS.includes(normalizedLanguage) && codeChild) {
         const raw = React.Children.toArray(codeChild.props.children)
           .map((child) => (typeof child === 'string' ? child : ''))
           .join('');
@@ -204,21 +205,21 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
 
       const baseClassName = ['df-code-block', className].filter(Boolean).join(' ');
 
-      if (language && codeChild && highlighter) {
+      if (normalizedLanguage && codeChild && highlighter) {
         const raw = React.Children.toArray(codeChild.props.children)
           .map((child) => (typeof child === 'string' ? child : ''))
           .join('');
 
         try {
           const html = highlighter.codeToHtml(raw, {
-            lang: language,
+            lang: normalizedLanguage as any,
             theme: viewTheme === 'dark' ? 'one-dark-pro' : 'github-light',
           });
 
           return (
             <div
               className={[baseClassName, 'df-code-block-shiki'].filter(Boolean).join(' ')}
-              data-language={language ? language.toUpperCase() : undefined}
+              data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
               dangerouslySetInnerHTML={{ __html: html }}
               {...props}
             />
@@ -231,7 +232,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
       return (
         <pre
           className={baseClassName}
-          data-language={language ? language.toUpperCase() : undefined}
+          data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
           {...props}
         >
           {children}
