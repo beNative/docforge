@@ -1,38 +1,15 @@
-import type { Highlighter } from 'shiki';
+import type { Highlighter } from 'shiki/bundle/full';
 
 let highlighterPromise: Promise<Highlighter> | null = null;
 
-const SHIKI_LANGUAGES = [
-  'javascript',
-  'typescript',
-  'tsx',
-  'jsx',
-  'json',
-  'html',
-  'css',
-  'bash',
-  'shell',
-  'python',
-  'markdown',
-  'yaml',
-  'java',
-  'c',
-  'cpp',
-  'go',
-  'rust',
-  'php',
-  'ruby',
-];
-
 export const getSharedHighlighter = async (): Promise<Highlighter> => {
   if (!highlighterPromise) {
-    highlighterPromise = import('shiki').then(({ getHighlighter }) =>
+    highlighterPromise = import('shiki/bundle/full').then(({ getHighlighter }) =>
       getHighlighter({
         themes: {
           light: 'github-light',
           dark: 'one-dark-pro',
         },
-        langs: SHIKI_LANGUAGES,
       })
     );
   }
