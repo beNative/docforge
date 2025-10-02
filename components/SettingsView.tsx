@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { Settings, DiscoveredLLMService, DiscoveredLLMModel, DatabaseStats, Command, PythonEnvironmentConfig, PythonPackageSpec } from '../types';
 import { llmDiscoveryService } from '../services/llmDiscoveryService';
 import { DEFAULT_SETTINGS } from '../constants';
-import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon, TerminalIcon, RefreshIcon, PlusIcon } from './Icons';
+import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon, TerminalIcon, RefreshIcon, PlusIcon, ChevronRightIcon } from './Icons';
 import * as HeroIcons from './iconsets/Heroicons';
 import * as LucideIcons from './iconsets/Lucide';
 import * as FeatherIcons from './iconsets/Feather';
@@ -281,6 +281,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [currentSettings, setCurrentSettings] = useState<Settings>(settings);
   const [isDirty, setIsDirty] = useState(false);
   const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
+  const [isNavCollapsed, setIsNavCollapsed] = useState(false);
+  const [quickSearch, setQuickSearch] = useState('');
   const { addLog } = useLogger();
   const [pythonValidationError, setPythonValidationError] = useState<string | null>(null);
 
@@ -327,6 +329,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     };
   }, []);
 
+  const filteredCategories = useMemo(() => {
+    const query = quickSearch.trim().toLowerCase();
+    if (!query) {
+      return categories;
+    }
+    return categories.filter(({ label, id }) => {
+      const normalizedLabel = label.toLowerCase();
+      return normalizedLabel.includes(query) || id.toLowerCase().includes(query);
+    });
+  }, [quickSearch]);
+
   const handleSave = useCallback(() => {
     addLog('INFO', 'User action: Save settings.');
     onSave(currentSettings);
@@ -337,6 +350,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     setVisibleCategory(id);
   }, []);
 
+  const handleQuickSearchSubmit = useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const [firstMatch] = filteredCategories;
+      if (firstMatch) {
+        handleNavClick(firstMatch.id);
+      }
+    },
+    [filteredCategories, handleNavClick]
+  );
+
   const isSaveDisabled = !isDirty || !!pythonValidationError;
 
   return (
@@ -344,9 +368,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <header className="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0">
         <h1 className="text-xl font-semibold text-text-main">Settings</h1>
         <div className="flex flex-col items-end gap-1">
-          <Button onClick={handleSave} disabled={isSaveDisabled} variant="primary">
-            {isDirty ? 'Save Changes' : 'Saved'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsNavCollapsed((prev) => !prev)}
+              aria-label={isNavCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+              className="inline-flex items-center justify-center rounded-md border border-border-color bg-secondary/60 p-2 text-text-secondary transition-colors hover:text-text-main hover:bg-secondary"
+            >
+              <ChevronRightIcon className={`h-4 w-4 transition-transform ${isNavCollapsed ? '' : 'rotate-180'}`} />
+            </button>
+            <Button onClick={handleSave} disabled={isSaveDisabled} variant="primary">
+              {isDirty ? 'Save Changes' : 'Saved'}
+            </Button>
+          </div>
           {pythonValidationError && (
             <p className="text-[10px] text-destructive-text max-w-xs text-right">
               Python settings error: {pythonValidationError}
@@ -354,28 +388,66 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       </header>
+      <div className="border-b border-border-color bg-background/80">
+        <form onSubmit={handleQuickSearchSubmit} className="p-4">
+          <label htmlFor="settings-quick-search" className="sr-only">
+            Quick search settings sections
+          </label>
+          <input
+            id="settings-quick-search"
+            type="search"
+            value={quickSearch}
+            onChange={(event) => setQuickSearch(event.target.value)}
+            placeholder="Search settings sections..."
+            className="w-full rounded-md border border-border-color bg-background px-3 py-2 text-sm text-text-main transition-colors focus:outline-none focus:ring-2 focus:ring-primary/60"
+          />
+        </form>
+      </div>
       <div className="flex-1 flex overflow-hidden">
-        <nav className="w-48 p-4 border-r border-border-color bg-secondary/50">
-          <ul className="space-y-1">
-            {categories.map(({ id, label, icon: Icon }) => (
-              <li key={id}>
+        <aside
+          className={`flex-shrink-0 border-r border-border-color bg-secondary/50 p-3 transition-all duration-300 ease-in-out ${
+            isNavCollapsed ? 'w-16 md:w-20' : 'w-56 md:w-64'
+          }`}
+        >
+          <ul className={`space-y-1 ${isNavCollapsed ? 'flex flex-col items-center gap-2' : ''}`}>
+            {filteredCategories.length === 0 && (
+              <li className="px-2 text-center text-[11px] text-text-secondary">No sections found</li>
+            )}
+            {filteredCategories.map(({ id, label, icon: Icon }) => (
+              <li key={id} className={isNavCollapsed ? 'flex w-full justify-center' : ''}>
                 <button
                   onClick={() => handleNavClick(id)}
-                  className={`w-full flex items-center gap-3 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  title={label}
+                  className={`w-full flex items-center rounded-md text-xs font-medium transition-all ${
+                    isNavCollapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2'
+                  } ${
                     visibleCategory === id
                       ? 'bg-primary/10 text-primary'
                       : 'text-text-secondary hover:bg-border-color/50 hover:text-text-main'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span>{label}</span>
+                  <Icon className="h-4 w-4" />
+                  {isNavCollapsed ? (
+                    <span className="sr-only">{label}</span>
+                  ) : (
+                    <span>{label}</span>
+                  )}
                 </button>
               </li>
             ))}
           </ul>
-        </nav>
-        <main ref={mainPanelRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-8 divide-y divide-border-color/50">
+        </aside>
+        <main
+          ref={mainPanelRef}
+          className={`flex-1 overflow-y-auto transition-[padding] duration-300 ease-in-out ${
+            isNavCollapsed ? 'px-2 sm:px-4' : 'px-0 sm:px-2'
+          }`}
+        >
+          <div
+            className={`mx-auto max-w-4xl divide-y divide-border-color/50 transition-[padding] duration-300 ease-in-out ${
+              isNavCollapsed ? 'px-6 sm:px-8 lg:px-10' : 'px-6 sm:px-8 lg:px-9'
+            }`}
+          >
             <ProviderSettingsSection
               {...{
                 settings: currentSettings,
