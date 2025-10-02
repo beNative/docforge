@@ -426,7 +426,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           padding: 1.25rem 1.5rem;
           font-family: var(--markdown-code-font-family, 'JetBrains Mono', monospace);
           font-size: var(--markdown-code-font-size, 14px);
-          line-height: 1.65;
+          line-height: 1.4;
           overflow: auto;
           position: relative;
         }
@@ -466,7 +466,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
 
         .df-code-block .line {
           display: block;
-          min-height: 1.35em;
+          line-height: 1.4;
         }
 
         .df-code-block-shiki .shiki {
