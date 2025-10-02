@@ -216,11 +216,20 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
             theme: viewTheme === 'dark' ? 'one-dark-pro' : 'github-light',
           });
 
+          // Shiki injects newline characters between the span.line elements which the
+          // <pre> block preserves, resulting in visual blank lines between each code
+          // line. Collapse those inter-tag newlines while keeping intentional empty
+          // lines that are represented by dedicated <span class="line"></span> nodes.
+          const compactHtml = html
+            .replace(/>\s*\n\s*</g, '><')
+            .replace(/\n(<\/code>)/g, '$1')
+            .replace(/\n(<\/pre>)/g, '$1');
+
           return (
             <div
               className={[baseClassName, 'df-code-block-shiki'].filter(Boolean).join(' ')}
               data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
-              dangerouslySetInnerHTML={{ __html: html }}
+              dangerouslySetInnerHTML={{ __html: compactHtml }}
               {...props}
             />
           );
