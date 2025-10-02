@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ChevronDownIcon, ChevronRightIcon } from './Icons';
 import ToggleSwitch from './ToggleSwitch';
 
@@ -17,19 +17,43 @@ const ValueEditor: React.FC<{
   path: (string | number)[];
   value: any;
   onSettingChange: (path: (string | number)[], value: any) => void;
-}> = ({ path, value, onSettingChange }) => {
+  onFocusPath?: () => void;
+}> = ({ path, value, onSettingChange, onFocusPath }) => {
   const type = getValueType(value);
   const inputClass = "w-full p-1 text-sm rounded-md bg-background text-text-main border border-border-color focus:ring-1 focus:ring-primary focus:outline-none";
 
   switch (type) {
     case 'string':
-      return <input type="text" value={value} onChange={e => onSettingChange(path, e.target.value)} className={inputClass} />;
+      return (
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onSettingChange(path, e.target.value)}
+          onFocus={onFocusPath}
+          className={inputClass}
+        />
+      );
     case 'number':
-      return <input type="number" value={value} onChange={e => onSettingChange(path, Number(e.target.value))} className={inputClass} />;
+      return (
+        <input
+          type="number"
+          value={value}
+          onChange={(e) => onSettingChange(path, Number(e.target.value))}
+          onFocus={onFocusPath}
+          className={inputClass}
+        />
+      );
     case 'boolean':
-      return <ToggleSwitch id={path.join('-')} checked={value} onChange={checked => onSettingChange(path, checked)} />;
+      return (
+        <ToggleSwitch
+          id={path.join('-')}
+          checked={value}
+          onChange={(checked) => onSettingChange(path, checked)}
+          onFocus={onFocusPath}
+        />
+      );
     case 'null':
-        return <span className="text-text-secondary italic px-1 text-sm">null</span>;
+      return <span className="text-text-secondary italic px-1 text-sm">null</span>;
     default:
       return null;
   }
@@ -41,29 +65,82 @@ const TreeNode: React.FC<{
   path: (string | number)[];
   level: number;
   onSettingChange: (path: (string | number)[], value: any) => void;
-}> = ({ nodeKey, nodeValue, path, level, onSettingChange }) => {
+  onSelectPath?: (path: (string | number)[]) => void;
+  selectedPath?: (string | number)[] | null;
+}> = ({ nodeKey, nodeValue, path, level, onSettingChange, onSelectPath, selectedPath }) => {
   const type = getValueType(nodeValue);
   const isObject = type === 'object' || type === 'array';
   const [isExpanded, setIsExpanded] = useState(true);
+  const isSelected = useMemo(() => {
+    if (!selectedPath) {
+      return false;
+    }
+    if (selectedPath.length !== path.length) {
+      return false;
+    }
+    return selectedPath.every((segment, index) => segment === path[index]);
+  }, [path, selectedPath]);
+
+  const handleSelect = () => {
+    onSelectPath?.([...path]);
+  };
 
   return (
     <div style={{ paddingLeft: `${level * 20}px` }}>
-      <div className="flex items-center gap-2 py-1.5">
+      <div
+        className={`flex items-center gap-2 py-1.5 px-2 rounded-md border ${
+          isSelected ? 'border-primary/60 bg-primary/10' : 'border-transparent hover:border-border-color/80 hover:bg-secondary/50'
+        } cursor-pointer transition-colors`}
+        onClick={handleSelect}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleSelect();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+      >
         <div className="w-5 flex-shrink-0">
-            {isObject && (
-                <button onClick={() => setIsExpanded(!isExpanded)} className="p-0.5 rounded hover:bg-border-color/50">
-                    {isExpanded ? <ChevronDownIcon className="w-4 h-4 text-text-secondary" /> : <ChevronRightIcon className="w-4 h-4 text-text-secondary" />}
-                </button>
-            )}
+          {isObject && (
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setIsExpanded(!isExpanded);
+                handleSelect();
+              }}
+              className="p-0.5 rounded hover:bg-border-color/50"
+            >
+              {isExpanded ? <ChevronDownIcon className="w-4 h-4 text-text-secondary" /> : <ChevronRightIcon className="w-4 h-4 text-text-secondary" />}
+            </button>
+          )}
         </div>
         <span className="font-mono text-sm text-text-secondary select-none">{nodeKey}:</span>
-        {!isObject && <div className="flex-1"><ValueEditor path={path} value={nodeValue} onSettingChange={onSettingChange} /></div>}
+        {!isObject && (
+          <div className="flex-1" onClick={(event) => event.stopPropagation()}>
+            <ValueEditor
+              path={path}
+              value={nodeValue}
+              onSettingChange={onSettingChange}
+              onFocusPath={handleSelect}
+            />
+          </div>
+        )}
         {isObject && <span className="text-xs text-text-secondary/70 font-mono">{type === 'array' ? `Array[${Object.keys(nodeValue).length}]` : 'Object'}</span>}
       </div>
       {isObject && isExpanded && (
         <div className="border-l border-border-color/50 ml-2.5">
           {Object.entries(nodeValue).map(([key, value]) => (
-            <TreeNode key={key} nodeKey={key} nodeValue={value} path={[...path, key]} level={level + 1} onSettingChange={onSettingChange} />
+            <TreeNode
+              key={key}
+              nodeKey={key}
+              nodeValue={value}
+              path={[...path, key]}
+              level={level + 1}
+              onSettingChange={onSettingChange}
+              onSelectPath={onSelectPath}
+              selectedPath={selectedPath}
+            />
           ))}
         </div>
       )}
@@ -75,13 +152,24 @@ const TreeNode: React.FC<{
 interface SettingsTreeEditorProps {
   settings: object;
   onSettingChange: (path: (string | number)[], value: any) => void;
+  onSelectPath?: (path: (string | number)[]) => void;
+  selectedPath?: (string | number)[] | null;
 }
 
-const SettingsTreeEditor: React.FC<SettingsTreeEditorProps> = ({ settings, onSettingChange }) => {
+const SettingsTreeEditor: React.FC<SettingsTreeEditorProps> = ({ settings, onSettingChange, onSelectPath, selectedPath }) => {
   return (
     <div className="p-2 rounded-lg bg-background border border-border-color h-96 overflow-y-auto">
       {Object.entries(settings).map(([key, value]) => (
-        <TreeNode key={key} nodeKey={key} nodeValue={value} path={[key]} level={0} onSettingChange={onSettingChange} />
+        <TreeNode
+          key={key}
+          nodeKey={key}
+          nodeValue={value}
+          path={[key]}
+          level={0}
+          onSettingChange={onSettingChange}
+          onSelectPath={onSelectPath}
+          selectedPath={selectedPath}
+        />
       ))}
     </div>
   );

@@ -10,7 +10,7 @@ import * as TablerIcons from './iconsets/Tabler';
 import * as MaterialIcons from './iconsets/Material';
 import Spinner from './Spinner';
 import Button from './Button';
-import JsonEditor from './JsonEditor';
+import AdvancedSettingDetail from './AdvancedSettingDetail';
 import Modal from './Modal';
 import { repository } from '../services/repository';
 import ToggleSwitch from './ToggleSwitch';
@@ -422,6 +422,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 settings: currentSettings,
                 setCurrentSettings,
                 sectionRef: (el) => (sectionRefs.current.advanced = el),
+                pythonValidationError,
               }}
             />
           </div>
@@ -1461,76 +1462,129 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
     );
 };
 
-const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
-    const [jsonString, setJsonString] = useState(() => JSON.stringify(settings, null, 2));
-    const [jsonError, setJsonError] = useState<string | null>(null);
-    const [mode, setMode] = useState<'tree' | 'json'>('tree');
+const getValueAtPath = (source: any, path: (string | number)[] | null) => {
+  if (!path) {
+    return undefined;
+  }
+  let current = source;
+  for (const segment of path) {
+    if (current === null || current === undefined) {
+      return undefined;
+    }
+    current = current[segment as keyof typeof current];
+  }
+  return current;
+};
 
-    useEffect(() => {
-        setJsonString(JSON.stringify(settings, null, 2));
-        setJsonError(null);
-    },[settings]);
+const pathExists = (source: any, path: (string | number)[] | null) => {
+  if (!path) {
+    return false;
+  }
+  let current = source;
+  for (let index = 0; index < path.length; index++) {
+    const segment = path[index];
+    if (current === null || current === undefined) {
+      return false;
+    }
+    if (!(segment in current)) {
+      return false;
+    }
+    current = current[segment as keyof typeof current];
+  }
+  return true;
+};
 
-    const handleJsonChange = (value: string) => {
-        setJsonString(value);
-        try {
-            const parsed = JSON.parse(value);
-            setCurrentSettings(parsed);
-            setJsonError(null);
-        } catch (error) {
-            setJsonError(error instanceof Error ? error.message : 'Invalid JSON format.');
+const getFirstRootPath = (settings: object): (string | number)[] | null => {
+  const keys = Object.keys(settings);
+  if (keys.length === 0) {
+    return null;
+  }
+  return [keys[0]];
+};
+
+interface AdvancedSettingsSectionProps
+  extends Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'> {
+  pythonValidationError?: string | null;
+}
+
+const AdvancedSettingsSection: React.FC<AdvancedSettingsSectionProps> = ({
+  settings,
+  setCurrentSettings,
+  sectionRef,
+  pythonValidationError,
+}) => {
+  const [selectedPath, setSelectedPath] = useState<(string | number)[] | null>(null);
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedPath) {
+      const initialPath = getFirstRootPath(settings);
+      if (initialPath) {
+        setSelectedPath(initialPath);
+      }
+      return;
+    }
+
+    if (!pathExists(settings, selectedPath)) {
+      const fallbackPath = getFirstRootPath(settings);
+      if (fallbackPath) {
+        setSelectedPath(fallbackPath);
+      } else {
+        setSelectedPath(null);
+      }
+    }
+  }, [settings, selectedPath]);
+
+  const handleSettingChange = (path: (string | number)[], value: any) => {
+    setJsonError(null);
+    setCurrentSettings((prevSettings) => {
+      const newSettings = JSON.parse(JSON.stringify(prevSettings));
+      let current: any = newSettings;
+      for (let index = 0; index < path.length - 1; index++) {
+        const key = path[index];
+        if (!(key in current) || current[key] === null || typeof current[key] !== 'object') {
+          return prevSettings;
         }
-    };
-    
-    const handleSettingChange = (path: (string | number)[], value: any) => {
-      setCurrentSettings(prevSettings => {
-          // A safe way to deep-clone and update nested properties
-          const newSettings = JSON.parse(JSON.stringify(prevSettings));
-          let current: any = newSettings;
-          for (let i = 0; i < path.length - 1; i++) {
-              const key = path[i];
-              if (current[key] === undefined || typeof current[key] !== 'object') {
-                  // This path is invalid, which shouldn't happen with the tree editor.
-                  // Return original state to be safe.
-                  return prevSettings;
-              }
-              current = current[key];
-          }
-          current[path[path.length - 1]] = value;
-          return newSettings;
-      });
-    };
+        current = current[key];
+      }
+      current[path[path.length - 1]] = value;
+      return newSettings;
+    });
+  };
 
-    return (
-         <div id="advanced" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">Advanced</h2>
-            <div className="space-y-6">
-                <SettingRow label="Settings Editor" description="Edit settings using an interactive tree or raw JSON for full control.">
-                    <div className="w-full">
-                        <div className="flex justify-end mb-2">
-                            <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
-                                <button onClick={() => setMode('tree')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'tree' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
-                                    Tree
-                                </button>
-                                <button onClick={() => setMode('json')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'json' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
-                                    JSON
-                                </button>
-                            </div>
-                        </div>
+  const selectedValue = getValueAtPath(settings, selectedPath);
+  const defaultValue = getValueAtPath(DEFAULT_SETTINGS, selectedPath);
 
-                        {mode === 'tree' ? (
-                            <SettingsTreeEditor settings={settings} onSettingChange={handleSettingChange} />
-                        ) : (
-                            <div>
-                                <JsonEditor value={jsonString} onChange={handleJsonChange} />
-                                {jsonError && <p className="text-sm text-destructive-text mt-2">{jsonError}</p>}
-                            </div>
-                        )}
-                    </div>
-                </SettingRow>
+  return (
+    <div id="advanced" ref={sectionRef} className="py-6">
+      <h2 className="text-lg font-semibold text-text-main mb-4">Advanced</h2>
+      <div className="space-y-6">
+        <SettingRow label="Settings Editor" description="Browse the settings tree and fine-tune values with contextual tools.">
+          <div className="w-full">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+              <div>
+                <SettingsTreeEditor
+                  settings={settings}
+                  onSettingChange={handleSettingChange}
+                  onSelectPath={setSelectedPath}
+                  selectedPath={selectedPath}
+                />
+              </div>
+              <AdvancedSettingDetail
+                path={selectedPath}
+                value={selectedValue}
+                defaultValue={defaultValue}
+                onSettingChange={handleSettingChange}
+                onJsonErrorChange={setJsonError}
+                jsonError={jsonError}
+                pythonValidationError={pythonValidationError}
+              />
             </div>
-        </div>
-    );
+          </div>
+        </SettingRow>
+      </div>
+    </div>
+  );
 };
 
 
