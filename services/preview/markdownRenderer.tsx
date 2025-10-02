@@ -340,12 +340,11 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-markdown > * {
-          margin-top: calc(var(--markdown-font-size, 16px) * var(--markdown-paragraph-spacing, 0.75));
-          margin-bottom: calc(var(--markdown-font-size, 16px) * var(--markdown-paragraph-spacing, 0.75));
+          margin-top: 0;
         }
 
-        .df-markdown > :first-child {
-          margin-top: 0;
+        .df-markdown > * + * {
+          margin-top: calc(var(--markdown-font-size, 16px) * var(--markdown-paragraph-spacing, 0.75));
         }
 
         .df-markdown h1 {
@@ -427,7 +426,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           padding: 1.25rem 1.5rem;
           font-family: var(--markdown-code-font-family, 'JetBrains Mono', monospace);
           font-size: var(--markdown-code-font-size, 14px);
-          line-height: 1.65;
+          line-height: 1.4;
           overflow: auto;
           position: relative;
         }
@@ -467,7 +466,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
 
         .df-code-block .line {
           display: block;
-          min-height: 1.35em;
+          line-height: 1.4;
         }
 
         .df-code-block-shiki .shiki {
