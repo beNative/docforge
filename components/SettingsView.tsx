@@ -280,12 +280,43 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [currentSettings, setCurrentSettings] = useState<Settings>(settings);
   const [isDirty, setIsDirty] = useState(false);
-  const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
   const { addLog } = useLogger();
   const [pythonValidationError, setPythonValidationError] = useState<string | null>(null);
 
-  const sectionRefs = useRef<Partial<Record<SettingsCategory, HTMLDivElement | null>>>({});
-  const mainPanelRef = useRef<HTMLElement>(null);
+  const resolveCategoryFromHash = useCallback((): SettingsCategory => {
+    if (typeof window === 'undefined') {
+      return 'provider';
+    }
+    const hash = window.location.hash.replace('#', '');
+    const match = categories.find(({ id }) => id === hash);
+    return match ? match.id : 'provider';
+  }, []);
+
+  const [activeTab, setActiveTab] = useState<SettingsCategory>(() => resolveCategoryFromHash());
+
+  const sectionRefs = useRef<Record<SettingsCategory, HTMLDivElement | null>>({
+    provider: null,
+    appearance: null,
+    shortcuts: null,
+    python: null,
+    general: null,
+    database: null,
+    advanced: null,
+  });
+
+  const tabButtonRefs = useRef<Record<SettingsCategory, HTMLButtonElement | null>>({
+    provider: null,
+    appearance: null,
+    shortcuts: null,
+    python: null,
+    general: null,
+    database: null,
+    advanced: null,
+  });
+
+  const setSectionRef = useCallback((id: SettingsCategory, el: HTMLDivElement | null) => {
+    sectionRefs.current[id] = el;
+  }, []);
 
   useEffect(() => {
     setCurrentSettings(settings);
@@ -295,47 +326,146 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     setIsDirty(JSON.stringify(settings) !== JSON.stringify(currentSettings));
   }, [settings, currentSettings]);
 
-  useEffect(() => {
-    const panel = mainPanelRef.current;
-    if (!panel) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setVisibleCategory(entry.target.id as SettingsCategory);
-          }
-        });
-      },
-      {
-        root: panel,
-        rootMargin: '-40% 0px -60% 0px',
-        threshold: 0,
-      }
-    );
-
-    const sections = Object.values(sectionRefs.current).filter(
-      (section): section is HTMLDivElement => Boolean(section)
-    );
-    sections.forEach((section) => observer.observe(section));
-
-    return () => {
-      sections.forEach((section) => observer.unobserve(section));
-      observer.disconnect();
-    };
-  }, []);
-
   const handleSave = useCallback(() => {
     addLog('INFO', 'User action: Save settings.');
     onSave(currentSettings);
   }, [addLog, onSave, currentSettings]);
 
   const handleNavClick = useCallback((id: SettingsCategory) => {
-    sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setVisibleCategory(id);
+    setActiveTab(id);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `#${id}`);
+    }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleHashChange = () => {
+      const next = resolveCategoryFromHash();
+      setActiveTab(next);
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [resolveCategoryFromHash]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const currentHash = window.location.hash.replace('#', '');
+      if (currentHash !== activeTab) {
+        window.history.replaceState(null, '', `#${activeTab}`);
+      }
+    }
+
+    const section = sectionRefs.current[activeTab];
+    if (!section) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      if (typeof section.focus === 'function') {
+        section.focus({ preventScroll: true });
+      }
+      section.scrollIntoView({ block: 'start' });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab]);
+
+  const handleTabKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        return;
+      }
+
+      event.preventDefault();
+      const maxIndex = categories.length - 1;
+      let nextIndex = index;
+
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        nextIndex = index === maxIndex ? 0 : index + 1;
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        nextIndex = index === 0 ? maxIndex : index - 1;
+      } else if (event.key === 'Home') {
+        nextIndex = 0;
+      } else if (event.key === 'End') {
+        nextIndex = maxIndex;
+      }
+
+      const nextCategory = categories[nextIndex];
+      handleNavClick(nextCategory.id);
+      const button = tabButtonRefs.current[nextCategory.id];
+      button?.focus();
+    },
+    [handleNavClick]
+  );
+
+  const renderActiveSection = () => {
+    switch (activeTab) {
+      case 'provider':
+        return (
+          <ProviderSettingsSection
+            settings={currentSettings}
+            setCurrentSettings={setCurrentSettings}
+            discoveredServices={discoveredServices}
+            onDetectServices={onDetectServices}
+            isDetecting={isDetecting}
+            sectionRef={(el) => setSectionRef('provider', el)}
+          />
+        );
+      case 'appearance':
+        return (
+          <AppearanceSettingsSection
+            settings={currentSettings}
+            setCurrentSettings={setCurrentSettings}
+            sectionRef={(el) => setSectionRef('appearance', el)}
+          />
+        );
+      case 'shortcuts':
+        return (
+          <KeyboardShortcutsSection
+            settings={currentSettings}
+            setCurrentSettings={setCurrentSettings}
+            commands={commands}
+            sectionRef={(el) => setSectionRef('shortcuts', el)}
+          />
+        );
+      case 'python':
+        return (
+          <PythonSettingsSection
+            settings={currentSettings}
+            setCurrentSettings={setCurrentSettings}
+            sectionRef={(el) => setSectionRef('python', el)}
+            onValidationChange={setPythonValidationError}
+          />
+        );
+      case 'general':
+        return (
+          <GeneralSettingsSection
+            settings={currentSettings}
+            setCurrentSettings={setCurrentSettings}
+            sectionRef={(el) => setSectionRef('general', el)}
+          />
+        );
+      case 'database':
+        return <DatabaseSettingsSection sectionRef={(el) => setSectionRef('database', el)} />;
+      case 'advanced':
+        return (
+          <AdvancedSettingsSection
+            settings={currentSettings}
+            setCurrentSettings={setCurrentSettings}
+            sectionRef={(el) => setSectionRef('advanced', el)}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   const isSaveDisabled = !isDirty || !!pythonValidationError;
 
@@ -354,76 +484,40 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       </header>
-      <div className="flex-1 flex overflow-hidden">
-        <nav className="w-48 p-4 border-r border-border-color bg-secondary/50">
-          <ul className="space-y-1">
-            {categories.map(({ id, label, icon: Icon }) => (
-              <li key={id}>
-                <button
-                  onClick={() => handleNavClick(id)}
-                  className={`w-full flex items-center gap-3 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    visibleCategory === id
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-text-secondary hover:bg-border-color/50 hover:text-text-main'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{label}</span>
-                </button>
-              </li>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="border-b border-border-color bg-secondary/50 px-4">
+          <div
+            role="tablist"
+            aria-label="Settings categories"
+            className="max-w-4xl mx-auto flex flex-wrap items-center gap-2 py-3"
+          >
+            {categories.map(({ id, label, icon: Icon }, index) => (
+              <button
+                key={id}
+                ref={(el) => {
+                  tabButtonRefs.current[id] = el;
+                }}
+                role="tab"
+                type="button"
+                onClick={() => handleNavClick(id)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                aria-selected={activeTab === id}
+                tabIndex={activeTab === id ? 0 : -1}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                  activeTab === id
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-text-secondary hover:bg-border-color/60 hover:text-text-main'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{label}</span>
+              </button>
             ))}
-          </ul>
-        </nav>
-        <main ref={mainPanelRef} className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-8 divide-y divide-border-color/50">
-            <ProviderSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                discoveredServices,
-                onDetectServices,
-                isDetecting,
-                sectionRef: (el) => (sectionRefs.current.provider = el),
-              }}
-            />
-            <AppearanceSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.appearance = el),
-              }}
-            />
-            <KeyboardShortcutsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                commands,
-                sectionRef: (el) => (sectionRefs.current.shortcuts = el),
-              }}
-            />
-            <PythonSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.python = el),
-                onValidationChange: setPythonValidationError,
-              }}
-            />
-            <GeneralSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.general = el),
-              }}
-            />
-            <DatabaseSettingsSection {...{ sectionRef: (el) => (sectionRefs.current.database = el) }} />
-            <AdvancedSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.advanced = el),
-              }}
-            />
+          </div>
+        </div>
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-8 py-6">
+            {renderActiveSection()}
           </div>
         </main>
       </div>
@@ -495,9 +589,63 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
     const selectedService = discoveredServices.find(s => s.generateUrl === settings.llmProviderUrl);
 
     return (
-        <div id="provider" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">LLM Provider</h2>
-            <div className="space-y-6">
+        <div
+            id="provider"
+            ref={sectionRef}
+            className="py-6 focus:outline-none"
+            tabIndex={-1}
+        >
+            <h2 className="text-lg font-semibold text-text-main mb-2">LLM Provider</h2>
+            <div className="sticky top-0 z-10 -mx-8 px-8 py-3 bg-background/95 backdrop-blur border-b border-border-color/60 shadow-sm">
+                <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                        onClick={onDetectServices}
+                        disabled={isDetecting}
+                        variant="secondary"
+                        isLoading={isDetecting}
+                        className="text-xs"
+                    >
+                        {isDetecting ? 'Detecting…' : 'Re-Detect Services'}
+                    </Button>
+                    <select
+                        id="llmServiceQuick"
+                        value={selectedService?.id || ''}
+                        onChange={(e) => handleServiceChange(e.target.value)}
+                        disabled={discoveredServices.length === 0}
+                        className="min-w-[180px] max-w-xs bg-background border border-border-color rounded-md px-3 py-1.5 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                        aria-label="Detected service"
+                    >
+                        <option value="" disabled>
+                            {discoveredServices.length > 0 ? 'Select a service' : 'No services detected'}
+                        </option>
+                        {discoveredServices.map(service => (
+                            <option key={service.id} value={service.id}>{service.name}</option>
+                        ))}
+                    </select>
+                    <div className="relative">
+                        <select
+                            id="llmModelQuick"
+                            value={settings.llmModelName}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, llmModelName: e.target.value }))}
+                            disabled={!selectedService || availableModels.length === 0}
+                            className="min-w-[180px] max-w-xs bg-background border border-border-color rounded-md px-3 py-1.5 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                            aria-label="Preferred model"
+                        >
+                            <option value="" disabled>
+                                {!selectedService ? 'Select service first' : 'Select a model'}
+                            </option>
+                            {availableModels.map(model => (
+                                <option key={model.id} value={model.id}>{model.name}</option>
+                            ))}
+                        </select>
+                        {isFetchingModels && <div className="absolute right-2 top-1/2 -translate-y-1/2"><Spinner /></div>}
+                    </div>
+                </div>
+                {detectionError && (
+                    <p className="text-[11px] text-destructive-text mt-2">{detectionError}</p>
+                )}
+            </div>
+            <div className="space-y-6 mt-6">
                 <SettingRow label="Detect Services" description="Scan for locally running LLM services like Ollama and LM Studio.">
                     <div className="w-60">
                         <Button onClick={onDetectServices} disabled={isDetecting} variant="secondary" isLoading={isDetecting} className="w-full">
@@ -569,9 +717,53 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
 
 
     return (
-        <div id="appearance" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">Appearance</h2>
-            <div className="space-y-6">
+        <div
+            id="appearance"
+            ref={sectionRef}
+            className="py-6 focus:outline-none"
+            tabIndex={-1}
+        >
+            <h2 className="text-lg font-semibold text-text-main mb-2">Appearance</h2>
+            <div className="sticky top-0 z-10 -mx-8 px-8 py-3 bg-background/95 backdrop-blur border-b border-border-color/60 shadow-sm">
+                <div className="flex flex-wrap items-center gap-6">
+                    <div className="flex flex-col gap-1 text-xs min-w-[220px]">
+                        <span className="font-semibold text-text-main">Interface Scale</span>
+                        <div className="flex items-center gap-3">
+                            <input
+                                id="uiScaleQuick"
+                                type="range"
+                                min="50"
+                                max="200"
+                                step="10"
+                                value={settings.uiScale}
+                                onChange={(e) => setCurrentSettings(prev => ({ ...prev, uiScale: Number(e.target.value) }))}
+                                className="w-40 h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                                aria-label="Interface scale"
+                            />
+                            <span className="font-semibold text-text-main tabular-nums min-w-[42px] text-right">
+                                {settings.uiScale}%
+                            </span>
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-1 text-xs min-w-[180px]">
+                        <span className="font-semibold text-text-main">Icon Set</span>
+                        <select
+                            id="iconSetQuick"
+                            value={settings.iconSet}
+                            onChange={(event) => setCurrentSettings((prev) => ({ ...prev, iconSet: event.target.value as Settings['iconSet'] }))}
+                            className="bg-background border border-border-color rounded-md px-3 py-1.5 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
+                            aria-label="Icon set"
+                        >
+                            <option value="heroicons">Heroicons</option>
+                            <option value="lucide">Lucide</option>
+                            <option value="feather">Feather</option>
+                            <option value="tabler">Tabler</option>
+                            <option value="material">Material</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div className="space-y-6 mt-6">
                 <SettingRow label="Interface Scale" description="Adjust the size of all UI elements in the application.">
                     <div className="flex items-center gap-4 w-60">
                         <input
@@ -1048,13 +1240,43 @@ const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurr
   const interpreterValue = formState.useCustomInterpreter ? 'custom' : formState.interpreterPath;
 
   return (
-    <div id="python" ref={sectionRef} className="py-6">
-      <h2 className="text-lg font-semibold text-text-main mb-4">Python Execution</h2>
-      <p className="text-xs text-text-secondary max-w-3xl mb-6">
+    <div id="python" ref={sectionRef} className="py-6 focus:outline-none" tabIndex={-1}>
+      <h2 className="text-lg font-semibold text-text-main mb-2">Python Execution</h2>
+      <div className="sticky top-0 z-10 -mx-8 px-8 py-3 bg-background/95 backdrop-blur border-b border-border-color/60 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              refreshEnvironments();
+              refreshInterpreters();
+            }}
+            isLoading={isLoading || isDetecting}
+            className="text-xs"
+          >
+            <RefreshIcon className="w-4 h-4 mr-1" /> Refresh Sources
+          </Button>
+          <Button onClick={openCreateModal} className="text-xs">
+            <PlusIcon className="w-4 h-4 mr-1" /> New Environment
+          </Button>
+          <div className="flex flex-col gap-1 text-xs min-w-[180px]">
+            <span className="font-semibold text-text-main">Console Theme</span>
+            <select
+              id="pythonConsoleThemeQuick"
+              value={settings.pythonConsoleTheme}
+              onChange={(e) => handleConsoleThemeChange(e.target.value as 'light' | 'dark')}
+              className="bg-background border border-border-color rounded-md px-3 py-1.5 text-xs text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-text-secondary max-w-3xl mt-4">
         Configure how DocForge prepares isolated Python environments. These defaults are applied when auto-creating a virtual
         environment for a document and can be overridden per environment.
       </p>
-      <div className="space-y-6">
+      <div className="space-y-6 mt-6">
         <SettingRow label="Target Python Version" description="Preferred Python version when creating new virtual environments.">
           <input
             type="text"
@@ -1319,9 +1541,26 @@ requests"
 
 const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
     return (
-         <div id="general" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">General</h2>
-            <div className="space-y-6">
+         <div
+            id="general"
+            ref={sectionRef}
+            className="py-6 focus:outline-none"
+            tabIndex={-1}
+        >
+            <h2 className="text-lg font-semibold text-text-main mb-2">General</h2>
+            <div className="sticky top-0 z-10 -mx-8 px-8 py-3 bg-background/95 backdrop-blur border-b border-border-color/60 shadow-sm">
+                <div className="flex flex-wrap items-center gap-4 text-xs text-text-secondary">
+                    <label className="flex items-center gap-2 font-semibold text-text-main">
+                        Pre-releases
+                        <ToggleSwitch id="allowPrereleaseQuick" checked={settings.allowPrerelease} onChange={(val) => setCurrentSettings(s => ({...s, allowPrerelease: val}))} />
+                    </label>
+                    <label className="flex items-center gap-2 font-semibold text-text-main">
+                        Auto-save Logs
+                        <ToggleSwitch id="autoSaveLogsQuick" checked={settings.autoSaveLogs} onChange={(val) => setCurrentSettings(s => ({...s, autoSaveLogs: val}))} />
+                    </label>
+                </div>
+            </div>
+            <div className="space-y-6 mt-6">
                  <SettingRow htmlFor="allowPrerelease" label="Receive Pre-releases" description="Get notified about new beta versions and test features early.">
                     <ToggleSwitch id="allowPrerelease" checked={settings.allowPrerelease} onChange={(val) => setCurrentSettings(s => ({...s, allowPrerelease: val}))} />
                 </SettingRow>
@@ -1404,9 +1643,32 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
     };
     
     return (
-         <div id="database" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">Database Management</h2>
-            <div className="space-y-6">
+         <div
+            id="database"
+            ref={sectionRef}
+            className="py-6 focus:outline-none"
+            tabIndex={-1}
+        >
+            <h2 className="text-lg font-semibold text-text-main mb-2">Database Management</h2>
+            <div className="sticky top-0 z-10 -mx-8 px-8 py-3 bg-background/95 backdrop-blur border-b border-border-color/60 shadow-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button onClick={handleBackup} variant="secondary" isLoading={operation?.name === 'backup' && operation?.status === 'running'} className="text-xs">
+                        <SaveIcon className="w-4 h-4 mr-2" /> Backup
+                    </Button>
+                    <Button onClick={handleIntegrityCheck} variant="secondary" isLoading={operation?.name === 'integrity' && operation?.status === 'running'} className="text-xs">
+                        <CheckIcon className="w-4 h-4 mr-2" /> Check Integrity
+                    </Button>
+                    <Button onClick={handleVacuum} variant="secondary" isLoading={operation?.name === 'vacuum' && operation?.status === 'running'} className="text-xs">
+                        <SparklesIcon className="w-4 h-4 mr-2" /> Vacuum
+                    </Button>
+                </div>
+                {operation && (
+                    <p className={`text-[11px] mt-2 ${operation.status === 'error' ? 'text-error' : 'text-success'}`}>
+                        {operation.message}
+                    </p>
+                )}
+            </div>
+            <div className="space-y-6 mt-6">
                  <SettingRow label="Database File" description="This file contains all your documents, folders, and history.">
                     <div className="text-sm text-text-main bg-background px-3 py-2 rounded-md border border-border-color w-full font-mono text-xs select-all break-all">
                         {dbPath}
@@ -1502,9 +1764,24 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
     };
 
     return (
-         <div id="advanced" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">Advanced</h2>
-            <div className="space-y-6">
+         <div
+            id="advanced"
+            ref={sectionRef}
+            className="py-6 focus:outline-none"
+            tabIndex={-1}
+        >
+            <h2 className="text-lg font-semibold text-text-main mb-2">Advanced</h2>
+            <div className="sticky top-0 z-10 -mx-8 px-8 py-3 bg-background/95 backdrop-blur border-b border-border-color/60 shadow-sm">
+                <div className="flex items-center gap-2 p-1 bg-background border border-border-color rounded-lg text-xs">
+                    <button onClick={() => setMode('tree')} className={`px-3 py-1 font-semibold rounded-md transition-colors ${mode === 'tree' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
+                        Tree
+                    </button>
+                    <button onClick={() => setMode('json')} className={`px-3 py-1 font-semibold rounded-md transition-colors ${mode === 'json' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
+                        JSON
+                    </button>
+                </div>
+            </div>
+            <div className="space-y-6 mt-6">
                 <SettingRow label="Settings Editor" description="Edit settings using an interactive tree or raw JSON for full control.">
                     <div className="w-full">
                         <div className="flex justify-end mb-2">

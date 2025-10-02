@@ -65,7 +65,7 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
     const hasEditorResults = Object.keys(groupedEditorCommands).length > 0;
 
     return (
-        <div id="shortcuts" ref={sectionRef} className="py-6">
+        <div id="shortcuts" ref={sectionRef} className="py-6 focus:outline-none" tabIndex={-1}>
             <h2 className="text-lg font-semibold text-text-main mb-1">Keyboard Shortcuts</h2>
             <p className="text-xs text-text-secondary mb-4">Customize shortcuts for application commands and Monaco editor keybindings.</p>
             
