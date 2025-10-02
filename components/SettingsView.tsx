@@ -15,6 +15,7 @@ import Modal from './Modal';
 import { repository } from '../services/repository';
 import ToggleSwitch from './ToggleSwitch';
 import SettingRow from './SettingRow';
+import SettingsGroupCard from './SettingsGroupCard';
 import SettingsTreeEditor from './SettingsTreeEditor';
 import { useLogger } from '../hooks/useLogger';
 import KeyboardShortcutsSection from './KeyboardShortcutsSection';
@@ -205,7 +206,7 @@ const FontFamilySelector: React.FC<FontFamilySelectorProps> = ({
   };
 
   return (
-    <SettingRow label={label} description={description}>
+    <SettingRow label={label} description={description} contentVariant="soft">
       <div className="flex flex-col gap-4 md:flex-row">
         <div className="flex-1 space-y-3">
           <div>
@@ -495,24 +496,44 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
     const selectedService = discoveredServices.find(s => s.generateUrl === settings.llmProviderUrl);
 
     return (
-        <div id="provider" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">LLM Provider</h2>
-            <div className="space-y-6">
-                <SettingRow label="Detect Services" description="Scan for locally running LLM services like Ollama and LM Studio.">
-                    <div className="w-60">
-                        <Button onClick={onDetectServices} disabled={isDetecting} variant="secondary" isLoading={isDetecting} className="w-full">
-                            {isDetecting ? 'Detecting...' : 'Re-Detect Services'}
-                        </Button>
-                        {detectionError && <p className="text-center text-xs text-destructive-text mt-2">{detectionError}</p>}
-                    </div>
+        <section id="provider" ref={sectionRef} className="py-6 space-y-8">
+            <SettingsGroupCard
+                title="LLM Provider"
+                description="Connect DocForge to local discovery services and choose which language model powers AI-assisted workflows."
+                icon={<SparklesIcon className="w-5 h-5" />}
+            >
+                <SettingRow
+                    label="Detect Services"
+                    description="Scan for locally running LLM services like Ollama and LM Studio."
+                    inlineDescription={
+                        detectionError
+                            ? <span className="text-destructive-text">{detectionError}</span>
+                            : 'Run discovery again whenever you start a new local service or change network access.'
+                    }
+                    contentVariant="soft"
+                >
+                    <Button
+                        onClick={onDetectServices}
+                        disabled={isDetecting}
+                        variant="secondary"
+                        isLoading={isDetecting}
+                        className="w-full sm:w-60"
+                    >
+                        {isDetecting ? 'Detecting…' : 'Re-Detect Services'}
+                    </Button>
                 </SettingRow>
-                <SettingRow label="Detected Service" description="Choose a running service to connect to for AI features.">
+                <SettingRow
+                    label="Detected Service"
+                    description="Choose a running service to connect to for AI features."
+                    inlineDescription="Only active services appear here. Configure remote providers from the Advanced settings if needed."
+                    contentVariant="soft"
+                >
                     <select
                         id="llmService"
                         value={selectedService?.id || ''}
                         onChange={(e) => handleServiceChange(e.target.value)}
                         disabled={discoveredServices.length === 0}
-                        className="w-60 p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+                        className="w-full sm:w-60 p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
                     >
                         <option value="" disabled>{discoveredServices.length > 0 ? 'Select a service' : 'No services detected'}</option>
                         {discoveredServices.map(service => (
@@ -520,9 +541,14 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
                         ))}
                     </select>
                 </SettingRow>
-                <SettingRow label="Model Name" description="Select which model to use for generating titles and refining documents.">
-                     <div className="relative w-60">
-                       <select
+                <SettingRow
+                    label="Model Name"
+                    description="Select which model to use for generating titles and refining documents."
+                    inlineDescription="Model availability refreshes automatically after you select a provider."
+                    contentVariant="soft"
+                >
+                    <div className="relative w-full sm:w-60">
+                        <select
                             id="llmModelName"
                             value={settings.llmModelName}
                             onChange={(e) => setCurrentSettings(prev => ({ ...prev, llmModelName: e.target.value }))}
@@ -531,14 +557,14 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
                         >
                             <option value="" disabled>{!selectedService ? 'Select service first' : 'Select a model'}</option>
                             {availableModels.map(model => (
-                            <option key={model.id} value={model.id}>{model.name}</option>
+                                <option key={model.id} value={model.id}>{model.name}</option>
                             ))}
                         </select>
                         {isFetchingModels && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Spinner /></div>}
                     </div>
                 </SettingRow>
-            </div>
-        </div>
+            </SettingsGroupCard>
+        </section>
     );
 };
 
@@ -569,11 +595,19 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
 
 
     return (
-        <div id="appearance" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">Appearance</h2>
-            <div className="space-y-6">
-                <SettingRow label="Interface Scale" description="Adjust the size of all UI elements in the application.">
-                    <div className="flex items-center gap-4 w-60">
+        <section id="appearance" ref={sectionRef} className="py-6 space-y-8">
+            <SettingsGroupCard
+                title="Interface"
+                description="Tune the overall scale of DocForge and pick an icon family that matches your workflow."
+                icon={<SunIcon className="w-5 h-5" />}
+            >
+                <SettingRow
+                    label="Interface Scale"
+                    description="Adjust the size of all UI elements in the application."
+                    inlineDescription="Higher values boost readability on high-density displays while lower values create a denser layout."
+                    contentVariant="soft"
+                >
+                    <div className="flex items-center gap-4 w-full sm:w-64">
                         <input
                             id="uiScale"
                             type="range"
@@ -587,9 +621,14 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.uiScale}%</span>
                     </div>
                 </SettingRow>
-                <SettingRow label="Icon Set" description="Customize the look of icons throughout the application.">
-                    <div className="grid grid-cols-3 gap-3 w-80">
-                         <CardButton name="Heroicons" value="heroicons" isSelected={settings.iconSet === 'heroicons'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
+                <SettingRow
+                    label="Icon Set"
+                    description="Customize the look of icons throughout the application."
+                    inlineDescription="Icon previews reflect the current theme to help you compare contrast and weight."
+                    contentVariant="soft"
+                >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 w-full">
+                        <CardButton name="Heroicons" value="heroicons" isSelected={settings.iconSet === 'heroicons'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
                             <HeroIcons.PlusIcon className="w-5 h-5" /> <HeroIcons.SparklesIcon className="w-5 h-5" /> <HeroIcons.FolderIcon className="w-5 h-5" />
                         </CardButton>
                         <CardButton name="Lucide" value="lucide" isSelected={settings.iconSet === 'lucide'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
@@ -602,12 +641,23 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                             <TablerIcons.PlusIcon className="w-5 h-5" /> <TablerIcons.SparklesIcon className="w-5 h-5" /> <TablerIcons.FolderIcon className="w-5 h-5" />
                         </CardButton>
                         <CardButton name="Material" value="material" isSelected={settings.iconSet === 'material'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>
-                             <MaterialIcons.PlusIcon className="w-5 h-5" /> <MaterialIcons.SparklesIcon className="w-5 h-5" /> <MaterialIcons.FolderIcon className="w-5 h-5" />
+                            <MaterialIcons.PlusIcon className="w-5 h-5" /> <MaterialIcons.SparklesIcon className="w-5 h-5" /> <MaterialIcons.FolderIcon className="w-5 h-5" />
                         </CardButton>
                     </div>
                 </SettingRow>
-                <SettingRow label="Markdown Font Size" description="Adjust the base font size for the Markdown preview.">
-                    <div className="flex items-center gap-4 w-60">
+            </SettingsGroupCard>
+
+            <SettingsGroupCard
+                title="Markdown Layout"
+                description="Control the typography, spacing, and readable width of generated documents."
+            >
+                <SettingRow
+                    label="Markdown Font Size"
+                    description="Adjust the base font size for the Markdown preview."
+                    inlineDescription="Use smaller sizes for dense dashboards or larger values for presentation views."
+                    contentVariant="soft"
+                >
+                    <div className="flex items-center gap-4 w-full sm:w-64">
                         <input
                             id="markdownFontSize"
                             type="range"
@@ -621,8 +671,13 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownFontSize}px</span>
                     </div>
                 </SettingRow>
-                <SettingRow label="Markdown Line Height" description="Control the spacing between lines of text for better readability.">
-                    <div className="flex items-center gap-4 w-60">
+                <SettingRow
+                    label="Markdown Line Height"
+                    description="Control the spacing between lines of text for better readability."
+                    inlineDescription="Increased line spacing helps when presenting documentation on large displays."
+                    contentVariant="soft"
+                >
+                    <div className="flex items-center gap-4 w-full sm:w-64">
                         <input
                             id="markdownLineHeight"
                             type="range"
@@ -636,8 +691,13 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownLineHeight.toFixed(1)}</span>
                     </div>
                 </SettingRow>
-                <SettingRow label="Markdown Heading Spacing" description="Control the vertical space above headings to tighten or relax sections.">
-                    <div className="flex items-center gap-4 w-60">
+                <SettingRow
+                    label="Markdown Heading Spacing"
+                    description="Control the vertical space above headings to tighten or relax sections."
+                    inlineDescription="Helpful when preparing compact reports where headings need more breathing room."
+                    contentVariant="soft"
+                >
+                    <div className="flex items-center gap-4 w-full sm:w-64">
                         <input
                             id="markdownHeadingSpacing"
                             type="range"
@@ -651,8 +711,12 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownHeadingSpacing.toFixed(1)}x</span>
                     </div>
                 </SettingRow>
-                <SettingRow label="Markdown Paragraph Spacing" description="Adjust the space between paragraphs and block elements.">
-                    <div className="flex items-center gap-4 w-60">
+                <SettingRow
+                    label="Markdown Paragraph Spacing"
+                    description="Adjust the space between paragraphs and block elements."
+                    contentVariant="soft"
+                >
+                    <div className="flex items-center gap-4 w-full sm:w-64">
                         <input
                             id="markdownParagraphSpacing"
                             type="range"
@@ -666,8 +730,12 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownParagraphSpacing.toFixed(2)}x</span>
                     </div>
                 </SettingRow>
-                <SettingRow label="Markdown Max Width" description="Set the maximum width of the text content to improve line length.">
-                    <div className="flex items-center gap-4 w-60">
+                <SettingRow
+                    label="Markdown Max Width"
+                    description="Set the maximum width of the text content to improve line length."
+                    contentVariant="soft"
+                >
+                    <div className="flex items-center gap-4 w-full sm:w-64">
                         <input
                             id="markdownMaxWidth"
                             type="range"
@@ -681,8 +749,12 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownMaxWidth}px</span>
                     </div>
                 </SettingRow>
-                <SettingRow label="Document Vertical Padding" description="Control the padding above and below the rendered document.">
-                    <div className="flex items-center gap-4 w-60">
+                <SettingRow
+                    label="Document Vertical Padding"
+                    description="Control the padding above and below the rendered document."
+                    contentVariant="soft"
+                >
+                    <div className="flex items-center gap-4 w-full sm:w-64">
                         <input
                             id="markdownContentPadding"
                             type="range"
@@ -696,22 +768,13 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownContentPadding}px</span>
                     </div>
                 </SettingRow>
-                <SettingRow label="Code Block Font Size" description="Adjust the font size used inside fenced code blocks.">
-                    <div className="flex items-center gap-4 w-60">
-                        <input
-                            id="markdownCodeFontSize"
-                            type="range"
-                            min="8"
-                            max="32"
-                            step="1"
-                            value={settings.markdownCodeFontSize}
-                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownCodeFontSize: Number(e.target.value) }))}
-                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
-                        />
-                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownCodeFontSize}px</span>
-                    </div>
-                </SettingRow>
-                                <FontFamilySelector
+            </SettingsGroupCard>
+
+            <SettingsGroupCard
+                title="Typography"
+                description="Choose font families used across the Markdown preview and the editor interface."
+            >
+                <FontFamilySelector
                   id="markdownBodyFontFamily"
                   label="Body Font Family"
                   description="Typography used for paragraphs and general text."
@@ -744,12 +807,49 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                   onChange={(font) => handleFontChange('markdownCodeFontFamily', font)}
                   helperText="Also applies to the Markdown preview's code blocks."
                 />
+                <FontFamilySelector
+                  id="editorFontFamily"
+                  label="Editor Font Family"
+                  description="Choose the default font used in the Monaco-powered text editors."
+                  value={settings.editorFontFamily}
+                  placeholder="Consolas, 'Courier New', monospace"
+                  options={editorFontOptions}
+                  defaultValue={DEFAULT_SETTINGS.editorFontFamily}
+                  onChange={(font) => handleFontChange('editorFontFamily', font)}
+                  helperText="Affects both the primary editor and diff viewer."
+                />
+            </SettingsGroupCard>
+
+            <SettingsGroupCard
+                title="Code Presentation"
+                description="Align code-focused areas with your preferred density and theme."
+            >
+                <SettingRow
+                  label="Code Block Font Size"
+                  description="Adjust the font size used inside fenced code blocks."
+                  contentVariant="soft"
+                >
+                  <div className="flex items-center gap-4 w-full sm:w-64">
+                    <input
+                      id="markdownCodeFontSize"
+                      type="range"
+                      min="8"
+                      max="32"
+                      step="1"
+                      value={settings.markdownCodeFontSize}
+                      onChange={(e) => setCurrentSettings(prev => ({ ...prev, markdownCodeFontSize: Number(e.target.value) }))}
+                      className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                    />
+                    <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.markdownCodeFontSize}px</span>
+                  </div>
+                </SettingRow>
                 <SettingRow
                   label="Editor Font Size"
                   description="Set the default font size for the code editor."
                   htmlFor="editorFontSize"
+                  contentVariant="soft"
                 >
-                  <div className="flex items-center gap-4 w-60">
+                  <div className="flex items-center gap-4 w-full sm:w-64">
                     <input
                       id="editorFontSize"
                       type="range"
@@ -765,21 +865,11 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                     </span>
                   </div>
                 </SettingRow>
-                <FontFamilySelector
-                  id="editorFontFamily"
-                  label="Editor Font Family"
-                  description="Choose the default font used in the Monaco-powered text editors."
-                  value={settings.editorFontFamily}
-                  placeholder="Consolas, 'Courier New', monospace"
-                  options={editorFontOptions}
-                  defaultValue={DEFAULT_SETTINGS.editorFontFamily}
-                  onChange={(font) => handleFontChange('editorFontFamily', font)}
-                  helperText="Affects both the primary editor and diff viewer."
-                />
                 <SettingRow
                   label="Code Block Background (Light Theme)"
                   description="Adjust the background color for Markdown code blocks when using the light theme."
                   htmlFor="markdownCodeBlockBackgroundLight"
+                  contentVariant="soft"
                 >
                   <div className="flex items-center gap-3">
                     <input
@@ -806,6 +896,7 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                   label="Code Block Background (Dark Theme)"
                   description="Adjust the background color for Markdown code blocks when using the dark theme."
                   htmlFor="markdownCodeBlockBackgroundDark"
+                  contentVariant="soft"
                 >
                   <div className="flex items-center gap-3">
                     <input
@@ -828,8 +919,8 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                     </Button>
                   </div>
                 </SettingRow>
-            </div>
-        </div>
+            </SettingsGroupCard>
+        </section>
     );
 };
 
@@ -1069,14 +1160,18 @@ const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurr
   const interpreterValue = formState.useCustomInterpreter ? 'custom' : formState.interpreterPath;
 
   return (
-    <div id="python" ref={sectionRef} className="py-6">
-      <h2 className="text-lg font-semibold text-text-main mb-4">Python Execution</h2>
-      <p className="text-xs text-text-secondary max-w-3xl mb-6">
-        Configure how DocForge prepares isolated Python environments. These defaults are applied when auto-creating a virtual
-        environment for a document and can be overridden per environment.
-      </p>
-      <div className="space-y-6">
-        <SettingRow label="Target Python Version" description="Preferred Python version when creating new virtual environments.">
+    <section id="python" ref={sectionRef} className="py-6 space-y-8">
+      <SettingsGroupCard
+        title="Python Execution"
+        description="Configure how DocForge prepares isolated Python environments. These defaults apply when a document automatically provisions a virtual environment."
+        icon={<TerminalIcon className="w-5 h-5" />}
+      >
+        <SettingRow
+          label="Target Python Version"
+          description="Preferred Python version when creating new virtual environments."
+          inlineDescription="Use semantic version ranges (e.g. 3.11) to align with your interpreters."
+          contentVariant="soft"
+        >
           <input
             type="text"
             value={settings.pythonDefaults.targetPythonVersion}
@@ -1084,29 +1179,43 @@ const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurr
               ...prev,
               pythonDefaults: { ...prev.pythonDefaults, targetPythonVersion: e.target.value.trim() },
             }))}
-            className="w-40 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full sm:w-64 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
             placeholder="3.11"
           />
         </SettingRow>
-        <SettingRow label="Default Packages" description="One package per line. Versions can use ==, >=, <=, etc.">
+        <SettingRow
+          label="Default Packages"
+          description="One package per line. Versions can use ==, >=, <=, etc."
+          inlineDescription="DocForge installs these packages whenever it bootstraps a managed environment."
+          contentVariant="soft"
+        >
           <textarea
             value={packagesInput}
             onChange={(e) => handlePackagesChange(e.target.value)}
             className="w-full h-28 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary font-mono"
-            placeholder="numpy
-pandas
-requests"
+            placeholder="numpy\npandas\nrequests"
           />
         </SettingRow>
-        <SettingRow label="Default Environment Variables" description="JSON object defining environment variables applied to every run.">
+        <SettingRow
+          label="Default Environment Variables"
+          description="JSON object defining environment variables applied to every run."
+          inlineDescription={
+            envVarError ? <span className="text-destructive-text">{envVarError}</span> : 'Provide a JSON object with string values to share credentials or toggles across runs.'
+          }
+          contentVariant="soft"
+        >
           <textarea
             value={envVarJson}
             onChange={(e) => handleEnvVarChange(e.target.value)}
             className="w-full h-32 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary font-mono"
           />
-          {envVarError && <p className="text-xs text-destructive-text mt-2">{envVarError}</p>}
         </SettingRow>
-        <SettingRow label="Default Working Directory" description="Optional directory used when running scripts if no environment-specific directory is set.">
+        <SettingRow
+          label="Default Working Directory"
+          description="Optional directory used when running scripts if no environment-specific directory is set."
+          inlineDescription="Leave blank to execute scripts from the document location."
+          contentVariant="soft"
+        >
           <input
             type="text"
             value={settings.pythonWorkingDirectory ?? ''}
@@ -1115,58 +1224,67 @@ requests"
             placeholder="/path/to/projects"
           />
         </SettingRow>
-        <SettingRow label="Console Theme" description="Theme used for the dedicated Python output window.">
+        <SettingRow
+          label="Console Theme"
+          description="Theme used for the dedicated Python output window."
+          inlineDescription="Switch to light mode for brighter projectors or dark mode for contrast-rich coding sessions."
+          contentVariant="soft"
+        >
           <select
             value={settings.pythonConsoleTheme}
             onChange={(e) => handleConsoleThemeChange(e.target.value as 'light' | 'dark')}
-            className="w-40 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full sm:w-64 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="dark">Dark</option>
             <option value="light">Light</option>
           </select>
         </SettingRow>
-        <div className="border border-border-color rounded-lg">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border-color bg-secondary/40">
-            <div>
-              <p className="text-sm font-semibold text-text-main">Managed Environments</p>
-              <p className="text-xs text-text-secondary">Create reusable Python virtual environments with curated packages.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" onClick={() => { refreshEnvironments(); refreshInterpreters(); }} isLoading={isLoading || isDetecting}>
-                <RefreshIcon className="w-4 h-4 mr-1" /> Refresh
-              </Button>
-              <Button onClick={openCreateModal}><PlusIcon className="w-4 h-4 mr-1" /> New Environment</Button>
-            </div>
+      </SettingsGroupCard>
+
+      <SettingsGroupCard
+        title="Managed Environments"
+        description="Create reusable Python virtual environments with curated packages."
+        headerAction={
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => { refreshEnvironments(); refreshInterpreters(); }}
+              isLoading={isLoading || isDetecting}
+            >
+              <RefreshIcon className="w-4 h-4 mr-1" /> Refresh
+            </Button>
+            <Button onClick={openCreateModal}>
+              <PlusIcon className="w-4 h-4 mr-1" /> New Environment
+            </Button>
           </div>
-          <div className="p-4 space-y-3">
-            {environments.length === 0 ? (
-              <p className="text-xs text-text-secondary">No environments configured yet.</p>
-            ) : (
-              environments.map((env) => (
-                <div key={env.envId} className="border border-border-color rounded-md p-3">
-                  <div className="flex flex-wrap justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-sm text-text-main">{env.name}</p>
-                      <p className="text-xs text-text-secondary">Python {env.pythonVersion} • {env.managed ? 'Managed' : 'External'}</p>
-                      <p className="text-xs text-text-secondary break-all mt-1">{env.pythonExecutable}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="secondary" onClick={() => openEditModal(env)}>Configure</Button>
-                      <Button variant="destructive" onClick={() => handleDeleteEnvironment(env)}>Delete</Button>
-                    </div>
-                  </div>
-                  {(env.description || env.workingDirectory) && (
-                    <div className="mt-2 text-xs text-text-secondary space-y-1">
-                      {env.description && <p>{env.description}</p>}
-                      {env.workingDirectory && <p>Working directory: {env.workingDirectory}</p>}
-                    </div>
-                  )}
+        }
+        contentClassName="space-y-4"
+        tone="muted"
+      >
+        {environments.length === 0 ? (
+          <p className="text-xs text-text-secondary">No environments configured yet.</p>
+        ) : (
+          environments.map((env) => (
+            <div key={env.envId} className="border border-border-color rounded-xl p-4 bg-secondary/40">
+              <div className="flex flex-wrap justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="font-semibold text-sm text-text-main">{env.name}</p>
+                  <p className="text-xs text-text-secondary">Python {env.pythonVersion} • {env.managed ? 'Managed' : 'External'}</p>
+                  <p className="text-xs text-text-secondary break-all">{env.pythonExecutable}</p>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="secondary" onClick={() => openEditModal(env)}>Edit</Button>
+                  <Button variant="secondary" onClick={() => handleDeleteEnvironment(env)} className="text-destructive-text border-destructive-border">Delete</Button>
+                </div>
+              </div>
+              {env.description && <p className="text-xs text-text-secondary mt-2">{env.description}</p>}
+              {env.packages.length > 0 && (
+                <p className="text-xs text-text-secondary mt-2">Packages: {env.packages.map((pkg) => pkg.version ? `${pkg.name}${pkg.version}` : pkg.name).join(', ')}</p>
+              )}
+            </div>
+          ))
+        )}
+      </SettingsGroupCard>
 
       {isCreateOpen && (
         <Modal title="Create Python Environment" onClose={closeModals}>
@@ -1334,23 +1452,40 @@ requests"
           </form>
         </Modal>
       )}
-    </div>
+    </section>
   );
 };
 
 const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
     return (
-         <div id="general" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">General</h2>
-            <div className="space-y-6">
-                 <SettingRow htmlFor="allowPrerelease" label="Receive Pre-releases" description="Get notified about new beta versions and test features early.">
+        <section id="general" ref={sectionRef} className="py-6 space-y-8">
+            <SettingsGroupCard
+                title="General"
+                description="Global preferences that control updates and background maintenance."
+                icon={<GearIcon className="w-5 h-5" />}
+            >
+                <SettingRow
+                    htmlFor="allowPrerelease"
+                    label="Receive Pre-releases"
+                    description="Get notified about new beta versions and test features early."
+                    inlineDescription="Pre-release builds may include experimental features and occasional instability."
+                    contentVariant="soft"
+                    align="center"
+                >
                     <ToggleSwitch id="allowPrerelease" checked={settings.allowPrerelease} onChange={(val) => setCurrentSettings(s => ({...s, allowPrerelease: val}))} />
                 </SettingRow>
-                 <SettingRow htmlFor="autoSaveLogs" label="Auto-save Logs" description="Automatically save all logs to a daily file on your computer for debugging.">
+                <SettingRow
+                    htmlFor="autoSaveLogs"
+                    label="Auto-save Logs"
+                    description="Automatically save all logs to a daily file on your computer for debugging."
+                    inlineDescription="Logs are stored locally and rotated daily to simplify troubleshooting."
+                    contentVariant="soft"
+                    align="center"
+                >
                     <ToggleSwitch id="autoSaveLogs" checked={settings.autoSaveLogs} onChange={(val) => setCurrentSettings(s => ({...s, autoSaveLogs: val}))} />
                 </SettingRow>
-            </div>
-        </div>
+            </SettingsGroupCard>
+        </section>
     );
 };
 
@@ -1424,31 +1559,57 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
         }
     };
     
+    const operationInlineDescription = operation
+        ? operation.status === 'running'
+            ? 'Maintenance task running…'
+            : operation.message
+        : 'Run maintenance tasks periodically to keep the database responsive.';
+
+    const operationClass = operation?.status === 'error'
+        ? 'text-destructive-text'
+        : operation?.status === 'success'
+            ? 'text-success'
+            : 'text-text-secondary';
+
     return (
-         <div id="database" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">Database Management</h2>
-            <div className="space-y-6">
-                 <SettingRow label="Database File" description="This file contains all your documents, folders, and history.">
+         <section id="database" ref={sectionRef} className="py-6 space-y-8">
+            <SettingsGroupCard
+                title="Database Management"
+                description="Inspect the local database, trigger maintenance tasks, and monitor storage usage."
+                icon={<DatabaseIcon className="w-5 h-5" />}
+            >
+                <SettingRow
+                    label="Database File"
+                    description="This file contains all your documents, folders, and history."
+                    inlineDescription="Copy the path to back up or move the database to a new location."
+                    contentVariant="soft"
+                >
                     <div className="text-sm text-text-main bg-background px-3 py-2 rounded-md border border-border-color w-full font-mono text-xs select-all break-all">
                         {dbPath}
                     </div>
                 </SettingRow>
-                <SettingRow label="Operations" description="Perform maintenance tasks on the application database.">
-                    <div className="flex flex-col items-end w-full gap-2">
-                        <div className="flex items-center gap-2">
-                            <Button onClick={handleBackup} variant="secondary" isLoading={operation?.name === 'backup' && operation.status === 'running'}><SaveIcon className="w-4 h-4 mr-2" /> Backup</Button>
-                            <Button onClick={handleIntegrityCheck} variant="secondary" isLoading={operation?.name === 'integrity' && operation.status === 'running'}><CheckIcon className="w-4 h-4 mr-2" /> Check Integrity</Button>
-                            <Button onClick={handleVacuum} variant="secondary" isLoading={operation?.name === 'vacuum' && operation.status === 'running'}><SparklesIcon className="w-4 h-4 mr-2" /> Vacuum</Button>
-                        </div>
-                        {operation && (
-                            <p className={`text-xs mt-2 text-right ${operation.status === 'error' ? 'text-error' : 'text-success'}`}>{operation.message}</p>
-                        )}
+                <SettingRow
+                    label="Operations"
+                    description="Perform maintenance tasks on the application database."
+                    inlineDescription={<span className={`text-xs ${operationClass}`}>{operationInlineDescription}</span>}
+                    contentVariant="soft"
+                    align="center"
+                >
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={handleBackup} variant="secondary" isLoading={operation?.name === 'backup' && operation.status === 'running'}><SaveIcon className="w-4 h-4 mr-2" /> Backup</Button>
+                        <Button onClick={handleIntegrityCheck} variant="secondary" isLoading={operation?.name === 'integrity' && operation.status === 'running'}><CheckIcon className="w-4 h-4 mr-2" /> Check Integrity</Button>
+                        <Button onClick={handleVacuum} variant="secondary" isLoading={operation?.name === 'vacuum' && operation.status === 'running'}><SparklesIcon className="w-4 h-4 mr-2" /> Vacuum</Button>
                     </div>
                 </SettingRow>
-                <SettingRow label="Statistics" description="An overview of the database contents and size.">
-                     {isLoadingStats ? <Spinner/> : !stats ? <p className="text-sm text-error">Could not load stats.</p> : (
+                <SettingRow
+                    label="Statistics"
+                    description="An overview of the database contents and size."
+                    contentVariant="soft"
+                    contentClassName="block"
+                >
+                     {isLoadingStats ? <Spinner/> : !stats ? <p className="text-sm text-destructive-text">Could not load stats.</p> : (
                         <div className="w-full space-y-4">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                 <div className="bg-background p-3 rounded-md border border-border-color"><strong>File Size:</strong> {stats.fileSize}</div>
                                 <div className="bg-background p-3 rounded-md border border-border-color"><strong>Schema Version:</strong> {stats.schemaVersion}</div>
                                 <div className="bg-background p-3 rounded-md border border-border-color"><strong>Page Size:</strong> {stats.pageSize} bytes</div>
@@ -1477,8 +1638,8 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
                         </div>
                      )}
                 </SettingRow>
-            </div>
-        </div>
+            </SettingsGroupCard>
+        </section>
     );
 };
 
@@ -1523,10 +1684,19 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
     };
 
     return (
-         <div id="advanced" ref={sectionRef} className="py-6">
-            <h2 className="text-lg font-semibold text-text-main mb-4">Advanced</h2>
-            <div className="space-y-6">
-                <SettingRow label="Settings Editor" description="Edit settings using an interactive tree or raw JSON for full control.">
+         <section id="advanced" ref={sectionRef} className="py-6 space-y-8">
+            <SettingsGroupCard
+                title="Advanced"
+                description="Directly edit the configuration tree or raw JSON when you need precise control."
+                icon={<FileIcon className="w-5 h-5" />}
+            >
+                <SettingRow
+                    label="Settings Editor"
+                    description="Edit settings using an interactive tree or raw JSON for full control."
+                    inlineDescription="Switch between the visual tree editor and raw JSON to inspect or copy configuration snippets."
+                    contentVariant="soft"
+                    contentClassName="block"
+                >
                     <div className="w-full">
                         <div className="flex justify-end mb-2">
                             <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
@@ -1549,8 +1719,8 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
                         )}
                     </div>
                 </SettingRow>
-            </div>
-        </div>
+            </SettingsGroupCard>
+        </section>
     );
 };
 
