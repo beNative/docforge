@@ -5,9 +5,10 @@
   "main": "dist/main.js",
   "scripts": {
     "start": "npm run build:css && node esbuild.config.js --watch & electron .",
-    "build": "npm run build:css && node esbuild.config.js",
+    "build": "npm run build:css && node esbuild.config.js && node scripts/prepare-icons.mjs",
     "package": "npm run build && electron-builder",
     "publish": "npm run build && electron-builder --publish always",
+    "prepare:icons": "node scripts/prepare-icons.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:css": "tailwindcss -i ./styles/tailwind.css -o ./dist/tailwind.css --minify"
   },
@@ -32,6 +33,8 @@
     "electron": "^31.1.0",
     "electron-builder": "^24.13.3",
     "esbuild": "^0.23.0",
+    "fast-xml-parser": "^5.2.5",
+    "icon-gen": "^5.0.0",
     "katex": "^0.16.11",
     "mermaid": "^10.9.1",
     "plantuml-encoder": "^1.4.0",

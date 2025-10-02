@@ -115,7 +115,7 @@ This module handles all communication with the external Large Language Model. It
 
 Electron Builder manages the packaging and publishing workflow for DocForge. The most relevant npm scripts are:
 
--   `npm run build` — Bundles the renderer and preload scripts and prepares assets in `dist/`.
+-   `npm run build` — Bundles the renderer and preload scripts, prepares assets in `dist/`, and generates platform icon binaries from the source SVG.
 -   `npm run package` — Produces distributable builds without uploading them.
 -   `npm run publish` — Builds the application and publishes artifacts using Electron Builder's configured GitHub target.
 
@@ -124,3 +124,9 @@ Electron Builder manages the packaging and publishing workflow for DocForge. The
 1. Run `npm version <new-version> --no-git-tag-version` to bump the version in both `package.json` and `package-lock.json` without creating a Git tag.
 2. Review and update the Markdown documentation (README, manuals, version logs) so the release notes accurately describe the changes.
 3. Execute `npm run publish` to package the application and upload the release artifacts to GitHub.
+
+### Application Icon Pipeline
+
+-   The canonical icon artwork lives at `assets/icon.svg`. During `npm run build` (and thus during `npm run package`/`npm run publish`), the `scripts/prepare-icons.mjs` script validates the SVG and, if valid, generates the required `icon.icns`, `icon.ico`, and `icon.png` files in the `assets/` directory using `icon-gen`.
+-   If the SVG is missing or invalid, the script logs a warning and leaves the existing binary icon assets untouched so packaging can proceed with the previous icons.
+-   To regenerate icons without running a full build, execute `npm run prepare:icons`.
