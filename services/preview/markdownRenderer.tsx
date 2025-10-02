@@ -216,11 +216,20 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
             theme: viewTheme === 'dark' ? 'one-dark-pro' : 'github-light',
           });
 
+          // Shiki injects newline characters between the span.line elements which the
+          // <pre> block preserves, resulting in visual blank lines between each code
+          // line. Collapse those inter-tag newlines while keeping intentional empty
+          // lines that are represented by dedicated <span class="line"></span> nodes.
+          const compactHtml = html
+            .replace(/>\s*\n\s*</g, '><')
+            .replace(/\n(<\/code>)/g, '$1')
+            .replace(/\n(<\/pre>)/g, '$1');
+
           return (
             <div
               className={[baseClassName, 'df-code-block-shiki'].filter(Boolean).join(' ')}
               data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
-              dangerouslySetInnerHTML={{ __html: html }}
+              dangerouslySetInnerHTML={{ __html: compactHtml }}
               {...props}
             />
           );
@@ -340,12 +349,11 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-markdown > * {
-          margin-top: calc(var(--markdown-font-size, 16px) * var(--markdown-paragraph-spacing, 0.75));
-          margin-bottom: calc(var(--markdown-font-size, 16px) * var(--markdown-paragraph-spacing, 0.75));
+          margin-top: 0;
         }
 
-        .df-markdown > :first-child {
-          margin-top: 0;
+        .df-markdown > * + * {
+          margin-top: calc(var(--markdown-font-size, 16px) * var(--markdown-paragraph-spacing, 0.75));
         }
 
         .df-markdown h1 {
@@ -427,7 +435,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           padding: 1.25rem 1.5rem;
           font-family: var(--markdown-code-font-family, 'JetBrains Mono', monospace);
           font-size: var(--markdown-code-font-size, 14px);
-          line-height: 1.65;
+          line-height: 1.4;
           overflow: auto;
           position: relative;
         }
@@ -467,7 +475,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
 
         .df-code-block .line {
           display: block;
-          min-height: 1.35em;
+          line-height: 1.4;
         }
 
         .df-code-block-shiki .shiki {
