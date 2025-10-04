@@ -1,6 +1,6 @@
 {
   "name": "docforge",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "An application to manage and refine documents.",
   "main": "dist/main.js",
   "scripts": {

@@ -1,5 +1,22 @@
 # Version Log
 
+## v0.6.2 - The Documentation Polish Update
+
+This maintenance release focuses on keeping the documentation set in sync with the
+project's release workflow so the publishing checklist is easy to follow.
+
+### 🛠 Improvements
+
+-   Synced the release preparation guidance between the project README and the
+    documentation bundle to avoid diverging instructions.
+-   Linked the README to the version history so maintainers can quickly review
+    prior changes when drafting release notes.
+
+### 🐛 Fixes
+
+-   Corrected outdated documentation references that omitted the release
+    preparation steps from the published docs bundle.
+
 ## v0.6.1 - The Release Prep Update
 
 This maintenance release focuses on preparing DocForge for distribution by polishing the release workflow and tidying up the documentation set.

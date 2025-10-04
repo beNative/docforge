@@ -33,3 +33,21 @@ DocForge is a desktop application designed to streamline the process of creating
 4.  **Create:** Start creating, organizing, and refining your documents!
 
 For detailed instructions on usage and features, please refer to the [Functional Manual](./FUNCTIONAL_MANUAL.md).
+To review the history of changes, see the [Version Log](./VERSION_LOG.md).
+
+## Release Preparation
+
+To create a new public build of DocForge:
+
+1. Update the version in `package.json` and regenerate the lockfile with `npm version <new-version> --no-git-tag-version`.
+2. Review the Markdown documentation (README, manuals, and version log) so the release notes accurately reflect recent changes.
+3. Sync the documentation copies under `docs/` (README, manuals, version log) with any updates made at the project root.
+4. Run `npm run publish` to build the application and publish the artifacts to the configured GitHub release target via Electron Builder.
+
+## Application Icon Workflow
+
+- The canonical artwork lives at `assets/icon.svg`. Keep this SVG under version control to simplify brand updates.
+- `npm run build` (and any script that calls it) automatically validates the SVG and regenerates `icon.icns`, `icon.ico`, and a high-resolution `icon.png` via the `scripts/prepare-icons.mjs` helper.
+- If the SVG is missing or invalid the script logs a warning and leaves existing binary icons untouched, allowing packaging to proceed with the previously generated assets.
+- Run `npm run prepare:icons` to regenerate the platform-specific icons on demand without rebuilding the JavaScript bundles.
+
