@@ -26,6 +26,12 @@ interface DocumentEditorProps {
   formatTrigger: number;
 }
 
+const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint: string | null | undefined): ViewMode => {
+  if (mode) return mode;
+  const normalizedHint = languageHint?.toLowerCase();
+  return normalizedHint === 'pdf' || normalizedHint === 'application/pdf' ? 'preview' : 'edit';
+};
+
 const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange, onViewModeChange, formatTrigger }) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
@@ -39,7 +45,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>(documentNode.default_view_mode || 'edit');
+  const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
   const [splitSize, setSplitSize] = useState(50);
   const { addLog } = useLogger();
   const { skipNextAutoSave } = useDocumentAutoSave({
@@ -108,7 +114,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
         setTitle(documentNode.title);
         setContent(nextContent);
         setBaselineContent(nextContent);
-        setViewMode(documentNode.default_view_mode || 'edit');
+        setViewMode(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
         setSplitSize(50);
         isContentInitialized.current = true;
         setIsDirty(false);
@@ -126,7 +132,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             setContent(nextContent);
         }
     }
-  }, [documentNode.id, documentNode.content, documentNode.default_view_mode, documentNode.title, isDirty]);
+  }, [documentNode.id, documentNode.content, documentNode.default_view_mode, documentNode.language_hint, documentNode.title, isDirty]);
 
   useEffect(() => {
     setTitle(documentNode.title);
@@ -137,6 +143,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
         setIsDiffMode(false);
     }
   }, [viewMode, isDiffMode]);
+
+  useEffect(() => {
+    const normalizedHint = documentNode.language_hint?.toLowerCase();
+    if ((normalizedHint === 'pdf' || normalizedHint === 'application/pdf') && !documentNode.default_view_mode && viewMode === 'edit') {
+      setViewMode('preview');
+    }
+  }, [documentNode.language_hint, documentNode.default_view_mode, viewMode]);
 
   useEffect(() => {
     // Only mark as dirty after the initial content has been loaded.

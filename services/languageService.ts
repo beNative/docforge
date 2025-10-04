@@ -76,6 +76,8 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
         case 'fmx':
         case 'ini':
              return 'ini';
+        case 'application/pdf':
+            return 'pdf';
         case 'pdf':
             return 'pdf';
         default:

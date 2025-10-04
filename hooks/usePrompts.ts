@@ -58,11 +58,13 @@ export const useDocuments = () => {
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
 
   const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '', doc_type = 'prompt', language_hint = 'markdown' }: { parentId: string | null, title?: string, content?: string, doc_type?: DocType, language_hint?: string | null }) => {
+    const resolvedLanguage = mapExtensionToLanguageId(language_hint);
+    const defaultViewMode = doc_type === 'pdf' || resolvedLanguage === 'pdf' ? 'preview' : undefined;
     const newNode = await addNode({
       parent_id: parentId,
       node_type: 'document',
       title,
-      document: { content, doc_type, language_hint: mapExtensionToLanguageId(language_hint) } as any,
+      document: { content, doc_type, language_hint: resolvedLanguage, default_view_mode: defaultViewMode } as any,
     });
     return nodeToDocumentOrFolder(newNode);
   }, [addNode]);

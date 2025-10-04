@@ -40,6 +40,9 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
         case 'fmx':
         case 'ini':
             return 'ini';
+        case 'application/pdf':
+        case 'pdf':
+            return 'pdf';
         default: return 'plaintext';
     }
 };
@@ -208,7 +211,7 @@ export const databaseService = {
         }
 
         // Insert Documents and Versions
-        const docStmt = db.prepare('INSERT INTO documents (node_id, doc_type, language_hint) VALUES (?, ?, ?)');
+        const docStmt = db.prepare('INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode) VALUES (?, ?, ?, ?)');
         const versionStmt = db.prepare('INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)');
         const updateDocStmt = db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?');
 
@@ -219,7 +222,7 @@ export const databaseService = {
         }
 
         for (const doc of data.documents) {
-            const docResult = docStmt.run(doc.node_id, doc.doc_type, doc.language_hint);
+            const docResult = docStmt.run(doc.node_id, doc.doc_type, doc.language_hint, doc.default_view_mode ?? null);
             const docId = Number(docResult.lastInsertRowid);
             
             const versions = docVersionsByNode.get(doc.node_id) || [];
@@ -296,9 +299,9 @@ export const databaseService = {
           const originalDoc = db.prepare('SELECT * FROM documents WHERE node_id = ?').get(nodeId) as Document;
           if (originalDoc) {
             const newDocResult = db.prepare(`
-              INSERT INTO documents (node_id, doc_type, language_hint, current_version_id)
-              VALUES (?, ?, ?, NULL)
-            `).run(newNodeId, originalDoc.doc_type, originalDoc.language_hint);
+              INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode, current_version_id)
+              VALUES (?, ?, ?, ?, NULL)
+            `).run(newNodeId, originalDoc.doc_type, originalDoc.language_hint, originalDoc.default_view_mode);
             const newDocId = newDocResult.lastInsertRowid;
   
             // Fix: Cast the result to DocVersion array.
@@ -456,11 +459,20 @@ export const databaseService = {
             const maxSortOrderResult = db.prepare(`SELECT MAX(sort_order) as max_order FROM nodes WHERE parent_id ${currentParentId ? '= ?' : 'IS NULL'}`).get(currentParentId) as { max_order: number | null };
             const sortOrder = (maxSortOrderResult?.max_order ?? -1) + 1;
             const extension = file.name.split('.').pop() || null;
-            const languageHint = mapExtensionToLanguageId_local(extension);
+            let languageHint = mapExtensionToLanguageId_local(extension);
 
             db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, 'document', ?, ?, ?, ?)`).run(newNodeId, currentParentId, file.name, sortOrder, now, now);
 
-            const docResult = db.prepare(`INSERT INTO documents (node_id, doc_type, language_hint) VALUES (?, ?, ?)`).run(newNodeId, 'source_code', languageHint);
+            const trimmedContent = file.content.trim();
+            const isPdf = languageHint === 'pdf' || languageHint === 'application/pdf' || trimmedContent.startsWith('data:application/pdf');
+            if (isPdf) {
+                languageHint = 'pdf';
+            }
+            const docType = isPdf ? 'pdf' : 'source_code';
+            const defaultViewMode = isPdf ? 'preview' : null;
+
+            const docResult = db.prepare(`INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode) VALUES (?, ?, ?, ?)`)
+              .run(newNodeId, docType, languageHint, defaultViewMode);
             const documentId = Number(docResult.lastInsertRowid);
 
             const contentId = getContentId(file.content);
