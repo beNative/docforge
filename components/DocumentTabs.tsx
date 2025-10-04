@@ -41,44 +41,93 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
     const tabRefs = useRef(new Map<string, HTMLDivElement>());
     const dragState = useRef<{ id: string | null; index: number }>({ id: null, index: -1 });
     const [menuState, setMenuState] = useState<MenuState>(INITIAL_MENU_STATE);
-    const [isOverflowing, setIsOverflowing] = useState(false);
+    const [scrollState, setScrollState] = useState({
+        canScrollLeft: false,
+        canScrollRight: false,
+        hiddenTabIds: [] as string[],
+    });
 
-    const updateOverflow = useCallback(() => {
+    const updateScrollState = useCallback(() => {
         const container = scrollContainerRef.current;
         if (!container) {
-            setIsOverflowing(false);
+            setScrollState({ canScrollLeft: false, canScrollRight: false, hiddenTabIds: [] });
             return;
         }
-        setIsOverflowing(container.scrollWidth > container.clientWidth + 1);
-    }, []);
+
+        const { scrollLeft, scrollWidth, clientWidth } = container;
+        const containerRect = container.getBoundingClientRect();
+        const hiddenTabIds: string[] = [];
+
+        for (const id of openDocumentIds) {
+            const element = tabRefs.current.get(id);
+            if (!element) continue;
+            const rect = element.getBoundingClientRect();
+            const isHiddenLeft = rect.right <= containerRect.left + 2;
+            const isHiddenRight = rect.left >= containerRect.right - 2;
+            if (isHiddenLeft || isHiddenRight) {
+                hiddenTabIds.push(id);
+            }
+        }
+
+        const canScrollLeft = scrollLeft > 1;
+        const canScrollRight = scrollLeft + clientWidth < scrollWidth - 1;
+
+        setScrollState((previous) => {
+            if (
+                previous.canScrollLeft === canScrollLeft &&
+                previous.canScrollRight === canScrollRight &&
+                previous.hiddenTabIds.length === hiddenTabIds.length &&
+                previous.hiddenTabIds.every((id, index) => id === hiddenTabIds[index])
+            ) {
+                return previous;
+            }
+            return {
+                canScrollLeft,
+                canScrollRight,
+                hiddenTabIds,
+            };
+        });
+    }, [openDocumentIds]);
 
     useEffect(() => {
-        updateOverflow();
-    }, [updateOverflow, openDocumentIds.length, documents]);
+        updateScrollState();
+    }, [updateScrollState, openDocumentIds.length, documents]);
 
     useEffect(() => {
         const container = scrollContainerRef.current;
         if (!container || typeof ResizeObserver === 'undefined') return;
 
-        const observer = new ResizeObserver(() => updateOverflow());
+        const observer = new ResizeObserver(() => updateScrollState());
         observer.observe(container);
         if (container.parentElement) {
             observer.observe(container.parentElement);
         }
-        window.addEventListener('resize', updateOverflow);
+        window.addEventListener('resize', updateScrollState);
         return () => {
             observer.disconnect();
-            window.removeEventListener('resize', updateOverflow);
+            window.removeEventListener('resize', updateScrollState);
         };
-    }, [updateOverflow]);
+    }, [updateScrollState]);
 
     useEffect(() => {
         if (!activeDocumentId) return;
         const element = tabRefs.current.get(activeDocumentId);
         if (element) {
             element.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+            requestAnimationFrame(() => updateScrollState());
         }
-    }, [activeDocumentId]);
+    }, [activeDocumentId, updateScrollState]);
+
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => updateScrollState();
+        container.addEventListener('scroll', handleScroll, { passive: true });
+        return () => {
+            container.removeEventListener('scroll', handleScroll);
+        };
+    }, [updateScrollState]);
 
     const closeMenu = useCallback(() => {
         setMenuState(INITIAL_MENU_STATE);
@@ -110,8 +159,11 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
 
     const openOverflowMenu = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
+        if (!scrollState.hiddenTabIds.length) {
+            return;
+        }
         const rect = event.currentTarget.getBoundingClientRect();
-        const items: MenuItem[] = openDocumentIds.map((id) => {
+        const items: MenuItem[] = scrollState.hiddenTabIds.map((id) => {
             const doc = docsById.get(id);
             const displayTitle = doc?.title?.trim() || 'Untitled Document';
             return {
@@ -126,7 +178,41 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
             position: { x: rect.left, y: rect.bottom + 4 },
             items,
         });
-    }, [openDocumentIds, docsById, onSelectTab, activeDocumentId]);
+    }, [scrollState.hiddenTabIds, docsById, onSelectTab, activeDocumentId]);
+
+    const scrollToDirection = useCallback((direction: 'left' | 'right') => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const { clientWidth, scrollLeft } = container;
+        if (!openDocumentIds.length) return;
+
+        if (direction === 'left') {
+            for (let index = openDocumentIds.length - 1; index >= 0; index -= 1) {
+                const id = openDocumentIds[index];
+                const element = tabRefs.current.get(id);
+                if (!element) continue;
+                const tabStart = element.offsetLeft;
+                if (tabStart < scrollLeft - 1) {
+                    container.scrollTo({ left: tabStart, behavior: 'smooth' });
+                    return;
+                }
+            }
+            container.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+            for (let index = 0; index < openDocumentIds.length; index += 1) {
+                const id = openDocumentIds[index];
+                const element = tabRefs.current.get(id);
+                if (!element) continue;
+                const tabEnd = element.offsetLeft + element.offsetWidth;
+                if (tabEnd > scrollLeft + clientWidth + 1) {
+                    container.scrollTo({ left: tabEnd - clientWidth, behavior: 'smooth' });
+                    return;
+                }
+            }
+            container.scrollTo({ left: container.scrollWidth - clientWidth, behavior: 'smooth' });
+        }
+    }, [openDocumentIds]);
 
     const handleDragStart = useCallback((event: React.DragEvent<HTMLDivElement>, tabId: string, index: number) => {
         dragState.current = { id: tabId, index };
@@ -242,24 +328,44 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
             <div className="flex items-center gap-1 px-2 w-full h-full">
                 <div
                     ref={scrollContainerRef}
-                    className="flex-1 overflow-hidden h-full"
+                    className="flex-1 h-full overflow-x-auto overflow-y-hidden scrollbar-hidden"
                     onDragOver={handleDragOver}
                     onDrop={handleContainerDrop}
+                    role="tablist"
                 >
-                    <div className="flex items-stretch gap-1 overflow-x-auto h-full pr-2" role="tablist">
+                    <div className="flex items-stretch gap-1 h-full min-w-max pr-2">
                         {tabElements}
                     </div>
                 </div>
-                {isOverflowing && openDocumentIds.length > 0 && (
+                <div className="flex items-center gap-1">
                     <button
                         type="button"
-                        className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary text-text-secondary hover:text-text-main hover:bg-secondary/80 border border-border-color/70"
+                        className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary text-text-secondary hover:text-text-main hover:bg-secondary/80 border border-border-color/70 disabled:opacity-40 disabled:cursor-default"
+                        onClick={() => scrollToDirection('left')}
+                        aria-label="Scroll tabs left"
+                        disabled={!scrollState.canScrollLeft}
+                    >
+                        <ChevronDownIcon className="w-4 h-4 -rotate-90" />
+                    </button>
+                    <button
+                        type="button"
+                        className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary text-text-secondary hover:text-text-main hover:bg-secondary/80 border border-border-color/70 disabled:opacity-40 disabled:cursor-default"
+                        onClick={() => scrollToDirection('right')}
+                        aria-label="Scroll tabs right"
+                        disabled={!scrollState.canScrollRight}
+                    >
+                        <ChevronDownIcon className="w-4 h-4 rotate-90" />
+                    </button>
+                    <button
+                        type="button"
+                        className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary text-text-secondary hover:text-text-main hover:bg-secondary/80 border border-border-color/70 disabled:opacity-40 disabled:cursor-default"
                         onClick={openOverflowMenu}
-                        aria-label="Show all tabs"
+                        aria-label="Show hidden tabs"
+                        disabled={!scrollState.hiddenTabIds.length}
                     >
                         <ChevronDownIcon className="w-4 h-4" />
                     </button>
-                )}
+                </div>
             </div>
             <ContextMenu
                 isOpen={menuState.isOpen}
