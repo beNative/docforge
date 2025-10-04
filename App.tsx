@@ -127,6 +127,7 @@ const MainApp: React.FC = () => {
     const commandPaletteTargetRef = useRef<HTMLDivElement>(null);
     const commandPaletteInputRef = useRef<HTMLInputElement>(null);
     const dragCounter = useRef(0);
+    const ensureNodeVisibleRef = useRef<(node: Pick<DocumentOrFolder, 'id' | 'type' | 'parentId'>) => void>();
 
     const llmStatus = useLLMStatus(settings.llmProviderUrl);
     const { logs, addLog } = useLogger();
@@ -323,8 +324,23 @@ const MainApp: React.FC = () => {
             };
         });
 
-        await addDocumentsFromFiles(fileEntries, parentId);
-    }, [addDocumentsFromFiles]);
+        const importedNodes = await addDocumentsFromFiles(fileEntries, parentId);
+
+        if (importedNodes.length > 0) {
+            const imageNodes = importedNodes.filter(node => node.docType === 'image');
+            const targetNode = imageNodes[imageNodes.length - 1] ?? importedNodes[importedNodes.length - 1];
+            if (targetNode) {
+                const nodeForReveal = { id: targetNode.nodeId, type: 'document' as const, parentId: targetNode.parentId };
+                setActiveNodeId(targetNode.nodeId);
+                setSelectedIds(new Set([targetNode.nodeId]));
+                setLastClickedId(targetNode.nodeId);
+                setActiveTemplateId(null);
+                setDocumentView('editor');
+                setView('editor');
+                ensureNodeVisibleRef.current?.(nodeForReveal);
+            }
+        }
+    }, [addDocumentsFromFiles, setActiveNodeId, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
 
     useEffect(() => {
         const handleDragEnter = (e: DragEvent) => {
@@ -446,6 +462,10 @@ const MainApp: React.FC = () => {
         });
         setPendingRevealId(node.id);
     }, [items, setPendingRevealId]);
+
+    useEffect(() => {
+        ensureNodeVisibleRef.current = ensureNodeVisible;
+    }, [ensureNodeVisible]);
 
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document.');

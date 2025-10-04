@@ -53,7 +53,16 @@ const PREVIEWABLE_LANGUAGES = new Set<string>([
 const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint: string | null | undefined): ViewMode => {
   if (mode) return mode;
   const normalizedHint = languageHint?.toLowerCase();
-  return normalizedHint === 'pdf' || normalizedHint === 'application/pdf' ? 'preview' : 'edit';
+  if (!normalizedHint) {
+    return 'edit';
+  }
+  if (normalizedHint === 'pdf' || normalizedHint === 'application/pdf') {
+    return 'preview';
+  }
+  if (normalizedHint === 'image' || normalizedHint.startsWith('image/')) {
+    return 'preview';
+  }
+  return 'edit';
 };
 
 const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange, onViewModeChange, formatTrigger }) => {

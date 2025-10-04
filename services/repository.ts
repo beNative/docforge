@@ -1,4 +1,15 @@
-import type { Node, Document, DocVersion, DocumentOrFolder, DocumentVersion, DocumentTemplate, Settings, ContentStore, ViewMode } from '../types';
+import type {
+  Node,
+  Document,
+  DocVersion,
+  DocumentOrFolder,
+  DocumentVersion,
+  DocumentTemplate,
+  Settings,
+  ContentStore,
+  ViewMode,
+  ImportedNodeSummary,
+} from '../types';
 import { cryptoService } from './cryptoService';
 import { DEFAULT_SETTINGS, EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
@@ -999,7 +1010,7 @@ export const repository = {
         }
     },
 
-    async importFiles(filesData: {path: string, name: string, content: string}[], targetParentId: string | null) {
+    async importFiles(filesData: {path: string, name: string, content: string}[], targetParentId: string | null): Promise<ImportedNodeSummary[]> {
         if (!window.electronAPI?.dbImportFiles) {
             throw new Error("File import is not supported in this environment.");
         }
@@ -1007,6 +1018,7 @@ export const repository = {
         if (!result.success) {
             throw new Error(result.error || 'Failed to import files in main process.');
         }
+        return result.createdNodes ?? [];
     },
 
     async getDbPath(): Promise<string> {

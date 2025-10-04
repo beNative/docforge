@@ -6,7 +6,7 @@ import { INITIAL_SCHEMA } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 // Fix: Import types to use for casting
-import type { Node, Document, DocVersion, DatabaseStats } from '../types';
+import type { Node, Document, DocVersion, DatabaseStats, DocType, ViewMode, ImportedNodeSummary } from '../types';
 
 let db: Database.Database;
 
@@ -43,6 +43,23 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
         case 'application/pdf':
         case 'pdf':
             return 'pdf';
+        case 'png':
+        case 'jpg':
+        case 'jpeg':
+        case 'gif':
+        case 'bmp':
+        case 'webp':
+        case 'svg':
+        case 'svgz':
+        case 'image/png':
+        case 'image/jpg':
+        case 'image/jpeg':
+        case 'image/gif':
+        case 'image/bmp':
+        case 'image/webp':
+        case 'image/svg':
+        case 'image/svg+xml':
+            return 'image';
         default: return 'plaintext';
     }
 };
@@ -409,7 +426,8 @@ export const databaseService = {
     }
   },
 
-  importFiles(filesData: {path: string, name: string, content: string}[], targetParentId: string | null): { success: boolean, error?: string } {
+  importFiles(filesData: {path: string; name: string; content: string}[], targetParentId: string | null): { success: boolean; error?: string; createdNodes: ImportedNodeSummary[] } {
+    const createdNodes: ImportedNodeSummary[] = [];
     const transaction = db.transaction(() => {
         console.log(`Starting import transaction for ${filesData.length} files.`);
         const knownFolderPaths = new Map<string, string>(); // 'parentId/folderName' -> 'node_id'
@@ -461,15 +479,23 @@ export const databaseService = {
             const extension = file.name.split('.').pop() || null;
             let languageHint = mapExtensionToLanguageId_local(extension);
 
-            db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, 'document', ?, ?, ?, ?)`).run(newNodeId, currentParentId, file.name, sortOrder, now, now);
-
             const trimmedContent = file.content.trim();
-            const isPdf = languageHint === 'pdf' || languageHint === 'application/pdf' || trimmedContent.startsWith('data:application/pdf');
+            const sample = trimmedContent.slice(0, 64).toLowerCase();
+            const isPdf = languageHint === 'pdf' || sample.startsWith('data:application/pdf');
+            const isSvgContent = sample.startsWith('<svg');
+            const isImageDataUrl = sample.startsWith('data:image/');
+            const isImage = languageHint === 'image' || isImageDataUrl || isSvgContent;
+
             if (isPdf) {
                 languageHint = 'pdf';
+            } else if (isImage) {
+                languageHint = 'image';
             }
-            const docType = isPdf ? 'pdf' : 'source_code';
-            const defaultViewMode = isPdf ? 'preview' : null;
+
+            const docType: DocType = isPdf ? 'pdf' : isImage ? 'image' : 'source_code';
+            const defaultViewMode: ViewMode | null = docType === 'pdf' || docType === 'image' ? 'preview' : null;
+
+            db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, 'document', ?, ?, ?, ?)`).run(newNodeId, currentParentId, file.name, sortOrder, now, now);
 
             const docResult = db.prepare(`INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode) VALUES (?, ?, ?, ?)`)
               .run(newNodeId, docType, languageHint, defaultViewMode);
@@ -480,15 +506,23 @@ export const databaseService = {
             const newVersionId = Number(versionResult.lastInsertRowid);
             db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?').run(newVersionId, documentId);
             console.log(`Created document "${file.name}" with node id ${newNodeId}`);
+
+            createdNodes.push({
+                nodeId: newNodeId,
+                parentId: currentParentId ?? null,
+                docType,
+                languageHint,
+                defaultViewMode,
+            });
         }
     });
 
     try {
         transaction();
-        return { success: true };
+        return { success: true, createdNodes };
     } catch (error) {
         console.error('File import transaction failed:', error);
-        return { success: false, error: error instanceof Error ? error.message : String(error) };
+        return { success: false, error: error instanceof Error ? error.message : String(error), createdNodes: [] };
     }
   },
 

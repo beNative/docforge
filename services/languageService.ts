@@ -88,6 +88,7 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
         case 'bmp':
         case 'webp':
         case 'svg':
+        case 'svgz':
             return 'image';
         case 'image/png':
         case 'image/jpg':

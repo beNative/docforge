@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Node, ViewMode } from '../types';
+import type { Node, ViewMode, ImportedNodeSummary } from '../types';
 import { repository } from '../services/repository';
 import { useLogger } from './useLogger';
 
@@ -68,9 +68,15 @@ export const useNodes = () => {
       addLog('DEBUG', `Content for node ${nodeId} saved.`);
   }, [addLog]);
 
-  const importFiles = useCallback(async (filesData: {path: string, name: string, content: string}[], targetParentId: string | null) => {
-    await repository.importFiles(filesData, targetParentId);
-  }, []);
+  const importFiles = useCallback(
+    async (
+      filesData: { path: string; name: string; content: string }[],
+      targetParentId: string | null
+    ): Promise<ImportedNodeSummary[]> => {
+      return repository.importFiles(filesData, targetParentId);
+    },
+    []
+  );
 
   return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, addLog };
 };
