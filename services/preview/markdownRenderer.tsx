@@ -50,6 +50,11 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
         return;
       }
 
+      const mermaidWithParse = mermaid as typeof mermaid & {
+        parseError?: (err: unknown, hash?: unknown) => void;
+      };
+      const previousParseError = mermaidWithParse.parseError;
+
       try {
         setError(null);
         mermaid.initialize({
@@ -57,6 +62,9 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
           securityLevel: 'loose',
           theme: theme === 'dark' ? 'dark' : 'default',
         });
+        mermaidWithParse.parseError = (err: unknown, _hash?: unknown) => {
+          throw err instanceof Error ? err : new Error(String(err));
+        };
         const { svg } = await mermaid.render(renderIdRef.current, trimmed);
         if (!cancelled) {
           target.innerHTML = svg;
@@ -70,6 +78,12 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
           console.error('[MermaidDiagram] Failed to render diagram', err);
           setError('Unable to render the Mermaid diagram. Please verify the diagram syntax.');
           setErrorDetails(details);
+        }
+      } finally {
+        if (previousParseError) {
+          mermaidWithParse.parseError = previousParseError;
+        } else {
+          delete mermaidWithParse.parseError;
         }
       }
     };
