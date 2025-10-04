@@ -189,7 +189,6 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   }
 
   const safeIndent = Math.max(indentPerLevel, 0);
-  const paddingLeft = level > 0 ? level * safeIndent : 0;
   const paddingTopBottom = Math.max(verticalSpacing, 0);
 
   return (
@@ -201,7 +200,6 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onContextMenu={handleContextMenu}
-      style={{ paddingLeft: `${paddingLeft}px` }}
       className="relative"
       data-item-id={node.id}
     >
@@ -270,7 +268,10 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         {dropPosition === 'inside' && <div className="absolute inset-0 border-2 border-primary rounded-md pointer-events-none bg-primary/10" />}
 
         {isFolder && isExpanded && (
-            <ul className="m-0 pl-0 list-none space-y-0">
+            <ul
+                className="m-0 pl-0 list-none space-y-0"
+                style={{ marginLeft: `${safeIndent}px` }}
+            >
                 {node.children.map((childNode, index) => (
                     <DocumentTreeItem
                         key={childNode.id}
