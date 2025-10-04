@@ -119,7 +119,16 @@ export const useDocuments = () => {
         const reader = new FileReader();
         reader.onload = () => resolve({ path: entry.path, name: entry.name, content: reader.result as string });
         reader.onerror = (error) => reject(error);
-        reader.readAsText(entry.file);
+
+        const fileName = entry.name.toLowerCase();
+        const mimeType = entry.file.type;
+        const shouldReadAsDataUrl = (mimeType && mimeType.includes('pdf')) || fileName.endsWith('.pdf');
+
+        if (shouldReadAsDataUrl) {
+          reader.readAsDataURL(entry.file);
+        } else {
+          reader.readAsText(entry.file);
+        }
       });
     });
 
