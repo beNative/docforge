@@ -26,6 +26,30 @@ interface MermaidDiagramProps {
   theme: 'light' | 'dark';
 }
 
+const ensureMermaidParseErrorHandler = (() => {
+  let configured = false;
+
+  return () => {
+    if (configured) {
+      return;
+    }
+
+    const handler = (error: unknown) => {
+      throw error instanceof Error
+        ? error
+        : new Error(typeof error === 'string' ? error : 'Unknown Mermaid parse error');
+    };
+
+    if (typeof mermaid.setParseErrorHandler === 'function') {
+      mermaid.setParseErrorHandler(handler as (err: any, hash: any) => void);
+    } else {
+      (mermaid as unknown as { parseError?: (err: unknown, hash?: unknown) => void }).parseError = handler;
+    }
+
+    configured = true;
+  };
+})();
+
 const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,17 +76,23 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
 
       try {
         setError(null);
+
+        ensureMermaidParseErrorHandler();
+
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'loose',
           theme: theme === 'dark' ? 'dark' : 'default',
         });
+
         const { svg } = await mermaid.render(renderIdRef.current, trimmed);
+
         if (!cancelled) {
           target.innerHTML = svg;
           setError(null);
           setErrorDetails(null);
         }
+
       } catch (err) {
         if (!cancelled) {
           target.innerHTML = '';
