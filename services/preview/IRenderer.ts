@@ -10,5 +10,9 @@ export interface IRenderer {
   /**
    * Takes a string of content and transforms it into a renderable React element or HTML string.
    */
-  render(content: string, addLog?: (level: LogLevel, message: string) => void): Promise<{ output: React.ReactElement | string; error?: string }>;
+  render(
+    content: string,
+    addLog?: (level: LogLevel, message: string) => void,
+    languageId?: string | null,
+  ): Promise<{ output: React.ReactElement | string; error?: string }>;
 }

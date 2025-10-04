@@ -3,6 +3,7 @@ import { HtmlRenderer } from './preview/htmlRenderer';
 import { MarkdownRenderer } from './preview/markdownRenderer';
 import { PlaintextRenderer } from './preview/plaintextRenderer';
 import { PdfRenderer } from './preview/pdfRenderer';
+import { ImageRenderer } from './preview/imageRenderer';
 
 class PreviewService {
   private renderers: IRenderer[];
@@ -13,6 +14,7 @@ class PreviewService {
       new MarkdownRenderer(),
       new HtmlRenderer(),
       new PdfRenderer(),
+      new ImageRenderer(),
       new PlaintextRenderer(), // Fallback renderer should be last
     ];
   }

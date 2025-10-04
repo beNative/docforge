@@ -691,7 +691,11 @@ export class MarkdownRenderer implements IRenderer {
     return languageId === 'markdown';
   }
 
-  async render(content: string, addLog?: (level: LogLevel, message: string) => void): Promise<{ output: React.ReactElement; error?: string }> {
+  async render(
+    content: string,
+    addLog?: (level: LogLevel, message: string) => void,
+    languageId?: string | null,
+  ): Promise<{ output: React.ReactElement; error?: string }> {
     try {
       return { output: <MarkdownViewer content={content} /> };
     } catch (e) {

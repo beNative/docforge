@@ -7,7 +7,11 @@ export class HtmlRenderer implements IRenderer {
     return languageId === 'html';
   }
 
-  async render(content: string, addLog?: (level: LogLevel, message: string) => void): Promise<{ output: React.ReactElement; error?: string }> {
+  async render(
+    content: string,
+    addLog?: (level: LogLevel, message: string) => void,
+    languageId?: string | null,
+  ): Promise<{ output: React.ReactElement; error?: string }> {
     // Using `color-scheme` allows the iframe content to respect the system's light/dark mode preference.
     const fullHtml = `<html><head><style>body { color-scheme: light dark; font-family: sans-serif; padding: 1rem; }</style></head><body>${content}</body></html>`;
 

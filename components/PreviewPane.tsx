@@ -28,7 +28,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
 
       setError(null);
       const renderer = previewService.getRendererForLanguage(language);
-      const result = await renderer.render(content, addLog);
+      const result = await renderer.render(content, addLog, language);
 
       clearTimeout(loadingTimer);
       if (!isCancelled) {

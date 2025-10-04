@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import type { IRenderer } from './IRenderer';
+import type { LogLevel } from '../../types';
 
 interface PdfPreviewProps extends React.HTMLAttributes<HTMLDivElement> {
   content: string;
@@ -100,7 +101,7 @@ export class PdfRenderer implements IRenderer {
     return languageId === 'pdf' || languageId === 'application/pdf';
   }
 
-  async render(content: string) {
+  async render(content: string, addLog?: (level: LogLevel, message: string) => void, languageId?: string | null) {
     return { output: <PdfPreview content={content} /> };
   }
 }

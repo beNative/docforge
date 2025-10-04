@@ -26,6 +26,30 @@ interface DocumentEditorProps {
   formatTrigger: number;
 }
 
+const PREVIEWABLE_LANGUAGES = new Set<string>([
+  'markdown',
+  'html',
+  'pdf',
+  'application/pdf',
+  'image',
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'bmp',
+  'webp',
+  'svg',
+  'svg+xml',
+  'image/png',
+  'image/jpg',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'image/bmp',
+  'image/svg',
+  'image/svg+xml',
+]);
+
 const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint: string | null | undefined): ViewMode => {
   if (mode) return mode;
   const normalizedHint = languageHint?.toLowerCase();
@@ -357,7 +381,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     }
     setRefinedContent(null);
   };
-  
+
   const handleCopy = async () => {
     if (!content.trim()) return;
     await navigator.clipboard.writeText(content);
@@ -367,10 +391,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   };
 
   const language = documentNode.language_hint || 'plaintext';
-  const supportsAiTools = ['markdown', 'plaintext'].includes(language);
-  const supportsPreview = ['markdown', 'html', 'pdf'].includes(language);
-  const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(language);
-  const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (language === 'python');
+  const normalizedLanguage = language.toLowerCase();
+  const supportsAiTools = ['markdown', 'plaintext'].includes(normalizedLanguage);
+  const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
+  const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
   const pythonDefaults = useMemo(() => ({
     ...settings.pythonDefaults,
     workingDirectory: settings.pythonWorkingDirectory ?? settings.pythonDefaults.workingDirectory ?? null,
