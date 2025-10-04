@@ -1136,6 +1136,8 @@ const MainApp: React.FC = () => {
                                         onRenameTemplate={handleRenameTemplate}
                                         onNewTemplate={handleNewTemplate}
                                         onNewFromTemplate={() => setCreateFromTemplateOpen(true)}
+                                        documentTreeIndent={settings.documentTreeIndent}
+                                        documentTreeVerticalSpacing={settings.documentTreeVerticalSpacing}
                                     />
                                 </aside>
                                 <div 

@@ -248,6 +248,8 @@ export interface Settings {
   autoSaveLogs: boolean;
   allowPrerelease: boolean;
   uiScale: number;
+  documentTreeIndent: number;
+  documentTreeVerticalSpacing: number;
   customShortcuts: Record<string, string[]>;
   markdownFontSize: number;
   markdownLineHeight: number;
