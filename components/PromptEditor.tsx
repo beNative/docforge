@@ -29,6 +29,9 @@ interface DocumentEditorProps {
 const PREVIEWABLE_LANGUAGES = new Set<string>([
   'markdown',
   'html',
+  'plantuml',
+  'puml',
+  'uml',
   'pdf',
   'application/pdf',
   'image',
@@ -60,6 +63,9 @@ const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint:
     return 'preview';
   }
   if (normalizedHint === 'image' || normalizedHint.startsWith('image/')) {
+    return 'preview';
+  }
+  if (normalizedHint === 'plantuml' || normalizedHint === 'puml' || normalizedHint === 'uml') {
     return 'preview';
   }
   return 'edit';

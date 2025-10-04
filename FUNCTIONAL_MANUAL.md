@@ -150,6 +150,8 @@ The **General** settings category includes a **PlantUML Rendering** selector. Ch
 
 If the Java runtime is unavailable, DocForge will report the error in the preview and you can switch back to remote rendering at any time.
 
+The chosen rendering mode is used for PlantUML code blocks inside Markdown documents *and* for standalone `.puml` documents rendered through the dedicated PlantUML previewer.
+
 ### Logger Panel
 
 Accessed via the terminal icon in the title bar, this panel is your primary tool for debugging and monitoring application activity.

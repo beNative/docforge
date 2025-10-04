@@ -34,7 +34,7 @@ const buildOrWatch = async (name, config) => {
         platform: 'node',
         entryPoints: ['electron/main.ts'],
         outfile: 'dist/main.js',
-        external: ['electron', 'better-sqlite3'],
+        external: ['electron', 'better-sqlite3', 'node-plantuml'],
       }),
       buildOrWatch('preload', {
         ...sharedConfig,

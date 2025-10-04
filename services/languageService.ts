@@ -9,6 +9,7 @@ export const SUPPORTED_LANGUAGES = [
     { id: 'css', label: 'CSS' },
     { id: 'json', label: 'JSON' },
     { id: 'markdown', label: 'Markdown' },
+    { id: 'plantuml', label: 'PlantUML' },
     { id: 'java', label: 'Java' },
     { id: 'csharp', label: 'C#' },
     { id: 'cpp', label: 'C++' },
@@ -46,6 +47,9 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
         case 'md':
         case 'markdown':
             return 'markdown';
+        case 'puml':
+        case 'plantuml':
+            return 'plantuml';
         case 'java':
             return 'java';
         case 'cs':
