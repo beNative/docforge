@@ -190,6 +190,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
 
   const safeIndent = Math.max(indentPerLevel, 0);
   const paddingTopBottom = Math.max(verticalSpacing, 0);
+  const basePaddingLeft = 4; // matches Tailwind px-1 for consistent baseline spacing
+  const rowPaddingLeft = basePaddingLeft + Math.max(level, 0) * safeIndent;
 
   return (
     <li
@@ -206,8 +208,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         <div
             onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
             onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
-            style={{ paddingTop: `${paddingTopBottom}px`, paddingBottom: `${paddingTopBottom}px` }}
-            className={`w-full text-left px-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
+            style={{ paddingTop: `${paddingTopBottom}px`, paddingBottom: `${paddingTopBottom}px`, paddingLeft: `${rowPaddingLeft}px` }}
+            className={`w-full text-left pr-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
                 isSelected ? 'bg-tree-selected text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
             } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
         >
@@ -270,7 +272,6 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         {isFolder && isExpanded && (
             <ul
                 className="m-0 pl-0 list-none space-y-0"
-                style={{ marginLeft: `${safeIndent}px` }}
             >
                 {node.children.map((childNode, index) => (
                     <DocumentTreeItem
