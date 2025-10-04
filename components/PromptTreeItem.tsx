@@ -289,7 +289,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
 
         {!isFolder && searchTerm.trim() && node.searchSnippet && (
             <div
-                className="text-[11px] text-text-secondary leading-snug truncate pr-3"
+                className="text-[11px] text-text-secondary leading-snug whitespace-pre-wrap break-words pr-3"
                 style={{ paddingLeft: `${snippetPaddingLeft}px` }}
             >
                 {highlightMatches(node.searchSnippet, searchTerm)}
