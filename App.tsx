@@ -120,6 +120,7 @@ const MainApp: React.FC = () => {
     const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; position: { x: number, y: number }, items: MenuItem[] }>({ isOpen: false, position: { x: 0, y: 0 }, items: [] });
     const [isDraggingFile, setIsDraggingFile] = useState(false);
     const [formatTrigger, setFormatTrigger] = useState(0);
+    const [bodySearchMatches, setBodySearchMatches] = useState<Map<string, string>>(new Map());
 
 
     const isSidebarResizing = useRef(false);
@@ -171,9 +172,20 @@ const MainApp: React.FC = () => {
     }, [theme, settings.markdownCodeBlockBackgroundLight, settings.markdownCodeBlockBackgroundDark, settingsLoaded]);
 
 
+    const itemsWithSearchMetadata = useMemo(() => {
+        const trimmed = searchTerm.trim();
+        if (!trimmed || bodySearchMatches.size === 0) {
+            return items;
+        }
+        return items.map(item => {
+            const snippet = bodySearchMatches.get(item.id);
+            return snippet ? { ...item, searchSnippet: snippet } : item;
+        });
+    }, [items, bodySearchMatches, searchTerm]);
+
     const activeNode = useMemo(() => {
-        return items.find(p => p.id === activeNodeId) || null;
-    }, [items, activeNodeId]);
+        return itemsWithSearchMetadata.find(p => p.id === activeNodeId) || null;
+    }, [itemsWithSearchMetadata, activeNodeId]);
 
     const activeTemplate = useMemo(() => {
         return templates.find(t => t.template_id === activeTemplateId) || null;
@@ -184,35 +196,71 @@ const MainApp: React.FC = () => {
     }, [activeNode]);
 
 
+    useEffect(() => {
+        const term = searchTerm.trim();
+        if (!term) {
+            setBodySearchMatches(new Map());
+            return;
+        }
+
+        let isCancelled = false;
+
+        repository.searchDocumentsByBody(term, 200)
+            .then(results => {
+                if (!isCancelled) {
+                    setBodySearchMatches(new Map(results.map(result => [result.nodeId, result.snippet])));
+                }
+            })
+            .catch(error => {
+                if (!isCancelled) {
+                    console.error('Failed to search document bodies:', error);
+                    setBodySearchMatches(new Map());
+                }
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [searchTerm]);
+
     const { documentTree, navigableItems } = useMemo(() => {
-        let itemsToBuildFrom = items;
+        let itemsToBuildFrom = itemsWithSearchMetadata;
         if (searchTerm.trim()) {
             const lowerCaseSearchTerm = searchTerm.toLowerCase();
             const visibleIds = new Set<string>();
-            const originalItemsById: Map<string, DocumentOrFolder> = new Map(items.map(i => [i.id, i]));
+            const originalItemsById: Map<string, DocumentOrFolder> = new Map(itemsWithSearchMetadata.map(i => [i.id, i]));
             const getAncestors = (itemId: string) => {
                 let current = originalItemsById.get(itemId);
                 while (current && current.parentId) {
-                visibleIds.add(current.parentId);
-                current = originalItemsById.get(current.parentId);
+                    visibleIds.add(current.parentId);
+                    current = originalItemsById.get(current.parentId);
                 }
             };
             const getDescendantIdsRecursive = (itemId: string): Set<string> => {
                 const descendantIds = new Set<string>();
                 const findChildren = (parentId: string) => {
-                    items.forEach(p => { if (p.parentId === parentId) { descendantIds.add(p.id); if (p.type === 'folder') findChildren(p.id); } });
+                    itemsWithSearchMetadata.forEach(p => {
+                        if (p.parentId === parentId) {
+                            descendantIds.add(p.id);
+                            if (p.type === 'folder') findChildren(p.id);
+                        }
+                    });
                 };
                 findChildren(itemId);
                 return descendantIds;
             };
-            items.forEach(item => {
-                if (item.title.toLowerCase().includes(lowerCaseSearchTerm)) {
+            itemsWithSearchMetadata.forEach(item => {
+                const titleMatch = item.title.toLowerCase().includes(lowerCaseSearchTerm);
+                const bodyMatch = Boolean(item.searchSnippet);
+                if (titleMatch || bodyMatch) {
                     visibleIds.add(item.id);
                     getAncestors(item.id);
-                    if (item.type === 'folder') getDescendantIdsRecursive(item.id).forEach(id => visibleIds.add(id));
+                    if (titleMatch && item.type === 'folder') {
+                        getDescendantIdsRecursive(item.id).forEach(id => visibleIds.add(id));
+                    }
                 }
             });
-            itemsToBuildFrom = items.filter(item => visibleIds.has(item.id));
+            itemsToBuildFrom = itemsWithSearchMetadata.filter(item => visibleIds.has(item.id));
         }
         const itemsById = new Map<string, DocumentNode>(itemsToBuildFrom.map(p => [p.id, { ...p, children: [] }]));
         const rootNodes: DocumentNode[] = [];
@@ -224,27 +272,27 @@ const MainApp: React.FC = () => {
                 rootNodes.push(node);
             }
         }
-        
+
         const finalTree = rootNodes;
 
-        const displayExpandedIds = searchTerm.trim() 
-            ? new Set(itemsToBuildFrom.filter(i => i.type === 'folder').map(i => i.id)) 
+        const displayExpandedIds = searchTerm.trim()
+            ? new Set(itemsToBuildFrom.filter(i => i.type === 'folder').map(i => i.id))
             : expandedFolderIds;
 
         const flatList: NavigableItem[] = [];
         const flatten = (nodes: DocumentNode[]) => {
-        for (const node of nodes) {
-            flatList.push({ id: node.id, type: node.type, parentId: node.parentId });
-            if (node.type === 'folder' && displayExpandedIds.has(node.id)) {
-            flatten(node.children);
+            for (const node of nodes) {
+                flatList.push({ id: node.id, type: node.type, parentId: node.parentId });
+                if (node.type === 'folder' && displayExpandedIds.has(node.id)) {
+                    flatten(node.children);
+                }
             }
-        }
         };
         flatten(finalTree);
         templates.forEach(t => flatList.push({ id: t.template_id, type: 'template', parentId: null }));
 
         return { documentTree: finalTree, navigableItems: flatList };
-    }, [items, templates, searchTerm, expandedFolderIds]);
+    }, [itemsWithSearchMetadata, templates, searchTerm, expandedFolderIds]);
 
     useEffect(() => {
         if (window.electronAPI?.getAppVersion) {
@@ -1100,8 +1148,8 @@ const MainApp: React.FC = () => {
                                     style={{ width: `${sidebarWidth}px` }} 
                                     className="bg-secondary border-r border-border-color flex flex-col flex-shrink-0"
                                 >
-                                    <Sidebar 
-                                        documents={items}
+                                    <Sidebar
+                                        documents={itemsWithSearchMetadata}
                                         documentTree={documentTree}
                                         navigableItems={navigableItems}
                                         selectedIds={selectedIds}

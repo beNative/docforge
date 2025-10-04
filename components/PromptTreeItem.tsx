@@ -57,6 +57,27 @@ const getDropPosition = (
   }
 };
 
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const highlightMatches = (text: string, term: string): React.ReactNode => {
+  if (!term.trim()) {
+    return text;
+  }
+  const escaped = escapeRegExp(term.trim());
+  const regex = new RegExp(`(${escaped})`, 'ig');
+  const parts = text.split(regex);
+  return parts.map((part, index) => {
+    if (index % 2 === 1) {
+      return (
+        <span key={index} className="bg-primary/20 text-text-main rounded-sm px-0.5">
+          {part}
+        </span>
+      );
+    }
+    return <React.Fragment key={index}>{part}</React.Fragment>;
+  });
+};
+
 
 const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const {
@@ -80,7 +101,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     renamingNodeId,
     onRenameComplete,
     indentPerLevel,
-    verticalSpacing
+    verticalSpacing,
+    searchTerm,
   } = props;
   
   const [isRenaming, setIsRenaming] = useState(false);
@@ -192,6 +214,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const paddingTopBottom = Math.max(verticalSpacing, 0);
   const basePaddingLeft = 4; // matches Tailwind px-1 for consistent baseline spacing
   const rowPaddingLeft = basePaddingLeft + Math.max(level, 0) * safeIndent;
+  const snippetPaddingLeft = rowPaddingLeft + 28;
 
   return (
     <li
@@ -240,7 +263,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                 ) : (
-                    <span className="truncate flex-1 px-1">{node.title}</span>
+                    <span className="truncate flex-1 px-1">{highlightMatches(node.title, searchTerm)}</span>
                 )}
             </div>
 
@@ -263,7 +286,16 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                 </div>
             )}
         </div>
-        
+
+        {!isFolder && searchTerm.trim() && node.searchSnippet && (
+            <div
+                className="text-[11px] text-text-secondary leading-snug truncate pr-3"
+                style={{ paddingLeft: `${snippetPaddingLeft}px` }}
+            >
+                {highlightMatches(node.searchSnippet, searchTerm)}
+            </div>
+        )}
+
         {dropPosition && <div className={`absolute left-0 right-0 h-0.5 bg-primary pointer-events-none ${
             dropPosition === 'before' ? 'top-0' : dropPosition === 'after' ? 'bottom-0' : ''
         }`} />}

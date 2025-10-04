@@ -196,6 +196,43 @@ const mapNodeTree = (nodes: Node[], mapper: (node: Node) => void) => {
     }
 };
 
+const escapeForLikePattern = (value: string): string => value.replace(/([\\%_])/g, '\\$1');
+
+const createSnippetFromContent = (content: string, term: string, snippetLength: number = 160): string => {
+    const normalizedContent = content.replace(/\s+/g, ' ').trim();
+    if (!normalizedContent) {
+        return '';
+    }
+
+    const lowerContent = normalizedContent.toLowerCase();
+    const lowerTerm = term.toLowerCase();
+    const matchIndex = lowerContent.indexOf(lowerTerm);
+
+    if (matchIndex === -1) {
+        if (normalizedContent.length <= snippetLength) {
+            return normalizedContent;
+        }
+        return `${normalizedContent.slice(0, snippetLength).trim()}…`;
+    }
+
+    const halfWindow = Math.max(0, Math.floor((snippetLength - lowerTerm.length) / 2));
+    let start = Math.max(0, matchIndex - halfWindow);
+    let end = Math.min(normalizedContent.length, matchIndex + lowerTerm.length + halfWindow);
+
+    if (end - start > snippetLength) {
+        end = start + snippetLength;
+    }
+
+    let snippet = normalizedContent.slice(start, end).trim();
+    if (start > 0) {
+        snippet = `…${snippet}`;
+    }
+    if (end < normalizedContent.length) {
+        snippet = `${snippet}…`;
+    }
+    return snippet;
+};
+
 const duplicateNodeRecursive = (state: BrowserState, node: Node, newParentId: string | null, sortOrder: number): Node => {
     const now = new Date().toISOString();
     const clonedNode: Node = {
@@ -482,6 +519,65 @@ export const repository = {
             }
         }
         return rootNodes;
+    },
+
+    async searchDocumentsByBody(searchTerm: string, limit: number = 50): Promise<{ nodeId: string; snippet: string }[]> {
+        const term = searchTerm.trim();
+        if (!term) {
+            return [];
+        }
+
+        if (limit <= 0) {
+            return [];
+        }
+
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const lowerTerm = term.toLowerCase();
+            const results: { nodeId: string; snippet: string }[] = [];
+            mapNodeTree(state.nodes, node => {
+                if (node.node_type !== 'document' || !node.document?.content) {
+                    return;
+                }
+                const content = node.document.content;
+                if (content.toLowerCase().includes(lowerTerm)) {
+                    results.push({
+                        nodeId: node.node_id,
+                        snippet: createSnippetFromContent(content, term),
+                    });
+                }
+            });
+            return results.slice(0, Math.max(limit, 0));
+        }
+
+        if (!window.electronAPI) {
+            return [];
+        }
+
+        const lowerTerm = term.toLowerCase();
+        const pattern = `%${escapeForLikePattern(lowerTerm)}%`;
+        const maxResults = Math.max(limit, 0) || 50;
+
+        const rows = await window.electronAPI.dbQuery(
+            `
+            SELECT d.node_id as node_id, cs.text_content as content
+            FROM documents d
+            JOIN doc_versions dv ON d.current_version_id = dv.version_id
+            JOIN content_store cs ON dv.content_id = cs.content_id
+            WHERE cs.text_content IS NOT NULL
+              AND cs.text_content != ''
+              AND LOWER(cs.text_content) LIKE ? ESCAPE '\\'
+            LIMIT ?
+        `,
+            [pattern, maxResults],
+        );
+
+        return rows
+            .filter(row => typeof row.content === 'string' && row.content.length > 0)
+            .map(row => ({
+                nodeId: row.node_id,
+                snippet: createSnippetFromContent(row.content, term),
+            }));
     },
 
     async addNode(nodeData: Omit<Node, 'node_id' | 'sort_order' | 'created_at' | 'updated_at'>): Promise<Node> {
