@@ -374,7 +374,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             ))}
           </ul>
         </nav>
-        <main ref={mainPanelRef} className="flex-1 overflow-y-auto">
+        <main ref={mainPanelRef} className="flex-1 overflow-y-auto bg-secondary">
           <div className="max-w-4xl mx-auto px-8 divide-y divide-border-color/50">
             <ProviderSettingsSection
               {...{
