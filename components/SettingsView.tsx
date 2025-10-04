@@ -593,7 +593,7 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                             id="documentTreeVerticalSpacing"
                             type="range"
                             min="0"
-                            max="12"
+                            max="16"
                             step="1"
                             value={settings.documentTreeVerticalSpacing}
                             onChange={(e) => setCurrentSettings(prev => ({ ...prev, documentTreeVerticalSpacing: Number(e.target.value) }))}
@@ -607,8 +607,8 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <input
                             id="documentTreeIndent"
                             type="range"
-                            min="8"
-                            max="40"
+                            min="0"
+                            max="32"
                             step="1"
                             value={settings.documentTreeIndent}
                             onChange={(e) => setCurrentSettings(prev => ({ ...prev, documentTreeIndent: Number(e.target.value) }))}

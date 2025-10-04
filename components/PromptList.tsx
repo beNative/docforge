@@ -116,7 +116,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
         onDragLeave={handleRootDragLeave}
         onContextMenu={handleRootContextMenu}
     >
-        <ul className="space-y-0 p-1">
+        <ul className="space-y-0 p-1 m-0 list-none">
         {tree.map((node, index) => (
             <DocumentTreeItem
                 key={node.id}

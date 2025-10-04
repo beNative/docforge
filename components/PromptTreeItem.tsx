@@ -270,7 +270,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         {dropPosition === 'inside' && <div className="absolute inset-0 border-2 border-primary rounded-md pointer-events-none bg-primary/10" />}
 
         {isFolder && isExpanded && (
-            <ul>
+            <ul className="m-0 pl-0 list-none space-y-0">
                 {node.children.map((childNode, index) => (
                     <DocumentTreeItem
                         key={childNode.id}
