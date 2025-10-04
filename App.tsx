@@ -18,6 +18,7 @@ import InfoView from './components/InfoView';
 import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
+import FolderOverview, { FolderOverviewMetrics } from './components/FolderOverview';
 import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
@@ -295,6 +296,151 @@ const MainApp: React.FC = () => {
         return { documentTree: finalTree, navigableItems: flatList };
     }, [itemsWithSearchMetadata, templates, searchTerm, expandedFolderIds]);
 
+    const activeFolderMetrics = useMemo<FolderOverviewMetrics | null>(() => {
+        if (!activeNode || activeNode.type !== 'folder') {
+            return null;
+        }
+
+        const parseDate = (value?: string | null): Date | null => {
+            if (!value) return null;
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? null : date;
+        };
+
+        const computeFromTree = (folderNode: DocumentNode): FolderOverviewMetrics => {
+            const recordLatest = (() => {
+                let latest: Date | null = null;
+                return {
+                    update(value?: string | null) {
+                        const parsed = parseDate(value);
+                        if (parsed && (!latest || parsed > latest)) {
+                            latest = parsed;
+                        }
+                    },
+                    getValue() {
+                        return latest;
+                    },
+                };
+            })();
+
+            recordLatest.update(folderNode.updatedAt);
+
+            const directDocumentCount = folderNode.children.filter(child => child.type === 'document').length;
+            const directFolderCount = folderNode.children.filter(child => child.type === 'folder').length;
+
+            let totalDocumentCount = 0;
+            let totalFolderCount = 0;
+            const stack = [...folderNode.children];
+
+            while (stack.length > 0) {
+                const current = stack.pop()!;
+                recordLatest.update(current.updatedAt);
+                if (current.type === 'document') {
+                    totalDocumentCount += 1;
+                } else if (current.type === 'folder') {
+                    totalFolderCount += 1;
+                    stack.push(...current.children);
+                }
+            }
+
+            const latestDate = recordLatest.getValue();
+
+            return {
+                directDocumentCount,
+                directFolderCount,
+                totalDocumentCount,
+                totalFolderCount,
+                totalItemCount: totalDocumentCount + totalFolderCount,
+                lastUpdated: latestDate ? latestDate.toISOString() : null,
+            };
+        };
+
+        const buildChildMap = () => {
+            const map = new Map<string | null, DocumentOrFolder[]>();
+            for (const item of items) {
+                const key = item.parentId;
+                if (!map.has(key)) {
+                    map.set(key, []);
+                }
+                map.get(key)!.push(item);
+            }
+            return map;
+        };
+
+        const computeFromList = (): FolderOverviewMetrics => {
+            const childMap = buildChildMap();
+            const directChildren = childMap.get(activeNode.id) ?? [];
+
+            const recordLatest = (() => {
+                let latest: Date | null = null;
+                return {
+                    update(value?: string | null) {
+                        const parsed = parseDate(value);
+                        if (parsed && (!latest || parsed > latest)) {
+                            latest = parsed;
+                        }
+                    },
+                    getValue() {
+                        return latest;
+                    },
+                };
+            })();
+
+            recordLatest.update(activeNode.updatedAt);
+
+            const directDocumentCount = directChildren.filter(child => child.type === 'document').length;
+            const directFolderCount = directChildren.filter(child => child.type === 'folder').length;
+
+            let totalDocumentCount = 0;
+            let totalFolderCount = 0;
+            const stack = [...directChildren];
+
+            while (stack.length > 0) {
+                const current = stack.pop()!;
+                recordLatest.update(current.updatedAt);
+                if (current.type === 'document') {
+                    totalDocumentCount += 1;
+                } else {
+                    totalFolderCount += 1;
+                    const childItems = childMap.get(current.id) ?? [];
+                    stack.push(...childItems);
+                }
+            }
+
+            const latestDate = recordLatest.getValue();
+
+            return {
+                directDocumentCount,
+                directFolderCount,
+                totalDocumentCount,
+                totalFolderCount,
+                totalItemCount: totalDocumentCount + totalFolderCount,
+                lastUpdated: latestDate ? latestDate.toISOString() : null,
+            };
+        };
+
+        const findNodeInTree = (nodes: DocumentNode[]): DocumentNode | null => {
+            for (const node of nodes) {
+                if (node.id === activeNode.id) {
+                    return node;
+                }
+                if (node.type === 'folder') {
+                    const match = findNodeInTree(node.children);
+                    if (match) {
+                        return match;
+                    }
+                }
+            }
+            return null;
+        };
+
+        const folderNode = findNodeInTree(documentTree);
+        if (folderNode) {
+            return computeFromTree(folderNode);
+        }
+        return computeFromList();
+    }, [activeNode, documentTree, items]);
+
     useEffect(() => {
         if (window.electronAPI?.getAppVersion) {
             window.electronAPI.getAppVersion().then(setAppVersion);
@@ -389,6 +535,18 @@ const MainApp: React.FC = () => {
             }
         }
     }, [addDocumentsFromFiles, setActiveNodeId, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
+
+    const handleImportFilesIntoFolder = useCallback((files: FileList, parentId: string) => {
+        if (!files || files.length === 0) {
+            return;
+        }
+
+        const targetFolder = items.find(item => item.id === parentId && item.type === 'folder');
+        const folderTitle = targetFolder?.title?.trim() || 'Untitled Folder';
+
+        addLog('INFO', `User action: Import ${files.length} file(s) into folder "${folderTitle}".`);
+        void handleDropFiles(files, parentId);
+    }, [items, addLog, handleDropFiles]);
 
     useEffect(() => {
         const handleDragEnter = (e: DragEvent) => {
@@ -686,6 +844,20 @@ const MainApp: React.FC = () => {
         updateItem(id, { title });
     };
 
+    const handleStartRenamingNode = useCallback((id: string) => {
+        const target = items.find(item => item.id === id) ?? null;
+        if (target) {
+            const trimmedTitle = target.title?.trim();
+            const fallbackTitle = target.type === 'folder' ? 'Untitled Folder' : 'Untitled Document';
+            const displayTitle = trimmedTitle && trimmedTitle.length > 0 ? trimmedTitle : fallbackTitle;
+            addLog('INFO', `User action: Rename ${target.type} "${displayTitle}".`);
+            ensureNodeVisible({ id: target.id, type: target.type, parentId: target.parentId ?? null });
+        } else {
+            addLog('INFO', 'User action: Rename item.');
+        }
+        setRenamingNodeId(id);
+    }, [items, addLog, ensureNodeVisible]);
+
     const handleRenameTemplate = (id: string, title: string) => {
         updateTemplate(id, { title });
     };
@@ -971,7 +1143,7 @@ const MainApp: React.FC = () => {
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Format', icon: FormatIcon, action: handleFormatDocument, disabled: !isFormattable || currentSelection.size !== 1, shortcut: getCommand('format-document')?.shortcutString },
-                { label: 'Rename', icon: PencilIcon, action: () => setRenamingNodeId(nodeId), disabled: currentSelection.size !== 1 },
+                { label: 'Rename', icon: PencilIcon, action: () => handleStartRenamingNode(nodeId), disabled: currentSelection.size !== 1 },
                 { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0, shortcut: getCommand('duplicate-item')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Copy Content', icon: CopyIcon, action: () => hasDocuments && handleCopyNodeContent(selectedNodes.find(n => n.type === 'document')!.id), disabled: !hasDocuments},
@@ -992,7 +1164,7 @@ const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -1128,7 +1300,27 @@ const MainApp: React.FC = () => {
                     />
                 );
             }
-            return <WelcomeScreen onNewDocument={() => handleNewDocument()} />;
+            if (activeNode.type === 'folder') {
+                const fallbackMetrics: FolderOverviewMetrics = {
+                    directDocumentCount: 0,
+                    directFolderCount: 0,
+                    totalDocumentCount: 0,
+                    totalFolderCount: 0,
+                    totalItemCount: 0,
+                    lastUpdated: activeNode.updatedAt,
+                };
+                return (
+                    <FolderOverview
+                        key={activeNode.id}
+                        folder={activeNode}
+                        metrics={activeFolderMetrics ?? fallbackMetrics}
+                        onNewDocument={(parentId) => handleNewDocument(parentId)}
+                        onNewSubfolder={(parentId) => handleNewFolder(parentId)}
+                        onImportFiles={handleImportFilesIntoFolder}
+                        onRenameFolder={handleStartRenamingNode}
+                    />
+                );
+            }
         }
         return <WelcomeScreen onNewDocument={() => handleNewDocument()} />;
     };

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "npm run build:css && node esbuild.config.js --watch & electron .",
     "build": "npm run build:css && node esbuild.config.js && node scripts/prepare-icons.mjs",
+    "dev": "npm run start",
     "package": "npm run build && electron-builder",
     "publish": "npm run build && electron-builder --publish always",
     "prepare:icons": "node scripts/prepare-icons.mjs",
