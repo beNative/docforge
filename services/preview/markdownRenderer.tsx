@@ -26,6 +26,36 @@ interface MermaidDiagramProps {
   theme: 'light' | 'dark';
 }
 
+const ensureSafeMermaidParseError = (() => {
+  let configured = false;
+
+  return () => {
+    if (configured) {
+      return;
+    }
+
+    const mermaidWithParseError = mermaid as unknown as {
+      parseError?: (err: unknown, hash?: unknown) => void;
+    };
+
+    mermaidWithParseError.parseError = (err: unknown, hash?: unknown) => {
+      const details =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'string'
+            ? err
+            : typeof (hash as { message?: string } | undefined)?.message === 'string'
+              ? (hash as { message?: string }).message!
+              : 'Mermaid diagram parsing failed with an unknown error.';
+
+      console.error('[MermaidDiagram] Mermaid parser error', err, hash);
+      throw err instanceof Error ? err : new Error(details);
+    };
+
+    configured = true;
+  };
+})();
+
 const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +81,7 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
       }
 
       try {
+        ensureSafeMermaidParseError();
         setError(null);
         mermaid.initialize({
           startOnLoad: false,
