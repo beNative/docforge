@@ -228,6 +228,7 @@ export interface DocumentOrFolder {
   doc_type?: DocType;
   language_hint?: string | null;
   default_view_mode?: ViewMode | null;
+  searchSnippet?: string;
 }
 
 // Fix: Renamed LegacyPromptVersion to DocumentVersion and aliased it to the new DocVersion type
