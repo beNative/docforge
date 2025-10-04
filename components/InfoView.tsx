@@ -81,7 +81,7 @@ const InfoView: React.FC<InfoViewProps> = ({ settings }) => {
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden min-h-0">
       <header className="flex items-center justify-between px-4 h-7 border-b border-border-color bg-secondary flex-shrink-0">
-        <h1 className="text-xs font-semibold text-text-secondary tracking-[0.2em] uppercase">Application Information</h1>
+        <h1 className="text-xs font-semibold text-text-secondary tracking-wider uppercase">Application Information</h1>
         <nav className="flex items-center gap-1">
           {(Object.keys(docFiles) as DocTab[]).map(tab => (
             <button
