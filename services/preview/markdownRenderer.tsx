@@ -274,7 +274,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
     hr(props) {
       return <hr className="df-divider" {...props} />;
     },
-  }), [highlighter, viewTheme]);
+  }), [highlighter, viewTheme, settings.plantumlRendererMode]);
 
   return (
     <div ref={ref} onScroll={onScroll} className={`w-full h-full overflow-auto bg-secondary df-markdown-container ${theme}`}>
