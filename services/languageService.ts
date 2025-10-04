@@ -21,6 +21,7 @@ export const SUPPORTED_LANGUAGES = [
     { id: 'yaml', label: 'YAML' },
     { id: 'pascal', label: 'Pascal' },
     { id: 'ini', label: 'INI' },
+    { id: 'pdf', label: 'PDF' },
 ];
 
 export const mapExtensionToLanguageId = (extension: string | null): string => {
@@ -75,6 +76,10 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
         case 'fmx':
         case 'ini':
              return 'ini';
+        case 'application/pdf':
+            return 'pdf';
+        case 'pdf':
+            return 'pdf';
         default:
             // Try to find a direct match in supported languages by id
             const match = SUPPORTED_LANGUAGES.find(l => l.id === extension.toLowerCase());

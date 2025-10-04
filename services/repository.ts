@@ -561,8 +561,8 @@ export const repository = {
 
         if (nodeData.node_type === 'document' && nodeData.document) {
             const docRes = await window.electronAPI!.dbRun(
-                `INSERT INTO documents (node_id, doc_type, language_hint) VALUES (?, ?, ?)`,
-                [newNodeId, nodeData.document.doc_type, nodeData.document.language_hint]
+                `INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode) VALUES (?, ?, ?, ?)`,
+                [newNodeId, nodeData.document.doc_type, nodeData.document.language_hint, nodeData.document.default_view_mode ?? null]
             );
             const documentId = docRes.lastInsertRowid;
 
