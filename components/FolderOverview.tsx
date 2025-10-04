@@ -1,7 +1,17 @@
 import React, { useRef } from 'react';
-import type { DocumentOrFolder } from '../types';
+import type { DocType, DocumentOrFolder } from '../types';
 import Button from './Button';
 import { FolderIcon, FileIcon, InfoIcon, PlusIcon, FolderPlusIcon, FolderDownIcon, PencilIcon, SearchIcon, XIcon } from './Icons';
+
+export interface DocTypeCount {
+    type: DocType;
+    count: number;
+}
+
+export interface LanguageCount {
+    label: string;
+    count: number;
+}
 
 export interface FolderOverviewMetrics {
     directDocumentCount: number;
@@ -11,6 +21,8 @@ export interface FolderOverviewMetrics {
     totalItemCount: number;
     lastUpdated: string | null;
     recentDocuments: RecentDocumentSummary[];
+    docTypeCounts: DocTypeCount[];
+    languageCounts: LanguageCount[];
 }
 
 export interface RecentDocumentSummary {
@@ -18,6 +30,8 @@ export interface RecentDocumentSummary {
     title: string;
     updatedAt: string | null;
     parentPath: string[];
+    docType?: DocType;
+    languageHint?: string | null;
 }
 
 export interface FolderSearchResult extends RecentDocumentSummary {
@@ -70,6 +84,15 @@ const highlightMatches = (text: string, term: string): React.ReactNode => {
     });
 };
 
+const DOC_TYPE_LABELS: Record<DocType, string> = {
+    prompt: 'Prompts',
+    source_code: 'Source code',
+    pdf: 'PDFs',
+    image: 'Images',
+};
+
+const formatDocTypeLabel = (docType: DocType) => DOC_TYPE_LABELS[docType] ?? docType.replace(/_/g, ' ');
+
 const StatCard: React.FC<{ label: string; value: number; icon: React.ReactNode }> = ({ label, value, icon }) => (
     <div className="flex items-center gap-4 rounded-lg border border-border-color bg-background/80 px-4 py-5 shadow-sm">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -102,9 +125,13 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
         totalItemCount,
         lastUpdated,
         recentDocuments,
+        docTypeCounts,
+        languageCounts,
     } = metrics;
 
     const hasChildren = totalItemCount > 0;
+    const hasDocTypeSummary = docTypeCounts.some(({ count }) => count > 0);
+    const hasLanguageSummary = languageCounts.some(({ count }) => count > 0);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const handleImportClick = () => {
@@ -345,6 +372,52 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                             <p className="mt-3 text-sm text-text-secondary">
                                 Includes updates to all documents and subfolders contained here.
                             </p>
+                        </div>
+                    </div>
+
+                    <div className="mt-8 rounded-lg border border-border-color bg-background/70 p-6">
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Contents at a glance</h2>
+                        <div className="mt-4 grid gap-6 md:grid-cols-2">
+                            <div>
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-text-tertiary">Document types</h3>
+                                {hasDocTypeSummary ? (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {docTypeCounts.map(({ type, count }) => (
+                                            <span
+                                                key={type}
+                                                className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-primary"
+                                            >
+                                                <span>{formatDocTypeLabel(type)}</span>
+                                                <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                                                    {count}
+                                                </span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="mt-3 text-sm text-text-secondary">No documents yet.</p>
+                                )}
+                            </div>
+                            <div>
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-text-tertiary">Languages</h3>
+                                {hasLanguageSummary ? (
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {languageCounts.map(({ label, count }) => (
+                                            <span
+                                                key={label.toLowerCase()}
+                                                className="inline-flex items-center gap-2 rounded-full bg-text-secondary/10 px-3 py-1 text-xs font-medium uppercase tracking-wide text-text-secondary"
+                                            >
+                                                <span>{label}</span>
+                                                <span className="rounded-full bg-text-secondary/20 px-2 py-0.5 text-[10px] font-semibold text-text-secondary">
+                                                    {count}
+                                                </span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="mt-3 text-sm text-text-secondary">No language information yet.</p>
+                                )}
+                            </div>
                         </div>
                     </div>
 

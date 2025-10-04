@@ -18,7 +18,7 @@ import InfoView from './components/InfoView';
 import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
-import FolderOverview, { FolderOverviewMetrics, FolderSearchResult, RecentDocumentSummary } from './components/FolderOverview';
+import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
 import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
@@ -27,7 +27,7 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode } from './types';
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
@@ -371,6 +371,55 @@ const MainApp: React.FC = () => {
             return node.type === 'folder' ? 'Untitled Folder' : 'Untitled Document';
         };
 
+        const toTitleCase = (value: string) => {
+            return value
+                .split(/[-_\s]+/)
+                .filter(Boolean)
+                .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+                .join(' ');
+        };
+
+        const addDocTypeCount = (map: Map<DocType, number>, docType: DocType) => {
+            map.set(docType, (map.get(docType) ?? 0) + 1);
+        };
+
+        const addLanguageCount = (
+            map: Map<string, { label: string; count: number }>,
+            value?: string | null,
+        ) => {
+            const trimmed = (value ?? '').trim();
+            const key = trimmed ? trimmed.toLowerCase() : 'unknown';
+            const label = trimmed ? toTitleCase(trimmed) : 'Unknown';
+            const existing = map.get(key);
+            if (existing) {
+                existing.count += 1;
+            } else {
+                map.set(key, { label, count: 1 });
+            }
+        };
+
+        const finalizeDocTypeCounts = (map: Map<DocType, number>): DocTypeCount[] =>
+            Array.from(map.entries())
+                .map(([type, count]) => ({ type, count }))
+                .sort((a, b) => {
+                    if (a.count !== b.count) {
+                        return b.count - a.count;
+                    }
+                    return a.type.localeCompare(b.type);
+                });
+
+        const finalizeLanguageCounts = (
+            map: Map<string, { label: string; count: number }>,
+        ): LanguageCount[] =>
+            Array.from(map.values())
+                .map(({ label, count }) => ({ label, count }))
+                .sort((a, b) => {
+                    if (a.count !== b.count) {
+                        return b.count - a.count;
+                    }
+                    return a.label.localeCompare(b.label);
+                });
+
         const computeFromTree = (folderNode: DocumentNode) => {
             const recordLatest = (() => {
                 let latest: Date | null = null;
@@ -400,17 +449,24 @@ const MainApp: React.FC = () => {
                 parentPath: [],
             }));
             const allDocuments: RecentDocumentSummary[] = [];
+            const docTypeMap = new Map<DocType, number>();
+            const languageMap = new Map<string, { label: string; count: number }>();
 
             while (stack.length > 0) {
                 const { node: current, parentPath } = stack.pop()!;
                 recordLatest.update(current.updatedAt);
                 if (current.type === 'document') {
                     totalDocumentCount += 1;
+                    const docType = (current.doc_type ?? 'prompt') as DocType;
+                    addDocTypeCount(docTypeMap, docType);
+                    addLanguageCount(languageMap, current.language_hint);
                     allDocuments.push({
                         id: current.id,
                         title: current.title,
                         updatedAt: current.updatedAt,
                         parentPath,
+                        docType,
+                        languageHint: current.language_hint ?? null,
                     });
                 } else if (current.type === 'folder') {
                     totalFolderCount += 1;
@@ -438,6 +494,8 @@ const MainApp: React.FC = () => {
                     totalItemCount: totalDocumentCount + totalFolderCount,
                     lastUpdated: latestDate ? latestDate.toISOString() : null,
                     recentDocuments,
+                    docTypeCounts: finalizeDocTypeCounts(docTypeMap),
+                    languageCounts: finalizeLanguageCounts(languageMap),
                 },
                 documents: allDocuments,
             };
@@ -486,17 +544,24 @@ const MainApp: React.FC = () => {
                 parentPath: [],
             }));
             const allDocuments: RecentDocumentSummary[] = [];
+            const docTypeMap = new Map<DocType, number>();
+            const languageMap = new Map<string, { label: string; count: number }>();
 
             while (stack.length > 0) {
                 const { node: current, parentPath } = stack.pop()!;
                 recordLatest.update(current.updatedAt);
                 if (current.type === 'document') {
                     totalDocumentCount += 1;
+                    const docType = (current.doc_type ?? 'prompt') as DocType;
+                    addDocTypeCount(docTypeMap, docType);
+                    addLanguageCount(languageMap, current.language_hint);
                     allDocuments.push({
                         id: current.id,
                         title: current.title,
                         updatedAt: current.updatedAt,
                         parentPath,
+                        docType,
+                        languageHint: current.language_hint ?? null,
                     });
                 } else {
                     totalFolderCount += 1;
@@ -524,6 +589,8 @@ const MainApp: React.FC = () => {
                     totalItemCount: totalDocumentCount + totalFolderCount,
                     lastUpdated: latestDate ? latestDate.toISOString() : null,
                     recentDocuments,
+                    docTypeCounts: finalizeDocTypeCounts(docTypeMap),
+                    languageCounts: finalizeLanguageCounts(languageMap),
                 },
                 documents: allDocuments,
             };
@@ -1493,6 +1560,8 @@ const MainApp: React.FC = () => {
                     totalItemCount: 0,
                     lastUpdated: activeNode.updatedAt,
                     recentDocuments: [],
+                    docTypeCounts: [],
+                    languageCounts: [],
                 };
                 return (
                     <FolderOverview
