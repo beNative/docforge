@@ -196,10 +196,12 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
                 const tabStart = element.offsetLeft;
                 if (tabStart < scrollLeft - 1) {
                     container.scrollTo({ left: tabStart, behavior: 'smooth' });
+                    requestAnimationFrame(() => updateScrollState());
                     return;
                 }
             }
             container.scrollTo({ left: 0, behavior: 'smooth' });
+            requestAnimationFrame(() => updateScrollState());
         } else {
             for (let index = 0; index < openDocumentIds.length; index += 1) {
                 const id = openDocumentIds[index];
@@ -208,12 +210,33 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
                 const tabEnd = element.offsetLeft + element.offsetWidth;
                 if (tabEnd > scrollLeft + clientWidth + 1) {
                     container.scrollTo({ left: tabEnd - clientWidth, behavior: 'smooth' });
+                    requestAnimationFrame(() => updateScrollState());
                     return;
                 }
             }
             container.scrollTo({ left: container.scrollWidth - clientWidth, behavior: 'smooth' });
+            requestAnimationFrame(() => updateScrollState());
         }
-    }, [openDocumentIds]);
+    }, [openDocumentIds, updateScrollState]);
+
+    const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const dominantDelta = Math.abs(event.deltaX) >= Math.abs(event.deltaY)
+            ? event.deltaX
+            : event.shiftKey
+                ? event.deltaY
+                : 0;
+
+        if (dominantDelta === 0) {
+            return;
+        }
+
+        event.preventDefault();
+        container.scrollBy({ left: dominantDelta });
+        requestAnimationFrame(() => updateScrollState());
+    }, [updateScrollState]);
 
     const handleDragStart = useCallback((event: React.DragEvent<HTMLDivElement>, tabId: string, index: number) => {
         dragState.current = { id: tabId, index };
@@ -330,9 +353,10 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
                 <div className="flex-1 h-full relative overflow-hidden">
                     <div
                         ref={scrollContainerRef}
-                        className="absolute inset-y-0 left-0 right-0 overflow-x-auto overflow-y-hidden scrollbar-hidden"
+                        className="absolute inset-y-0 left-0 right-0 overflow-hidden scrollbar-hidden"
                         onDragOver={handleDragOver}
                         onDrop={handleContainerDrop}
+                        onWheel={handleWheel}
                         role="tablist"
                     >
                         <div className="flex items-stretch gap-1 h-full min-w-max pr-2">

@@ -6,10 +6,17 @@
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
   scrollbar-color: transparent transparent !important;
+  scrollbar-gutter: stable both-edges;
 }
 
 .scrollbar-hidden::-webkit-scrollbar {
   width: 0 !important;
   height: 0 !important;
   display: none !important;
+}
+
+.scrollbar-hidden::-webkit-scrollbar-track,
+.scrollbar-hidden::-webkit-scrollbar-thumb {
+  background: transparent !important;
+  border: none !important;
 }
