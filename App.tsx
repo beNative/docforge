@@ -307,6 +307,14 @@ const MainApp: React.FC = () => {
             return Number.isNaN(date.getTime()) ? null : date;
         };
 
+        const formatNodeTitle = (node: DocumentOrFolder) => {
+            const trimmed = node.title.trim();
+            if (trimmed) {
+                return trimmed;
+            }
+            return node.type === 'folder' ? 'Untitled Folder' : 'Untitled Document';
+        };
+
         const computeFromTree = (folderNode: DocumentNode): FolderOverviewMetrics => {
             const recordLatest = (() => {
                 let latest: Date | null = null;
@@ -325,25 +333,45 @@ const MainApp: React.FC = () => {
 
             recordLatest.update(folderNode.updatedAt);
 
-            const directDocumentCount = folderNode.children.filter(child => child.type === 'document').length;
-            const directFolderCount = folderNode.children.filter(child => child.type === 'folder').length;
+            const folderChildren = folderNode.children ?? [];
+            const directDocumentCount = folderChildren.filter(child => child.type === 'document').length;
+            const directFolderCount = folderChildren.filter(child => child.type === 'folder').length;
 
             let totalDocumentCount = 0;
             let totalFolderCount = 0;
-            const stack = [...folderNode.children];
+            const stack: { node: DocumentNode; parentPath: string[] }[] = folderChildren.map(child => ({
+                node: child,
+                parentPath: [],
+            }));
+            const recentDocuments: FolderOverviewMetrics['recentDocuments'] = [];
 
             while (stack.length > 0) {
-                const current = stack.pop()!;
+                const { node: current, parentPath } = stack.pop()!;
                 recordLatest.update(current.updatedAt);
                 if (current.type === 'document') {
                     totalDocumentCount += 1;
+                    recentDocuments.push({
+                        id: current.id,
+                        title: current.title,
+                        updatedAt: current.updatedAt,
+                        parentPath,
+                    });
                 } else if (current.type === 'folder') {
                     totalFolderCount += 1;
-                    stack.push(...current.children);
+                    const nextPath = [...parentPath, formatNodeTitle(current)];
+                    const childNodes = current.children ?? [];
+                    stack.push(...childNodes.map(child => ({ node: child, parentPath: nextPath })));
                 }
             }
 
             const latestDate = recordLatest.getValue();
+            const sortedRecent = recentDocuments
+                .sort((a, b) => {
+                    const aDate = parseDate(a.updatedAt)?.getTime() ?? 0;
+                    const bDate = parseDate(b.updatedAt)?.getTime() ?? 0;
+                    return bDate - aDate;
+                })
+                .slice(0, 5);
 
             return {
                 directDocumentCount,
@@ -352,6 +380,7 @@ const MainApp: React.FC = () => {
                 totalFolderCount,
                 totalItemCount: totalDocumentCount + totalFolderCount,
                 lastUpdated: latestDate ? latestDate.toISOString() : null,
+                recentDocuments: sortedRecent,
             };
         };
 
@@ -393,21 +422,39 @@ const MainApp: React.FC = () => {
 
             let totalDocumentCount = 0;
             let totalFolderCount = 0;
-            const stack = [...directChildren];
+            const stack: { node: DocumentOrFolder; parentPath: string[] }[] = directChildren.map(child => ({
+                node: child,
+                parentPath: [],
+            }));
+            const recentDocuments: FolderOverviewMetrics['recentDocuments'] = [];
 
             while (stack.length > 0) {
-                const current = stack.pop()!;
+                const { node: current, parentPath } = stack.pop()!;
                 recordLatest.update(current.updatedAt);
                 if (current.type === 'document') {
                     totalDocumentCount += 1;
+                    recentDocuments.push({
+                        id: current.id,
+                        title: current.title,
+                        updatedAt: current.updatedAt,
+                        parentPath,
+                    });
                 } else {
                     totalFolderCount += 1;
                     const childItems = childMap.get(current.id) ?? [];
-                    stack.push(...childItems);
+                    const nextPath = [...parentPath, formatNodeTitle(current)];
+                    stack.push(...childItems.map(item => ({ node: item, parentPath: nextPath })));
                 }
             }
 
             const latestDate = recordLatest.getValue();
+            const sortedRecent = recentDocuments
+                .sort((a, b) => {
+                    const aDate = parseDate(a.updatedAt)?.getTime() ?? 0;
+                    const bDate = parseDate(b.updatedAt)?.getTime() ?? 0;
+                    return bDate - aDate;
+                })
+                .slice(0, 5);
 
             return {
                 directDocumentCount,
@@ -416,6 +463,7 @@ const MainApp: React.FC = () => {
                 totalFolderCount,
                 totalItemCount: totalDocumentCount + totalFolderCount,
                 lastUpdated: latestDate ? latestDate.toISOString() : null,
+                recentDocuments: sortedRecent,
             };
         };
 
@@ -1308,6 +1356,7 @@ const MainApp: React.FC = () => {
                     totalFolderCount: 0,
                     totalItemCount: 0,
                     lastUpdated: activeNode.updatedAt,
+                    recentDocuments: [],
                 };
                 return (
                     <FolderOverview

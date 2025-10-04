@@ -10,6 +10,14 @@ export interface FolderOverviewMetrics {
     totalFolderCount: number;
     totalItemCount: number;
     lastUpdated: string | null;
+    recentDocuments: RecentDocumentSummary[];
+}
+
+export interface RecentDocumentSummary {
+    id: string;
+    title: string;
+    updatedAt: string | null;
+    parentPath: string[];
 }
 
 interface FolderOverviewProps {
@@ -59,6 +67,7 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
         totalFolderCount,
         totalItemCount,
         lastUpdated,
+        recentDocuments,
     } = metrics;
 
     const hasChildren = totalItemCount > 0;
@@ -181,6 +190,50 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                 Includes updates to all documents and subfolders contained here.
                             </p>
                         </div>
+                    </div>
+
+                    <div className="mt-10 rounded-lg border border-border-color bg-background/70 p-6">
+                        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+                            Recently updated in this folder
+                        </h2>
+                        {recentDocuments.length > 0 ? (
+                            <ul className="mt-4 space-y-3">
+                                {recentDocuments.map((doc) => {
+                                    const formattedTitle = doc.title.trim() || 'Untitled document';
+                                    const formattedDate = formatDateTime(doc.updatedAt);
+                                    const hasPath = doc.parentPath.length > 0;
+                                    const isUnknownDate = formattedDate === 'Unknown';
+                                    return (
+                                        <li
+                                            key={doc.id}
+                                            className="flex flex-col gap-2 rounded-md border border-border-color/80 bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                    <FileIcon className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-text-main">{formattedTitle}</p>
+                                                    {hasPath && (
+                                                        <p className="text-xs uppercase tracking-wide text-text-tertiary">
+                                                            {doc.parentPath.join(' / ')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="text-sm text-text-secondary sm:text-right">
+                                                Updated {isUnknownDate ? 'recently' : formattedDate}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <div className="mt-4 flex items-center gap-2 rounded-md border border-dashed border-border-color/70 bg-background/60 px-4 py-3 text-sm text-text-secondary">
+                                <InfoIcon className="h-4 w-4" />
+                                <span>No recent document activity yet. Updates will appear here as you work.</span>
+                            </div>
+                        )}
                     </div>
 
                     {!hasChildren && (
