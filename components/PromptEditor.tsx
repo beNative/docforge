@@ -355,7 +355,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
 
   const language = documentNode.language_hint || 'plaintext';
   const supportsAiTools = ['markdown', 'plaintext'].includes(language);
-  const supportsPreview = ['markdown', 'html'].includes(language);
+  const supportsPreview = ['markdown', 'html', 'pdf'].includes(language);
   const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(language);
   const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (language === 'python');
   const pythonDefaults = useMemo(() => ({

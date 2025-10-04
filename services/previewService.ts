@@ -2,6 +2,7 @@ import type { IRenderer } from './preview/IRenderer';
 import { HtmlRenderer } from './preview/htmlRenderer';
 import { MarkdownRenderer } from './preview/markdownRenderer';
 import { PlaintextRenderer } from './preview/plaintextRenderer';
+import { PdfRenderer } from './preview/pdfRenderer';
 
 class PreviewService {
   private renderers: IRenderer[];
@@ -11,6 +12,7 @@ class PreviewService {
     this.renderers = [
       new MarkdownRenderer(),
       new HtmlRenderer(),
+      new PdfRenderer(),
       new PlaintextRenderer(), // Fallback renderer should be last
     ];
   }
