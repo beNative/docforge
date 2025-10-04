@@ -1,5 +1,24 @@
 # Version Log
 
+## v0.6.3 - The Release Readiness Refresh
+
+This maintenance release aligns the publishing workflow documentation with the
+latest release checklist so preparing builds remains predictable and
+well-documented.
+
+### 🛠 Improvements
+
+-   Clarified the release preparation steps in the README and technical manual
+    to include drafting release notes and syncing the published documentation
+    bundle.
+-   Ensured the `docs/` copies of the manuals stay in lockstep with the root
+    documentation to avoid drift between the repository and published guides.
+
+### 🐛 Fixes
+
+-   Restored the missing release workflow section in the published technical
+    manual so hosted documentation once again includes the full checklist.
+
 ## v0.6.2 - The Documentation Polish Update
 
 This maintenance release focuses on keeping the documentation set in sync with the
