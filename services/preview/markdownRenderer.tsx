@@ -26,19 +26,16 @@ interface MermaidDiagramProps {
   theme: 'light' | 'dark';
 }
 
-const ensureSafeMermaidParseError = (() => {
-  let configured = false;
+const applySafeMermaidParseError = (
+  handler?: (err: unknown, hash?: unknown) => void,
+) => {
+  const mermaidWithParseError = mermaid as unknown as {
+    parseError?: (err: unknown, hash?: unknown) => void;
+    mermaidAPI?: { parseError?: (err: unknown, hash?: unknown) => void };
+  };
 
-  return () => {
-    if (configured) {
-      return;
-    }
-
-    const mermaidWithParseError = mermaid as unknown as {
-      parseError?: (err: unknown, hash?: unknown) => void;
-    };
-
-    mermaidWithParseError.parseError = (err: unknown, hash?: unknown) => {
+  const safeHandler =
+    handler ?? ((err: unknown, hash?: unknown) => {
       const details =
         err instanceof Error
           ? err.message
@@ -50,11 +47,15 @@ const ensureSafeMermaidParseError = (() => {
 
       console.error('[MermaidDiagram] Mermaid parser error', err, hash);
       throw err instanceof Error ? err : new Error(details);
-    };
+    });
 
-    configured = true;
-  };
-})();
+  mermaidWithParseError.parseError = safeHandler;
+  if (mermaidWithParseError.mermaidAPI) {
+    mermaidWithParseError.mermaidAPI.parseError = safeHandler;
+  }
+
+  return safeHandler;
+};
 
 const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,13 +82,15 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
       }
 
       try {
-        ensureSafeMermaidParseError();
         setError(null);
+        const safeParseError = applySafeMermaidParseError();
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'loose',
           theme: theme === 'dark' ? 'dark' : 'default',
+          parseError: safeParseError,
         });
+        applySafeMermaidParseError(safeParseError);
         const { svg } = await mermaid.render(renderIdRef.current, trimmed);
         if (!cancelled) {
           target.innerHTML = svg;
