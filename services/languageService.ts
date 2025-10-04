@@ -22,6 +22,7 @@ export const SUPPORTED_LANGUAGES = [
     { id: 'pascal', label: 'Pascal' },
     { id: 'ini', label: 'INI' },
     { id: 'pdf', label: 'PDF' },
+    { id: 'image', label: 'Image (PNG/JPEG/GIF/WebP/SVG/BMP)' },
 ];
 
 export const mapExtensionToLanguageId = (extension: string | null): string => {
@@ -80,6 +81,24 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
             return 'pdf';
         case 'pdf':
             return 'pdf';
+        case 'png':
+        case 'jpg':
+        case 'jpeg':
+        case 'gif':
+        case 'bmp':
+        case 'webp':
+        case 'svg':
+        case 'svgz':
+            return 'image';
+        case 'image/png':
+        case 'image/jpg':
+        case 'image/jpeg':
+        case 'image/gif':
+        case 'image/bmp':
+        case 'image/webp':
+        case 'image/svg':
+        case 'image/svg+xml':
+            return 'image';
         default:
             // Try to find a direct match in supported languages by id
             const match = SUPPORTED_LANGUAGES.find(l => l.id === extension.toLowerCase());

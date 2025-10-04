@@ -18,7 +18,10 @@ declare global {
       dbGetStats: () => Promise<{ success: boolean; stats?: DatabaseStats; error?: string }>;
       dbGetPath: () => Promise<string>;
       // FIX: Add missing `dbImportFiles` to the electronAPI type definition.
-      dbImportFiles: (filesData: {path: string; name: string; content: string}[], targetParentId: string | null) => Promise<{ success: boolean; error?: string }>;
+      dbImportFiles: (
+        filesData: { path: string; name: string; content: string }[],
+        targetParentId: string | null
+      ) => Promise<{ success: boolean; error?: string; createdNodes?: ImportedNodeSummary[] }>;
       legacyFileExists: (filename: string) => Promise<boolean>;
       readLegacyFile: (filename: string) => Promise<{ success: boolean, data?: string, error?: string }>;
       getAppVersion: () => Promise<string>;
@@ -64,8 +67,16 @@ declare global {
 // =================================================================
 
 export type NodeType = 'folder' | 'document';
-export type DocType = 'prompt' | 'source_code' | 'pdf';
+export type DocType = 'prompt' | 'source_code' | 'pdf' | 'image';
 export type ViewMode = 'edit' | 'preview' | 'split-vertical' | 'split-horizontal';
+
+export interface ImportedNodeSummary {
+  nodeId: string;
+  parentId: string | null;
+  docType: DocType;
+  languageHint: string | null;
+  defaultViewMode: ViewMode | null;
+}
 
 export type PythonExecutionStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
 

@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import type { Node, DocumentOrFolder, DocType } from '../types';
+import type { Node, DocumentOrFolder, DocType, ImportedNodeSummary } from '../types';
 import { useNodes } from './useNodes';
 import { mapExtensionToLanguageId } from '../services/languageService';
 
@@ -59,7 +59,8 @@ export const useDocuments = () => {
 
   const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '', doc_type = 'prompt', language_hint = 'markdown' }: { parentId: string | null, title?: string, content?: string, doc_type?: DocType, language_hint?: string | null }) => {
     const resolvedLanguage = mapExtensionToLanguageId(language_hint);
-    const defaultViewMode = doc_type === 'pdf' || resolvedLanguage === 'pdf' ? 'preview' : undefined;
+    const shouldPreviewByDefault = doc_type === 'pdf' || doc_type === 'image' || resolvedLanguage === 'pdf' || resolvedLanguage === 'image';
+    const defaultViewMode = shouldPreviewByDefault ? 'preview' : undefined;
     const newNode = await addNode({
       parent_id: parentId,
       node_type: 'document',
@@ -113,7 +114,10 @@ export const useDocuments = () => {
       await moveNodes(draggedIds, targetId, position);
   }, [moveNodes]);
 
-  const addDocumentsFromFiles = useCallback(async (files: { path: string; name: string; file: File }[], targetNodeId: string | null) => {
+  const addDocumentsFromFiles = useCallback(async (
+    files: { path: string; name: string; file: File }[],
+    targetNodeId: string | null
+  ): Promise<ImportedNodeSummary[]> => {
     addLog('INFO', `Importing ${files.length} files...`);
 
     const fileReadPromises = files.map(entry => {
@@ -124,7 +128,14 @@ export const useDocuments = () => {
 
         const fileName = entry.name.toLowerCase();
         const mimeType = entry.file.type;
-        const shouldReadAsDataUrl = (mimeType && mimeType.includes('pdf')) || fileName.endsWith('.pdf');
+        const extension = fileName.split('.').pop() || '';
+        const isPdf = (mimeType && mimeType.includes('pdf')) || extension === 'pdf';
+        const isSvg = extension === 'svg' || extension === 'svgz' || mimeType === 'image/svg+xml';
+        const isImage =
+          (!isSvg && !!mimeType && mimeType.startsWith('image/')) ||
+          ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'].some(ext => extension === ext);
+
+        const shouldReadAsDataUrl = isPdf || isImage;
 
         if (shouldReadAsDataUrl) {
           reader.readAsDataURL(entry.file);
@@ -136,12 +147,14 @@ export const useDocuments = () => {
 
     try {
       const filesData = await Promise.all(fileReadPromises);
-      await importFiles(filesData, targetNodeId);
+      const createdNodes = await importFiles(filesData, targetNodeId);
       addLog('INFO', 'File import process completed successfully in the backend.');
       await refreshNodes();
+      return createdNodes;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       addLog('ERROR', `File import failed: ${message}`);
+      return [];
     }
   }, [addLog, importFiles, refreshNodes]);
 
