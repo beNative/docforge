@@ -2,6 +2,7 @@ import React, { useRef, useEffect, forwardRef, useImperativeHandle, useCallback,
 import { useTheme } from '../hooks/useTheme';
 import { MONACO_KEYBINDING_DEFINITIONS } from '../services/editor/monacoKeybindings';
 import { DEFAULT_SETTINGS } from '../constants';
+import { ensureMonaco } from '../services/editor/monacoLoader';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -114,6 +115,7 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
 const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
+    const monacoApiRef = useRef<any>(null);
     const { theme } = useTheme();
     const contentRef = useRef(content);
     const customShortcutsRef = useRef<Record<string, string[]>>({});
@@ -135,7 +137,12 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
             monacoInstanceRef.current?.getAction('editor.action.formatDocument')?.run();
         },
         setScrollTop(scrollTop: number) {
-            monacoInstanceRef.current?.setScrollTop(scrollTop, monaco.editor.ScrollType.Immediate);
+            const scrollType = monacoApiRef.current?.editor?.ScrollType?.Immediate;
+            if (scrollType) {
+                monacoInstanceRef.current?.setScrollTop(scrollTop, scrollType);
+            } else {
+                monacoInstanceRef.current?.setScrollTop(scrollTop);
+            }
         },
         getScrollInfo() {
             return new Promise(resolve => {
@@ -167,7 +174,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     }, []);
 
     const applyEditorShortcuts = useCallback(() => {
-        if (!monacoInstanceRef.current || typeof monaco === 'undefined') {
+        const monacoApi = monacoApiRef.current;
+        if (!monacoInstanceRef.current || !monacoApi) {
             return;
         }
 
@@ -180,7 +188,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 return;
             }
 
-            const keybinding = toMonacoKeybinding(monaco, keys);
+            const keybinding = toMonacoKeybinding(monacoApi, keys);
             if (keybinding === null) {
                 return;
             }
@@ -211,77 +219,79 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     }, [content]);
 
     useEffect(() => {
-        if (editorRef.current && typeof ((window as any).require) !== 'undefined') {
-            // Configure Monaco Environment to load workers from CDN. This is crucial for syntax highlighting.
-            if (!(window as any).MonacoEnvironment) {
-                (window as any).MonacoEnvironment = {
-                    getWorkerUrl: function (_moduleId: any, label: string) {
-                        const CDN_PATH = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs';
-                        if (label === 'json') return `${CDN_PATH}/language/json/json.worker.js`;
-                        if (label === 'css' || label === 'scss' || label === 'less') return `${CDN_PATH}/language/css/css.worker.js`;
-                        if (label === 'html' || label === 'handlebars' || label === 'razor') return `${CDN_PATH}/language/html/html.worker.js`;
-                        if (label === 'typescript' || label === 'javascript') return `${CDN_PATH}/language/typescript/ts.worker.js`;
-                        return `${CDN_PATH}/editor/editor.worker.js`;
-                    },
-                };
+        let isCancelled = false;
+
+        const initializeEditor = async () => {
+            if (!editorRef.current) {
+                return;
             }
 
-            (window as any).require.config({ paths: { 'vs': 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' }});
-            (window as any).require(['vs/editor/editor.main'], () => {
-                 if (editorRef.current) {
-                    // Ensure any previous instance is disposed
-                    if (monacoInstanceRef.current) {
-                        disposeEditorShortcuts();
-                        monacoInstanceRef.current.dispose();
-                    }
-
-                    const editorInstance = monaco.editor.create(editorRef.current, {
-                        value: content,
-                        language: language || 'plaintext',
-                        theme: theme === 'dark' ? 'vs-dark' : 'vs',
-                        automaticLayout: true,
-                        fontSize: computedFontSize,
-                        fontFamily: computedFontFamily,
-                        minimap: {
-                            enabled: true,
-                        },
-                        wordWrap: 'on',
-                        folding: true,
-                        showFoldingControls: 'always',
-                        bracketPairColorization: {
-                            enabled: true,
-                        },
-                    });
-
-                    editorInstance.onDidChangeModelContent(() => {
-                        const currentValue = editorInstance.getValue();
-                        if (currentValue !== contentRef.current) {
-                           onChange(currentValue);
-                        }
-                    });
-
-                    editorInstance.onDidScrollChange((e: any) => {
-                        if (e.scrollTopChanged) {
-                           onScroll?.({
-                               scrollTop: e.scrollTop,
-                               scrollHeight: e.scrollHeight,
-                               clientHeight: editorInstance.getLayoutInfo().height
-                           });
-                        }
-                    });
-
-                    monacoInstanceRef.current = editorInstance;
-                    applyEditorShortcuts();
+            try {
+                const monacoApi = await ensureMonaco();
+                if (!monacoApi || isCancelled || !editorRef.current) {
+                    return;
                 }
-            });
-        }
+
+                monacoApiRef.current = monacoApi;
+
+                if (monacoInstanceRef.current) {
+                    disposeEditorShortcuts();
+                    monacoInstanceRef.current.dispose();
+                }
+
+                const editorInstance = monacoApi.editor.create(editorRef.current, {
+                    value: content,
+                    language: language || 'plaintext',
+                    theme: theme === 'dark' ? 'vs-dark' : 'vs',
+                    automaticLayout: true,
+                    fontSize: computedFontSize,
+                    fontFamily: computedFontFamily,
+                    minimap: {
+                        enabled: true,
+                    },
+                    wordWrap: 'on',
+                    folding: true,
+                    showFoldingControls: 'always',
+                    bracketPairColorization: {
+                        enabled: true,
+                    },
+                });
+
+                editorInstance.onDidChangeModelContent(() => {
+                    const currentValue = editorInstance.getValue();
+                    if (currentValue !== contentRef.current) {
+                        onChange(currentValue);
+                    }
+                });
+
+                editorInstance.onDidScrollChange((e: any) => {
+                    if (e.scrollTopChanged) {
+                        onScroll?.({
+                            scrollTop: e.scrollTop,
+                            scrollHeight: e.scrollHeight,
+                            clientHeight: editorInstance.getLayoutInfo().height
+                        });
+                    }
+                });
+
+                monacoInstanceRef.current = editorInstance;
+                applyEditorShortcuts();
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to initialize Monaco editor', error);
+            }
+        };
+
+        initializeEditor();
 
         return () => {
+            isCancelled = true;
             disposeEditorShortcuts();
             if (monacoInstanceRef.current) {
                 monacoInstanceRef.current.dispose();
                 monacoInstanceRef.current = null;
             }
+            monacoApiRef.current = null;
         };
     }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, computedFontFamily, computedFontSize]);
 
@@ -299,8 +309,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
 
     // Effect to update theme
     useEffect(() => {
-        if (monacoInstanceRef.current) {
-            monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
+        if (monacoInstanceRef.current && monacoApiRef.current) {
+            monacoApiRef.current.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
         }
     }, [theme]);
 
@@ -309,11 +319,11 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
             monacoInstanceRef.current.updateOptions({ fontFamily: computedFontFamily, fontSize: computedFontSize });
         }
     }, [computedFontFamily, computedFontSize]);
-    
+
     // Effect to update language
     useEffect(() => {
-        if (monacoInstanceRef.current && monacoInstanceRef.current.getModel()) {
-            monaco.editor.setModelLanguage(monacoInstanceRef.current.getModel(), language || 'plaintext');
+        if (monacoInstanceRef.current && monacoInstanceRef.current.getModel() && monacoApiRef.current) {
+            monacoApiRef.current.editor.setModelLanguage(monacoInstanceRef.current.getModel(), language || 'plaintext');
         }
     }, [language]);
 

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { DEFAULT_SETTINGS } from '../constants';
+import { ensureMonaco } from '../services/editor/monacoLoader';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -20,6 +21,7 @@ interface MonacoDiffEditorProps {
 const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily, fontSize }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const editorInstanceRef = useRef<any>(null);
+    const monacoApiRef = useRef<any>(null);
     const { theme } = useTheme();
     const modelsRef = useRef<{ original: any; modified: any } | null>(null);
     const changeListenerRef = useRef<{ dispose: () => void } | null>(null);
@@ -48,73 +50,85 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
     }, []);
 
     useEffect(() => {
-        if (!editorRef.current || typeof ((window as any).require) === 'undefined') {
+        if (!editorRef.current) {
             return;
         }
 
         let isCancelled = false;
 
-        (window as any).require(['vs/editor/editor.main'], () => {
-            if (!editorRef.current || isCancelled) return;
+        const initializeDiffEditor = async () => {
+            try {
+                const monacoApi = await ensureMonaco();
+                if (!monacoApi || isCancelled || !editorRef.current) {
+                    return;
+                }
 
-            if (!editorInstanceRef.current) {
-                editorInstanceRef.current = monaco.editor.createDiffEditor(editorRef.current, {
-                    originalEditable: false,
-                    readOnly,
-                    automaticLayout: true,
-                    fontSize: computedFontSize,
-                    fontFamily: computedFontFamily,
-                    wordWrap: 'on',
-                    renderSideBySide: renderMode !== 'inline',
-                    minimap: { enabled: false },
-                    diffWordWrap: 'on',
-                });
-            }
+                monacoApiRef.current = monacoApi;
 
-            const editor = editorInstanceRef.current;
-            editor.updateOptions({
-                readOnly,
-                renderSideBySide: renderMode !== 'inline',
-                diffWordWrap: 'on',
-                fontFamily: computedFontFamily,
-                fontSize: computedFontSize,
-            });
-
-            monaco.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
-
-            const originalModel = monaco.editor.createModel(oldText ?? '', language);
-            const modifiedModel = monaco.editor.createModel(newText ?? '', language);
-
-            editor.setModel({
-                original: originalModel,
-                modified: modifiedModel,
-            });
-
-            const previousModels = modelsRef.current;
-            modelsRef.current = { original: originalModel, modified: modifiedModel };
-            previousModels?.original?.dispose();
-            previousModels?.modified?.dispose();
-
-            disposeListeners();
-
-            const modifiedEditor = editor.getModifiedEditor();
-
-            if (onChange && !readOnly) {
-                changeListenerRef.current = modifiedEditor.onDidChangeModelContent(() => {
-                    onChange(modifiedEditor.getValue());
-                });
-            }
-
-            if (onScroll) {
-                scrollListenerRef.current = modifiedEditor.onDidScrollChange(() => {
-                    onScroll({
-                        scrollTop: modifiedEditor.getScrollTop(),
-                        scrollHeight: modifiedEditor.getScrollHeight(),
-                        clientHeight: modifiedEditor.getLayoutInfo().height,
+                if (!editorInstanceRef.current) {
+                    editorInstanceRef.current = monacoApi.editor.createDiffEditor(editorRef.current, {
+                        originalEditable: false,
+                        readOnly,
+                        automaticLayout: true,
+                        fontSize: computedFontSize,
+                        fontFamily: computedFontFamily,
+                        wordWrap: 'on',
+                        renderSideBySide: renderMode !== 'inline',
+                        minimap: { enabled: false },
+                        diffWordWrap: 'on',
                     });
+                }
+
+                const editor = editorInstanceRef.current;
+                editor.updateOptions({
+                    readOnly,
+                    renderSideBySide: renderMode !== 'inline',
+                    diffWordWrap: 'on',
+                    fontFamily: computedFontFamily,
+                    fontSize: computedFontSize,
                 });
+
+                monacoApi.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
+
+                const originalModel = monacoApi.editor.createModel(oldText ?? '', language);
+                const modifiedModel = monacoApi.editor.createModel(newText ?? '', language);
+
+                editor.setModel({
+                    original: originalModel,
+                    modified: modifiedModel,
+                });
+
+                const previousModels = modelsRef.current;
+                modelsRef.current = { original: originalModel, modified: modifiedModel };
+                previousModels?.original?.dispose();
+                previousModels?.modified?.dispose();
+
+                disposeListeners();
+
+                const modifiedEditor = editor.getModifiedEditor();
+
+                if (onChange && !readOnly) {
+                    changeListenerRef.current = modifiedEditor.onDidChangeModelContent(() => {
+                        onChange(modifiedEditor.getValue());
+                    });
+                }
+
+                if (onScroll) {
+                    scrollListenerRef.current = modifiedEditor.onDidScrollChange(() => {
+                        onScroll({
+                            scrollTop: modifiedEditor.getScrollTop(),
+                            scrollHeight: modifiedEditor.getScrollHeight(),
+                            clientHeight: modifiedEditor.getLayoutInfo().height,
+                        });
+                    });
+                }
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to initialize Monaco diff editor', error);
             }
-        });
+        };
+
+        initializeDiffEditor();
 
         return () => {
             isCancelled = true;
@@ -143,6 +157,7 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
                 modelsRef.current.modified?.dispose();
                 modelsRef.current = null;
             }
+            monacoApiRef.current = null;
         };
     }, [disposeListeners]);
 
