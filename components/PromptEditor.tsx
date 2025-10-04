@@ -482,7 +482,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             fontSize={settings.editorFontSize}
           />
         );
-    const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} />;
+    const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} settings={settings} />;
     
     switch(viewMode) {
         case 'edit': return editor;

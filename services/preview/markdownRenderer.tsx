@@ -10,7 +10,8 @@ import type { Highlighter } from 'shiki';
 import mermaid from 'mermaid';
 import plantumlEncoder from 'plantuml-encoder';
 import type { IRenderer } from './IRenderer';
-import type { LogLevel } from '../../types';
+import type { LogLevel, Settings } from '../../types';
+import { DEFAULT_SETTINGS } from '../../constants';
 import { useTheme } from '../../hooks/useTheme';
 import { getSharedHighlighter } from './shikiHighlighter';
 
@@ -18,6 +19,7 @@ import 'katex/dist/katex.min.css';
 
 interface MarkdownViewerProps {
   content: string;
+  settings: Settings;
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 }
 
@@ -101,28 +103,71 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
 
 interface PlantUMLDiagramProps {
   code: string;
+  mode: Settings['plantumlRendererMode'];
 }
 
 const PLANTUML_LANGS = ['plantuml', 'puml', 'uml'];
 const PLANTUML_SERVER = 'https://www.plantuml.com/plantuml/svg';
 
-const PlantUMLDiagram: React.FC<PlantUMLDiagramProps> = ({ code }) => {
-  const [hasError, setHasError] = useState(false);
+interface PlantUMLErrorProps {
+  message: string;
+  details?: string | null;
+}
 
-  const encoded = useMemo(() => {
+const PlantUMLError: React.FC<PlantUMLErrorProps> = ({ message, details }) => (
+  <div className="df-plantuml" role="alert">
+    <div className="df-plantuml-error">
+      <div className="df-plantuml-error__message">{message}</div>
+      {details && details.trim() && (
+        <details className="df-plantuml-error__details">
+          <summary>Technical details</summary>
+          <code>{details}</code>
+        </details>
+      )}
+    </div>
+  </div>
+);
+
+const PlantUMLRemoteDiagram: React.FC<{ code: string }> = ({ code }) => {
+  const { encoded, reason, error } = useMemo(() => {
+    const trimmed = code.trim();
+    if (!trimmed) {
+      return { encoded: null, reason: 'empty' as const, error: 'The PlantUML code block is empty.' };
+    }
     try {
-      return plantumlEncoder.encode(code.trim());
+      return { encoded: plantumlEncoder.encode(trimmed), reason: 'ok' as const, error: null };
     } catch (err) {
-      return null;
+      return {
+        encoded: null,
+        reason: 'encode-error' as const,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }, [code]);
 
+  const [hasError, setHasError] = useState(false);
+  const [errorDetails, setErrorDetails] = useState<string | null>(error);
+
+  useEffect(() => {
+    setHasError(false);
+    setErrorDetails(error);
+  }, [error, encoded, code]);
+
   if (!encoded) {
-    return <div className="df-plantuml df-plantuml-error">Unable to encode PlantUML diagram.</div>;
+    const message =
+      reason === 'empty'
+        ? 'PlantUML diagram is empty.'
+        : 'Unable to encode PlantUML diagram.';
+    return <PlantUMLError message={message} details={errorDetails} />;
   }
 
   if (hasError) {
-    return <div className="df-plantuml df-plantuml-error">Failed to load PlantUML diagram from server.</div>;
+    return (
+      <PlantUMLError
+        message="Failed to load PlantUML diagram from remote server."
+        details={errorDetails ?? `Request URL: ${PLANTUML_SERVER}/${encoded}`}
+      />
+    );
   }
 
   return (
@@ -131,13 +176,121 @@ const PlantUMLDiagram: React.FC<PlantUMLDiagramProps> = ({ code }) => {
         src={`${PLANTUML_SERVER}/${encoded}`}
         alt="PlantUML diagram"
         loading="lazy"
-        onError={() => setHasError(true)}
+        onError={() => {
+          setHasError(true);
+          setErrorDetails(`Request URL: ${PLANTUML_SERVER}/${encoded}`);
+        }}
       />
     </div>
   );
 };
 
-const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ content, onScroll }, ref) => {
+interface OfflineRenderState {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  svg?: string;
+  error?: string;
+  details?: string | null;
+}
+
+const PlantUMLOfflineDiagram: React.FC<{ code: string }> = ({ code }) => {
+  const [state, setState] = useState<OfflineRenderState>({ status: 'idle' });
+
+  useEffect(() => {
+    let cancelled = false;
+    const trimmed = code.trim();
+
+    if (!trimmed) {
+      setState({ status: 'error', error: 'PlantUML diagram is empty.', details: null });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (typeof window === 'undefined' || !window.electronAPI?.renderPlantUML) {
+      setState({
+        status: 'error',
+        error: 'Local PlantUML renderer is not available in this environment.',
+        details: 'Switch to remote rendering or run the desktop app with a Java runtime installed.',
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setState({ status: 'loading' });
+
+    window.electronAPI
+      .renderPlantUML(trimmed, 'svg')
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        if (result?.success && result.svg) {
+          setState({ status: 'success', svg: result.svg });
+        } else {
+          setState({
+            status: 'error',
+            error: result?.error || 'The local PlantUML renderer returned no output.',
+            details: result?.details ?? null,
+          });
+        }
+      })
+      .catch((err) => {
+        if (cancelled) {
+          return;
+        }
+        const details = err instanceof Error ? err.message : String(err);
+        setState({
+          status: 'error',
+          error: 'Unable to render PlantUML diagram locally.',
+          details,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code]);
+
+  if (state.status === 'loading' || state.status === 'idle') {
+    return (
+      <div className="df-plantuml">
+        <div className="df-plantuml-loading">Rendering diagram locally...</div>
+      </div>
+    );
+  }
+
+  if (state.status === 'error') {
+    return <PlantUMLError message={state.error ?? 'Unable to render PlantUML diagram locally.'} details={state.details} />;
+  }
+
+  if (state.status === 'success' && state.svg) {
+    return (
+      <div
+        className="df-plantuml"
+        role="img"
+        aria-label="PlantUML diagram"
+        dangerouslySetInnerHTML={{ __html: state.svg }}
+      />
+    );
+  }
+
+  return (
+    <PlantUMLError
+      message="Local PlantUML renderer did not return any SVG output."
+      details={state.details}
+    />
+  );
+};
+
+const PlantUMLDiagram: React.FC<PlantUMLDiagramProps> = ({ code, mode }) => {
+  if (mode === 'offline') {
+    return <PlantUMLOfflineDiagram code={code} />;
+  }
+  return <PlantUMLRemoteDiagram code={code} />;
+};
+
+const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ content, settings, onScroll }, ref) => {
   const { theme } = useTheme();
   const viewTheme: 'light' | 'dark' = theme === 'dark' ? 'dark' : 'light';
   const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
@@ -200,7 +353,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         const raw = React.Children.toArray(codeChild.props.children)
           .map((child) => (typeof child === 'string' ? child : ''))
           .join('');
-        return <PlantUMLDiagram code={raw} />;
+        return <PlantUMLDiagram code={raw} mode={settings.plantumlRendererMode} />;
       }
 
       const baseClassName = ['df-code-block', className].filter(Boolean).join(' ');
@@ -627,7 +780,8 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-mermaid svg,
-        .df-plantuml img {
+        .df-plantuml img,
+        .df-plantuml svg {
           width: 100%;
           height: auto;
         }
@@ -637,9 +791,6 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           margin-top: 0.75rem;
           font-size: 0.9rem;
           color: rgb(var(--color-destructive-text));
-        }
-
-        .df-mermaid-error {
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
@@ -647,11 +798,13 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           text-align: left;
         }
 
-        .df-mermaid-error__message {
+        .df-mermaid-error__message,
+        .df-plantuml-error__message {
           font-weight: 600;
         }
 
-        .df-mermaid-error__details {
+        .df-mermaid-error__details,
+        .df-plantuml-error__details {
           width: 100%;
           border: 1px solid rgba(var(--color-border), 0.6);
           border-radius: 0.5rem;
@@ -660,18 +813,25 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           color: rgba(var(--color-text-secondary), 0.95);
         }
 
-        .df-mermaid-error__details > summary {
+        .df-mermaid-error__details > summary,
+        .df-plantuml-error__details > summary {
           cursor: pointer;
           font-weight: 600;
           color: rgb(var(--color-destructive-text));
         }
 
-        .df-mermaid-error__details code {
+        .df-mermaid-error__details code,
+        .df-plantuml-error__details code {
           display: block;
           margin-top: 0.5rem;
           word-break: break-word;
           font-size: 0.85rem;
           color: rgba(var(--color-text), 0.95);
+        }
+
+        .df-plantuml-loading {
+          font-size: 0.9rem;
+          color: rgba(var(--color-text-secondary), 0.9);
         }
 
         .df-markdown .katex {
@@ -695,9 +855,11 @@ export class MarkdownRenderer implements IRenderer {
     content: string,
     addLog?: (level: LogLevel, message: string) => void,
     languageId?: string | null,
+    settings?: Settings,
   ): Promise<{ output: React.ReactElement; error?: string }> {
     try {
-      return { output: <MarkdownViewer content={content} /> };
+      const effectiveSettings = settings ?? DEFAULT_SETTINGS;
+      return { output: <MarkdownViewer content={content} settings={effectiveSettings} /> };
     } catch (e) {
       const error = e instanceof Error ? e.message : 'Failed to render Markdown';
       addLog?.('ERROR', `[MarkdownRenderer] Render failed: ${error}`);

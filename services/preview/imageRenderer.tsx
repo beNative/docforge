@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { IRenderer } from './IRenderer';
-import type { LogLevel } from '../../types';
+import type { LogLevel, Settings } from '../../types';
 
 type SupportedImageType =
   | 'image/png'
@@ -299,7 +299,12 @@ export class ImageRenderer implements IRenderer {
     return this.supportedIds.includes(normalized);
   }
 
-  async render(content: string, addLog?: (level: LogLevel, message: string) => void, languageId?: string | null) {
+  async render(
+    content: string,
+    addLog?: (level: LogLevel, message: string) => void,
+    languageId?: string | null,
+    _settings?: Settings,
+  ) {
     return { output: <ImagePreview content={content} languageId={languageId} /> };
   }
 }

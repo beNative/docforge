@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   getPlatform: () => ipcRenderer.invoke('app:get-platform'),
   getLogPath: () => ipcRenderer.invoke('app:get-log-path'),
+  renderPlantUML: (diagram: string, format: 'svg' = 'svg') => ipcRenderer.invoke('plantuml:render-svg', diagram, format),
   updaterSetAllowPrerelease: (allow: boolean) => ipcRenderer.send('updater:set-allow-prerelease', allow),
   onUpdateDownloaded: (callback: (version: string) => void) => {
     const handler = (_: IpcRendererEvent, version: string) => callback(version);

@@ -133,13 +133,22 @@ Accessed via the gear icon in the title bar. The settings are organized into cat
 - **LLM Provider:** Configure your connection to a local AI service. You can detect running services and select a model.
 - **Appearance:** Change the UI scale and choose from different icon sets.
 - **Keyboard Shortcuts:** View and customize keyboard shortcuts for all major application actions. You can record a new key combination for any command.
-- **General:** Configure application behavior, like auto-saving logs and opting into pre-release updates.
+- **General:** Configure application behavior, like auto-saving logs, opting into pre-release updates, and choosing how PlantUML diagrams are rendered.
 - **Database:** View detailed statistics about your local database file, and perform maintenance tasks such as creating a compressed backup, checking file integrity, and optimizing the database size (`VACUUM`).
 - **Advanced:** View and edit the raw JSON configuration file using an interactive tree or a raw text editor, and import/export your settings.
 
 ### Info View
 
 Accessed via the info icon in the title bar. This view contains tabs for reading the application's `README.md`, this `FUNCTIONAL_MANUAL.md`, the `TECHNICAL_MANUAL.md`, and the `VERSION_LOG.md`.
+
+#### PlantUML Rendering Modes
+
+The **General** settings category includes a **PlantUML Rendering** selector. Choose between:
+
+- **Remote (plantuml.com):** Encodes the diagram and requests the SVG from the public PlantUML server.
+- **Offline (local renderer):** Invokes the bundled PlantUML engine inside the desktop application. This mode requires a local Java Runtime Environment and access to Graphviz (or the bundled `viz.js` assets) so the renderer can generate diagrams without contacting plantuml.com.
+
+If the Java runtime is unavailable, DocForge will report the error in the preview and you can switch back to remote rendering at any time.
 
 ### Logger Panel
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PreviewPane from './PreviewPane';
 import Spinner from './Spinner';
 import { useLogger } from '../hooks/useLogger';
+import type { Settings } from '../types';
 
 type DocTab = 'Readme' | 'Functional Manual' | 'Technical Manual' | 'Version Log';
 
@@ -12,7 +13,11 @@ const docFiles: Record<DocTab, string> = {
   'Version Log': 'VERSION_LOG.md',
 };
 
-const InfoView: React.FC = () => {
+interface InfoViewProps {
+  settings: Settings;
+}
+
+const InfoView: React.FC<InfoViewProps> = ({ settings }) => {
   const [activeTab, setActiveTab] = useState<DocTab>('Readme');
   const [documents, setDocuments] = useState<Record<DocTab, string>>({
     'Readme': 'Loading...',
@@ -100,7 +105,7 @@ const InfoView: React.FC = () => {
             <span>Loading documentation...</span>
           </div>
         ) : (
-          <PreviewPane content={documents[activeTab]} language="markdown" addLog={addLog} />
+          <PreviewPane content={documents[activeTab]} language="markdown" addLog={addLog} settings={settings} />
         )}
       </div>
     </div>

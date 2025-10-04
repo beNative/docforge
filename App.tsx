@@ -1090,7 +1090,7 @@ const MainApp: React.FC = () => {
     }
 
     const renderMainContent = () => {
-        if (view === 'info') return <InfoView />;
+        if (view === 'info') return <InfoView settings={settings} />;
         if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} commands={enrichedCommands} />;
         
         if (activeTemplate) {
