@@ -26,28 +26,45 @@ interface MermaidDiagramProps {
   theme: 'light' | 'dark';
 }
 
+type SafeParseErrorHandler = ((err: unknown, hash?: unknown) => void) & {
+  lastError?: Error | null;
+};
+
+const normalizeMermaidError = (err: unknown, hash?: unknown) => {
+  if (err instanceof Error) {
+    return err;
+  }
+
+  if (typeof err === 'string') {
+    return new Error(err);
+  }
+
+  const message =
+    typeof (hash as { message?: string } | undefined)?.message === 'string'
+      ? (hash as { message?: string }).message!
+      : 'Mermaid diagram parsing failed with an unknown error.';
+
+  return new Error(message);
+};
+
 const applySafeMermaidParseError = (
-  handler?: (err: unknown, hash?: unknown) => void,
+  handler?: SafeParseErrorHandler,
 ) => {
   const mermaidWithParseError = mermaid as unknown as {
     parseError?: (err: unknown, hash?: unknown) => void;
     mermaidAPI?: { parseError?: (err: unknown, hash?: unknown) => void };
   };
 
-  const safeHandler =
-    handler ?? ((err: unknown, hash?: unknown) => {
-      const details =
-        err instanceof Error
-          ? err.message
-          : typeof err === 'string'
-            ? err
-            : typeof (hash as { message?: string } | undefined)?.message === 'string'
-              ? (hash as { message?: string }).message!
-              : 'Mermaid diagram parsing failed with an unknown error.';
-
-      console.error('[MermaidDiagram] Mermaid parser error', err, hash);
-      throw err instanceof Error ? err : new Error(details);
-    });
+  const safeHandler: SafeParseErrorHandler =
+    handler ??
+    Object.assign(
+      (err: unknown, hash?: unknown) => {
+        const normalized = normalizeMermaidError(err, hash);
+        safeHandler.lastError = normalized;
+        console.error('[MermaidDiagram] Mermaid parser error', normalized, hash);
+      },
+      { lastError: null as Error | null },
+    );
 
   mermaidWithParseError.parseError = safeHandler;
   if (mermaidWithParseError.mermaidAPI) {
@@ -81,9 +98,11 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
         return;
       }
 
+      const safeParseError = applySafeMermaidParseError();
+      safeParseError.lastError = null;
+
       try {
         setError(null);
-        const safeParseError = applySafeMermaidParseError();
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: 'loose',
@@ -92,6 +111,9 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
         });
         applySafeMermaidParseError(safeParseError);
         const { svg } = await mermaid.render(renderIdRef.current, trimmed);
+        if (safeParseError.lastError) {
+          throw safeParseError.lastError;
+        }
         if (!cancelled) {
           target.innerHTML = svg;
           setError(null);
@@ -100,8 +122,12 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
       } catch (err) {
         if (!cancelled) {
           target.innerHTML = '';
-          const details = err instanceof Error ? err.message : String(err);
-          console.error('[MermaidDiagram] Failed to render diagram', err);
+          const normalizedError =
+            err instanceof Error
+              ? err
+              : safeParseError.lastError ?? normalizeMermaidError(err);
+          const details = normalizedError.message;
+          console.error('[MermaidDiagram] Failed to render diagram', normalizedError);
           setError('Unable to render the Mermaid diagram. Please verify the diagram syntax.');
           setErrorDetails(details);
         }
