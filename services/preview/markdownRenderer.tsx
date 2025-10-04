@@ -35,9 +35,19 @@ const ensureMermaidParseErrorHandler = (() => {
     }
 
     const handler = (error: unknown) => {
-      throw error instanceof Error
-        ? error
-        : new Error(typeof error === 'string' ? error : 'Unknown Mermaid parse error');
+      if (typeof document !== 'undefined') {
+        // The default Mermaid handler injects a detached global overlay on parse errors.
+        // Replace it with a scoped logger so any failure stays confined to the preview.
+        document.querySelectorAll('body > .mermaid, body > .mermaidTooltip').forEach((node) => {
+          if (node.parentElement === document.body) {
+            document.body.removeChild(node);
+          }
+        });
+      }
+
+      if (error) {
+        console.error('[MermaidDiagram] Mermaid parse error', error);
+      }
     };
 
     if (typeof mermaid.setParseErrorHandler === 'function') {
