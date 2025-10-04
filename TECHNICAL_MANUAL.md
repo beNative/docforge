@@ -14,6 +14,7 @@ This document provides a technical overview of the DocForge application's archit
 -   **Bundler:** [esbuild](https://esbuild.github.io/) for fast and efficient bundling of the application's source code.
 -   **Styling:** [Tailwind CSS](https://tailwindcss.com/) for a utility-first CSS framework.
 -   **Packaging:** [electron-builder](https://www.electron.build/) for creating distributable application packages.
+-   **Diagram Rendering:** [PlantUML](https://plantuml.com/) via either the public plantuml.com service or the bundled [`node-plantuml`](https://www.npmjs.com/package/node-plantuml) renderer. Offline rendering requires a locally installed Java Runtime Environment and access to Graphviz (or the cached `viz.js` binary) so that diagrams can be rendered without network access.
 
 ---
 
@@ -93,7 +94,8 @@ This system provides a consistent and extensible editing experience for all docu
 -   **`CodeEditor.tsx`:** A React component that wraps and configures the Monaco Editor instance. It's responsible for managing the editor's content, theme, and language for syntax highlighting based on props.
 -   **`PreviewPane.tsx`:** This component is responsible for displaying the rendered output of a document. It debounces content updates for performance and uses the `PreviewService` to get the correct output.
 -   **`services/previewService.ts`:** This service acts as a registry for all available renderer "plugins." It exposes a method, `getRendererForLanguage()`, which finds and returns the appropriate renderer for a given language ID (e.g., 'markdown').
--   **Renderer Plugins (`services/preview/`):** Each file format with a preview is supported by a dedicated renderer class that implements the `IRenderer` interface. This makes the system highly extensible: to support a new format, one only needs to create a new renderer class and add it to the `previewService` registry. Currently, renderers for Markdown, HTML, and plaintext (fallback) are implemented.
+-   **Renderer Plugins (`services/preview/`):** Each file format with a preview is supported by a dedicated renderer class that implements the `IRenderer` interface. This makes the system highly extensible: to support a new format, one only needs to create a new renderer class and add it to the `previewService` registry. The bundled plugins cover Markdown (with Mermaid + PlantUML support), standalone PlantUML documents, HTML, PDFs, common image formats, and a plaintext fallback renderer.
+    -   Both the Markdown renderer and the standalone PlantUML renderer share the `PlantUMLDiagram` component, which routes diagrams through either the remote plantuml.com server or the offline `node-plantuml` IPC bridge depending on the active setting.
 
 ### LLM Service (`services/llmService.ts`)
 

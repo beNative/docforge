@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { previewService } from '../services/previewService';
 import Spinner from './Spinner';
 import { useTheme } from '../hooks/useTheme';
-import type { LogLevel } from '../types';
+import type { LogLevel, Settings } from '../types';
 
 interface PreviewPaneProps {
   content: string;
   language: string | null;
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
   addLog: (level: LogLevel, message: string) => void;
+  settings: Settings;
 }
 
-const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ content, language, onScroll, addLog }, ref) => {
+const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ content, language, onScroll, addLog, settings }, ref) => {
   const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,7 +29,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
 
       setError(null);
       const renderer = previewService.getRendererForLanguage(language);
-      const result = await renderer.render(content, addLog, language);
+      const result = await renderer.render(content, addLog, language, settings);
 
       clearTimeout(loadingTimer);
       if (!isCancelled) {
@@ -57,7 +58,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
       isCancelled = true;
       clearTimeout(debounceTimer);
     };
-  }, [content, language, addLog, ref, onScroll]);
+  }, [content, language, addLog, ref, onScroll, settings]);
 
   return (
     <div className="w-full h-full bg-secondary">

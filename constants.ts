@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   iconSet: 'heroicons',
   autoSaveLogs: false,
   allowPrerelease: false,
+  plantumlRendererMode: 'remote',
   uiScale: 100,
   documentTreeIndent: 16,
   documentTreeVerticalSpacing: 4,

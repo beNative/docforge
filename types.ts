@@ -27,6 +27,10 @@ declare global {
       getAppVersion: () => Promise<string>;
       getPlatform: () => Promise<string>;
       getLogPath: () => Promise<string>;
+      renderPlantUML: (
+        diagram: string,
+        format?: 'svg'
+      ) => Promise<{ success: boolean; svg?: string; error?: string; details?: string }>;
       updaterSetAllowPrerelease: (allow: boolean) => void;
       onUpdateDownloaded: (callback: (version: string) => void) => () => void;
       quitAndInstallUpdate: () => void;
@@ -259,6 +263,7 @@ export interface Settings {
   iconSet: 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material';
   autoSaveLogs: boolean;
   allowPrerelease: boolean;
+  plantumlRendererMode: 'remote' | 'offline';
   uiScale: number;
   documentTreeIndent: number;
   documentTreeVerticalSpacing: number;

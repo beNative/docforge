@@ -4,6 +4,7 @@ import { MarkdownRenderer } from './preview/markdownRenderer';
 import { PlaintextRenderer } from './preview/plaintextRenderer';
 import { PdfRenderer } from './preview/pdfRenderer';
 import { ImageRenderer } from './preview/imageRenderer';
+import { PlantUMLRenderer } from './preview/plantumlRenderer';
 
 class PreviewService {
   private renderers: IRenderer[];
@@ -12,6 +13,7 @@ class PreviewService {
     // The order is important: more specific renderers should come before the generic fallback.
     this.renderers = [
       new MarkdownRenderer(),
+      new PlantUMLRenderer(),
       new HtmlRenderer(),
       new PdfRenderer(),
       new ImageRenderer(),

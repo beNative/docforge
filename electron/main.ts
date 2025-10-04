@@ -13,6 +13,7 @@ import * as zlib from 'zlib';
 import * as os from 'os';
 import * as stream from 'stream';
 import { promisify } from 'util';
+import { generate as plantumlGenerate } from 'node-plantuml';
 
 // Fix: Inform TypeScript about the __dirname global variable provided by Node.js, which is present in a CommonJS-like environment.
 declare const __dirname: string;
@@ -333,6 +334,77 @@ ipcMain.handle('docs:read', async (_, filename: string) => {
     } catch (error) {
         console.error(`Failed to read doc: ${filename}`, error);
         return { success: false, error: error instanceof Error ? error.message : `Could not read ${filename}` };
+    }
+});
+
+ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' = 'svg') => {
+    const trimmed = (diagram ?? '').trim();
+    if (!trimmed) {
+        return { success: false, error: 'Diagram content is empty.' };
+    }
+
+    if (format !== 'svg') {
+        return { success: false, error: `Unsupported PlantUML format: ${format}` };
+    }
+
+    try {
+        const generator = plantumlGenerate(trimmed, { format: 'svg' });
+        generator.out.setEncoding('utf-8');
+        generator.err.setEncoding('utf-8');
+
+        return await new Promise<{ success: boolean; svg?: string; error?: string; details?: string }>((resolve) => {
+            let svgOutput = '';
+            let errorOutput = '';
+
+            const cleanup = () => {
+                generator.out.removeAllListeners();
+                generator.err.removeAllListeners();
+            };
+
+            const resolveWithError = (message: string) => {
+                cleanup();
+                resolve({
+                    success: false,
+                    error: message,
+                    details: errorOutput.trim() || undefined,
+                });
+            };
+
+            generator.err.on('data', (chunk) => {
+                errorOutput += chunk.toString();
+            });
+
+            generator.out.on('data', (chunk) => {
+                svgOutput += chunk.toString();
+            });
+
+            generator.out.on('end', () => {
+                cleanup();
+                if (svgOutput.trim()) {
+                    resolve({ success: true, svg: svgOutput });
+                } else {
+                    resolve({
+                        success: false,
+                        error: 'PlantUML renderer produced no SVG output.',
+                        details: errorOutput.trim() || undefined,
+                    });
+                }
+            });
+
+            generator.out.on('error', (streamError) => {
+                const message = streamError instanceof Error ? streamError.message : String(streamError);
+                resolveWithError(message);
+            });
+
+            generator.err.on('error', (streamError) => {
+                const message = streamError instanceof Error ? streamError.message : String(streamError);
+                resolveWithError(message);
+            });
+        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('PlantUML rendering failed:', error);
+        return { success: false, error: message };
     }
 });
 

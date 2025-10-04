@@ -1369,8 +1369,10 @@ requests"
 };
 
 const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
+    const isOfflineRendererAvailable = typeof window !== 'undefined' && !!window.electronAPI?.renderPlantUML;
+    const offlineRendererMessage = 'Offline rendering requires the desktop application with a local Java runtime.';
     return (
-         <div id="general" ref={sectionRef} className="py-6">
+            <div id="general" ref={sectionRef} className="py-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">General</h2>
             <div className="space-y-6">
                  <SettingRow htmlFor="allowPrerelease" label="Receive Pre-releases" description="Get notified about new beta versions and test features early.">
@@ -1378,6 +1380,31 @@ const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurre
                 </SettingRow>
                  <SettingRow htmlFor="autoSaveLogs" label="Auto-save Logs" description="Automatically save all logs to a daily file on your computer for debugging.">
                     <ToggleSwitch id="autoSaveLogs" checked={settings.autoSaveLogs} onChange={(val) => setCurrentSettings(s => ({...s, autoSaveLogs: val}))} />
+                </SettingRow>
+                 <SettingRow
+                    htmlFor="plantumlRendererMode"
+                    label="PlantUML Rendering"
+                    description="Choose whether PlantUML diagrams are rendered via the public server or the local renderer."
+                >
+                    <div className="flex flex-col items-end w-full md:items-end">
+                        <select
+                            id="plantumlRendererMode"
+                            value={settings.plantumlRendererMode}
+                            onChange={(event) => setCurrentSettings(prev => ({
+                                ...prev,
+                                plantumlRendererMode: event.target.value as Settings['plantumlRendererMode'],
+                            }))}
+                            className="w-full md:w-64 px-3 py-2 text-sm rounded-md border border-border-color bg-background text-text-main focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        >
+                            <option value="remote">Remote (plantuml.com)</option>
+                            <option value="offline">Offline (local renderer)</option>
+                        </select>
+                        {!isOfflineRendererAvailable && (
+                            <p className={`mt-2 text-xs ${settings.plantumlRendererMode === 'offline' ? 'text-destructive-text' : 'text-text-secondary'} text-right md:text-left md:w-full`}>
+                                {offlineRendererMessage}
+                            </p>
+                        )}
+                    </div>
                 </SettingRow>
             </div>
         </div>
