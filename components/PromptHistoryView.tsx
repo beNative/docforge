@@ -325,10 +325,18 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Selected Version"} size="xs">
                             {isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}
                         </IconButton>
-                        <Button onClick={() => { addLog('INFO', `User action: Restore version for document "${document.title}".`); onRestore(focusedVersion.content); }} disabled={focusedIndex === 0} variant="secondary" className="px-1.5 py-0.5 text-[11px]">
-                            <UndoIcon className="w-3 h-3 mr-1.5"/>
-                            Restore Selected Version
-                        </Button>
+                        <IconButton
+                            onClick={() => {
+                                addLog('INFO', `User action: Restore version for document "${document.title}".`);
+                                onRestore(focusedVersion.content);
+                            }}
+                            disabled={focusedIndex === 0}
+                            tooltip="Restore Selected Version"
+                            size="xs"
+                            className="disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <UndoIcon className="w-4 h-4" />
+                        </IconButton>
                     </div>
                 </div>
                 
