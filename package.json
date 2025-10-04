@@ -10,6 +10,7 @@
     "package": "npm run build && electron-builder",
     "publish": "npm run build && electron-builder --publish always",
     "prepare:icons": "node scripts/prepare-icons.mjs",
+    "test": "node scripts/validate-gui-test-plan.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:css": "tailwindcss -i ./styles/tailwind.css -o ./dist/tailwind.css --minify",
     "dev:web": "npm run build && http-server -c-1 -p 4173 ."
