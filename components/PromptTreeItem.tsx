@@ -193,14 +193,14 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onContextMenu={handleContextMenu}
-      style={{ paddingLeft: `${level * 16}px` }}
+      style={{ paddingLeft: `${level * 32}px` }}
       className="relative"
       data-item-id={node.id}
     >
         <div
             onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
             onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
-            className={`w-full text-left p-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
+            className={`w-full text-left px-1 py-0.5 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
                 isSelected ? 'bg-tree-selected text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
             } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
         >
@@ -261,12 +261,12 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         {dropPosition === 'inside' && <div className="absolute inset-0 border-2 border-primary rounded-md pointer-events-none bg-primary/10" />}
 
         {isFolder && isExpanded && (
-            <ul>
+            <ul className="pl-0 ml-0">
                 {node.children.map((childNode, index) => (
-                    <DocumentTreeItem 
-                        key={childNode.id} 
-                        {...props} 
-                        node={childNode} 
+                    <DocumentTreeItem
+                        key={childNode.id}
+                        {...props}
+                        node={childNode}
                         level={level + 1}
                         canMoveUp={index > 0}
                         canMoveDown={index < node.children.length - 1}
