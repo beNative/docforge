@@ -1571,7 +1571,7 @@ const MainApp: React.FC = () => {
                         onNewDocument={(parentId) => handleNewDocument(parentId)}
                         onNewSubfolder={(parentId) => handleNewFolder(parentId)}
                         onImportFiles={handleImportFilesIntoFolder}
-                        onRenameFolder={handleStartRenamingNode}
+                        onRenameFolderTitle={handleRenameNode}
                         folderSearchTerm={folderSearchTerm}
                         onFolderSearchTermChange={setFolderSearchTerm}
                         searchResults={folderSearchResults}
