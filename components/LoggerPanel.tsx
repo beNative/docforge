@@ -119,8 +119,8 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
         onMouseDown={onResizeStart}
         className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
       />
-      <header className="flex items-center justify-between px-2 py-1.5 border-b border-border-color flex-shrink-0 gap-2">
-        <h3 className="text-[11px] font-semibold text-text-main">Application Logs</h3>
+      <header className="flex items-center justify-between px-2 h-7 border-b border-border-color bg-secondary flex-shrink-0 gap-2">
+        <h3 className="text-xs font-semibold text-text-secondary tracking-wider uppercase">Application Logs</h3>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-text-secondary">Level:</span>
@@ -145,7 +145,7 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
                 className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-text-secondary hover:text-text-main px-1"
                 aria-label="Clear log filter"
               >
-                ×
+                Ã—
               </button>
             )}
           </div>

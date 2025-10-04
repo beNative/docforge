@@ -341,17 +341,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
-      <header className="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0">
-        <h1 className="text-xl font-semibold text-text-main">Settings</h1>
-        <div className="flex flex-col items-end gap-1">
-          <Button onClick={handleSave} disabled={isSaveDisabled} variant="primary">
-            {isDirty ? 'Save Changes' : 'Saved'}
-          </Button>
+      <header className="flex items-center justify-between px-4 h-7 border-b border-border-color bg-secondary flex-shrink-0">
+        <h1 className="text-xs font-semibold text-text-secondary tracking-wider uppercase">Settings</h1>
+        <div className="flex items-center gap-2">
           {pythonValidationError && (
-            <p className="text-[10px] text-destructive-text max-w-xs text-right">
+            <p className="text-[10px] text-destructive-text max-w-xs text-right leading-tight">
               Python settings error: {pythonValidationError}
             </p>
           )}
+          <Button onClick={handleSave} disabled={isSaveDisabled} variant="primary" className="whitespace-nowrap">
+            {isDirty ? 'Save Changes' : 'Saved'}
+          </Button>
         </div>
       </header>
       <div className="flex-1 flex overflow-hidden">
