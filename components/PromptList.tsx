@@ -8,6 +8,8 @@ interface DocumentListProps {
   documents: DocumentOrFolder[]; // needed for the empty state check
   selectedIds: Set<string>;
   focusedItemId: string | null;
+  indentPerLevel: number;
+  verticalSpacing: number;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
   onDeleteNode: (id: string, shiftKey?: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
@@ -24,8 +26,27 @@ interface DocumentListProps {
   onRenameComplete: () => void;
 }
 
-const DocumentList: React.FC<DocumentListProps> = ({ 
-  tree, documents, selectedIds, focusedItemId, onSelectNode, onDeleteNode, onRenameNode, onMoveNode, onDropFiles, onCopyNodeContent, searchTerm, expandedIds, onToggleExpand, onMoveUp, onMoveDown, onContextMenu, renamingNodeId, onRenameComplete
+const DocumentList: React.FC<DocumentListProps> = ({
+  tree,
+  documents,
+  selectedIds,
+  focusedItemId,
+  indentPerLevel,
+  verticalSpacing,
+  onSelectNode,
+  onDeleteNode,
+  onRenameNode,
+  onMoveNode,
+  onDropFiles,
+  onCopyNodeContent,
+  searchTerm,
+  expandedIds,
+  onToggleExpand,
+  onMoveUp,
+  onMoveDown,
+  onContextMenu,
+  renamingNodeId,
+  onRenameComplete
 }) => {
   // Fix: Corrected useState declaration syntax from `=>` to `=`. This resolves all subsequent "cannot find name" errors.
   const [isRootDropping, setIsRootDropping] = useState(false);
@@ -95,12 +116,14 @@ const DocumentList: React.FC<DocumentListProps> = ({
         onDragLeave={handleRootDragLeave}
         onContextMenu={handleRootContextMenu}
     >
-        <ul className="space-y-0 p-1">
+        <ul className="space-y-0 p-1 m-0 list-none">
         {tree.map((node, index) => (
             <DocumentTreeItem
                 key={node.id}
                 node={node}
                 level={0}
+                indentPerLevel={indentPerLevel}
+                verticalSpacing={verticalSpacing}
                 selectedIds={selectedIds}
                 focusedItemId={focusedItemId}
                 expandedIds={displayExpandedIds}

@@ -11,6 +11,8 @@ export interface DocumentNode extends DocumentOrFolder {
 interface DocumentTreeItemProps {
   node: DocumentNode;
   level: number;
+  indentPerLevel: number;
+  verticalSpacing: number;
   selectedIds: Set<string>;
   focusedItemId: string | null;
   expandedIds: Set<string>;
@@ -76,7 +78,9 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     canMoveDown,
     onContextMenu,
     renamingNodeId,
-    onRenameComplete
+    onRenameComplete,
+    indentPerLevel,
+    verticalSpacing
   } = props;
   
   const [isRenaming, setIsRenaming] = useState(false);
@@ -184,6 +188,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onContextMenu(e, node.id);
   }
 
+  const safeIndent = Math.max(indentPerLevel, 0);
+  const paddingTopBottom = Math.max(verticalSpacing, 0);
+  const basePaddingLeft = 4; // matches Tailwind px-1 for consistent baseline spacing
+  const rowPaddingLeft = basePaddingLeft + Math.max(level, 0) * safeIndent;
+
   return (
     <li
       ref={itemRef}
@@ -193,14 +202,14 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onContextMenu={handleContextMenu}
-      style={{ paddingLeft: `${level * 16}px` }}
       className="relative"
       data-item-id={node.id}
     >
         <div
             onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
             onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
-            className={`w-full text-left p-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
+            style={{ paddingTop: `${paddingTopBottom}px`, paddingBottom: `${paddingTopBottom}px`, paddingLeft: `${rowPaddingLeft}px` }}
+            className={`w-full text-left pr-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
                 isSelected ? 'bg-tree-selected text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
             } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
         >
@@ -261,13 +270,17 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         {dropPosition === 'inside' && <div className="absolute inset-0 border-2 border-primary rounded-md pointer-events-none bg-primary/10" />}
 
         {isFolder && isExpanded && (
-            <ul>
+            <ul
+                className="m-0 pl-0 list-none space-y-0"
+            >
                 {node.children.map((childNode, index) => (
-                    <DocumentTreeItem 
-                        key={childNode.id} 
-                        {...props} 
-                        node={childNode} 
+                    <DocumentTreeItem
+                        key={childNode.id}
+                        {...props}
+                        node={childNode}
                         level={level + 1}
+                        indentPerLevel={indentPerLevel}
+                        verticalSpacing={verticalSpacing}
                         canMoveUp={index > 0}
                         canMoveDown={index < node.children.length - 1}
                     />

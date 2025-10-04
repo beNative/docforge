@@ -587,6 +587,36 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                         <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.uiScale}%</span>
                     </div>
                 </SettingRow>
+                <SettingRow label="Document Tree Row Spacing" description="Adjust the vertical padding used for each entry in the sidebar tree.">
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="documentTreeVerticalSpacing"
+                            type="range"
+                            min="0"
+                            max="16"
+                            step="1"
+                            value={settings.documentTreeVerticalSpacing}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, documentTreeVerticalSpacing: Number(e.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.documentTreeVerticalSpacing}px</span>
+                    </div>
+                </SettingRow>
+                <SettingRow label="Document Tree Indent" description="Control how far nested folders and documents are indented.">
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="documentTreeIndent"
+                            type="range"
+                            min="0"
+                            max="32"
+                            step="1"
+                            value={settings.documentTreeIndent}
+                            onChange={(e) => setCurrentSettings(prev => ({ ...prev, documentTreeIndent: Number(e.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{settings.documentTreeIndent}px</span>
+                    </div>
+                </SettingRow>
                 <SettingRow label="Icon Set" description="Customize the look of icons throughout the application.">
                     <div className="grid grid-cols-3 gap-3 w-80">
                          <CardButton name="Heroicons" value="heroicons" isSelected={settings.iconSet === 'heroicons'} onClick={(v) => setCurrentSettings(s => ({...s, iconSet: v}))}>

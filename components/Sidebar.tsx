@@ -51,6 +51,8 @@ interface SidebarProps {
   onRenameTemplate: (id: string, newTitle: string) => void;
   onNewTemplate: () => void;
   onNewFromTemplate: () => void;
+  documentTreeIndent: number;
+  documentTreeVerticalSpacing: number;
 }
 
 const DEFAULT_TEMPLATES_PANEL_HEIGHT = 160;
@@ -360,11 +362,13 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     </div>
                 </header>
                 <div className="flex-1 overflow-y-auto">
-                <DocumentList 
+                <DocumentList
                     tree={documentTree}
                     documents={props.documents}
                     selectedIds={props.selectedIds}
                     focusedItemId={focusedItemId}
+                    indentPerLevel={props.documentTreeIndent}
+                    verticalSpacing={props.documentTreeVerticalSpacing}
                     onSelectNode={props.onSelectNode}
                     onDeleteNode={props.onDeleteNode}
                     onRenameNode={props.onRenameNode}

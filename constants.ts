@@ -25,6 +25,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoSaveLogs: false,
   allowPrerelease: false,
   uiScale: 100,
+  documentTreeIndent: 16,
+  documentTreeVerticalSpacing: 4,
   customShortcuts: {},
   markdownFontSize: 16,
   markdownLineHeight: 1.7,
