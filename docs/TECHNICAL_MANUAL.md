@@ -110,3 +110,27 @@ This module handles all communication with the external Large Language Model. It
 -   **`DocumentEditor.tsx`:** The primary user-facing editor component. It serves as a layout controller, managing the view mode (editor, preview, split-screen) and containing both the `CodeEditor` (Monaco) and `PreviewPane` components. It orchestrates the flow of data between the editor and the preview.
 -   **`SettingsView.tsx`:** Manages all application settings, which are now read from and saved to the `settings` table in the database.
 -   **`DocumentHistoryView.tsx`:** This view now fetches version history for a document directly from the database, providing a reliable timeline of changes.
+
+---
+
+## 5. Build & Release Workflow
+
+Electron Builder manages the packaging and publishing workflow for DocForge. The most relevant npm scripts are:
+
+-   `npm run build` — Bundles the renderer and preload scripts, prepares assets in `dist/`, and generates platform icon binaries from the source SVG.
+-   `npm run package` — Produces distributable builds without uploading them.
+-   `npm run publish` — Builds the application and publishes artifacts using Electron Builder's configured GitHub target.
+
+### Publishing a Release
+
+1. Run `npm version <new-version> --no-git-tag-version` to bump the version in both `package.json` and `package-lock.json` without creating a Git tag.
+2. Update `VERSION_LOG.md` with a new section that captures the highlights of the release.
+3. Review and update the Markdown documentation (README, manuals, release notes) so the written guidance reflects the final state of the build.
+4. Sync the Markdown files under `docs/` with the copies at the project root.
+5. Execute `npm run publish` to package the application and upload the release artifacts to GitHub.
+
+### Application Icon Pipeline
+
+-   The canonical icon artwork lives at `assets/icon.svg`. During `npm run build` (and thus during `npm run package`/`npm run publish`), the `scripts/prepare-icons.mjs` script validates the SVG and, if valid, generates the required `icon.icns`, `icon.ico`, and `icon.png` files in the `assets/` directory using `icon-gen`.
+-   If the SVG is missing or invalid, the script logs a warning and leaves the existing binary icon assets untouched so packaging can proceed with the previous icons.
+-   To regenerate icons without running a full build, execute `npm run prepare:icons`.

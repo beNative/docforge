@@ -124,8 +124,10 @@ Electron Builder manages the packaging and publishing workflow for DocForge. The
 ### Publishing a Release
 
 1. Run `npm version <new-version> --no-git-tag-version` to bump the version in both `package.json` and `package-lock.json` without creating a Git tag.
-2. Review and update the Markdown documentation (README, manuals, version logs) so the release notes accurately describe the changes.
-3. Execute `npm run publish` to package the application and upload the release artifacts to GitHub.
+2. Update `VERSION_LOG.md` with a new section that captures the highlights of the release.
+3. Review and update the Markdown documentation (README, manuals, release notes) so the written guidance reflects the final state of the build.
+4. Sync the Markdown files under `docs/` with the copies at the project root.
+5. Execute `npm run publish` to package the application and upload the release artifacts to GitHub.
 
 ### Application Icon Pipeline
 
