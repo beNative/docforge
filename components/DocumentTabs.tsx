@@ -201,7 +201,7 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
                 aria-selected={isActive}
                 tabIndex={0}
                 data-tab-id={id}
-                className={`group relative flex items-center gap-2 px-3 py-1.5 border border-b-0 rounded-t-md cursor-pointer select-none transition-colors ${isActive ? 'bg-background text-text-main border-border-color border-b-background shadow-sm' : 'bg-secondary/60 text-text-secondary hover:text-text-main hover:bg-secondary/80 border-border-color/70'}`}
+                className={`group relative flex items-center gap-2 px-3 h-full border border-b-0 rounded-t-md cursor-pointer select-none transition-colors ${isActive ? 'bg-background text-text-main border-border-color border-b-background shadow-sm' : 'bg-secondary/60 text-text-secondary hover:text-text-main hover:bg-secondary/80 border-border-color/70'}`}
                 onClick={() => onSelectTab(id)}
                 onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
@@ -238,15 +238,15 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
     });
 
     return (
-        <div className="border-b border-border-color bg-secondary/70">
-            <div className="flex items-center gap-1 px-2">
+        <div className="border-b border-border-color bg-secondary/70 h-7 flex items-center">
+            <div className="flex items-center gap-1 px-2 w-full h-full">
                 <div
                     ref={scrollContainerRef}
-                    className="flex-1 overflow-hidden"
+                    className="flex-1 overflow-hidden h-full"
                     onDragOver={handleDragOver}
                     onDrop={handleContainerDrop}
                 >
-                    <div className="flex items-stretch gap-1 overflow-x-auto py-1 pr-2" role="tablist">
+                    <div className="flex items-stretch gap-1 overflow-x-auto h-full pr-2" role="tablist">
                         {tabElements}
                     </div>
                 </div>
