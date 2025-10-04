@@ -8,6 +8,7 @@ import { useLLMStatus } from './hooks/useLLMStatus';
 import { useLogger } from './hooks/useLogger';
 import Sidebar from './components/Sidebar';
 import DocumentEditor from './components/PromptEditor';
+import DocumentTabs from './components/DocumentTabs';
 import TemplateEditor from './components/TemplateEditor';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import SettingsView from './components/SettingsView';
@@ -87,13 +88,18 @@ const App: React.FC = () => {
     return <MainApp />;
 };
 
+type TabState = {
+    activeId: string | null;
+    order: string[];
+};
+
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
     const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
     
-    const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+    const [tabState, setTabState] = useState<TabState>({ activeId: null, order: [] });
     const [selectedIds, setSelectedIds] = useState(new Set<string>());
     const [lastClickedId, setLastClickedId] = useState<string | null>(null);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
@@ -125,6 +131,80 @@ const MainApp: React.FC = () => {
     const [folderSearchTerm, setFolderSearchTerm] = useState('');
     const [folderBodySearchMatches, setFolderBodySearchMatches] = useState<Map<string, string>>(new Map());
     const [isFolderSearchLoading, setIsFolderSearchLoading] = useState(false);
+
+    const activeNodeId = tabState.activeId;
+    const openDocumentIds = tabState.order;
+
+    const activateDocumentTab = useCallback((documentId: string) => {
+        setTabState(prev => {
+            const exists = prev.order.includes(documentId);
+            if (prev.activeId === documentId && exists) {
+                return prev;
+            }
+            const nextOrder = exists ? prev.order : [...prev.order, documentId];
+            return { order: nextOrder, activeId: documentId };
+        });
+    }, []);
+
+    const setActiveItem = useCallback((id: string | null) => {
+        setTabState(prev => {
+            if (prev.activeId === id) {
+                return prev;
+            }
+            return { order: prev.order, activeId: id };
+        });
+    }, []);
+
+    const closeDocumentTab = useCallback((documentId: string) => {
+        setTabState(prev => {
+            if (!prev.order.includes(documentId)) {
+                return prev;
+            }
+            const nextOrder = prev.order.filter(id => id !== documentId);
+            const nextActive = prev.activeId === documentId
+                ? (nextOrder[nextOrder.length - 1] ?? null)
+                : prev.activeId;
+            return { order: nextOrder, activeId: nextActive };
+        });
+    }, []);
+
+    const closeOtherDocumentTabs = useCallback((documentId: string) => {
+        setTabState(prev => {
+            if (!prev.order.includes(documentId)) {
+                return prev;
+            }
+            return { order: [documentId], activeId: documentId };
+        });
+    }, []);
+
+    const closeDocumentTabsToRight = useCallback((documentId: string) => {
+        setTabState(prev => {
+            const index = prev.order.indexOf(documentId);
+            if (index === -1) {
+                return prev;
+            }
+            const nextOrder = prev.order.slice(0, index + 1);
+            const nextActive = prev.activeId && nextOrder.includes(prev.activeId)
+                ? prev.activeId
+                : documentId;
+            return { order: nextOrder, activeId: nextActive };
+        });
+    }, []);
+
+    const reorderDocumentTabs = useCallback((fromIndex: number, toIndex: number) => {
+        setTabState(prev => {
+            if (fromIndex === toIndex) {
+                return prev;
+            }
+            if (fromIndex < 0 || toIndex < 0 || fromIndex >= prev.order.length || toIndex >= prev.order.length) {
+                return prev;
+            }
+            const nextOrder = [...prev.order];
+            const [moved] = nextOrder.splice(fromIndex, 1);
+            nextOrder.splice(toIndex, 0, moved);
+            return { order: nextOrder, activeId: prev.activeId };
+        });
+    }, []);
 
 
     const isSidebarResizing = useRef(false);
@@ -189,8 +269,8 @@ const MainApp: React.FC = () => {
     }, [items, bodySearchMatches, searchTerm]);
 
     const activeNode = useMemo(() => {
-        return itemsWithSearchMetadata.find(p => p.id === activeNodeId) || null;
-    }, [itemsWithSearchMetadata, activeNodeId]);
+        return itemsWithSearchMetadata.find(p => p.id === tabState.activeId) || null;
+    }, [itemsWithSearchMetadata, tabState.activeId]);
 
     useEffect(() => {
         setFolderSearchTerm('');
@@ -205,6 +285,9 @@ const MainApp: React.FC = () => {
     const activeDocument = useMemo(() => {
         return activeNode?.type === 'document' ? activeNode : null;
     }, [activeNode]);
+
+    const documentItems = useMemo(() => items.filter(item => item.type === 'document'), [items]);
+    const activeDocumentId = activeDocument?.id ?? null;
 
 
     useEffect(() => {
@@ -728,16 +811,67 @@ const MainApp: React.FC = () => {
     }, [expandedFolderIds, settingsLoaded]);
 
     useEffect(() => {
-        if (items.length > 0 && activeNodeId === null && activeTemplateId === null) {
-            const firstId = items[0].id;
-            setActiveNodeId(firstId);
-            setSelectedIds(new Set([firstId]));
-            setLastClickedId(firstId);
-        } else if (items.length === 0 && activeNodeId) {
-            setActiveNodeId(null);
+        if (items.length === 0) {
+            if (openDocumentIds.length > 0 || activeNodeId !== null) {
+                setTabState({ activeId: null, order: [] });
+            }
             setSelectedIds(new Set());
+            setLastClickedId(null);
+            return;
         }
-    }, [items, activeNodeId, activeTemplateId]);
+
+        if (activeTemplateId !== null) {
+            return;
+        }
+
+        if (activeNodeId === null) {
+            const firstItem = items[0];
+            if (firstItem.type === 'document') {
+                activateDocumentTab(firstItem.id);
+            } else {
+                setActiveItem(firstItem.id);
+            }
+            setSelectedIds(new Set([firstItem.id]));
+            setLastClickedId(firstItem.id);
+        }
+    }, [items, activeNodeId, activeTemplateId, openDocumentIds.length, activateDocumentTab, setActiveItem]);
+
+    useEffect(() => {
+        const documentIds = new Set(items.filter(item => item.type === 'document').map(item => item.id));
+        setTabState(prev => {
+            const filteredOrder = prev.order.filter(id => documentIds.has(id));
+            const orderChanged = filteredOrder.length !== prev.order.length;
+            let nextActive = prev.activeId;
+            if (nextActive && !documentIds.has(nextActive)) {
+                nextActive = filteredOrder[filteredOrder.length - 1] ?? null;
+            }
+            if (!orderChanged && nextActive === prev.activeId) {
+                return prev;
+            }
+            return {
+                order: orderChanged ? filteredOrder : prev.order,
+                activeId: nextActive,
+            };
+        });
+    }, [items]);
+
+    useEffect(() => {
+        if (activeTemplateId !== null) {
+            return;
+        }
+        if (activeNodeId && !items.some(item => item.id === activeNodeId)) {
+            const fallbackId = openDocumentIds[openDocumentIds.length - 1] ?? null;
+            if (fallbackId) {
+                setSelectedIds(new Set([fallbackId]));
+                setLastClickedId(fallbackId);
+                activateDocumentTab(fallbackId);
+            } else {
+                setSelectedIds(new Set());
+                setLastClickedId(null);
+                setActiveItem(null);
+            }
+        }
+    }, [items, activeNodeId, activeTemplateId, openDocumentIds, activateDocumentTab, setActiveItem, setSelectedIds, setLastClickedId]);
 
     const handleDetectServices = useCallback(async () => {
         addLog('INFO', 'User action: Detecting LLM services.');
@@ -776,7 +910,7 @@ const MainApp: React.FC = () => {
             const targetNode = imageNodes[imageNodes.length - 1] ?? importedNodes[importedNodes.length - 1];
             if (targetNode) {
                 const nodeForReveal = { id: targetNode.nodeId, type: 'document' as const, parentId: targetNode.parentId };
-                setActiveNodeId(targetNode.nodeId);
+                activateDocumentTab(targetNode.nodeId);
                 setSelectedIds(new Set([targetNode.nodeId]));
                 setLastClickedId(targetNode.nodeId);
                 setActiveTemplateId(null);
@@ -785,7 +919,7 @@ const MainApp: React.FC = () => {
                 ensureNodeVisibleRef.current?.(nodeForReveal);
             }
         }
-    }, [addDocumentsFromFiles, setActiveNodeId, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
+    }, [addDocumentsFromFiles, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
 
     const handleImportFilesIntoFolder = useCallback((files: FileList, parentId: string) => {
         if (!files || files.length === 0) {
@@ -943,14 +1077,14 @@ const MainApp: React.FC = () => {
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
         const newDoc = await addDocument({ parentId: effectiveParentId });
         ensureNodeVisible(newDoc);
-        setActiveNodeId(newDoc.id);
+        activateDocumentTab(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
         setLastClickedId(newDoc.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog]);
-    
+    }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog, activateDocumentTab]);
+
     const handleNewCodeFile = useCallback(async (filename: string) => {
         addLog('INFO', `User action: Create New Code File with name "${filename}".`);
         const languageHint = filename.split('.').pop() || null;
@@ -962,26 +1096,26 @@ const MainApp: React.FC = () => {
             language_hint: languageHint,
         });
         ensureNodeVisible(newDoc);
-        setActiveNodeId(newDoc.id);
+        activateDocumentTab(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
         setLastClickedId(newDoc.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog]);
+    }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog, activateDocumentTab]);
 
     const handleNewFolder = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Folder.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
         const newFolder = await addFolder(effectiveParentId);
         ensureNodeVisible(newFolder);
-        setActiveNodeId(newFolder.id);
+        setActiveItem(newFolder.id);
         setSelectedIds(new Set([newFolder.id]));
         setLastClickedId(newFolder.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addFolder, getParentIdForNewItem, ensureNodeVisible, addLog]);
+    }, [addFolder, getParentIdForNewItem, ensureNodeVisible, addLog, setActiveItem]);
 
     const handleNewRootFolder = useCallback(async () => {
         addLog('INFO', 'User action: Create New Root Folder.');
@@ -1008,28 +1142,28 @@ const MainApp: React.FC = () => {
         const newTemplate = await addTemplate();
         setActiveTemplateId(newTemplate.template_id);
         setLastClickedId(newTemplate.template_id);
-        setActiveNodeId(null);
+        setActiveItem(null);
         setSelectedIds(new Set());
         setView('editor');
-    }, [addTemplate, addLog]);
+    }, [addTemplate, addLog, setActiveItem]);
 
     const handleCreateFromTemplate = useCallback(async (title: string, content: string) => {
         addLog('INFO', `User action: Create Document from Template, title: "${title}".`);
         const newDoc = await addDocument({ parentId: null, title, content });
         ensureNodeVisible(newDoc);
-        setActiveNodeId(newDoc.id);
+        activateDocumentTab(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
         setLastClickedId(newDoc.id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [addDocument, ensureNodeVisible, addLog]);
+    }, [addDocument, ensureNodeVisible, addLog, activateDocumentTab]);
 
     const handleSelectNode = useCallback((id: string, e: React.MouseEvent) => {
         if (activeNodeId !== id) {
             setDocumentView('editor');
         }
-        
+
         const isShift = e.shiftKey;
         const isCtrl = e.ctrlKey || e.metaKey;
 
@@ -1059,18 +1193,113 @@ const MainApp: React.FC = () => {
             setLastClickedId(id);
         }
 
-        setActiveNodeId(id);
+        const selectedNode = items.find(item => item.id === id);
+        if (selectedNode?.type === 'document') {
+            activateDocumentTab(id);
+        } else {
+            setActiveItem(id);
+        }
         setActiveTemplateId(null);
         setView('editor');
-    }, [activeNodeId, lastClickedId, navigableItems]);
-    
+    }, [activeNodeId, lastClickedId, navigableItems, items, activateDocumentTab, setActiveItem]);
+
     const handleSelectTemplate = (id: string) => {
         setActiveTemplateId(id);
-        setActiveNodeId(null);
+        setActiveItem(null);
         setSelectedIds(new Set([id]));
         setLastClickedId(id);
         setView('editor');
     };
+
+    const handleActivateTab = useCallback((id: string) => {
+        const node = items.find(item => item.id === id);
+        if (!node || node.type !== 'document') {
+            closeDocumentTab(id);
+            return;
+        }
+        activateDocumentTab(id);
+        setSelectedIds(new Set([id]));
+        setLastClickedId(id);
+        setActiveTemplateId(null);
+        setDocumentView('editor');
+        setView('editor');
+    }, [items, activateDocumentTab, closeDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
+
+    const handleCloseTab = useCallback((id: string) => {
+        if (!openDocumentIds.includes(id)) {
+            return;
+        }
+        const nextOrder = openDocumentIds.filter(tabId => tabId !== id);
+        const wasActive = activeNodeId === id;
+        const nextActive = wasActive ? (nextOrder[nextOrder.length - 1] ?? null) : activeNodeId;
+
+        closeDocumentTab(id);
+
+        if (wasActive) {
+            if (nextActive) {
+                setSelectedIds(new Set([nextActive]));
+                setLastClickedId(nextActive);
+                setActiveTemplateId(null);
+                setDocumentView('editor');
+                setView('editor');
+            } else {
+                setSelectedIds(new Set());
+                setLastClickedId(null);
+            }
+        } else {
+            setSelectedIds(prev => {
+                if (!prev.has(id)) return prev;
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
+            if (lastClickedId === id) {
+                setLastClickedId(null);
+            }
+        }
+    }, [openDocumentIds, activeNodeId, closeDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, lastClickedId]);
+
+    const handleCloseOtherTabs = useCallback((id: string) => {
+        if (!openDocumentIds.includes(id)) {
+            return;
+        }
+        closeOtherDocumentTabs(id);
+        setSelectedIds(new Set([id]));
+        setLastClickedId(id);
+        setActiveTemplateId(null);
+        setDocumentView('editor');
+        setView('editor');
+    }, [openDocumentIds, closeOtherDocumentTabs, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
+
+    const handleCloseTabsToRight = useCallback((id: string) => {
+        const index = openDocumentIds.indexOf(id);
+        if (index === -1) {
+            return;
+        }
+        const closingIds = openDocumentIds.slice(index + 1);
+        closeDocumentTabsToRight(id);
+        if (closingIds.length === 0) {
+            return;
+        }
+
+        const activeClosed = activeNodeId ? closingIds.includes(activeNodeId) : false;
+        if (activeClosed) {
+            setSelectedIds(new Set([id]));
+            setLastClickedId(id);
+            setActiveTemplateId(null);
+            setDocumentView('editor');
+            setView('editor');
+        } else {
+            setSelectedIds(prev => {
+                const next = new Set(prev);
+                closingIds.forEach(tabId => next.delete(tabId));
+                return next;
+            });
+            if (lastClickedId && closingIds.includes(lastClickedId)) {
+                setLastClickedId(id);
+            }
+        }
+    }, [openDocumentIds, activeNodeId, closeDocumentTabsToRight, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, lastClickedId]);
     
     const handleSaveDocumentTitle = (updatedDoc: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => {
         if (activeNodeId) {
@@ -1203,10 +1432,33 @@ const MainApp: React.FC = () => {
             if (lastClickedId && idsToDelete.has(lastClickedId)) {
                 setLastClickedId(null);
             }
-            
-            if (activeNodeId && idsToDelete.has(activeNodeId)) {
-                setActiveNodeId(null);
+
+            const filteredOrder = tabState.order.filter(id => !idsToDelete.has(id));
+            const wasActiveDeleted = activeNodeId ? idsToDelete.has(activeNodeId) : false;
+            const nextActive = wasActiveDeleted ? (filteredOrder[filteredOrder.length - 1] ?? null) : activeNodeId;
+
+            setTabState(prev => {
+                const nextOrder = prev.order.filter(id => !idsToDelete.has(id));
+                let nextActiveId = prev.activeId;
+                if (nextActiveId && idsToDelete.has(nextActiveId)) {
+                    nextActiveId = nextOrder[nextOrder.length - 1] ?? null;
+                }
+                return { order: nextOrder, activeId: nextActiveId };
+            });
+
+            if (wasActiveDeleted) {
+                if (nextActive) {
+                    setSelectedIds(new Set([nextActive]));
+                    setLastClickedId(nextActive);
+                    setActiveTemplateId(null);
+                    setDocumentView('editor');
+                    setView('editor');
+                } else {
+                    setSelectedIds(new Set());
+                    setLastClickedId(null);
+                }
             }
+
             if (activeTemplateId && idsToDelete.has(activeTemplateId)) {
                 setActiveTemplateId(null);
             }
@@ -1226,7 +1478,7 @@ const MainApp: React.FC = () => {
                 }
             });
         }
-    }, [items, templates, deleteItems, deleteTemplates, activeNodeId, activeTemplateId, lastClickedId, addLog]);
+    }, [items, templates, deleteItems, deleteTemplates, activeNodeId, activeTemplateId, lastClickedId, addLog, tabState.order, setActiveTemplateId, setDocumentView, setView]);
 
     const handleDeleteNode = useCallback((id: string, shiftKey: boolean = false) => {
         const itemToDelete = items.find(p => p.id === id);
@@ -1682,12 +1934,28 @@ const MainApp: React.FC = () => {
                                     className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
                                 />
                                 <section className="flex-1 flex flex-col overflow-hidden bg-background">
-                                    {renderMainContent()}
+                                    {openDocumentIds.length > 0 && (
+                                        <DocumentTabs
+                                            documents={documentItems}
+                                            openDocumentIds={openDocumentIds}
+                                            activeDocumentId={activeDocumentId}
+                                            onSelectTab={handleActivateTab}
+                                            onCloseTab={handleCloseTab}
+                                            onCloseOthers={handleCloseOtherTabs}
+                                            onCloseTabsToRight={handleCloseTabsToRight}
+                                            onReorderTabs={reorderDocumentTabs}
+                                        />
+                                    )}
+                                    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                                        {renderMainContent()}
+                                    </div>
                                 </section>
                             </>
                         ) : (
                             <section className="flex-1 flex flex-col overflow-hidden bg-background">
-                                {renderMainContent()}
+                                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                                    {renderMainContent()}
+                                </div>
                             </section>
                         )}
                     </main>

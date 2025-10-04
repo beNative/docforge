@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 
 export type MenuItem = {
@@ -16,8 +16,62 @@ interface ContextMenuProps {
   onClose: () => void;
 }
 
+const EDGE_MARGIN = 8;
+
 const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onClose }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<{ top: number; left: number; maxHeight: number; overflowY: React.CSSProperties['overflowY'] }>({
+    top: position.y,
+    left: position.x,
+    maxHeight: 0,
+    overflowY: 'visible',
+  });
+
+  const recalculatePosition = useCallback(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+
+    const { innerWidth, innerHeight } = window;
+    const rect = menu.getBoundingClientRect();
+    const maxHeight = Math.max(innerHeight - EDGE_MARGIN * 2, 0);
+
+    let left = rect.left;
+    let top = rect.top;
+
+    if (rect.right > innerWidth - EDGE_MARGIN) {
+      left = Math.max(EDGE_MARGIN, innerWidth - rect.width - EDGE_MARGIN);
+    }
+    if (left < EDGE_MARGIN) {
+      left = EDGE_MARGIN;
+    }
+
+    if (rect.bottom > innerHeight - EDGE_MARGIN) {
+      top = Math.max(EDGE_MARGIN, innerHeight - rect.height - EDGE_MARGIN);
+    }
+    if (top < EDGE_MARGIN) {
+      top = EDGE_MARGIN;
+    }
+
+    const overflowY: React.CSSProperties['overflowY'] = rect.height > maxHeight ? 'auto' : 'visible';
+
+    setMenuStyle((previous) => {
+      if (
+        previous.top === top &&
+        previous.left === left &&
+        previous.maxHeight === maxHeight &&
+        previous.overflowY === overflowY
+      ) {
+        return previous;
+      }
+
+      return {
+        top,
+        left,
+        maxHeight,
+        overflowY,
+      };
+    });
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -41,12 +95,53 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
     };
   }, [isOpen, onClose]);
 
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+
+    setMenuStyle((previous) => {
+      if (previous.top === position.y && previous.left === position.x) {
+        return previous;
+      }
+
+      return {
+        top: position.y,
+        left: position.x,
+        maxHeight: previous.maxHeight,
+        overflowY: previous.overflowY,
+      };
+    });
+
+    const frame = requestAnimationFrame(() => {
+      recalculatePosition();
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, position.x, position.y, recalculatePosition]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+
+    const frame = requestAnimationFrame(() => {
+      recalculatePosition();
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, items, recalculatePosition]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleResize = () => {
+      recalculatePosition();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [isOpen, recalculatePosition]);
+
   if (!isOpen) return null;
-  
-  const menuStyle: React.CSSProperties = {
-    top: position.y,
-    left: position.x,
-  };
 
   const overlayRoot = document.getElementById('overlay-root');
   if (!overlayRoot) return null;
@@ -54,7 +149,12 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
   return ReactDOM.createPortal(
     <div
       ref={menuRef}
-      style={menuStyle}
+      style={{
+        top: menuStyle.top,
+        left: menuStyle.left,
+        maxHeight: menuStyle.maxHeight ? menuStyle.maxHeight : undefined,
+        overflowY: menuStyle.overflowY,
+      }}
       className="fixed z-50 w-56 rounded-md bg-secondary p-1.5 shadow-2xl border border-border-color animate-fade-in-fast"
     >
       <ul className="space-y-1">
