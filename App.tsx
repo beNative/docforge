@@ -309,7 +309,11 @@ const MainApp: React.FC = () => {
 
     const handleDropFiles = useCallback(async (files: FileList, parentId: string | null) => {
         if (!files || files.length === 0) return;
-        
+
+        // Ensure the global drag overlay is cleared when files are dropped anywhere in the app.
+        dragCounter.current = 0;
+        setIsDraggingFile(false);
+
         const fileEntries = Array.from(files).map(file => {
             const f = file as FileWithRelativePath;
             return {
