@@ -18,6 +18,7 @@ import InfoView from './components/InfoView';
 import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
+import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
 import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
@@ -26,7 +27,7 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode } from './types';
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
@@ -121,6 +122,9 @@ const MainApp: React.FC = () => {
     const [isDraggingFile, setIsDraggingFile] = useState(false);
     const [formatTrigger, setFormatTrigger] = useState(0);
     const [bodySearchMatches, setBodySearchMatches] = useState<Map<string, string>>(new Map());
+    const [folderSearchTerm, setFolderSearchTerm] = useState('');
+    const [folderBodySearchMatches, setFolderBodySearchMatches] = useState<Map<string, string>>(new Map());
+    const [isFolderSearchLoading, setIsFolderSearchLoading] = useState(false);
 
 
     const isSidebarResizing = useRef(false);
@@ -188,6 +192,12 @@ const MainApp: React.FC = () => {
         return itemsWithSearchMetadata.find(p => p.id === activeNodeId) || null;
     }, [itemsWithSearchMetadata, activeNodeId]);
 
+    useEffect(() => {
+        setFolderSearchTerm('');
+        setFolderBodySearchMatches(new Map());
+        setIsFolderSearchLoading(false);
+    }, [activeNode?.id, activeNode?.type]);
+
     const activeTemplate = useMemo(() => {
         return templates.find(t => t.template_id === activeTemplateId) || null;
     }, [templates, activeTemplateId]);
@@ -223,6 +233,53 @@ const MainApp: React.FC = () => {
             isCancelled = true;
         };
     }, [searchTerm]);
+
+    useEffect(() => {
+        if (!activeNode || activeNode.type !== 'folder') {
+            return;
+        }
+
+        const term = folderSearchTerm.trim();
+        if (!term) {
+            setFolderBodySearchMatches(new Map());
+            setIsFolderSearchLoading(false);
+            return;
+        }
+
+        let isCancelled = false;
+        setIsFolderSearchLoading(true);
+        setFolderBodySearchMatches(new Map());
+
+        repository.searchDocumentsByBody(term, 200)
+            .then(results => {
+                if (isCancelled) {
+                    return;
+                }
+                const descendantIds = getDescendantIds(activeNode.id);
+                const matches = new Map<string, string>();
+                for (const result of results) {
+                    if (descendantIds.has(result.nodeId)) {
+                        matches.set(result.nodeId, result.snippet);
+                    }
+                }
+                setFolderBodySearchMatches(matches);
+            })
+            .catch(error => {
+                if (!isCancelled) {
+                    console.error('Failed to search within folder:', error);
+                    setFolderBodySearchMatches(new Map());
+                }
+            })
+            .finally(() => {
+                if (!isCancelled) {
+                    setIsFolderSearchLoading(false);
+                }
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [activeNode, folderSearchTerm, getDescendantIds]);
 
     const { documentTree, navigableItems } = useMemo(() => {
         let itemsToBuildFrom = itemsWithSearchMetadata;
@@ -294,6 +351,346 @@ const MainApp: React.FC = () => {
 
         return { documentTree: finalTree, navigableItems: flatList };
     }, [itemsWithSearchMetadata, templates, searchTerm, expandedFolderIds]);
+
+    const { metrics: activeFolderMetrics, documents: activeFolderDocuments } = useMemo(() => {
+        if (!activeNode || activeNode.type !== 'folder') {
+            return { metrics: null as FolderOverviewMetrics | null, documents: [] as RecentDocumentSummary[] };
+        }
+
+        const parseDate = (value?: string | null): Date | null => {
+            if (!value) return null;
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? null : date;
+        };
+
+        const formatNodeTitle = (node: { title: string; type: 'document' | 'folder' }) => {
+            const trimmed = node.title.trim();
+            if (trimmed) {
+                return trimmed;
+            }
+            return node.type === 'folder' ? 'Untitled Folder' : 'Untitled Document';
+        };
+
+        const toTitleCase = (value: string) => {
+            return value
+                .split(/[-_\s]+/)
+                .filter(Boolean)
+                .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+                .join(' ');
+        };
+
+        const addDocTypeCount = (map: Map<DocType, number>, docType: DocType) => {
+            map.set(docType, (map.get(docType) ?? 0) + 1);
+        };
+
+        const addLanguageCount = (
+            map: Map<string, { label: string; count: number }>,
+            value?: string | null,
+        ) => {
+            const trimmed = (value ?? '').trim();
+            const key = trimmed ? trimmed.toLowerCase() : 'unknown';
+            const label = trimmed ? toTitleCase(trimmed) : 'Unknown';
+            const existing = map.get(key);
+            if (existing) {
+                existing.count += 1;
+            } else {
+                map.set(key, { label, count: 1 });
+            }
+        };
+
+        const finalizeDocTypeCounts = (map: Map<DocType, number>): DocTypeCount[] =>
+            Array.from(map.entries())
+                .map(([type, count]) => ({ type, count }))
+                .sort((a, b) => {
+                    if (a.count !== b.count) {
+                        return b.count - a.count;
+                    }
+                    return a.type.localeCompare(b.type);
+                });
+
+        const finalizeLanguageCounts = (
+            map: Map<string, { label: string; count: number }>,
+        ): LanguageCount[] =>
+            Array.from(map.values())
+                .map(({ label, count }) => ({ label, count }))
+                .sort((a, b) => {
+                    if (a.count !== b.count) {
+                        return b.count - a.count;
+                    }
+                    return a.label.localeCompare(b.label);
+                });
+
+        const computeFromTree = (folderNode: DocumentNode) => {
+            const recordLatest = (() => {
+                let latest: Date | null = null;
+                return {
+                    update(value?: string | null) {
+                        const parsed = parseDate(value);
+                        if (parsed && (!latest || parsed > latest)) {
+                            latest = parsed;
+                        }
+                    },
+                    getValue() {
+                        return latest;
+                    },
+                };
+            })();
+
+            recordLatest.update(folderNode.updatedAt);
+
+            const folderChildren = folderNode.children ?? [];
+            const directDocumentCount = folderChildren.filter(child => child.type === 'document').length;
+            const directFolderCount = folderChildren.filter(child => child.type === 'folder').length;
+
+            let totalDocumentCount = 0;
+            let totalFolderCount = 0;
+            const stack: { node: DocumentNode; parentPath: string[] }[] = folderChildren.map(child => ({
+                node: child,
+                parentPath: [],
+            }));
+            const allDocuments: RecentDocumentSummary[] = [];
+            const docTypeMap = new Map<DocType, number>();
+            const languageMap = new Map<string, { label: string; count: number }>();
+
+            while (stack.length > 0) {
+                const { node: current, parentPath } = stack.pop()!;
+                recordLatest.update(current.updatedAt);
+                if (current.type === 'document') {
+                    totalDocumentCount += 1;
+                    const docType = (current.doc_type ?? 'prompt') as DocType;
+                    addDocTypeCount(docTypeMap, docType);
+                    addLanguageCount(languageMap, current.language_hint);
+                    allDocuments.push({
+                        id: current.id,
+                        title: current.title,
+                        updatedAt: current.updatedAt,
+                        parentPath,
+                        docType,
+                        languageHint: current.language_hint ?? null,
+                    });
+                } else if (current.type === 'folder') {
+                    totalFolderCount += 1;
+                    const nextPath = [...parentPath, formatNodeTitle(current)];
+                    const childNodes = current.children ?? [];
+                    stack.push(...childNodes.map(child => ({ node: child, parentPath: nextPath })));
+                }
+            }
+
+            const latestDate = recordLatest.getValue();
+            const recentDocuments = [...allDocuments]
+                .sort((a, b) => {
+                    const aDate = parseDate(a.updatedAt)?.getTime() ?? 0;
+                    const bDate = parseDate(b.updatedAt)?.getTime() ?? 0;
+                    return bDate - aDate;
+                })
+                .slice(0, 5);
+
+            return {
+                metrics: {
+                    directDocumentCount,
+                    directFolderCount,
+                    totalDocumentCount,
+                    totalFolderCount,
+                    totalItemCount: totalDocumentCount + totalFolderCount,
+                    lastUpdated: latestDate ? latestDate.toISOString() : null,
+                    recentDocuments,
+                    docTypeCounts: finalizeDocTypeCounts(docTypeMap),
+                    languageCounts: finalizeLanguageCounts(languageMap),
+                },
+                documents: allDocuments,
+            };
+        };
+
+        const buildChildMap = () => {
+            const map = new Map<string | null, DocumentOrFolder[]>();
+            for (const item of items) {
+                const key = item.parentId;
+                if (!map.has(key)) {
+                    map.set(key, []);
+                }
+                map.get(key)!.push(item);
+            }
+            return map;
+        };
+
+        const computeFromList = () => {
+            const childMap = buildChildMap();
+            const directChildren = childMap.get(activeNode.id) ?? [];
+
+            const recordLatest = (() => {
+                let latest: Date | null = null;
+                return {
+                    update(value?: string | null) {
+                        const parsed = parseDate(value);
+                        if (parsed && (!latest || parsed > latest)) {
+                            latest = parsed;
+                        }
+                    },
+                    getValue() {
+                        return latest;
+                    },
+                };
+            })();
+
+            recordLatest.update(activeNode.updatedAt);
+
+            const directDocumentCount = directChildren.filter(child => child.type === 'document').length;
+            const directFolderCount = directChildren.filter(child => child.type === 'folder').length;
+
+            let totalDocumentCount = 0;
+            let totalFolderCount = 0;
+            const stack: { node: DocumentOrFolder; parentPath: string[] }[] = directChildren.map(child => ({
+                node: child,
+                parentPath: [],
+            }));
+            const allDocuments: RecentDocumentSummary[] = [];
+            const docTypeMap = new Map<DocType, number>();
+            const languageMap = new Map<string, { label: string; count: number }>();
+
+            while (stack.length > 0) {
+                const { node: current, parentPath } = stack.pop()!;
+                recordLatest.update(current.updatedAt);
+                if (current.type === 'document') {
+                    totalDocumentCount += 1;
+                    const docType = (current.doc_type ?? 'prompt') as DocType;
+                    addDocTypeCount(docTypeMap, docType);
+                    addLanguageCount(languageMap, current.language_hint);
+                    allDocuments.push({
+                        id: current.id,
+                        title: current.title,
+                        updatedAt: current.updatedAt,
+                        parentPath,
+                        docType,
+                        languageHint: current.language_hint ?? null,
+                    });
+                } else {
+                    totalFolderCount += 1;
+                    const childItems = childMap.get(current.id) ?? [];
+                    const nextPath = [...parentPath, formatNodeTitle(current)];
+                    stack.push(...childItems.map(item => ({ node: item, parentPath: nextPath })));
+                }
+            }
+
+            const latestDate = recordLatest.getValue();
+            const recentDocuments = [...allDocuments]
+                .sort((a, b) => {
+                    const aDate = parseDate(a.updatedAt)?.getTime() ?? 0;
+                    const bDate = parseDate(b.updatedAt)?.getTime() ?? 0;
+                    return bDate - aDate;
+                })
+                .slice(0, 5);
+
+            return {
+                metrics: {
+                    directDocumentCount,
+                    directFolderCount,
+                    totalDocumentCount,
+                    totalFolderCount,
+                    totalItemCount: totalDocumentCount + totalFolderCount,
+                    lastUpdated: latestDate ? latestDate.toISOString() : null,
+                    recentDocuments,
+                    docTypeCounts: finalizeDocTypeCounts(docTypeMap),
+                    languageCounts: finalizeLanguageCounts(languageMap),
+                },
+                documents: allDocuments,
+            };
+        };
+
+        const findNodeInTree = (nodes: DocumentNode[]): DocumentNode | null => {
+            for (const node of nodes) {
+                if (node.id === activeNode.id) {
+                    return node;
+                }
+                if (node.type === 'folder') {
+                    const match = findNodeInTree(node.children);
+                    if (match) {
+                        return match;
+                    }
+                }
+            }
+            return null;
+        };
+
+        const folderNode = findNodeInTree(documentTree);
+        if (folderNode) {
+            return computeFromTree(folderNode);
+        }
+        return computeFromList();
+    }, [activeNode, documentTree, items]);
+
+    const folderSearchResults = useMemo<FolderSearchResult[]>(() => {
+        if (!activeNode || activeNode.type !== 'folder') {
+            return [];
+        }
+
+        const trimmed = folderSearchTerm.trim();
+        if (!trimmed) {
+            return [];
+        }
+
+        const lowerTerm = trimmed.toLowerCase();
+
+        const parseToTimestamp = (value?: string | null) => {
+            if (!value) {
+                return 0;
+            }
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+        };
+
+        const computeMatchScore = (fields: ('title' | 'body')[]) => {
+            if (fields.length === 2) {
+                return 0;
+            }
+            return fields[0] === 'title' ? 1 : 2;
+        };
+
+        type FolderSearchResultWithScore = FolderSearchResult & { matchScore: number; sortTimestamp: number; };
+
+        const results: FolderSearchResultWithScore[] = [];
+
+        for (const document of activeFolderDocuments) {
+            const titleLower = document.title.toLowerCase();
+            const hasTitleMatch = titleLower.includes(lowerTerm);
+            const snippet = folderBodySearchMatches.get(document.id);
+            const hasBodyMatch = Boolean(snippet);
+
+            if (!hasTitleMatch && !hasBodyMatch) {
+                continue;
+            }
+
+            const matchedFields: ('title' | 'body')[] = [];
+            if (hasTitleMatch) {
+                matchedFields.push('title');
+            }
+            if (hasBodyMatch) {
+                matchedFields.push('body');
+            }
+
+            results.push({
+                id: document.id,
+                title: document.title,
+                updatedAt: document.updatedAt,
+                parentPath: document.parentPath,
+                searchSnippet: snippet,
+                matchedFields,
+                matchScore: computeMatchScore(matchedFields),
+                sortTimestamp: parseToTimestamp(document.updatedAt),
+            });
+        }
+
+        return results
+            .sort((a, b) => {
+                if (a.matchScore !== b.matchScore) {
+                    return a.matchScore - b.matchScore;
+                }
+                if (a.sortTimestamp !== b.sortTimestamp) {
+                    return b.sortTimestamp - a.sortTimestamp;
+                }
+                return a.title.localeCompare(b.title);
+            })
+            .map(({ matchScore: _matchScore, sortTimestamp: _sortTimestamp, ...rest }) => rest);
+    }, [activeNode, activeFolderDocuments, folderBodySearchMatches, folderSearchTerm]);
 
     useEffect(() => {
         if (window.electronAPI?.getAppVersion) {
@@ -389,6 +786,18 @@ const MainApp: React.FC = () => {
             }
         }
     }, [addDocumentsFromFiles, setActiveNodeId, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
+
+    const handleImportFilesIntoFolder = useCallback((files: FileList, parentId: string) => {
+        if (!files || files.length === 0) {
+            return;
+        }
+
+        const targetFolder = items.find(item => item.id === parentId && item.type === 'folder');
+        const folderTitle = targetFolder?.title?.trim() || 'Untitled Folder';
+
+        addLog('INFO', `User action: Import ${files.length} file(s) into folder "${folderTitle}".`);
+        void handleDropFiles(files, parentId);
+    }, [items, addLog, handleDropFiles]);
 
     useEffect(() => {
         const handleDragEnter = (e: DragEvent) => {
@@ -514,6 +923,20 @@ const MainApp: React.FC = () => {
     useEffect(() => {
         ensureNodeVisibleRef.current = ensureNodeVisible;
     }, [ensureNodeVisible]);
+
+    const handleNavigateToNode = useCallback((nodeId: string) => {
+        const target = items.find(item => item.id === nodeId);
+        if (!target) {
+            return;
+        }
+        ensureNodeVisible(target);
+        setActiveTemplateId(null);
+        setView('editor');
+        setDocumentView('editor');
+        setActiveNodeId(nodeId);
+        setSelectedIds(new Set([nodeId]));
+        setLastClickedId(nodeId);
+    }, [items, ensureNodeVisible]);
 
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document.');
@@ -685,6 +1108,20 @@ const MainApp: React.FC = () => {
     const handleRenameNode = (id: string, title: string) => {
         updateItem(id, { title });
     };
+
+    const handleStartRenamingNode = useCallback((id: string) => {
+        const target = items.find(item => item.id === id) ?? null;
+        if (target) {
+            const trimmedTitle = target.title?.trim();
+            const fallbackTitle = target.type === 'folder' ? 'Untitled Folder' : 'Untitled Document';
+            const displayTitle = trimmedTitle && trimmedTitle.length > 0 ? trimmedTitle : fallbackTitle;
+            addLog('INFO', `User action: Rename ${target.type} "${displayTitle}".`);
+            ensureNodeVisible({ id: target.id, type: target.type, parentId: target.parentId ?? null });
+        } else {
+            addLog('INFO', 'User action: Rename item.');
+        }
+        setRenamingNodeId(id);
+    }, [items, addLog, ensureNodeVisible]);
 
     const handleRenameTemplate = (id: string, title: string) => {
         updateTemplate(id, { title });
@@ -971,7 +1408,7 @@ const MainApp: React.FC = () => {
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Format', icon: FormatIcon, action: handleFormatDocument, disabled: !isFormattable || currentSelection.size !== 1, shortcut: getCommand('format-document')?.shortcutString },
-                { label: 'Rename', icon: PencilIcon, action: () => setRenamingNodeId(nodeId), disabled: currentSelection.size !== 1 },
+                { label: 'Rename', icon: PencilIcon, action: () => handleStartRenamingNode(nodeId), disabled: currentSelection.size !== 1 },
                 { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0, shortcut: getCommand('duplicate-item')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Copy Content', icon: CopyIcon, action: () => hasDocuments && handleCopyNodeContent(selectedNodes.find(n => n.type === 'document')!.id), disabled: !hasDocuments},
@@ -992,7 +1429,7 @@ const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -1128,7 +1565,35 @@ const MainApp: React.FC = () => {
                     />
                 );
             }
-            return <WelcomeScreen onNewDocument={() => handleNewDocument()} />;
+            if (activeNode.type === 'folder') {
+                const fallbackMetrics: FolderOverviewMetrics = {
+                    directDocumentCount: 0,
+                    directFolderCount: 0,
+                    totalDocumentCount: 0,
+                    totalFolderCount: 0,
+                    totalItemCount: 0,
+                    lastUpdated: activeNode.updatedAt,
+                    recentDocuments: [],
+                    docTypeCounts: [],
+                    languageCounts: [],
+                };
+                return (
+                        <FolderOverview
+                            key={activeNode.id}
+                            folder={activeNode}
+                            metrics={activeFolderMetrics ?? fallbackMetrics}
+                            onNewDocument={(parentId) => handleNewDocument(parentId)}
+                            onNewSubfolder={(parentId) => handleNewFolder(parentId)}
+                            onImportFiles={handleImportFilesIntoFolder}
+                            onRenameFolderTitle={handleRenameNode}
+                            onNavigateToNode={handleNavigateToNode}
+                            folderSearchTerm={folderSearchTerm}
+                            onFolderSearchTermChange={setFolderSearchTerm}
+                            searchResults={folderSearchResults}
+                            isSearchLoading={isFolderSearchLoading}
+                        />
+                );
+            }
         }
         return <WelcomeScreen onNewDocument={() => handleNewDocument()} />;
     };
