@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { DocumentOrFolder } from '../types';
 import ContextMenu, { MenuItem } from './ContextMenu';
 import { CloseIcon, ChevronDownIcon, FileIcon } from './Icons';
+import IconButton from './IconButton';
 
 interface DocumentTabsProps {
     documents: DocumentOrFolder[];
@@ -326,45 +327,53 @@ const DocumentTabs: React.FC<DocumentTabsProps> = ({
     return (
         <div className="border-b border-border-color bg-secondary/70 h-7 flex items-center">
             <div className="flex items-center gap-1 px-2 w-full h-full">
-                <div
-                    ref={scrollContainerRef}
-                    className="flex-1 h-full overflow-x-auto overflow-y-hidden scrollbar-hidden"
-                    onDragOver={handleDragOver}
-                    onDrop={handleContainerDrop}
-                    role="tablist"
-                >
-                    <div className="flex items-stretch gap-1 h-full min-w-max pr-2">
-                        {tabElements}
+                <div className="flex-1 h-full relative overflow-hidden">
+                    <div
+                        ref={scrollContainerRef}
+                        className="absolute inset-y-0 left-0 right-0 overflow-x-auto overflow-y-hidden scrollbar-hidden"
+                        onDragOver={handleDragOver}
+                        onDrop={handleContainerDrop}
+                        role="tablist"
+                    >
+                        <div className="flex items-stretch gap-1 h-full min-w-max pr-2">
+                            {tabElements}
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
-                    <button
-                        type="button"
-                        className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary text-text-secondary hover:text-text-main hover:bg-secondary/80 border border-border-color/70 disabled:opacity-40 disabled:cursor-default"
+                    <IconButton
                         onClick={() => scrollToDirection('left')}
+                        tooltip="Scroll tabs left"
                         aria-label="Scroll tabs left"
+                        size="xs"
+                        variant="ghost"
                         disabled={!scrollState.canScrollLeft}
+                        className="disabled:opacity-40 disabled:cursor-default"
                     >
                         <ChevronDownIcon className="w-4 h-4 -rotate-90" />
-                    </button>
-                    <button
-                        type="button"
-                        className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary text-text-secondary hover:text-text-main hover:bg-secondary/80 border border-border-color/70 disabled:opacity-40 disabled:cursor-default"
+                    </IconButton>
+                    <IconButton
                         onClick={() => scrollToDirection('right')}
+                        tooltip="Scroll tabs right"
                         aria-label="Scroll tabs right"
+                        size="xs"
+                        variant="ghost"
                         disabled={!scrollState.canScrollRight}
+                        className="disabled:opacity-40 disabled:cursor-default"
                     >
                         <ChevronDownIcon className="w-4 h-4 rotate-90" />
-                    </button>
-                    <button
-                        type="button"
-                        className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary text-text-secondary hover:text-text-main hover:bg-secondary/80 border border-border-color/70 disabled:opacity-40 disabled:cursor-default"
+                    </IconButton>
+                    <IconButton
                         onClick={openOverflowMenu}
+                        tooltip="Show hidden tabs"
                         aria-label="Show hidden tabs"
+                        size="xs"
+                        variant="ghost"
                         disabled={!scrollState.hiddenTabIds.length}
+                        className="disabled:opacity-40 disabled:cursor-default"
                     >
                         <ChevronDownIcon className="w-4 h-4" />
-                    </button>
+                    </IconButton>
                 </div>
             </div>
             <ContextMenu
