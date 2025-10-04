@@ -133,7 +133,7 @@ Accessed via the gear icon in the title bar. The settings are organized into cat
 - **LLM Provider:** Configure your connection to a local AI service. You can detect running services and select a model.
 - **Appearance:** Change the UI scale and choose from different icon sets.
 - **Keyboard Shortcuts:** View and customize keyboard shortcuts for all major application actions. You can record a new key combination for any command.
-- **General:** Configure application behavior, like auto-saving logs and opting into pre-release updates.
+- **General:** Configure application behavior, including auto-saving logs, opting into pre-release updates, and choosing whether PlantUML diagrams render via the public server or the bundled offline renderer (Java required).
 - **Database:** View detailed statistics about your local database file, and perform maintenance tasks such as creating a compressed backup, checking file integrity, and optimizing the database size (`VACUUM`).
 - **Advanced:** View and edit the raw JSON configuration file using an interactive tree or a raw text editor, and import/export your settings.
 

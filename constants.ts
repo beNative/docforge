@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   markdownCodeBlockBackgroundDark: '#1f2933',
   markdownContentPadding: 48,
   markdownParagraphSpacing: 0.75,
+  plantumlRenderMode: 'remote',
   pythonDefaults: {
     targetPythonVersion: '3.11',
     basePackages: [

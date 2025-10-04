@@ -86,4 +86,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('python:run-status', handler);
     return () => ipcRenderer.removeListener('python:run-status', handler);
   },
+
+  // --- PlantUML ---
+  plantumlRenderOffline: (source: string) => ipcRenderer.invoke('plantuml:render-offline', source),
 });

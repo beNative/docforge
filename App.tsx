@@ -28,6 +28,7 @@ import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
 import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode } from './types';
 import { IconProvider } from './contexts/IconContext';
+import { SettingsProvider } from './contexts/SettingsContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { LOCAL_STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
@@ -1079,28 +1080,29 @@ const MainApp: React.FC = () => {
     };
 
     return (
-        <IconProvider value={{ iconSet: getSupportedIconSet(settings.iconSet) }}>
-            <div className="flex flex-col h-full font-sans bg-background text-text-main antialiased overflow-hidden">
-                {isElectron ? (
-                    <CustomTitleBar
-                        {...headerProps}
-                        commandPaletteTargetRef={commandPaletteTargetRef}
-                        searchTerm={commandPaletteSearch}
-                        onSearchTermChange={setCommandPaletteSearch}
-                        commandPaletteInputRef={commandPaletteInputRef}
-                    />
-                ) : (
-                    <Header {...headerProps} />
-                )}
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    <main className="flex-1 flex overflow-hidden min-h-0">
-                        {view === 'editor' ? (
-                            <>
-                                <aside 
-                                    style={{ width: `${sidebarWidth}px` }} 
-                                    className="bg-secondary border-r border-border-color flex flex-col flex-shrink-0"
-                                >
-                                    <Sidebar 
+        <SettingsProvider settings={settings} saveSettings={saveSettings} loaded={settingsLoaded}>
+            <IconProvider value={{ iconSet: getSupportedIconSet(settings.iconSet) }}>
+                <div className="flex flex-col h-full font-sans bg-background text-text-main antialiased overflow-hidden">
+                    {isElectron ? (
+                        <CustomTitleBar
+                            {...headerProps}
+                            commandPaletteTargetRef={commandPaletteTargetRef}
+                            searchTerm={commandPaletteSearch}
+                            onSearchTermChange={setCommandPaletteSearch}
+                            commandPaletteInputRef={commandPaletteInputRef}
+                        />
+                    ) : (
+                        <Header {...headerProps} />
+                    )}
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <main className="flex-1 flex overflow-hidden min-h-0">
+                            {view === 'editor' ? (
+                                <>
+                                    <aside
+                                        style={{ width: `${sidebarWidth}px` }}
+                                        className="bg-secondary border-r border-border-color flex flex-col flex-shrink-0"
+                                    >
+                                        <Sidebar
                                         documents={items}
                                         documentTree={documentTree}
                                         navigableItems={navigableItems}
@@ -1235,7 +1237,8 @@ const MainApp: React.FC = () => {
                     onCancel={() => { addLog('INFO', 'User cancelled action.'); setConfirmAction(null); }}
                 />
             )}
-        </IconProvider>
+            </IconProvider>
+        </SettingsProvider>
     );
 };
 

@@ -49,6 +49,7 @@ declare global {
       pythonGetRun: (runId: string) => Promise<PythonExecutionRun | null>;
       onPythonRunLog: (callback: (payload: { runId: string; entry: PythonExecutionLogEntry }) => void) => () => void;
       onPythonRunStatus: (callback: (payload: { runId: string; status: PythonExecutionStatus }) => void) => () => void;
+      plantumlRenderOffline: (source: string) => Promise<{ success: boolean; svg?: string; error?: string }>;
     };
   }
   // This is for the Electron main process, to add properties attached by Electron.
@@ -57,6 +58,10 @@ declare global {
       resourcesPath: string;
     }
   }
+}
+
+declare module 'plantuml' {
+  export default function plantuml(source: string): Promise<string>;
 }
 
 // =================================================================
@@ -265,6 +270,7 @@ export interface Settings {
   markdownCodeBlockBackgroundDark: string;
   markdownContentPadding: number;
   markdownParagraphSpacing: number;
+  plantumlRenderMode: 'remote' | 'offline';
   pythonDefaults: PythonEnvironmentDefaults;
   pythonWorkingDirectory: string | null;
   pythonConsoleTheme: 'light' | 'dark';

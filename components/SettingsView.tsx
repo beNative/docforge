@@ -1379,6 +1379,27 @@ const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurre
                  <SettingRow htmlFor="autoSaveLogs" label="Auto-save Logs" description="Automatically save all logs to a daily file on your computer for debugging.">
                     <ToggleSwitch id="autoSaveLogs" checked={settings.autoSaveLogs} onChange={(val) => setCurrentSettings(s => ({...s, autoSaveLogs: val}))} />
                 </SettingRow>
+                <SettingRow
+                    htmlFor="plantumlRenderMode"
+                    label="PlantUML Rendering"
+                    description="Choose whether diagrams are rendered through the public PlantUML server or locally (Java required)."
+                >
+                    <div className="relative inline-block">
+                        <select
+                            id="plantumlRenderMode"
+                            value={settings.plantumlRenderMode}
+                            onChange={(event) => setCurrentSettings(prev => ({
+                                ...prev,
+                                plantumlRenderMode: event.target.value as Settings['plantumlRenderMode'],
+                            }))}
+                            className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-8"
+                        >
+                            <option value="remote">Use remote PlantUML server</option>
+                            <option value="offline">Render locally (Java required)</option>
+                        </select>
+                        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-text-secondary text-xs">▼</span>
+                    </div>
+                </SettingRow>
             </div>
         </div>
     );

@@ -12,6 +12,7 @@ import plantumlEncoder from 'plantuml-encoder';
 import type { IRenderer } from './IRenderer';
 import type { LogLevel } from '../../types';
 import { useTheme } from '../../hooks/useTheme';
+import { useSettingsContext } from '../../contexts/SettingsContext';
 import { getSharedHighlighter } from './shikiHighlighter';
 
 import 'katex/dist/katex.min.css';
@@ -101,27 +102,142 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
 
 interface PlantUMLDiagramProps {
   code: string;
+  mode: 'remote' | 'offline';
 }
 
 const PLANTUML_LANGS = ['plantuml', 'puml', 'uml'];
 const PLANTUML_SERVER = 'https://www.plantuml.com/plantuml/svg';
 
-const PlantUMLDiagram: React.FC<PlantUMLDiagramProps> = ({ code }) => {
-  const [hasError, setHasError] = useState(false);
+const PlantUMLDiagram: React.FC<PlantUMLDiagramProps> = ({ code, mode }) => {
+  const trimmedCode = useMemo(() => code.trim(), [code]);
+  const [remoteError, setRemoteError] = useState(false);
+  const [offlineState, setOfflineState] = useState<{
+    isLoading: boolean;
+    svg: string | null;
+    error: string | null;
+    details?: string;
+  }>({ isLoading: false, svg: null, error: null, details: undefined });
 
   const encoded = useMemo(() => {
+    if (mode !== 'remote') {
+      return null;
+    }
     try {
-      return plantumlEncoder.encode(code.trim());
+      return plantumlEncoder.encode(trimmedCode);
     } catch (err) {
       return null;
     }
-  }, [code]);
+  }, [trimmedCode, mode]);
+
+  useEffect(() => {
+    setRemoteError(false);
+  }, [encoded, mode]);
+
+  useEffect(() => {
+    if (mode !== 'offline') {
+      setOfflineState({ isLoading: false, svg: null, error: null, details: undefined });
+      return;
+    }
+
+    if (!trimmedCode) {
+      setOfflineState({ isLoading: false, svg: null, error: null, details: undefined });
+      return;
+    }
+
+    let isCancelled = false;
+
+    const renderOffline = async () => {
+      if (!window.electronAPI?.plantumlRenderOffline) {
+        setOfflineState({
+          isLoading: false,
+          svg: null,
+          error: 'Offline PlantUML rendering is only available in the desktop application.',
+          details: undefined,
+        });
+        return;
+      }
+
+      setOfflineState({ isLoading: true, svg: null, error: null, details: undefined });
+
+      try {
+        const result = await window.electronAPI.plantumlRenderOffline(trimmedCode);
+        if (isCancelled) {
+          return;
+        }
+        if (result.success && result.svg) {
+          setOfflineState({ isLoading: false, svg: result.svg, error: null, details: undefined });
+        } else {
+          setOfflineState({
+            isLoading: false,
+            svg: null,
+            error: 'Failed to render PlantUML diagram locally.',
+            details: result.error,
+          });
+        }
+      } catch (err) {
+        if (isCancelled) {
+          return;
+        }
+        const details = err instanceof Error ? err.message : String(err);
+        console.error('[PlantUMLDiagram] Offline rendering failed', err);
+        setOfflineState({
+          isLoading: false,
+          svg: null,
+          error: 'Failed to render PlantUML diagram locally.',
+          details,
+        });
+      }
+    };
+
+    renderOffline();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [mode, trimmedCode]);
+
+  if (!trimmedCode) {
+    return <div className="df-plantuml df-plantuml-error">PlantUML diagram is empty.</div>;
+  }
+
+  if (mode === 'offline') {
+    if (offlineState.isLoading) {
+      return <div className="df-plantuml">Rendering PlantUML diagram locally…</div>;
+    }
+
+    if (offlineState.error) {
+      return (
+        <div className="df-plantuml df-plantuml-error" role="alert">
+          <div>{offlineState.error}</div>
+          {offlineState.details && (
+            <details className="df-plantuml-error__details">
+              <summary>Technical details</summary>
+              <code>{offlineState.details}</code>
+            </details>
+          )}
+        </div>
+      );
+    }
+
+    if (offlineState.svg) {
+      return (
+        <div
+          className="df-plantuml"
+          role="img"
+          aria-label="PlantUML diagram"
+          dangerouslySetInnerHTML={{ __html: offlineState.svg }}
+        />
+      );
+    }
+
+    return <div className="df-plantuml df-plantuml-error">The PlantUML renderer returned no output.</div>;
+  }
 
   if (!encoded) {
     return <div className="df-plantuml df-plantuml-error">Unable to encode PlantUML diagram.</div>;
   }
 
-  if (hasError) {
+  if (remoteError) {
     return <div className="df-plantuml df-plantuml-error">Failed to load PlantUML diagram from server.</div>;
   }
 
@@ -131,7 +247,7 @@ const PlantUMLDiagram: React.FC<PlantUMLDiagramProps> = ({ code }) => {
         src={`${PLANTUML_SERVER}/${encoded}`}
         alt="PlantUML diagram"
         loading="lazy"
-        onError={() => setHasError(true)}
+        onError={() => setRemoteError(true)}
       />
     </div>
   );
@@ -139,6 +255,7 @@ const PlantUMLDiagram: React.FC<PlantUMLDiagramProps> = ({ code }) => {
 
 const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ content, onScroll }, ref) => {
   const { theme } = useTheme();
+  const { settings } = useSettingsContext();
   const viewTheme: 'light' | 'dark' = theme === 'dark' ? 'dark' : 'light';
   const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
 
@@ -200,7 +317,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         const raw = React.Children.toArray(codeChild.props.children)
           .map((child) => (typeof child === 'string' ? child : ''))
           .join('');
-        return <PlantUMLDiagram code={raw} />;
+        return <PlantUMLDiagram code={raw} mode={settings.plantumlRenderMode} />;
       }
 
       const baseClassName = ['df-code-block', className].filter(Boolean).join(' ');
@@ -310,7 +427,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
     hr(props) {
       return <hr className="df-divider" {...props} />;
     },
-  }), [highlighter, viewTheme]);
+  }), [highlighter, settings.plantumlRenderMode, viewTheme]);
 
   return (
     <div ref={ref} onScroll={onScroll} className={`w-full h-full overflow-auto bg-secondary df-markdown-container ${theme}`}>
@@ -627,7 +744,8 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-mermaid svg,
-        .df-plantuml img {
+        .df-plantuml img,
+        .df-plantuml svg {
           width: 100%;
           height: auto;
         }
@@ -667,6 +785,31 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-mermaid-error__details code {
+          display: block;
+          margin-top: 0.5rem;
+          word-break: break-word;
+          font-size: 0.85rem;
+          color: rgba(var(--color-text), 0.95);
+        }
+
+        .df-plantuml-error__details {
+          width: 100%;
+          border: 1px solid rgba(var(--color-border), 0.6);
+          border-radius: 0.5rem;
+          padding: 0.75rem 0.85rem;
+          background: rgba(var(--color-background), 0.6);
+          color: rgba(var(--color-text-secondary), 0.95);
+          margin-top: 0.5rem;
+          text-align: left;
+        }
+
+        .df-plantuml-error__details > summary {
+          cursor: pointer;
+          font-weight: 600;
+          color: rgb(var(--color-destructive-text));
+        }
+
+        .df-plantuml-error__details code {
           display: block;
           margin-top: 0.5rem;
           word-break: break-word;

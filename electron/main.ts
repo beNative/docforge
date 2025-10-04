@@ -13,6 +13,7 @@ import * as zlib from 'zlib';
 import * as os from 'os';
 import * as stream from 'stream';
 import { promisify } from 'util';
+import plantuml from 'plantuml';
 
 // Fix: Inform TypeScript about the __dirname global variable provided by Node.js, which is present in a CommonJS-like environment.
 declare const __dirname: string;
@@ -333,6 +334,33 @@ ipcMain.handle('docs:read', async (_, filename: string) => {
     } catch (error) {
         console.error(`Failed to read doc: ${filename}`, error);
         return { success: false, error: error instanceof Error ? error.message : `Could not read ${filename}` };
+    }
+});
+
+ipcMain.handle('plantuml:render-offline', async (_, source: string) => {
+    try {
+        const trimmed = source.trim();
+        if (!trimmed) {
+            return { success: false, error: 'No PlantUML content provided.' };
+        }
+
+        const svg = await plantuml(trimmed);
+        if (!svg || !svg.trim()) {
+            return { success: false, error: 'The PlantUML renderer returned an empty response.' };
+        }
+
+        return { success: true, svg };
+    } catch (error: any) {
+        console.error('[PlantUML] Offline rendering failed', error);
+        let message = error instanceof Error ? error.message : 'Unknown PlantUML rendering error.';
+
+        if (error && typeof error === 'object' && 'code' in error && (error as any).code === 'ENOENT') {
+            message = 'Java runtime not found. Offline PlantUML rendering requires Java to be installed.';
+        } else if (error && typeof error === 'object' && 'stderr' in error && typeof (error as any).stderr === 'string' && (error as any).stderr.trim()) {
+            message = (error as any).stderr.toString();
+        }
+
+        return { success: false, error: message };
     }
 });
 

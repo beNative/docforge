@@ -94,6 +94,7 @@ This system provides a consistent and extensible editing experience for all docu
 -   **`PreviewPane.tsx`:** This component is responsible for displaying the rendered output of a document. It debounces content updates for performance and uses the `PreviewService` to get the correct output.
 -   **`services/previewService.ts`:** This service acts as a registry for all available renderer "plugins." It exposes a method, `getRendererForLanguage()`, which finds and returns the appropriate renderer for a given language ID (e.g., 'markdown').
 -   **Renderer Plugins (`services/preview/`):** Each file format with a preview is supported by a dedicated renderer class that implements the `IRenderer` interface. This makes the system highly extensible: to support a new format, one only needs to create a new renderer class and add it to the `previewService` registry. Currently, renderers for Markdown, HTML, and plaintext (fallback) are implemented.
+-   **PlantUML Offline Rendering:** The Markdown renderer can now switch between the public PlantUML server and a bundled offline renderer. When offline mode is selected, the renderer calls the new `plantuml:render-offline` IPC handler, which invokes the `plantuml` npm package in the main process. The package executes the bundled `plantuml.jar` and requires a local Java Runtime Environment (JRE). Errors from the Java process are captured and relayed back to the renderer so the UI can display actionable feedback.
 
 ### LLM Service (`services/llmService.ts`)
 
