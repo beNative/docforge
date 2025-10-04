@@ -18,7 +18,7 @@ import InfoView from './components/InfoView';
 import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
-import FolderOverview, { FolderOverviewMetrics } from './components/FolderOverview';
+import FolderOverview, { FolderOverviewMetrics, FolderSearchResult, RecentDocumentSummary } from './components/FolderOverview';
 import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
@@ -122,6 +122,9 @@ const MainApp: React.FC = () => {
     const [isDraggingFile, setIsDraggingFile] = useState(false);
     const [formatTrigger, setFormatTrigger] = useState(0);
     const [bodySearchMatches, setBodySearchMatches] = useState<Map<string, string>>(new Map());
+    const [folderSearchTerm, setFolderSearchTerm] = useState('');
+    const [folderBodySearchMatches, setFolderBodySearchMatches] = useState<Map<string, string>>(new Map());
+    const [isFolderSearchLoading, setIsFolderSearchLoading] = useState(false);
 
 
     const isSidebarResizing = useRef(false);
@@ -189,6 +192,12 @@ const MainApp: React.FC = () => {
         return itemsWithSearchMetadata.find(p => p.id === activeNodeId) || null;
     }, [itemsWithSearchMetadata, activeNodeId]);
 
+    useEffect(() => {
+        setFolderSearchTerm('');
+        setFolderBodySearchMatches(new Map());
+        setIsFolderSearchLoading(false);
+    }, [activeNode?.id, activeNode?.type]);
+
     const activeTemplate = useMemo(() => {
         return templates.find(t => t.template_id === activeTemplateId) || null;
     }, [templates, activeTemplateId]);
@@ -224,6 +233,53 @@ const MainApp: React.FC = () => {
             isCancelled = true;
         };
     }, [searchTerm]);
+
+    useEffect(() => {
+        if (!activeNode || activeNode.type !== 'folder') {
+            return;
+        }
+
+        const term = folderSearchTerm.trim();
+        if (!term) {
+            setFolderBodySearchMatches(new Map());
+            setIsFolderSearchLoading(false);
+            return;
+        }
+
+        let isCancelled = false;
+        setIsFolderSearchLoading(true);
+        setFolderBodySearchMatches(new Map());
+
+        repository.searchDocumentsByBody(term, 200)
+            .then(results => {
+                if (isCancelled) {
+                    return;
+                }
+                const descendantIds = getDescendantIds(activeNode.id);
+                const matches = new Map<string, string>();
+                for (const result of results) {
+                    if (descendantIds.has(result.nodeId)) {
+                        matches.set(result.nodeId, result.snippet);
+                    }
+                }
+                setFolderBodySearchMatches(matches);
+            })
+            .catch(error => {
+                if (!isCancelled) {
+                    console.error('Failed to search within folder:', error);
+                    setFolderBodySearchMatches(new Map());
+                }
+            })
+            .finally(() => {
+                if (!isCancelled) {
+                    setIsFolderSearchLoading(false);
+                }
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [activeNode, folderSearchTerm, getDescendantIds]);
 
     const { documentTree, navigableItems } = useMemo(() => {
         let itemsToBuildFrom = itemsWithSearchMetadata;
@@ -296,9 +352,9 @@ const MainApp: React.FC = () => {
         return { documentTree: finalTree, navigableItems: flatList };
     }, [itemsWithSearchMetadata, templates, searchTerm, expandedFolderIds]);
 
-    const activeFolderMetrics = useMemo<FolderOverviewMetrics | null>(() => {
+    const { metrics: activeFolderMetrics, documents: activeFolderDocuments } = useMemo(() => {
         if (!activeNode || activeNode.type !== 'folder') {
-            return null;
+            return { metrics: null as FolderOverviewMetrics | null, documents: [] as RecentDocumentSummary[] };
         }
 
         const parseDate = (value?: string | null): Date | null => {
@@ -307,7 +363,7 @@ const MainApp: React.FC = () => {
             return Number.isNaN(date.getTime()) ? null : date;
         };
 
-        const formatNodeTitle = (node: DocumentOrFolder) => {
+        const formatNodeTitle = (node: { title: string; type: 'document' | 'folder' }) => {
             const trimmed = node.title.trim();
             if (trimmed) {
                 return trimmed;
@@ -315,7 +371,7 @@ const MainApp: React.FC = () => {
             return node.type === 'folder' ? 'Untitled Folder' : 'Untitled Document';
         };
 
-        const computeFromTree = (folderNode: DocumentNode): FolderOverviewMetrics => {
+        const computeFromTree = (folderNode: DocumentNode) => {
             const recordLatest = (() => {
                 let latest: Date | null = null;
                 return {
@@ -343,14 +399,14 @@ const MainApp: React.FC = () => {
                 node: child,
                 parentPath: [],
             }));
-            const recentDocuments: FolderOverviewMetrics['recentDocuments'] = [];
+            const allDocuments: RecentDocumentSummary[] = [];
 
             while (stack.length > 0) {
                 const { node: current, parentPath } = stack.pop()!;
                 recordLatest.update(current.updatedAt);
                 if (current.type === 'document') {
                     totalDocumentCount += 1;
-                    recentDocuments.push({
+                    allDocuments.push({
                         id: current.id,
                         title: current.title,
                         updatedAt: current.updatedAt,
@@ -365,7 +421,7 @@ const MainApp: React.FC = () => {
             }
 
             const latestDate = recordLatest.getValue();
-            const sortedRecent = recentDocuments
+            const recentDocuments = [...allDocuments]
                 .sort((a, b) => {
                     const aDate = parseDate(a.updatedAt)?.getTime() ?? 0;
                     const bDate = parseDate(b.updatedAt)?.getTime() ?? 0;
@@ -374,13 +430,16 @@ const MainApp: React.FC = () => {
                 .slice(0, 5);
 
             return {
-                directDocumentCount,
-                directFolderCount,
-                totalDocumentCount,
-                totalFolderCount,
-                totalItemCount: totalDocumentCount + totalFolderCount,
-                lastUpdated: latestDate ? latestDate.toISOString() : null,
-                recentDocuments: sortedRecent,
+                metrics: {
+                    directDocumentCount,
+                    directFolderCount,
+                    totalDocumentCount,
+                    totalFolderCount,
+                    totalItemCount: totalDocumentCount + totalFolderCount,
+                    lastUpdated: latestDate ? latestDate.toISOString() : null,
+                    recentDocuments,
+                },
+                documents: allDocuments,
             };
         };
 
@@ -396,7 +455,7 @@ const MainApp: React.FC = () => {
             return map;
         };
 
-        const computeFromList = (): FolderOverviewMetrics => {
+        const computeFromList = () => {
             const childMap = buildChildMap();
             const directChildren = childMap.get(activeNode.id) ?? [];
 
@@ -426,14 +485,14 @@ const MainApp: React.FC = () => {
                 node: child,
                 parentPath: [],
             }));
-            const recentDocuments: FolderOverviewMetrics['recentDocuments'] = [];
+            const allDocuments: RecentDocumentSummary[] = [];
 
             while (stack.length > 0) {
                 const { node: current, parentPath } = stack.pop()!;
                 recordLatest.update(current.updatedAt);
                 if (current.type === 'document') {
                     totalDocumentCount += 1;
-                    recentDocuments.push({
+                    allDocuments.push({
                         id: current.id,
                         title: current.title,
                         updatedAt: current.updatedAt,
@@ -448,7 +507,7 @@ const MainApp: React.FC = () => {
             }
 
             const latestDate = recordLatest.getValue();
-            const sortedRecent = recentDocuments
+            const recentDocuments = [...allDocuments]
                 .sort((a, b) => {
                     const aDate = parseDate(a.updatedAt)?.getTime() ?? 0;
                     const bDate = parseDate(b.updatedAt)?.getTime() ?? 0;
@@ -457,13 +516,16 @@ const MainApp: React.FC = () => {
                 .slice(0, 5);
 
             return {
-                directDocumentCount,
-                directFolderCount,
-                totalDocumentCount,
-                totalFolderCount,
-                totalItemCount: totalDocumentCount + totalFolderCount,
-                lastUpdated: latestDate ? latestDate.toISOString() : null,
-                recentDocuments: sortedRecent,
+                metrics: {
+                    directDocumentCount,
+                    directFolderCount,
+                    totalDocumentCount,
+                    totalFolderCount,
+                    totalItemCount: totalDocumentCount + totalFolderCount,
+                    lastUpdated: latestDate ? latestDate.toISOString() : null,
+                    recentDocuments,
+                },
+                documents: allDocuments,
             };
         };
 
@@ -488,6 +550,80 @@ const MainApp: React.FC = () => {
         }
         return computeFromList();
     }, [activeNode, documentTree, items]);
+
+    const folderSearchResults = useMemo<FolderSearchResult[]>(() => {
+        if (!activeNode || activeNode.type !== 'folder') {
+            return [];
+        }
+
+        const trimmed = folderSearchTerm.trim();
+        if (!trimmed) {
+            return [];
+        }
+
+        const lowerTerm = trimmed.toLowerCase();
+
+        const parseToTimestamp = (value?: string | null) => {
+            if (!value) {
+                return 0;
+            }
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+        };
+
+        const computeMatchScore = (fields: ('title' | 'body')[]) => {
+            if (fields.length === 2) {
+                return 0;
+            }
+            return fields[0] === 'title' ? 1 : 2;
+        };
+
+        type FolderSearchResultWithScore = FolderSearchResult & { matchScore: number; sortTimestamp: number; };
+
+        const results: FolderSearchResultWithScore[] = [];
+
+        for (const document of activeFolderDocuments) {
+            const titleLower = document.title.toLowerCase();
+            const hasTitleMatch = titleLower.includes(lowerTerm);
+            const snippet = folderBodySearchMatches.get(document.id);
+            const hasBodyMatch = Boolean(snippet);
+
+            if (!hasTitleMatch && !hasBodyMatch) {
+                continue;
+            }
+
+            const matchedFields: ('title' | 'body')[] = [];
+            if (hasTitleMatch) {
+                matchedFields.push('title');
+            }
+            if (hasBodyMatch) {
+                matchedFields.push('body');
+            }
+
+            results.push({
+                id: document.id,
+                title: document.title,
+                updatedAt: document.updatedAt,
+                parentPath: document.parentPath,
+                searchSnippet: snippet,
+                matchedFields,
+                matchScore: computeMatchScore(matchedFields),
+                sortTimestamp: parseToTimestamp(document.updatedAt),
+            });
+        }
+
+        return results
+            .sort((a, b) => {
+                if (a.matchScore !== b.matchScore) {
+                    return a.matchScore - b.matchScore;
+                }
+                if (a.sortTimestamp !== b.sortTimestamp) {
+                    return b.sortTimestamp - a.sortTimestamp;
+                }
+                return a.title.localeCompare(b.title);
+            })
+            .map(({ matchScore: _matchScore, sortTimestamp: _sortTimestamp, ...rest }) => rest);
+    }, [activeNode, activeFolderDocuments, folderBodySearchMatches, folderSearchTerm]);
 
     useEffect(() => {
         if (window.electronAPI?.getAppVersion) {
@@ -1367,6 +1503,10 @@ const MainApp: React.FC = () => {
                         onNewSubfolder={(parentId) => handleNewFolder(parentId)}
                         onImportFiles={handleImportFilesIntoFolder}
                         onRenameFolder={handleStartRenamingNode}
+                        folderSearchTerm={folderSearchTerm}
+                        onFolderSearchTermChange={setFolderSearchTerm}
+                        searchResults={folderSearchResults}
+                        isSearchLoading={isFolderSearchLoading}
                     />
                 );
             }

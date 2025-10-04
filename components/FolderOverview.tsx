@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import type { DocumentOrFolder } from '../types';
 import Button from './Button';
-import { FolderIcon, FileIcon, InfoIcon, PlusIcon, FolderPlusIcon, FolderDownIcon, PencilIcon } from './Icons';
+import { FolderIcon, FileIcon, InfoIcon, PlusIcon, FolderPlusIcon, FolderDownIcon, PencilIcon, SearchIcon, XIcon } from './Icons';
 
 export interface FolderOverviewMetrics {
     directDocumentCount: number;
@@ -20,6 +20,11 @@ export interface RecentDocumentSummary {
     parentPath: string[];
 }
 
+export interface FolderSearchResult extends RecentDocumentSummary {
+    searchSnippet?: string | null;
+    matchedFields: ('title' | 'body')[];
+}
+
 interface FolderOverviewProps {
     folder: DocumentOrFolder;
     metrics: FolderOverviewMetrics;
@@ -27,6 +32,10 @@ interface FolderOverviewProps {
     onNewSubfolder: (parentId: string) => void;
     onImportFiles: (files: FileList, parentId: string) => void;
     onRenameFolder: (folderId: string) => void;
+    folderSearchTerm: string;
+    onFolderSearchTermChange: (value: string) => void;
+    searchResults: FolderSearchResult[];
+    isSearchLoading: boolean;
 }
 
 const formatDateTime = (value: string | null) => {
@@ -38,6 +47,27 @@ const formatDateTime = (value: string | null) => {
         return 'Unknown';
     }
     return date.toLocaleString();
+};
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const highlightMatches = (text: string, term: string): React.ReactNode => {
+    if (!term.trim()) {
+        return text;
+    }
+    const escaped = escapeRegExp(term.trim());
+    const regex = new RegExp(`(${escaped})`, 'ig');
+    const parts = text.split(regex);
+    return parts.map((part, index) => {
+        if (index % 2 === 1) {
+            return (
+                <span key={index} className="bg-primary/20 text-text-main rounded-sm px-1 py-0.5">
+                    {part}
+                </span>
+            );
+        }
+        return <React.Fragment key={index}>{part}</React.Fragment>;
+    });
 };
 
 const StatCard: React.FC<{ label: string; value: number; icon: React.ReactNode }> = ({ label, value, icon }) => (
@@ -59,6 +89,10 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
     onNewSubfolder,
     onImportFiles,
     onRenameFolder,
+    folderSearchTerm,
+    onFolderSearchTermChange,
+    searchResults,
+    isSearchLoading,
 }) => {
     const {
         directDocumentCount,
@@ -84,6 +118,16 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
             event.target.value = '';
         }
     };
+
+    const handleSearchChange: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+        onFolderSearchTermChange(event.target.value);
+    };
+
+    const handleClearSearch = () => {
+        onFolderSearchTermChange('');
+    };
+
+    const hasSearchTerm = folderSearchTerm.trim().length > 0;
 
     return (
         <div className="flex h-full flex-col overflow-y-auto bg-background">
@@ -148,6 +192,118 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                 aria-label="Import files into this folder"
                             />
                         </div>
+                    </div>
+
+                    <div className="mt-6">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-text-secondary" htmlFor="folder-search">
+                            Search within this folder
+                        </label>
+                        <div className="relative mt-2">
+                            <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+                            <input
+                                id="folder-search"
+                                type="search"
+                                value={folderSearchTerm}
+                                onChange={handleSearchChange}
+                                placeholder="Find documents by title or content..."
+                                className="w-full rounded-md border border-border-color bg-background px-9 py-2 text-sm text-text-main placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-primary"
+                            />
+                            {hasSearchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={handleClearSearch}
+                                    className="absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-text-secondary transition hover:text-text-main"
+                                    aria-label="Clear folder search"
+                                >
+                                    <XIcon className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        {hasSearchTerm && (
+                            <div className="mt-4 rounded-lg border border-border-color bg-background/70 p-6">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">Search results</h2>
+                                    <span className="text-xs text-text-tertiary">
+                                        {isSearchLoading
+                                            ? 'Searching…'
+                                            : searchResults.length === 1
+                                                ? '1 match'
+                                                : `${searchResults.length} matches`}
+                                    </span>
+                                </div>
+
+                                {searchResults.length > 0 ? (
+                                    <ul className="mt-4 space-y-3">
+                                        {searchResults.map((result) => {
+                                            const formattedTitle = result.title.trim() || 'Untitled document';
+                                            const formattedDate = formatDateTime(result.updatedAt);
+                                            const hasPath = result.parentPath.length > 0;
+                                            const isUnknownDate = formattedDate === 'Unknown';
+                                            return (
+                                                <li
+                                                    key={result.id}
+                                                    className="rounded-md border border-border-color/80 bg-background px-4 py-3"
+                                                >
+                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                                <FileIcon className="h-4 w-4" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium text-text-main">
+                                                                    {highlightMatches(formattedTitle, folderSearchTerm)}
+                                                                </p>
+                                                                {hasPath && (
+                                                                    <p className="text-xs uppercase tracking-wide text-text-tertiary">
+                                                                        {result.parentPath.join(' / ')}
+                                                                    </p>
+                                                                )}
+                                                                {result.searchSnippet && (
+                                                                    <p className="mt-2 text-xs text-text-secondary">
+                                                                        {highlightMatches(result.searchSnippet, folderSearchTerm)}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-start gap-2 sm:items-end">
+                                                            <span className="text-xs uppercase tracking-wide text-text-tertiary">
+                                                                Updated {isUnknownDate ? 'recently' : formattedDate}
+                                                            </span>
+                                                            {result.matchedFields.length > 0 && (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {result.matchedFields.map((field) => (
+                                                                        <span
+                                                                            key={field}
+                                                                            className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary"
+                                                                        >
+                                                                            {field === 'title' ? 'Title match' : 'Body match'}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                ) : (
+                                    <div className="mt-4 flex items-center gap-2 rounded-md border border-dashed border-border-color/70 bg-background/60 px-4 py-3 text-sm text-text-secondary">
+                                        <InfoIcon className="h-4 w-4" />
+                                        <span>
+                                            {isSearchLoading
+                                                ? 'Searching folder contents…'
+                                                : (
+                                                    <>
+                                                        No matches found for &ldquo;{folderSearchTerm}&rdquo;.
+                                                    </>
+                                                )}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
