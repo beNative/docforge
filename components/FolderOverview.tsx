@@ -46,6 +46,7 @@ interface FolderOverviewProps {
     onNewSubfolder: (parentId: string) => void;
     onImportFiles: (files: FileList, parentId: string) => void;
     onRenameFolderTitle: (folderId: string, title: string) => void;
+    onNavigateToNode: (nodeId: string) => void;
     folderSearchTerm: string;
     onFolderSearchTermChange: (value: string) => void;
     searchResults: FolderSearchResult[];
@@ -100,6 +101,7 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
     onNewSubfolder,
     onImportFiles,
     onRenameFolderTitle,
+    onNavigateToNode,
     folderSearchTerm,
     onFolderSearchTermChange,
     searchResults,
@@ -205,10 +207,10 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
     const hasSearchTerm = folderSearchTerm.trim().length > 0;
 
     return (
-        <div className="flex h-full flex-col bg-secondary">
+        <div className="flex h-full flex-col bg-white dark:bg-secondary">
             <div className="flex-1 overflow-auto">
-                <div className="px-6 py-4">
-                    <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border-color pb-3">
+                <div className="px-5 py-3">
+                    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border-color pb-3">
                         <div className="flex min-w-0 flex-1 flex-col gap-1">
                             <div className="flex items-center gap-2 text-text-secondary">
                                 <FolderIcon className="h-5 w-5" />
@@ -286,7 +288,7 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                         </div>
                     </header>
 
-                    <section className="mt-4 flex flex-col gap-2.5">
+                    <section className="mt-4 flex flex-col gap-2">
                         <label className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary" htmlFor="folder-search">
                             Search within this folder
                         </label>
@@ -332,49 +334,56 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                             const hasPath = result.parentPath.length > 0;
                                             const isUnknownDate = formattedDate === 'Unknown';
                                             return (
-                                                <li key={result.id} className="flex flex-col gap-1.5 px-3 py-2 sm:flex-row sm:items-start sm:justify-between">
-                                                    <div className="flex items-start gap-2.5">
-                                                        <div className="mt-0.5 text-text-secondary">
-                                                            <FileIcon className="h-4 w-4" />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-xs text-text-main" title={formattedTitle}>
-                                                                {highlightMatches(formattedTitle, folderSearchTerm)}
-                                                            </p>
-                                                            {hasPath && (
-                                                                <p className="text-[11px] uppercase tracking-wide text-text-tertiary">
-                                                                    {result.parentPath.join(' / ')}
-                                                                </p>
-                                                            )}
-                                                            {result.searchSnippet && (
-                                                                <p className="text-[11px] text-text-secondary">
-                                                                    {highlightMatches(result.searchSnippet, folderSearchTerm)}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-start gap-1 text-[11px] uppercase tracking-wide text-text-tertiary sm:items-end">
-                                                        <span>Updated {isUnknownDate ? 'recently' : formattedDate}</span>
-                                                        {result.matchedFields.length > 0 && (
-                                                            <div className="flex flex-wrap gap-1 normal-case">
-                                                                {result.matchedFields.map((field) => (
-                                                                    <span
-                                                                        key={field}
-                                                                        className="border border-primary/40 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary"
-                                                                    >
-                                                                        {field === 'title' ? 'Title match' : 'Body match'}
-                                                                    </span>
-                                                                ))}
+                                                <li key={result.id}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onNavigateToNode(result.id)}
+                                                        className="grid w-full gap-x-4 gap-y-1 rounded-sm border border-transparent px-3 py-2 text-left transition hover:border-primary/50 hover:bg-primary/5 focus:outline-none focus:ring-1 focus:ring-primary/60 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_minmax(0,1fr)]"
+                                                    >
+                                                        <div className="flex items-start gap-2">
+                                                            <div className="mt-0.5 text-text-secondary">
+                                                                <FileIcon className="h-4 w-4" />
                                                             </div>
-                                                        )}
-                                                    </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="truncate text-xs text-text-main" title={formattedTitle}>
+                                                                    {highlightMatches(formattedTitle, folderSearchTerm)}
+                                                                </p>
+                                                                {result.searchSnippet && (
+                                                                    <p className="mt-0.5 text-[11px] leading-snug text-text-secondary">
+                                                                        {highlightMatches(result.searchSnippet, folderSearchTerm)}
+                                                                    </p>
+                                                                )}
+                                                                {result.matchedFields.length > 0 && (
+                                                                    <div className="mt-1 flex flex-wrap gap-1 text-[10px] uppercase">
+                                                                        {result.matchedFields.map((field) => (
+                                                                            <span
+                                                                                key={field}
+                                                                                className="rounded-sm border border-primary/40 px-1.5 py-0.5 text-primary"
+                                                                            >
+                                                                                {field === 'title' ? 'Title match' : 'Body match'}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="min-w-0 text-[11px]">
+                                                            <span className="text-[10px] uppercase tracking-wide text-text-tertiary">Folder</span>
+                                                            <p className="mt-0.5 text-xs text-text-secondary break-words">
+                                                                {hasPath ? result.parentPath.join(' / ') : 'Workspace root'}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-[11px] uppercase tracking-wide text-text-tertiary md:text-right">
+                                                            Updated {isUnknownDate ? 'recently' : formattedDate}
+                                                        </div>
+                                                    </button>
                                                 </li>
                                             );
                                         })}
                                     </ul>
                                 ) : (
-                                    <div className="flex items-center gap-2 px-3 py-2 text-xs text-text-secondary">
-                                        <InfoIcon className="h-4 w-4" />
+                                    <div className="m-2 flex items-start gap-2 rounded-sm border border-border-color/70 bg-background px-3 py-2 text-xs text-text-secondary">
+                                        <InfoIcon className="mt-0.5 h-4 w-4 text-text-tertiary" />
                                         <span>
                                             {isSearchLoading
                                                 ? 'Searching folder contents…'
@@ -390,28 +399,29 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                         )}
                     </section>
 
-                    <section className="mt-4 grid gap-y-2.5 border-b border-border-color pb-4 text-xs text-text-main sm:grid-cols-2 sm:gap-x-6">
-                        <div className="flex flex-col gap-0.5">
-                            <span className="text-[11px] uppercase tracking-wide text-text-tertiary">Direct documents</span>
-                            <span className="text-base font-semibold">{directDocumentCount}</span>
+                    <section className="mt-4 border-b border-border-color pb-4 text-xs text-text-main">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[11px] uppercase tracking-wide text-text-tertiary">Direct documents</span>
+                                <span className="text-base font-semibold">{directDocumentCount}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[11px] uppercase tracking-wide text-text-tertiary">Direct folders</span>
+                                <span className="text-base font-semibold">{directFolderCount}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[11px] uppercase tracking-wide text-text-tertiary">Documents in subtree</span>
+                                <span className="text-base font-semibold">{totalDocumentCount}</span>
+                            </div>
+                            <div className="flex flex-col gap-0.5">
+                                <span className="text-[11px] uppercase tracking-wide text-text-tertiary">Folders in subtree</span>
+                                <span className="text-base font-semibold">{totalFolderCount}</span>
+                            </div>
                         </div>
-                        <div className="flex flex-col gap-0.5">
-                            <span className="text-[11px] uppercase tracking-wide text-text-tertiary">Direct folders</span>
-                            <span className="text-base font-semibold">{directFolderCount}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                            <span className="text-[11px] uppercase tracking-wide text-text-tertiary">Documents in subtree</span>
-                            <span className="text-base font-semibold">{totalDocumentCount}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                            <span className="text-[11px] uppercase tracking-wide text-text-tertiary">Folders in subtree</span>
-                            <span className="text-base font-semibold">{totalFolderCount}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5 sm:col-span-2">
-                            <span className="text-[11px] uppercase tracking-wide text-text-tertiary">Total items</span>
-                            <span className="text-base font-semibold">{totalItemCount}</span>
-                            <span className="text-[11px] text-text-secondary">
-                                Includes every document and folder contained within this folder’s hierarchy.
+                        <div className="mt-3 flex items-start gap-2 rounded-sm border border-border-color/70 bg-background px-3 py-2 text-[11px] leading-snug text-text-secondary">
+                            <InfoIcon className="mt-0.5 h-4 w-4 text-text-tertiary" />
+                            <span>
+                                Total items: <span className="font-semibold text-text-main">{totalItemCount}</span>. Includes every document and folder contained within this folder’s hierarchy.
                             </span>
                         </div>
                     </section>
@@ -464,9 +474,10 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                 Recently updated in this folder
                             </h2>
                             {!hasChildren && (
-                                <span className="text-xs text-text-secondary">
-                                    This folder is empty. Create content to populate these lists.
-                                </span>
+                                <div className="flex items-start gap-2 rounded-sm border border-border-color/70 bg-background px-3 py-2 text-xs text-text-secondary">
+                                    <InfoIcon className="mt-0.5 h-4 w-4 text-text-tertiary" />
+                                    <span>This folder is empty. Create content to populate these lists.</span>
+                                </div>
                             )}
                         </div>
                         {recentDocuments.length > 0 ? (
@@ -477,32 +488,39 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                     const hasPath = doc.parentPath.length > 0;
                                     const isUnknownDate = formattedDate === 'Unknown';
                                     return (
-                                        <li key={doc.id} className="flex flex-col gap-1.5 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                                            <div className="flex items-start gap-2.5">
-                                                <div className="mt-0.5 text-text-secondary">
-                                                    <FileIcon className="h-4 w-4" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="truncate text-xs text-text-main" title={formattedTitle}>
-                                                        {formattedTitle}
-                                                    </p>
-                                                    {hasPath && (
-                                                        <p className="text-[11px] uppercase tracking-wide text-text-tertiary">
-                                                            {doc.parentPath.join(' / ')}
+                                        <li key={doc.id}>
+                                            <button
+                                                type="button"
+                                                onClick={() => onNavigateToNode(doc.id)}
+                                                className="grid w-full gap-x-4 gap-y-1 rounded-sm border border-transparent px-3 py-2 text-left transition hover:border-primary/50 hover:bg-primary/5 focus:outline-none focus:ring-1 focus:ring-primary/60 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1.4fr)_minmax(0,1fr)]"
+                                            >
+                                                <div className="flex items-start gap-2">
+                                                    <div className="mt-0.5 text-text-secondary">
+                                                        <FileIcon className="h-4 w-4" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-xs text-text-main" title={formattedTitle}>
+                                                            {formattedTitle}
                                                         </p>
-                                                    )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="text-[11px] uppercase tracking-wide text-text-tertiary">
-                                                Updated {isUnknownDate ? 'recently' : formattedDate}
-                                            </div>
+                                                <div className="min-w-0 text-[11px]">
+                                                    <span className="text-[10px] uppercase tracking-wide text-text-tertiary">Folder</span>
+                                                    <p className="mt-0.5 text-xs text-text-secondary break-words">
+                                                        {hasPath ? doc.parentPath.join(' / ') : 'Workspace root'}
+                                                    </p>
+                                                </div>
+                                                <div className="text-[11px] uppercase tracking-wide text-text-tertiary md:text-right">
+                                                    Updated {isUnknownDate ? 'recently' : formattedDate}
+                                                </div>
+                                            </button>
                                         </li>
                                     );
                                 })}
                             </ul>
                         ) : (
-                            <div className="mt-3 flex items-center gap-2 text-xs text-text-secondary">
-                                <InfoIcon className="h-4 w-4" />
+                            <div className="mt-3 flex items-start gap-2 rounded-sm border border-border-color/70 bg-background px-3 py-2 text-xs text-text-secondary">
+                                <InfoIcon className="mt-0.5 h-4 w-4 text-text-tertiary" />
                                 <span>No recent document activity yet.</span>
                             </div>
                         )}

@@ -924,6 +924,20 @@ const MainApp: React.FC = () => {
         ensureNodeVisibleRef.current = ensureNodeVisible;
     }, [ensureNodeVisible]);
 
+    const handleNavigateToNode = useCallback((nodeId: string) => {
+        const target = items.find(item => item.id === nodeId);
+        if (!target) {
+            return;
+        }
+        ensureNodeVisible(target);
+        setActiveTemplateId(null);
+        setView('editor');
+        setDocumentView('editor');
+        setActiveNodeId(nodeId);
+        setSelectedIds(new Set([nodeId]));
+        setLastClickedId(nodeId);
+    }, [items, ensureNodeVisible]);
+
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
@@ -1564,19 +1578,20 @@ const MainApp: React.FC = () => {
                     languageCounts: [],
                 };
                 return (
-                    <FolderOverview
-                        key={activeNode.id}
-                        folder={activeNode}
-                        metrics={activeFolderMetrics ?? fallbackMetrics}
-                        onNewDocument={(parentId) => handleNewDocument(parentId)}
-                        onNewSubfolder={(parentId) => handleNewFolder(parentId)}
-                        onImportFiles={handleImportFilesIntoFolder}
-                        onRenameFolderTitle={handleRenameNode}
-                        folderSearchTerm={folderSearchTerm}
-                        onFolderSearchTermChange={setFolderSearchTerm}
-                        searchResults={folderSearchResults}
-                        isSearchLoading={isFolderSearchLoading}
-                    />
+                        <FolderOverview
+                            key={activeNode.id}
+                            folder={activeNode}
+                            metrics={activeFolderMetrics ?? fallbackMetrics}
+                            onNewDocument={(parentId) => handleNewDocument(parentId)}
+                            onNewSubfolder={(parentId) => handleNewFolder(parentId)}
+                            onImportFiles={handleImportFilesIntoFolder}
+                            onRenameFolderTitle={handleRenameNode}
+                            onNavigateToNode={handleNavigateToNode}
+                            folderSearchTerm={folderSearchTerm}
+                            onFolderSearchTermChange={setFolderSearchTerm}
+                            searchResults={folderSearchResults}
+                            isSearchLoading={isFolderSearchLoading}
+                        />
                 );
             }
         }
