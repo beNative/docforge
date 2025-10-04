@@ -193,18 +193,18 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onContextMenu={handleContextMenu}
-      style={{ paddingLeft: `${level * 16}px` }}
+      style={{ paddingLeft: `${level * 10}px` }}
       className="relative"
       data-item-id={node.id}
     >
         <div
             onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
             onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
-            className={`w-full text-left p-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
+            className={`w-full text-left px-1 py-0.5 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
                 isSelected ? 'bg-tree-selected text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
             } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
         >
-            <div className="flex items-center gap-1.5 flex-1 truncate">
+            <div className="flex items-center gap-1 flex-1 truncate">
                 {isFolder && node.children.length > 0 ? (
                     <button onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }} className="-ml-1 p-0.5 rounded hover:bg-border-color">
                         {isExpanded ? <ChevronDownIcon className="w-3.5 h-3.5" /> : <ChevronRightIcon className="w-3.5 h-3.5" />}
@@ -228,7 +228,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={handleRenameSubmit}
                         onKeyDown={handleRenameKeyDown}
-                        className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full text-left text-xs px-1 py-0.5 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                 ) : (
                     <span className="truncate flex-1 px-1">{node.title}</span>
