@@ -16,6 +16,8 @@ interface DocumentTreeItemProps {
   selectedIds: Set<string>;
   focusedItemId: string | null;
   expandedIds: Set<string>;
+  openDocumentIds: Set<string>;
+  activeDocumentId: string | null;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
   onDeleteNode: (id: string, shiftKey: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
@@ -86,6 +88,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     selectedIds,
     focusedItemId,
     expandedIds,
+    openDocumentIds,
+    activeDocumentId,
     onSelectNode,
     onDeleteNode,
     onRenameNode,
@@ -117,6 +121,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isExpanded = expandedIds.has(node.id);
   const isFolder = node.type === 'folder';
   const isCodeFile = node.doc_type === 'source_code';
+  const isOpenInTab = !isFolder && openDocumentIds.has(node.id);
+  const isActiveTab = isOpenInTab && activeDocumentId === node.id;
   
   useEffect(() => {
     if (renamingNodeId === node.id) {
@@ -251,6 +257,13 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                     isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
                 )}
 
+                {isOpenInTab && (
+                    <span
+                        aria-hidden="true"
+                        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActiveTab ? 'bg-primary' : 'bg-primary/50'}`}
+                    />
+                )}
+
                 {isRenaming ? (
                     <input
                         ref={renameInputRef}
@@ -313,6 +326,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         level={level + 1}
                         indentPerLevel={indentPerLevel}
                         verticalSpacing={verticalSpacing}
+                        openDocumentIds={openDocumentIds}
+                        activeDocumentId={activeDocumentId}
                         canMoveUp={index > 0}
                         canMoveDown={index < node.children.length - 1}
                     />
