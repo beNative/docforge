@@ -1910,6 +1910,7 @@ const MainApp: React.FC = () => {
                                         onToggleExpand={handleToggleExpand}
                                         onExpandAll={handleExpandAll}
                                         onCollapseAll={handleCollapseAll}
+                                        openDocumentIds={openDocumentIds}
                                         searchTerm={searchTerm}
                                         setSearchTerm={setSearchTerm}
                                         onContextMenu={handleContextMenu}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder } from '../types';
 import DocumentTreeItem, { DocumentNode } from './PromptTreeItem';
@@ -10,6 +10,7 @@ interface DocumentListProps {
   focusedItemId: string | null;
   indentPerLevel: number;
   verticalSpacing: number;
+  openDocumentIds: string[];
   onSelectNode: (id: string, e: React.MouseEvent) => void;
   onDeleteNode: (id: string, shiftKey?: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
@@ -33,6 +34,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
   focusedItemId,
   indentPerLevel,
   verticalSpacing,
+  openDocumentIds,
   onSelectNode,
   onDeleteNode,
   onRenameNode,
@@ -50,6 +52,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
 }) => {
   // Fix: Corrected useState declaration syntax from `=>` to `=`. This resolves all subsequent "cannot find name" errors.
   const [isRootDropping, setIsRootDropping] = useState(false);
+  const openDocumentIdSet = useMemo(() => new Set(openDocumentIds), [openDocumentIds]);
   
   const handleRootDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -124,6 +127,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 level={0}
                 indentPerLevel={indentPerLevel}
                 verticalSpacing={verticalSpacing}
+                openDocumentIds={openDocumentIdSet}
                 selectedIds={selectedIds}
                 focusedItemId={focusedItemId}
                 expandedIds={displayExpandedIds}

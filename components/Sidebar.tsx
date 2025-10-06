@@ -37,6 +37,7 @@ interface SidebarProps {
   onToggleExpand: (id: string) => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
+  openDocumentIds: string[];
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   onContextMenu: (e: React.MouseEvent, nodeId: string | null) => void;
@@ -73,7 +74,7 @@ const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: Document
 };
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled } = props;
+  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, openDocumentIds } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
@@ -369,6 +370,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     focusedItemId={focusedItemId}
                     indentPerLevel={props.documentTreeIndent}
                     verticalSpacing={props.documentTreeVerticalSpacing}
+                    openDocumentIds={openDocumentIds}
                     onSelectNode={props.onSelectNode}
                     onDeleteNode={props.onDeleteNode}
                     onRenameNode={props.onRenameNode}
