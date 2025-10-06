@@ -21,6 +21,7 @@ interface SidebarProps {
   lastClickedId: string | null;
   setLastClickedId: React.Dispatch<React.SetStateAction<string | null>>;
   activeNodeId: string | null;
+  openDocumentIds: Set<string>;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
   onDeleteSelection: (ids: Set<string>, options?: { force?: boolean }) => void;
   onDeleteNode: (id: string, shiftKey?: boolean) => void;
@@ -367,6 +368,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     documents={props.documents}
                     selectedIds={props.selectedIds}
                     focusedItemId={focusedItemId}
+                    openDocumentIds={props.openDocumentIds}
                     indentPerLevel={props.documentTreeIndent}
                     verticalSpacing={props.documentTreeVerticalSpacing}
                     onSelectNode={props.onSelectNode}

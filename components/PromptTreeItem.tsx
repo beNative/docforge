@@ -16,6 +16,7 @@ interface DocumentTreeItemProps {
   selectedIds: Set<string>;
   focusedItemId: string | null;
   expandedIds: Set<string>;
+  openDocumentIds: Set<string>;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
   onDeleteNode: (id: string, shiftKey: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
@@ -86,6 +87,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     selectedIds,
     focusedItemId,
     expandedIds,
+    openDocumentIds,
     onSelectNode,
     onDeleteNode,
     onRenameNode,
@@ -117,6 +119,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isExpanded = expandedIds.has(node.id);
   const isFolder = node.type === 'folder';
   const isCodeFile = node.doc_type === 'source_code';
+  const isOpenInTab = !isFolder && openDocumentIds.has(node.id);
   
   useEffect(() => {
     if (renamingNodeId === node.id) {
@@ -245,11 +248,23 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                     <div className="w-4" /> // Spacer for alignment
                 )}
 
-                {isFolder ? (
-                    isExpanded ? <FolderOpenIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FolderIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                ) : (
-                    isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                )}
+                <div className="relative flex-shrink-0">
+                    {isFolder ? (
+                        isExpanded ? <FolderOpenIcon className="w-3.5 h-3.5" /> : <FolderIcon className="w-3.5 h-3.5" />
+                    ) : (
+                        isCodeFile ? <CodeIcon className="w-3.5 h-3.5" /> : <FileIcon className="w-3.5 h-3.5" />
+                    )}
+                    {isOpenInTab && (
+                        <>
+                            <span
+                                className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-primary border border-secondary"
+                                title="Open in tab"
+                                aria-hidden="true"
+                            />
+                            <span className="sr-only">Open in tab</span>
+                        </>
+                    )}
+                </div>
 
                 {isRenaming ? (
                     <input

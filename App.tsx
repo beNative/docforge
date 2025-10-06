@@ -134,6 +134,7 @@ const MainApp: React.FC = () => {
 
     const activeNodeId = tabState.activeId;
     const openDocumentIds = tabState.order;
+    const openDocumentIdsSet = useMemo(() => new Set(openDocumentIds), [openDocumentIds]);
 
     const activateDocumentTab = useCallback((documentId: string) => {
         setTabState(prev => {
@@ -1894,6 +1895,7 @@ const MainApp: React.FC = () => {
                                         lastClickedId={lastClickedId}
                                         setLastClickedId={setLastClickedId}
                                         activeNodeId={activeNodeId}
+                                        openDocumentIds={openDocumentIdsSet}
                                         onSelectNode={handleSelectNode}
                                         onDeleteSelection={handleDeleteSelection}
                                         onDeleteNode={handleDeleteNode}
