@@ -13,6 +13,97 @@ let db: Database.Database;
 const DB_FILE_NAME = 'docforge.db';
 const DB_PATH = path.join(app.getPath('userData'), DB_FILE_NAME);
 
+const DOCUMENT_SEARCH_OBJECTS_SQL = `
+  DROP TRIGGER IF EXISTS document_search_after_document_insert;
+  DROP TRIGGER IF EXISTS document_search_after_document_update;
+  DROP TRIGGER IF EXISTS document_search_after_document_delete;
+  DROP TRIGGER IF EXISTS document_search_after_node_title_update;
+  DROP TABLE IF EXISTS document_search;
+  CREATE VIRTUAL TABLE document_search USING fts5(
+    document_id UNINDEXED,
+    node_id UNINDEXED,
+    title,
+    body
+  );
+  CREATE TRIGGER document_search_after_document_insert
+  AFTER INSERT ON documents
+  BEGIN
+    INSERT INTO document_search(rowid, document_id, node_id, title, body)
+    VALUES (
+      new.document_id,
+      new.document_id,
+      new.node_id,
+      (SELECT title FROM nodes WHERE node_id = new.node_id),
+      COALESCE((
+        SELECT cs.text_content
+        FROM doc_versions dv
+        JOIN content_store cs ON dv.content_id = cs.content_id
+        WHERE dv.version_id = new.current_version_id
+      ), '')
+    );
+  END;
+  CREATE TRIGGER document_search_after_document_update
+  AFTER UPDATE OF current_version_id ON documents
+  BEGIN
+    DELETE FROM document_search WHERE rowid = new.document_id;
+    INSERT INTO document_search(rowid, document_id, node_id, title, body)
+    VALUES (
+      new.document_id,
+      new.document_id,
+      new.node_id,
+      (SELECT title FROM nodes WHERE node_id = new.node_id),
+      COALESCE((
+        SELECT cs.text_content
+        FROM doc_versions dv
+        JOIN content_store cs ON dv.content_id = cs.content_id
+        WHERE dv.version_id = new.current_version_id
+      ), '')
+    );
+  END;
+  CREATE TRIGGER document_search_after_document_delete
+  AFTER DELETE ON documents
+  BEGIN
+    DELETE FROM document_search WHERE rowid = old.document_id;
+  END;
+  CREATE TRIGGER document_search_after_node_title_update
+  AFTER UPDATE OF title ON nodes
+  WHEN new.node_type = 'document'
+  BEGIN
+    DELETE FROM document_search
+    WHERE rowid = (
+      SELECT document_id FROM documents WHERE node_id = new.node_id
+    );
+    INSERT INTO document_search(rowid, document_id, node_id, title, body)
+    SELECT
+      d.document_id,
+      d.document_id,
+      d.node_id,
+      new.title,
+      COALESCE(cs.text_content, '')
+    FROM documents d
+    LEFT JOIN doc_versions dv ON d.current_version_id = dv.version_id
+    LEFT JOIN content_store cs ON dv.content_id = cs.content_id
+    WHERE d.node_id = new.node_id;
+  END;
+`;
+
+const populateDocumentSearch = () => {
+  db.exec('DELETE FROM document_search;');
+  db.exec(`
+    INSERT INTO document_search(rowid, document_id, node_id, title, body)
+    SELECT
+      d.document_id,
+      d.document_id,
+      d.node_id,
+      n.title,
+      COALESCE(cs.text_content, '')
+    FROM documents d
+    JOIN nodes n ON d.node_id = n.node_id
+    LEFT JOIN doc_versions dv ON d.current_version_id = dv.version_id
+    LEFT JOIN content_store cs ON dv.content_id = cs.content_id;
+  `);
+};
+
 // Helper function from languageService.ts, now inside database.ts to avoid cross-context dependencies
 const mapExtensionToLanguageId_local = (extension: string | null): string => {
     if (!extension) return 'plaintext';
@@ -73,7 +164,7 @@ export const databaseService = {
       console.log('Database does not exist, creating new one...');
       db.exec(INITIAL_SCHEMA);
       // Set PRAGMAs for a new database
-      db.pragma('user_version = 2');
+      db.pragma('user_version = 3');
       db.exec('PRAGMA journal_mode = WAL;');
       db.exec('PRAGMA foreign_keys = ON;');
       console.log('Database created and schema applied.');
@@ -166,6 +257,21 @@ export const databaseService = {
           console.log('Migration to version 2 complete.');
         } catch (e) {
           console.error('Fatal: Failed to migrate database to version 2:', e);
+        }
+      }
+
+      if (currentVersion < 3) {
+        console.log(`Migrating schema from version ${currentVersion} to 3...`);
+        try {
+          const transaction = db.transaction(() => {
+            db.exec(DOCUMENT_SEARCH_OBJECTS_SQL);
+            populateDocumentSearch();
+            db.pragma('user_version = 3');
+          });
+          transaction();
+          console.log('Migration to version 3 complete.');
+        } catch (e) {
+          console.error('Fatal: Failed to migrate database to version 3:', e);
         }
       }
     }
@@ -285,6 +391,8 @@ export const databaseService = {
                  settingsStmt.run(setting.key, JSON.stringify(setting.value));
             }
         }
+
+        populateDocumentSearch();
     });
 
     try {

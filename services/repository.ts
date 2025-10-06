@@ -565,30 +565,84 @@ export const repository = {
             return [];
         }
 
-        const lowerTerm = term.toLowerCase();
-        const pattern = `%${escapeForLikePattern(lowerTerm)}%`;
         const maxResults = Math.max(limit, 0) || 50;
+        const reservedOperators = new Set(['AND', 'OR', 'NOT', 'NEAR']);
+        const sanitizedTerms = (term.match(/\S+/g) ?? [])
+            .map(part => part.replace(/[^\p{L}\p{N}]/gu, '').trim())
+            .filter(token => token.length > 0 && !reservedOperators.has(token.toUpperCase()));
+        const ftsQuery = sanitizedTerms.length > 0
+            ? sanitizedTerms.map(token => `${token}*`).join(' ')
+            : term.replace(/["'`*^]/g, '');
 
-        const rows = await window.electronAPI.dbQuery(
-            `
-            SELECT d.node_id as node_id, cs.text_content as content
-            FROM documents d
-            JOIN doc_versions dv ON d.current_version_id = dv.version_id
-            JOIN content_store cs ON dv.content_id = cs.content_id
-            WHERE cs.text_content IS NOT NULL
-              AND cs.text_content != ''
-              AND LOWER(cs.text_content) LIKE ? ESCAPE '\\'
-            LIMIT ?
-        `,
-            [pattern, maxResults],
-        );
+        try {
+            const rows = await window.electronAPI.dbQuery(
+                `
+                SELECT node_id, title, body
+                FROM document_search
+                WHERE document_search MATCH ?
+                ORDER BY bm25(document_search)
+                LIMIT ?
+            `,
+                [ftsQuery, maxResults],
+            );
 
-        return rows
-            .filter(row => typeof row.content === 'string' && row.content.length > 0)
-            .map(row => ({
-                nodeId: row.node_id,
-                snippet: createSnippetFromContent(row.content, term),
-            }));
+            const seen = new Set<string>();
+
+            return rows
+                .filter(row => typeof row.node_id === 'string' && !seen.has(row.node_id))
+                .map(row => {
+                    seen.add(row.node_id);
+                    const body = typeof row.body === 'string' ? row.body : '';
+                    const title = typeof row.title === 'string' ? row.title : '';
+                    const source = body.trim().length > 0 ? body : title;
+                    const snippet = createSnippetFromContent(source, term) || title;
+                    return {
+                        nodeId: row.node_id,
+                        snippet,
+                    };
+                });
+        } catch (error) {
+            console.warn('FTS query failed, falling back to LIKE search', error);
+
+            const lowerTerm = term.toLowerCase();
+            const pattern = `%${escapeForLikePattern(lowerTerm)}%`;
+
+            const rows = await window.electronAPI.dbQuery(
+                `
+                SELECT
+                  d.node_id AS node_id,
+                  n.title AS title,
+                  COALESCE(cs.text_content, '') AS body
+                FROM documents d
+                JOIN nodes n ON d.node_id = n.node_id
+                LEFT JOIN doc_versions dv ON d.current_version_id = dv.version_id
+                LEFT JOIN content_store cs ON dv.content_id = cs.content_id
+                WHERE (
+                  cs.text_content IS NOT NULL
+                  AND cs.text_content != ''
+                  AND LOWER(cs.text_content) LIKE ? ESCAPE '\\'
+                ) OR LOWER(n.title) LIKE ? ESCAPE '\\'
+                LIMIT ?
+            `,
+                [pattern, pattern, maxResults],
+            );
+
+            const seen = new Set<string>();
+
+            return rows
+                .filter(row => typeof row.node_id === 'string' && !seen.has(row.node_id))
+                .map(row => {
+                    seen.add(row.node_id);
+                    const body = typeof row.body === 'string' ? row.body : '';
+                    const title = typeof row.title === 'string' ? row.title : '';
+                    const source = body.trim().length > 0 ? body : title;
+                    const snippet = createSnippetFromContent(source, term) || title;
+                    return {
+                        nodeId: row.node_id,
+                        snippet,
+                    };
+                });
+        }
     },
 
     async addNode(nodeData: Omit<Node, 'node_id' | 'sort_order' | 'created_at' | 'updated_at'>): Promise<Node> {

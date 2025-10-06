@@ -2,7 +2,7 @@
 // removing the need for external .sql files which can complicate the build process.
 
 export const INITIAL_SCHEMA = `
--- PRAGMA user_version is set to 2 by the database service for this schema.
+-- PRAGMA user_version is set to 3 by the database service for this schema.
 
 -- =================================================================
 --  CORE HIERARCHY & METADATA
@@ -47,6 +47,77 @@ CREATE TABLE doc_versions (
   content_id   INTEGER NOT NULL REFERENCES content_store(content_id) ON DELETE RESTRICT
 );
 CREATE INDEX idx_doc_version_doc ON doc_versions(document_id);
+
+CREATE VIRTUAL TABLE document_search USING fts5(
+  document_id UNINDEXED,
+  node_id UNINDEXED,
+  title,
+  body
+);
+
+CREATE TRIGGER document_search_after_document_insert
+AFTER INSERT ON documents
+BEGIN
+  INSERT INTO document_search(rowid, document_id, node_id, title, body)
+  VALUES (
+    new.document_id,
+    new.document_id,
+    new.node_id,
+    (SELECT title FROM nodes WHERE node_id = new.node_id),
+    COALESCE((
+      SELECT cs.text_content
+      FROM doc_versions dv
+      JOIN content_store cs ON dv.content_id = cs.content_id
+      WHERE dv.version_id = new.current_version_id
+    ), '')
+  );
+END;
+
+CREATE TRIGGER document_search_after_document_update
+AFTER UPDATE OF current_version_id ON documents
+BEGIN
+  DELETE FROM document_search WHERE rowid = new.document_id;
+  INSERT INTO document_search(rowid, document_id, node_id, title, body)
+  VALUES (
+    new.document_id,
+    new.document_id,
+    new.node_id,
+    (SELECT title FROM nodes WHERE node_id = new.node_id),
+    COALESCE((
+      SELECT cs.text_content
+      FROM doc_versions dv
+      JOIN content_store cs ON dv.content_id = cs.content_id
+      WHERE dv.version_id = new.current_version_id
+    ), '')
+  );
+END;
+
+CREATE TRIGGER document_search_after_document_delete
+AFTER DELETE ON documents
+BEGIN
+  DELETE FROM document_search WHERE rowid = old.document_id;
+END;
+
+CREATE TRIGGER document_search_after_node_title_update
+AFTER UPDATE OF title ON nodes
+WHEN new.node_type = 'document'
+BEGIN
+  DELETE FROM document_search
+  WHERE rowid = (
+    SELECT document_id FROM documents WHERE node_id = new.node_id
+  );
+  INSERT INTO document_search(rowid, document_id, node_id, title, body)
+  SELECT
+    d.document_id,
+    d.document_id,
+    d.node_id,
+    new.title,
+    COALESCE(cs.text_content, '')
+  FROM documents d
+  LEFT JOIN doc_versions dv ON d.current_version_id = dv.version_id
+  LEFT JOIN content_store cs ON dv.content_id = cs.content_id
+  WHERE d.node_id = new.node_id;
+END;
 
 -- =================================================================
 --  ANCILLARY TABLES
