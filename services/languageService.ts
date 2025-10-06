@@ -23,7 +23,7 @@ export const SUPPORTED_LANGUAGES = [
     { id: 'pascal', label: 'Pascal' },
     { id: 'ini', label: 'INI' },
     { id: 'pdf', label: 'PDF' },
-    { id: 'image', label: 'Image (PNG/JPEG/GIF/WebP/SVG/BMP)' },
+    { id: 'image', label: 'Image' },
 ];
 
 export const mapExtensionToLanguageId = (extension: string | null): string => {
