@@ -8,6 +8,7 @@ interface DocumentListProps {
   documents: DocumentOrFolder[]; // needed for the empty state check
   selectedIds: Set<string>;
   focusedItemId: string | null;
+  openDocumentIds: Set<string>;
   indentPerLevel: number;
   verticalSpacing: number;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
@@ -31,6 +32,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
   documents,
   selectedIds,
   focusedItemId,
+  openDocumentIds,
   indentPerLevel,
   verticalSpacing,
   onSelectNode,
@@ -127,6 +129,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 selectedIds={selectedIds}
                 focusedItemId={focusedItemId}
                 expandedIds={displayExpandedIds}
+                openDocumentIds={openDocumentIds}
                 onSelectNode={onSelectNode}
                 onDeleteNode={onDeleteNode}
                 onRenameNode={onRenameNode}
