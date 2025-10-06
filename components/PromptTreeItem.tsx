@@ -13,6 +13,7 @@ interface DocumentTreeItemProps {
   level: number;
   indentPerLevel: number;
   verticalSpacing: number;
+  openDocumentIds: Set<string>;
   selectedIds: Set<string>;
   focusedItemId: string | null;
   expandedIds: Set<string>;
@@ -86,6 +87,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     selectedIds,
     focusedItemId,
     expandedIds,
+    openDocumentIds,
     onSelectNode,
     onDeleteNode,
     onRenameNode,
@@ -117,6 +119,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isExpanded = expandedIds.has(node.id);
   const isFolder = node.type === 'folder';
   const isCodeFile = node.doc_type === 'source_code';
+  const isOpenInTab = !isFolder && openDocumentIds.has(node.id);
   
   useEffect(() => {
     if (renamingNodeId === node.id) {
@@ -250,6 +253,13 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                 ) : (
                     isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
                 )}
+                {isOpenInTab && (
+                    <span
+                        className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"
+                        aria-hidden="true"
+                        title="Open in tab"
+                    />
+                )}
 
                 {isRenaming ? (
                     <input
@@ -315,6 +325,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         verticalSpacing={verticalSpacing}
                         canMoveUp={index > 0}
                         canMoveDown={index < node.children.length - 1}
+                        openDocumentIds={openDocumentIds}
                     />
                 ))}
             </ul>
