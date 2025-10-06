@@ -21,6 +21,7 @@ interface SidebarProps {
   lastClickedId: string | null;
   setLastClickedId: React.Dispatch<React.SetStateAction<string | null>>;
   activeNodeId: string | null;
+  openDocumentIds: string[];
   onSelectNode: (id: string, e: React.MouseEvent) => void;
   onDeleteSelection: (ids: Set<string>, options?: { force?: boolean }) => void;
   onDeleteNode: (id: string, shiftKey?: boolean) => void;
@@ -78,6 +79,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
   const { addLog } = useLogger();
+
+  const openDocumentIds = useMemo(() => new Set(props.openDocumentIds), [props.openDocumentIds]);
 
 
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -369,6 +372,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     focusedItemId={focusedItemId}
                     indentPerLevel={props.documentTreeIndent}
                     verticalSpacing={props.documentTreeVerticalSpacing}
+                    openDocumentIds={openDocumentIds}
                     onSelectNode={props.onSelectNode}
                     onDeleteNode={props.onDeleteNode}
                     onRenameNode={props.onRenameNode}

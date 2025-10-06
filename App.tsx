@@ -1894,6 +1894,7 @@ const MainApp: React.FC = () => {
                                         lastClickedId={lastClickedId}
                                         setLastClickedId={setLastClickedId}
                                         activeNodeId={activeNodeId}
+                                        openDocumentIds={openDocumentIds}
                                         onSelectNode={handleSelectNode}
                                         onDeleteSelection={handleDeleteSelection}
                                         onDeleteNode={handleDeleteNode}

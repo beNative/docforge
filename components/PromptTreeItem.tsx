@@ -13,6 +13,7 @@ interface DocumentTreeItemProps {
   level: number;
   indentPerLevel: number;
   verticalSpacing: number;
+  openDocumentIds: Set<string>;
   selectedIds: Set<string>;
   focusedItemId: string | null;
   expandedIds: Set<string>;
@@ -103,6 +104,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     indentPerLevel,
     verticalSpacing,
     searchTerm,
+    openDocumentIds,
   } = props;
   
   const [isRenaming, setIsRenaming] = useState(false);
@@ -117,6 +119,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isExpanded = expandedIds.has(node.id);
   const isFolder = node.type === 'folder';
   const isCodeFile = node.doc_type === 'source_code';
+  const isOpenInTab = !isFolder && openDocumentIds.has(node.id);
   
   useEffect(() => {
     if (renamingNodeId === node.id) {
@@ -245,11 +248,20 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                     <div className="w-4" /> // Spacer for alignment
                 )}
 
-                {isFolder ? (
-                    isExpanded ? <FolderOpenIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FolderIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                ) : (
-                    isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                )}
+                <div className="relative flex-shrink-0">
+                    {isFolder ? (
+                        isExpanded ? <FolderOpenIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FolderIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    ) : (
+                        isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    )}
+                    {isOpenInTab && (
+                        <span
+                            className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary border border-border-color shadow-sm"
+                            aria-hidden="true"
+                            title="Open in tab"
+                        />
+                    )}
+                </div>
 
                 {isRenaming ? (
                     <input

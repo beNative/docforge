@@ -10,6 +10,7 @@ interface DocumentListProps {
   focusedItemId: string | null;
   indentPerLevel: number;
   verticalSpacing: number;
+  openDocumentIds: Set<string>;
   onSelectNode: (id: string, e: React.MouseEvent) => void;
   onDeleteNode: (id: string, shiftKey?: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
@@ -33,6 +34,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
   focusedItemId,
   indentPerLevel,
   verticalSpacing,
+  openDocumentIds,
   onSelectNode,
   onDeleteNode,
   onRenameNode,
@@ -124,6 +126,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 level={0}
                 indentPerLevel={indentPerLevel}
                 verticalSpacing={verticalSpacing}
+                openDocumentIds={openDocumentIds}
                 selectedIds={selectedIds}
                 focusedItemId={focusedItemId}
                 expandedIds={displayExpandedIds}
