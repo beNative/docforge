@@ -26,7 +26,8 @@ interface SettingsViewProps {
   discoveredServices: DiscoveredLLMService[];
   onDetectServices: () => void;
   isDetecting: boolean;
-  commands: Command[];
+  appCommands: Command[];
+  editorCommands: Command[];
 }
 
 type SettingsCategory = 'provider' | 'appearance' | 'shortcuts' | 'python' | 'general' | 'database' | 'advanced';
@@ -276,7 +277,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   discoveredServices,
   onDetectServices,
   isDetecting,
-  commands,
+  appCommands,
+  editorCommands,
 }) => {
   const [currentSettings, setCurrentSettings] = useState<Settings>(settings);
   const [isDirty, setIsDirty] = useState(false);
@@ -397,7 +399,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               {...{
                 settings: currentSettings,
                 setCurrentSettings,
-                commands,
+                appCommands,
+                editorCommands,
                 sectionRef: (el) => (sectionRefs.current.shortcuts = el),
               }}
             />

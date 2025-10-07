@@ -2,19 +2,18 @@ import React, { useState, useMemo } from 'react';
 import type { Settings, Command } from '../types';
 import { SearchIcon } from './Icons';
 import { ShortcutRow } from './ShortcutRow';
-import { createMonacoCommands } from '../services/editor/monacoKeybindings';
 
 interface KeyboardShortcutsSectionProps {
     settings: Settings;
     setCurrentSettings: React.Dispatch<React.SetStateAction<Settings>>;
-    commands: Command[];
+    appCommands: Command[];
+    editorCommands: Command[];
     sectionRef: (el: HTMLDivElement | null) => void;
 }
 
-const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ settings, setCurrentSettings, commands, sectionRef }) => {
+const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ settings, setCurrentSettings, appCommands, editorCommands, sectionRef }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    const editorCommands = useMemo(() => createMonacoCommands(), []);
-    const combinedCommands = useMemo(() => [...commands, ...editorCommands], [commands, editorCommands]);
+    const combinedCommands = useMemo(() => [...appCommands, ...editorCommands], [appCommands, editorCommands]);
 
     const filterCommands = (items: Command[]) => {
         const lowercasedTerm = searchTerm.toLowerCase();
@@ -36,7 +35,7 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
         });
     };
 
-    const filteredAppCommands = useMemo(() => filterCommands(commands), [commands, searchTerm, settings.customShortcuts]);
+    const filteredAppCommands = useMemo(() => filterCommands(appCommands), [appCommands, searchTerm, settings.customShortcuts]);
     const filteredEditorCommands = useMemo(() => filterCommands(editorCommands), [editorCommands, searchTerm, settings.customShortcuts]);
 
     const groupedAppCommands = useMemo(() => {

@@ -1636,6 +1636,18 @@ const MainApp: React.FC = () => {
 
     const monacoCommandTemplates = useMemo(() => createMonacoCommands(), []);
 
+    const monacoCommandsWithShortcuts = useMemo(() => {
+        return monacoCommandTemplates.map(template => {
+            const custom = settings.customShortcuts[template.id];
+            const effectiveShortcut = custom !== undefined ? custom : template.shortcut;
+            return {
+                ...template,
+                icon: CodeIcon,
+                shortcutString: effectiveShortcut ? formatShortcutForDisplay(effectiveShortcut) : undefined,
+            };
+        });
+    }, [monacoCommandTemplates, settings.customShortcuts]);
+
     const runMonacoCommand = useCallback((commandId: string | undefined, commandName: string) => {
         if (!commandId) {
             addLog('WARNING', `Cannot execute command "${commandName}" because it is missing a Monaco identifier.`);
@@ -1664,14 +1676,13 @@ const MainApp: React.FC = () => {
             return [] as Command[];
         }
 
-        return monacoCommandTemplates.map(template => ({
-            ...template,
-            icon: CodeIcon,
+        return monacoCommandsWithShortcuts.map(command => ({
+            ...command,
             action: () => {
-                runMonacoCommand(template.monacoCommandId, template.name);
+                runMonacoCommand(command.monacoCommandId, command.name);
             },
         }));
-    }, [isTextDocumentActive, monacoCommandTemplates, runMonacoCommand]);
+    }, [isTextDocumentActive, monacoCommandsWithShortcuts, runMonacoCommand]);
 
     const combinedCommands = useMemo(() => {
         return [...appCommands, ...monacoEditorCommands];
@@ -1857,7 +1868,17 @@ const MainApp: React.FC = () => {
 
     const renderMainContent = () => {
         if (view === 'info') return <InfoView settings={settings} />;
-        if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} commands={enrichedAppCommands} />;
+        if (view === 'settings') return (
+            <SettingsView
+                settings={settings}
+                onSave={saveSettings}
+                discoveredServices={discoveredServices}
+                onDetectServices={handleDetectServices}
+                isDetecting={isDetecting}
+                appCommands={enrichedAppCommands}
+                editorCommands={monacoCommandsWithShortcuts}
+            />
+        );
         
         if (activeTemplate) {
             return <TemplateEditor 
