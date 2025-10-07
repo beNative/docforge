@@ -99,9 +99,10 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     if (!disablePan) {
       event.preventDefault();
       const { deltaX, deltaY } = normalizeWheelDelta(event);
+      const scale = scaleRef.current || 1;
       setOffset((prev) => ({
-        x: prev.x - deltaX,
-        y: prev.y - deltaY,
+        x: prev.x - deltaX / scale,
+        y: prev.y - deltaY / scale,
       }));
     }
   }, [disablePan, disableZoom, setOffset, setScale, zoomStep]);
@@ -138,7 +139,8 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     const dx = event.clientX - panPointer.current.lastX;
     const dy = event.clientY - panPointer.current.lastY;
     panPointer.current = { id: event.pointerId, lastX: event.clientX, lastY: event.clientY };
-    setOffset((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+    const scale = scaleRef.current || 1;
+    setOffset((prev) => ({ x: prev.x + dx / scale, y: prev.y + dy / scale }));
   }, [disablePan, setOffset]);
 
   const endPan = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
