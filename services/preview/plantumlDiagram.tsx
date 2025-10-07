@@ -77,6 +77,7 @@ const PlantUMLRemoteDiagram: React.FC<{ code: string }> = ({ code }) => {
         src={`${PLANTUML_SERVER}/${encoded}`}
         alt="PlantUML diagram"
         loading="lazy"
+        draggable={false}
         onError={() => {
           setHasError(true);
           setErrorDetails(`Request URL: ${PLANTUML_SERVER}/${encoded}`);

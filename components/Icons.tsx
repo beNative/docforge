@@ -32,6 +32,17 @@ export const PlusIcon: React.FC<IconProps> = (props) => {
     }
 };
 
+export const MinusIcon: React.FC<IconProps> = (props) => {
+    const { iconSet } = useIconSet();
+    switch (iconSet) {
+        case 'lucide': return <LucideIcons.MinusIcon {...props} />;
+        case 'feather': return <FeatherIcons.MinusIcon {...props} />;
+        case 'tabler': return <TablerIcons.MinusIcon {...props} />;
+        case 'material': return <MaterialIcons.MinusIcon {...props} />;
+        case 'heroicons': default: return <HeroIcons.MinusIcon {...props} />;
+    }
+};
+
 export const TrashIcon: React.FC<IconProps> = (props) => {
     const { iconSet } = useIconSet();
     switch (iconSet) {
