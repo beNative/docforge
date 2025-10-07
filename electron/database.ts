@@ -1146,7 +1146,6 @@ export const databaseService = {
       }
     });
   },
-};
   getDbPath(workspaceId?: string): string {
     const id = workspaceId ?? activeWorkspaceId;
     if (!id) {
