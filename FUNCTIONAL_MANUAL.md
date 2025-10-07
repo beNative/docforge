@@ -102,6 +102,7 @@ The document editor is powered by Monaco, the same editor core used in VS Code, 
 - **Toolbar Actions:**
     - **Save Version:** Manually save the current content as a new version in the document's history. The button icon will be highlighted when there are unsaved changes.
     - **Version History:** Open a view to see all saved versions of the document.
+    - **Format:** Automatically tidy up supported languages—Markdown, JSON, JavaScript, and TypeScript—using DocForge's integrated formatter.
     - **Copy:** Copy the document's content to the clipboard.
     - **Refine with AI:** Send the document's content to your configured LLM to get an improved version (only for Markdown and plaintext files).
     - **Delete:** Delete the current document. A confirmation is required, where pressing `Enter` will confirm the action.
