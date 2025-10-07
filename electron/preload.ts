@@ -14,6 +14,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbVacuum: () => ipcRenderer.invoke('db:vacuum'),
   dbGetStats: () => ipcRenderer.invoke('db:get-stats'),
   dbGetPath: () => ipcRenderer.invoke('db:get-path'),
+  dbListWorkspaces: () => ipcRenderer.invoke('db:list-workspaces'),
+  dbCreateWorkspace: (name: string) => ipcRenderer.invoke('db:create-workspace', name),
+  dbRenameWorkspace: (workspaceId: string, newName: string) => ipcRenderer.invoke('db:rename-workspace', workspaceId, newName),
+  dbDeleteWorkspace: (workspaceId: string) => ipcRenderer.invoke('db:delete-workspace', workspaceId),
+  dbSwitchWorkspace: (workspaceId: string) => ipcRenderer.invoke('db:switch-workspace', workspaceId),
+  dbGetActiveWorkspace: () => ipcRenderer.invoke('db:get-active-workspace'),
+  dbTransferNodes: (nodeIds: string[], targetWorkspaceId: string, targetParentId: string | null) =>
+    ipcRenderer.invoke('db:transfer-nodes', nodeIds, targetWorkspaceId, targetParentId),
   dbImportFiles: (filesData: any[], targetParentId: string | null) => ipcRenderer.invoke('db:import-files', filesData, targetParentId),
 
   // --- Migration-related FS access ---

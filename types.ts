@@ -17,6 +17,17 @@ declare global {
       dbVacuum: () => Promise<{ success: boolean; error?: string }>;
       dbGetStats: () => Promise<{ success: boolean; stats?: DatabaseStats; error?: string }>;
       dbGetPath: () => Promise<string>;
+      dbListWorkspaces: () => Promise<WorkspaceInfo[]>;
+      dbCreateWorkspace: (name: string) => Promise<WorkspaceInfo>;
+      dbRenameWorkspace: (workspaceId: string, newName: string) => Promise<WorkspaceInfo>;
+      dbDeleteWorkspace: (workspaceId: string) => Promise<{ success: boolean; error?: string }>;
+      dbSwitchWorkspace: (workspaceId: string) => Promise<WorkspaceInfo>;
+      dbGetActiveWorkspace: () => Promise<WorkspaceInfo | null>;
+      dbTransferNodes: (
+        nodeIds: string[],
+        targetWorkspaceId: string,
+        targetParentId: string | null,
+      ) => Promise<{ success: boolean; createdNodeIds?: string[]; error?: string }>;
       // FIX: Add missing `dbImportFiles` to the electronAPI type definition.
       dbImportFiles: (
         filesData: { path: string; name: string; content: string }[],
@@ -321,6 +332,16 @@ export interface DiscoveredLLMService {
 export interface DiscoveredLLMModel {
   id: string;
   name: string;
+}
+
+export interface WorkspaceInfo {
+  workspaceId: string;
+  name: string;
+  filePath: string;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt: string | null;
+  isActive: boolean;
 }
 
 export interface DatabaseStats {

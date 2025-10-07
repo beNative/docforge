@@ -8,10 +8,55 @@ import * as crypto from 'crypto';
 // Fix: Import types to use for casting
 import type { Node, Document, DocVersion, DatabaseStats, DocType, ViewMode, ImportedNodeSummary } from '../types';
 
-let db: Database.Database;
+type WorkspaceRecord = {
+  workspaceId: string;
+  name: string;
+  fileName: string;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt: string | null;
+};
 
-const DB_FILE_NAME = 'docforge.db';
-const DB_PATH = path.join(app.getPath('userData'), DB_FILE_NAME);
+type WorkspaceInfo = {
+  workspaceId: string;
+  name: string;
+  filePath: string;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt: string | null;
+  isActive: boolean;
+};
+
+type NodePythonSettingsRow = {
+  node_id: string;
+  env_id: string | null;
+  auto_detect_env: number;
+  last_run_id: string | null;
+  updated_at: string;
+};
+
+type TransferDocVersionRow = DocVersion & {
+  sha256_hex: string;
+  text_content: string | null;
+  blob_content: Buffer | null;
+};
+
+type TransferNode = {
+  node: Node;
+  document?: (Document & { versions: TransferDocVersionRow[] });
+  pythonSettings?: NodePythonSettingsRow;
+  children: TransferNode[];
+};
+
+let db!: Database.Database;
+let dbInitialized = false;
+let currentDbPath: string | null = null;
+let workspaceRecords: WorkspaceRecord[] = [];
+let activeWorkspace: WorkspaceRecord | null = null;
+
+const WORKSPACE_DIRECTORY = path.join(app.getPath('userData'), 'workspaces');
+const WORKSPACE_METADATA_FILE = path.join(WORKSPACE_DIRECTORY, 'workspaces.json');
+const DEFAULT_WORKSPACE_NAME = 'Main Workspace';
 
 const DOCUMENT_SEARCH_OBJECTS_SQL = `
   DROP TRIGGER IF EXISTS document_search_after_document_insert;
@@ -87,9 +132,9 @@ const DOCUMENT_SEARCH_OBJECTS_SQL = `
   END;
 `;
 
-const populateDocumentSearch = () => {
-  db.exec('DELETE FROM document_search;');
-  db.exec(`
+const populateDocumentSearch = (connection: Database.Database) => {
+  connection.exec('DELETE FROM document_search;');
+  connection.exec(`
     INSERT INTO document_search(rowid, document_id, node_id, title, body)
     SELECT
       d.document_id,
@@ -102,6 +147,210 @@ const populateDocumentSearch = () => {
     LEFT JOIN doc_versions dv ON d.current_version_id = dv.version_id
     LEFT JOIN content_store cs ON dv.content_id = cs.content_id;
   `);
+};
+
+const ensureWorkspaceDirectory = () => {
+  if (!fs.existsSync(WORKSPACE_DIRECTORY)) {
+    fs.mkdirSync(WORKSPACE_DIRECTORY, { recursive: true });
+  }
+};
+
+const getWorkspaceDbPath = (workspace: WorkspaceRecord): string =>
+  path.join(WORKSPACE_DIRECTORY, workspace.fileName);
+
+const loadWorkspaceMetadata = (): WorkspaceRecord[] => {
+  if (!fs.existsSync(WORKSPACE_METADATA_FILE)) {
+    return [];
+  }
+
+  try {
+    const raw = fs.readFileSync(WORKSPACE_METADATA_FILE, 'utf-8');
+    const parsed = JSON.parse(raw) as WorkspaceRecord[];
+    return parsed.map(record => ({
+      workspaceId: record.workspaceId,
+      name: record.name,
+      fileName: record.fileName,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+      lastOpenedAt: record.lastOpenedAt ?? null,
+    }));
+  } catch (error) {
+    console.warn('Failed to read workspace metadata, starting with empty list.', error);
+    return [];
+  }
+};
+
+const persistWorkspaceMetadata = () => {
+  ensureWorkspaceDirectory();
+  try {
+    fs.writeFileSync(
+      WORKSPACE_METADATA_FILE,
+      JSON.stringify(workspaceRecords, null, 2),
+      'utf-8',
+    );
+  } catch (error) {
+    console.error('Failed to persist workspace metadata:', error);
+  }
+};
+
+const toWorkspaceInfo = (record: WorkspaceRecord): WorkspaceInfo => ({
+  workspaceId: record.workspaceId,
+  name: record.name,
+  filePath: getWorkspaceDbPath(record),
+  createdAt: record.createdAt,
+  updatedAt: record.updatedAt,
+  lastOpenedAt: record.lastOpenedAt,
+  isActive: activeWorkspace?.workspaceId === record.workspaceId,
+});
+
+const selectWorkspaceToOpen = (): WorkspaceRecord | null => {
+  if (workspaceRecords.length === 0) {
+    return null;
+  }
+
+  const sorted = [...workspaceRecords].sort((a, b) => {
+    if (a.lastOpenedAt && b.lastOpenedAt) {
+      return a.lastOpenedAt > b.lastOpenedAt ? -1 : 1;
+    }
+    if (a.lastOpenedAt) return -1;
+    if (b.lastOpenedAt) return 1;
+    return a.createdAt > b.createdAt ? -1 : 1;
+  });
+
+  return sorted[0];
+};
+
+const prepareDatabaseConnection = (connection: Database.Database, isNew: boolean) => {
+  if (isNew) {
+    console.log('Database does not exist, creating new one...');
+    connection.exec(INITIAL_SCHEMA);
+    connection.pragma('user_version = 3');
+    connection.exec('PRAGMA journal_mode = WAL;');
+    connection.exec('PRAGMA foreign_keys = ON;');
+    console.log('Database created and schema applied.');
+    return;
+  }
+
+  console.log('Existing database found.');
+  connection.exec('PRAGMA journal_mode = WAL;');
+  connection.exec('PRAGMA foreign_keys = ON;');
+
+  let currentVersion = connection.pragma('user_version', { simple: true }) as number;
+  if (currentVersion < 1) {
+    console.log(`Migrating schema from version ${currentVersion} to 1...`);
+    try {
+      const transaction = connection.transaction(() => {
+        const columns = connection.prepare("PRAGMA table_info(documents)").all() as {name: string}[];
+        const hasColumn = columns.some(col => col.name === 'default_view_mode');
+        if (!hasColumn) {
+          connection.exec('ALTER TABLE documents ADD COLUMN default_view_mode TEXT');
+        }
+        connection.pragma('user_version = 1');
+      });
+      transaction();
+      currentVersion = 1;
+      console.log('Migration to version 1 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 1:', e);
+    }
+  }
+
+  if (currentVersion < 2) {
+    console.log(`Migrating schema from version ${currentVersion} to 2...`);
+    try {
+      const transaction = connection.transaction(() => {
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS python_environments (
+            env_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            python_executable TEXT NOT NULL,
+            python_version TEXT NOT NULL,
+            managed INTEGER NOT NULL DEFAULT 1,
+            config_json TEXT NOT NULL,
+            working_directory TEXT,
+            description TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          );
+        `);
+
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS python_execution_runs (
+            run_id TEXT PRIMARY KEY,
+            node_id TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
+            env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
+            status TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            exit_code INTEGER,
+            error_message TEXT,
+            duration_ms INTEGER
+          );
+        `);
+
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS python_execution_logs (
+            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL REFERENCES python_execution_runs(run_id) ON DELETE CASCADE,
+            timestamp TEXT NOT NULL,
+            level TEXT NOT NULL,
+            message TEXT NOT NULL
+          );
+        `);
+
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS node_python_settings (
+            node_id TEXT PRIMARY KEY REFERENCES nodes(node_id) ON DELETE CASCADE,
+            env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
+            auto_detect_env INTEGER NOT NULL DEFAULT 1,
+            last_run_id TEXT REFERENCES python_execution_runs(run_id) ON DELETE SET NULL,
+            updated_at TEXT NOT NULL
+          );
+        `);
+
+        connection.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_node ON python_execution_runs(node_id);');
+        connection.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_env ON python_execution_runs(env_id);');
+        connection.exec('CREATE INDEX IF NOT EXISTS idx_python_logs_run ON python_execution_logs(run_id);');
+
+        connection.pragma('user_version = 2');
+      });
+      transaction();
+      currentVersion = 2;
+      console.log('Migration to version 2 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 2:', e);
+    }
+  }
+
+  if (currentVersion < 3) {
+    console.log(`Migrating schema from version ${currentVersion} to 3...`);
+    try {
+      const transaction = connection.transaction(() => {
+        connection.exec(DOCUMENT_SEARCH_OBJECTS_SQL);
+        populateDocumentSearch(connection);
+        connection.pragma('user_version = 3');
+      });
+      transaction();
+      console.log('Migration to version 3 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 3:', e);
+    }
+  }
+};
+
+const openWorkspaceConnection = (workspace: WorkspaceRecord): Database.Database => {
+  ensureWorkspaceDirectory();
+  const dbPath = getWorkspaceDbPath(workspace);
+  const dbExists = fs.existsSync(dbPath);
+  const connection = new Database(dbPath);
+  prepareDatabaseConnection(connection, !dbExists);
+  return connection;
+};
+
+const assertInitialized = () => {
+  if (!dbInitialized) {
+    throw new Error('Database service has not been initialized with an active workspace.');
+  }
 };
 
 // Helper function from languageService.ts, now inside database.ts to avoid cross-context dependencies
@@ -157,132 +406,149 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
 
 export const databaseService = {
   init() {
-    const dbExists = fs.existsSync(DB_PATH);
-    db = new Database(DB_PATH);
+    ensureWorkspaceDirectory();
+    workspaceRecords = loadWorkspaceMetadata();
 
-    if (!dbExists) {
-      console.log('Database does not exist, creating new one...');
-      db.exec(INITIAL_SCHEMA);
-      // Set PRAGMAs for a new database
-      db.pragma('user_version = 3');
-      db.exec('PRAGMA journal_mode = WAL;');
-      db.exec('PRAGMA foreign_keys = ON;');
-      console.log('Database created and schema applied.');
-    } else {
-      console.log('Existing database found.');
-      // Ensure PRAGMAs are set for existing databases too
-      db.exec('PRAGMA journal_mode = WAL;');
-      db.exec('PRAGMA foreign_keys = ON;');
-      
-      // Run migrations
-      const currentVersion = db.pragma('user_version', { simple: true }) as number;
-      if (currentVersion < 1) {
-        console.log(`Migrating schema from version ${currentVersion} to 1...`);
-        try {
-          const transaction = db.transaction(() => {
-            const columns = db.prepare("PRAGMA table_info(documents)").all() as {name: string}[];
-            const hasColumn = columns.some(col => col.name === 'default_view_mode');
-            if (!hasColumn) {
-              db.exec('ALTER TABLE documents ADD COLUMN default_view_mode TEXT');
-            }
-            db.pragma('user_version = 1');
-          });
-          transaction();
-          console.log('Migration to version 1 complete.');
-        } catch (e) {
-          console.error('Fatal: Failed to migrate database to version 1:', e);
-        }
-      }
+    if (workspaceRecords.length === 0) {
+      const now = new Date().toISOString();
+      const workspaceId = uuidv4();
+      const defaultRecord: WorkspaceRecord = {
+        workspaceId,
+        name: DEFAULT_WORKSPACE_NAME,
+        fileName: `${workspaceId}.db`,
+        createdAt: now,
+        updatedAt: now,
+        lastOpenedAt: now,
+      };
 
-      if (currentVersion < 2) {
-        console.log(`Migrating schema from version ${currentVersion} to 2...`);
-        try {
-          const transaction = db.transaction(() => {
-            db.exec(`
-              CREATE TABLE IF NOT EXISTS python_environments (
-                env_id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                python_executable TEXT NOT NULL,
-                python_version TEXT NOT NULL,
-                managed INTEGER NOT NULL DEFAULT 1,
-                config_json TEXT NOT NULL,
-                working_directory TEXT,
-                description TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-              );
-            `);
+      const connection = openWorkspaceConnection(defaultRecord);
+      connection.close();
 
-            db.exec(`
-              CREATE TABLE IF NOT EXISTS python_execution_runs (
-                run_id TEXT PRIMARY KEY,
-                node_id TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
-                env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
-                status TEXT NOT NULL,
-                started_at TEXT NOT NULL,
-                finished_at TEXT,
-                exit_code INTEGER,
-                error_message TEXT,
-                duration_ms INTEGER
-              );
-            `);
-
-            db.exec(`
-              CREATE TABLE IF NOT EXISTS python_execution_logs (
-                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id TEXT NOT NULL REFERENCES python_execution_runs(run_id) ON DELETE CASCADE,
-                timestamp TEXT NOT NULL,
-                level TEXT NOT NULL,
-                message TEXT NOT NULL
-              );
-            `);
-
-            db.exec(`
-              CREATE TABLE IF NOT EXISTS node_python_settings (
-                node_id TEXT PRIMARY KEY REFERENCES nodes(node_id) ON DELETE CASCADE,
-                env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
-                auto_detect_env INTEGER NOT NULL DEFAULT 1,
-                last_run_id TEXT REFERENCES python_execution_runs(run_id) ON DELETE SET NULL,
-                updated_at TEXT NOT NULL
-              );
-            `);
-
-            db.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_node ON python_execution_runs(node_id);');
-            db.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_env ON python_execution_runs(env_id);');
-            db.exec('CREATE INDEX IF NOT EXISTS idx_python_logs_run ON python_execution_logs(run_id);');
-
-            db.pragma('user_version = 2');
-          });
-          transaction();
-          console.log('Migration to version 2 complete.');
-        } catch (e) {
-          console.error('Fatal: Failed to migrate database to version 2:', e);
-        }
-      }
-
-      if (currentVersion < 3) {
-        console.log(`Migrating schema from version ${currentVersion} to 3...`);
-        try {
-          const transaction = db.transaction(() => {
-            db.exec(DOCUMENT_SEARCH_OBJECTS_SQL);
-            populateDocumentSearch();
-            db.pragma('user_version = 3');
-          });
-          transaction();
-          console.log('Migration to version 3 complete.');
-        } catch (e) {
-          console.error('Fatal: Failed to migrate database to version 3:', e);
-        }
-      }
+      workspaceRecords.push(defaultRecord);
+      persistWorkspaceMetadata();
     }
+
+    const workspaceToOpen = selectWorkspaceToOpen() ?? workspaceRecords[0];
+    this.switchWorkspace(workspaceToOpen.workspaceId);
+  },
+
+  switchWorkspace(workspaceId: string): WorkspaceInfo {
+    const target = workspaceRecords.find(record => record.workspaceId === workspaceId);
+    if (!target) {
+      throw new Error(`Workspace with id ${workspaceId} was not found.`);
+    }
+
+    if (activeWorkspace?.workspaceId === workspaceId && dbInitialized) {
+      return toWorkspaceInfo(target);
+    }
+
+    if (dbInitialized) {
+      try {
+        db.close();
+      } catch (error) {
+        console.warn('Failed to close previous workspace database cleanly:', error);
+      }
+      dbInitialized = false;
+    }
+
+    db = openWorkspaceConnection(target);
+    dbInitialized = true;
+    currentDbPath = getWorkspaceDbPath(target);
+    activeWorkspace = target;
+
+    const now = new Date().toISOString();
+    target.lastOpenedAt = now;
+    target.updatedAt = now;
+    persistWorkspaceMetadata();
+
+    return toWorkspaceInfo(target);
+  },
+
+  listWorkspaces(): WorkspaceInfo[] {
+    return workspaceRecords.map(toWorkspaceInfo);
+  },
+
+  createWorkspace(name: string): WorkspaceInfo {
+    const trimmedName = name?.trim();
+    const resolvedName = trimmedName && trimmedName.length > 0
+      ? trimmedName
+      : `Workspace ${workspaceRecords.length + 1}`;
+
+    const now = new Date().toISOString();
+    const workspaceId = uuidv4();
+    const record: WorkspaceRecord = {
+      workspaceId,
+      name: resolvedName,
+      fileName: `${workspaceId}.db`,
+      createdAt: now,
+      updatedAt: now,
+      lastOpenedAt: null,
+    };
+
+    const connection = openWorkspaceConnection(record);
+    connection.close();
+
+    workspaceRecords.push(record);
+    persistWorkspaceMetadata();
+
+    return toWorkspaceInfo(record);
+  },
+
+  renameWorkspace(workspaceId: string, newName: string): WorkspaceInfo {
+    const record = workspaceRecords.find(item => item.workspaceId === workspaceId);
+    if (!record) {
+      throw new Error(`Workspace with id ${workspaceId} was not found.`);
+    }
+
+    const trimmed = newName?.trim();
+    if (!trimmed) {
+      throw new Error('Workspace name cannot be empty.');
+    }
+
+    record.name = trimmed;
+    record.updatedAt = new Date().toISOString();
+    persistWorkspaceMetadata();
+
+    return toWorkspaceInfo(record);
+  },
+
+  deleteWorkspace(workspaceId: string): { success: boolean; error?: string } {
+    const recordIndex = workspaceRecords.findIndex(item => item.workspaceId === workspaceId);
+    if (recordIndex === -1) {
+      return { success: false, error: `Workspace with id ${workspaceId} was not found.` };
+    }
+
+    if (activeWorkspace?.workspaceId === workspaceId) {
+      return { success: false, error: 'Cannot delete the active workspace.' };
+    }
+
+    const [record] = workspaceRecords.splice(recordIndex, 1);
+    persistWorkspaceMetadata();
+
+    try {
+      const dbPath = getWorkspaceDbPath(record);
+      if (fs.existsSync(dbPath)) {
+        fs.unlinkSync(dbPath);
+      }
+    } catch (error) {
+      console.warn('Failed to remove workspace database file:', error);
+    }
+
+    return { success: true };
+  },
+
+  getActiveWorkspace(): WorkspaceInfo | null {
+    return activeWorkspace ? toWorkspaceInfo(activeWorkspace) : null;
   },
 
   isNew(): boolean {
+    assertInitialized();
     const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='nodes'").get();
     return !tableCheck;
   },
-  
+
   query(sql: string, params: any[] = []): any[] {
+    assertInitialized();
     try {
       return db.prepare(sql).all(...(params || []));
     } catch(e) {
@@ -292,6 +558,7 @@ export const databaseService = {
   },
 
   get(sql: string, params: any[] = []): any {
+    assertInitialized();
     try {
       return db.prepare(sql).get(...(params || []));
     } catch(e) {
@@ -299,8 +566,9 @@ export const databaseService = {
       throw e;
     }
   },
-  
+
   run(sql: string, params: any[] = []): Database.RunResult {
+    assertInitialized();
     try {
       return db.prepare(sql).run(...(params || []));
     } catch(e) {
@@ -310,6 +578,7 @@ export const databaseService = {
   },
 
   migrateFromJson(data: any): { success: boolean, error?: string } {
+    assertInitialized();
     const transaction = db.transaction(() => {
         // Clear existing data for a clean migration slate.
         db.exec('DELETE FROM settings;');
@@ -392,7 +661,7 @@ export const databaseService = {
             }
         }
 
-        populateDocumentSearch();
+        populateDocumentSearch(db);
     });
 
     try {
@@ -403,8 +672,9 @@ export const databaseService = {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   },
-  
+
   duplicateNodes(nodeIds: string[]): { success: boolean, error?: string } {
+    assertInitialized();
     const transaction = db.transaction((ids: string[]) => {
       const _recursiveDuplicate = (nodeId: string, newParentId: string | null, sortOrder: number): string => {
         // Fix: Cast the result to the Node type to resolve property access errors.
@@ -495,6 +765,7 @@ export const databaseService = {
   },
 
   deleteVersions(documentId: number, versionIds: number[]): { success: boolean, error?: string } {
+    assertInitialized();
     if (versionIds.length === 0) {
       return { success: true };
     }
@@ -535,6 +806,7 @@ export const databaseService = {
   },
 
   importFiles(filesData: {path: string; name: string; content: string}[], targetParentId: string | null): { success: boolean; error?: string; createdNodes: ImportedNodeSummary[] } {
+    assertInitialized();
     const createdNodes: ImportedNodeSummary[] = [];
     const transaction = db.transaction(() => {
         console.log(`Starting import transaction for ${filesData.length} files.`);
@@ -634,15 +906,226 @@ export const databaseService = {
     }
   },
 
+  transferNodesToWorkspace(
+    nodeIds: string[],
+    targetWorkspaceId: string,
+    targetParentId: string | null,
+  ): { success: boolean; createdNodeIds?: string[]; error?: string } {
+    assertInitialized();
+
+    const uniqueIds = Array.from(new Set(nodeIds));
+    if (uniqueIds.length === 0) {
+      return { success: true, createdNodeIds: [] };
+    }
+
+    const targetWorkspace = workspaceRecords.find(record => record.workspaceId === targetWorkspaceId);
+    if (!targetWorkspace) {
+      return { success: false, error: `Workspace with id ${targetWorkspaceId} was not found.` };
+    }
+
+    if (activeWorkspace?.workspaceId === targetWorkspaceId) {
+      return { success: false, error: 'Target workspace must be different from the active workspace.' };
+    }
+
+    let sourceOrderRows: { node_id: string; sort_order: number }[] = [];
+    try {
+      const stmt = db.prepare('SELECT node_id, sort_order FROM nodes WHERE node_id = ?');
+      sourceOrderRows = uniqueIds.map(id => {
+        const row = stmt.get(id) as { node_id: string; sort_order: number } | undefined;
+        if (!row) {
+          throw new Error(`Node with id ${id} was not found in the active workspace.`);
+        }
+        return row;
+      });
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+
+    sourceOrderRows.sort((a, b) => a.sort_order - b.sort_order);
+
+    const collectTransferTree = (connection: Database.Database, nodeId: string): TransferNode => {
+      const nodeRow = connection.prepare(
+        'SELECT node_id, parent_id, node_type, title, sort_order, created_at, updated_at FROM nodes WHERE node_id = ?',
+      ).get(nodeId) as Node | undefined;
+      if (!nodeRow) {
+        throw new Error(`Node with id ${nodeId} could not be loaded for transfer.`);
+      }
+
+      const transferNode: TransferNode = {
+        node: { ...nodeRow },
+        children: [],
+      };
+
+      if (nodeRow.node_type === 'document') {
+        const documentRow = connection.prepare(
+          'SELECT document_id, node_id, doc_type, language_hint, default_view_mode, current_version_id FROM documents WHERE node_id = ?',
+        ).get(nodeId) as Document | undefined;
+        if (documentRow) {
+          const versions = connection.prepare(
+            `SELECT dv.version_id, dv.document_id, dv.created_at, dv.content_id, cs.sha256_hex, cs.text_content, cs.blob_content
+             FROM doc_versions dv
+             JOIN content_store cs ON dv.content_id = cs.content_id
+             WHERE dv.document_id = ?
+             ORDER BY dv.created_at ASC, dv.version_id ASC`
+          ).all(documentRow.document_id) as TransferDocVersionRow[];
+          transferNode.document = { ...documentRow, versions };
+        }
+      }
+
+      const pythonSettings = connection.prepare(
+        'SELECT node_id, env_id, auto_detect_env, last_run_id, updated_at FROM node_python_settings WHERE node_id = ?',
+      ).get(nodeId) as NodePythonSettingsRow | undefined;
+      if (pythonSettings) {
+        transferNode.pythonSettings = { ...pythonSettings };
+      }
+
+      const childIds = connection.prepare(
+        'SELECT node_id FROM nodes WHERE parent_id = ? ORDER BY sort_order',
+      ).all(nodeId) as { node_id: string }[];
+      transferNode.children = childIds.map(child => collectTransferTree(connection, child.node_id));
+
+      return transferNode;
+    };
+
+    let transferTrees: TransferNode[] = [];
+    try {
+      transferTrees = sourceOrderRows.map(row => collectTransferTree(db, row.node_id));
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+
+    const targetConnection = openWorkspaceConnection(targetWorkspace);
+    const createdNodeIds: string[] = [];
+
+    try {
+      if (targetParentId) {
+        const parentExists = targetConnection.prepare('SELECT node_id FROM nodes WHERE node_id = ?').get(targetParentId) as { node_id: string } | undefined;
+        if (!parentExists) {
+          throw new Error('Target parent node does not exist in the destination workspace.');
+        }
+      }
+
+      const maxSortOrderRow = targetConnection.prepare(
+        `SELECT MAX(sort_order) as max_order FROM nodes WHERE parent_id ${targetParentId ? '= ?' : 'IS NULL'}`,
+      ).get(targetParentId ? [targetParentId] : []) as { max_order: number | null };
+      let nextSortOrder = (maxSortOrderRow?.max_order ?? -1) + 1;
+
+      const contentIdCache = new Map<string, number>();
+      const resolveContentId = (sha: string, text: string | null, blob: Buffer | null) => {
+        if (contentIdCache.has(sha)) {
+          return contentIdCache.get(sha)!;
+        }
+        const existing = targetConnection.prepare('SELECT content_id FROM content_store WHERE sha256_hex = ?').get(sha) as { content_id: number } | undefined;
+        if (existing) {
+          contentIdCache.set(sha, existing.content_id);
+          return existing.content_id;
+        }
+        const insertResult = targetConnection.prepare(
+          'INSERT INTO content_store (sha256_hex, text_content, blob_content) VALUES (?, ?, ?)',
+        ).run(sha, text ?? null, blob ?? null);
+        const insertedId = Number(insertResult.lastInsertRowid);
+        contentIdCache.set(sha, insertedId);
+        return insertedId;
+      };
+
+      const insertTree = (tree: TransferNode, parentId: string | null, sortOrder: number): string => {
+        const newNodeId = uuidv4();
+        targetConnection.prepare(
+          `INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          newNodeId,
+          parentId,
+          tree.node.node_type,
+          tree.node.title,
+          sortOrder,
+          tree.node.created_at,
+          tree.node.updated_at,
+        );
+
+        if (tree.document) {
+          const docInsert = targetConnection.prepare(
+            `INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode, current_version_id)
+             VALUES (?, ?, ?, ?, NULL)`
+          ).run(newNodeId, tree.document.doc_type, tree.document.language_hint, tree.document.default_view_mode);
+          const newDocumentId = Number(docInsert.lastInsertRowid);
+
+          let newCurrentVersionId: number | null = null;
+          for (const version of tree.document.versions) {
+            const contentId = resolveContentId(version.sha256_hex, version.text_content ?? null, version.blob_content ?? null);
+            const versionInsert = targetConnection.prepare(
+              'INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)',
+            ).run(newDocumentId, version.created_at, contentId);
+            const newVersionId = Number(versionInsert.lastInsertRowid);
+            if (tree.document.current_version_id === version.version_id) {
+              newCurrentVersionId = newVersionId;
+            }
+          }
+
+          if (newCurrentVersionId !== null) {
+            targetConnection.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?').run(newCurrentVersionId, newDocumentId);
+          }
+        }
+
+        if (tree.pythonSettings) {
+          targetConnection.prepare(
+            `INSERT OR REPLACE INTO node_python_settings (node_id, env_id, auto_detect_env, last_run_id, updated_at)
+             VALUES (?, ?, ?, ?, ?)`
+          ).run(
+            newNodeId,
+            tree.pythonSettings.env_id,
+            tree.pythonSettings.auto_detect_env,
+            tree.pythonSettings.last_run_id,
+            tree.pythonSettings.updated_at,
+          );
+        }
+
+        tree.children.forEach((child, index) => {
+          insertTree(child, newNodeId, index);
+        });
+
+        return newNodeId;
+      };
+
+      const transaction = targetConnection.transaction(() => {
+        for (const tree of transferTrees) {
+          const insertedRootId = insertTree(tree, targetParentId, nextSortOrder++);
+          createdNodeIds.push(insertedRootId);
+        }
+      });
+
+      transaction();
+
+      targetWorkspace.updatedAt = new Date().toISOString();
+      persistWorkspaceMetadata();
+
+      return { success: true, createdNodeIds };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      try {
+        targetConnection.close();
+      } catch (closeError) {
+        console.warn('Failed to close target workspace connection after transfer:', closeError);
+      }
+    }
+  },
+
   getDbPath(): string {
-    return DB_PATH;
+    assertInitialized();
+    if (!currentDbPath) {
+      throw new Error('Active workspace path is not available.');
+    }
+    return currentDbPath;
   },
 
   async backupDatabase(filePath: string): Promise<void> {
+    assertInitialized();
     await db.backup(filePath);
   },
 
   runIntegrityCheck(): string {
+    assertInitialized();
     const results = db.pragma('integrity_check');
     if (Array.isArray(results) && results.length === 1 && (results[0] as any).integrity_check === 'ok') {
         return 'ok';
@@ -651,11 +1134,13 @@ export const databaseService = {
   },
 
   runVacuum(): void {
+    assertInitialized();
     db.exec('VACUUM;');
   },
 
   getDatabaseStats(): DatabaseStats {
-    const fileSize = statSync(DB_PATH).size;
+    assertInitialized();
+    const fileSize = currentDbPath ? statSync(currentDbPath).size : 0;
     const pageSize = db.pragma('page_size', { simple: true }) as number;
     const pageCount = db.pragma('page_count', { simple: true }) as number;
     const schemaVersion = db.pragma('schema_version', { simple: true }) as number;
@@ -683,8 +1168,16 @@ export const databaseService = {
   },
 
   close() {
-    if (db) {
+    if (!dbInitialized) {
+      return;
+    }
+
+    try {
       db.close();
+    } finally {
+      dbInitialized = false;
+      activeWorkspace = null;
+      currentDbPath = null;
     }
   }
 };

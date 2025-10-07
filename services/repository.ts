@@ -9,6 +9,7 @@ import type {
   ContentStore,
   ViewMode,
   ImportedNodeSummary,
+  WorkspaceInfo,
 } from '../types';
 import { cryptoService } from './cryptoService';
 import { DEFAULT_SETTINGS, EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
@@ -1169,6 +1170,77 @@ export const repository = {
             throw new Error(result.error || 'Failed to import files in main process.');
         }
         return result.createdNodes ?? [];
+    },
+
+    async listWorkspaces(): Promise<WorkspaceInfo[]> {
+        if (!isElectron || !window.electronAPI?.dbListWorkspaces) {
+            const now = new Date().toISOString();
+            return [{
+                workspaceId: 'browser-preview',
+                name: 'Browser Preview',
+                filePath: 'in-memory',
+                createdAt: now,
+                updatedAt: now,
+                lastOpenedAt: now,
+                isActive: true,
+            }];
+        }
+        return window.electronAPI.dbListWorkspaces();
+    },
+
+    async createWorkspace(name: string): Promise<WorkspaceInfo> {
+        if (!window.electronAPI?.dbCreateWorkspace) {
+            throw new Error('Workspace creation is not supported in this environment.');
+        }
+        return window.electronAPI.dbCreateWorkspace(name);
+    },
+
+    async renameWorkspace(workspaceId: string, newName: string): Promise<WorkspaceInfo> {
+        if (!window.electronAPI?.dbRenameWorkspace) {
+            throw new Error('Workspace renaming is not supported in this environment.');
+        }
+        return window.electronAPI.dbRenameWorkspace(workspaceId, newName);
+    },
+
+    async deleteWorkspace(workspaceId: string): Promise<{ success: boolean; error?: string }> {
+        if (!window.electronAPI?.dbDeleteWorkspace) {
+            throw new Error('Workspace deletion is not supported in this environment.');
+        }
+        return window.electronAPI.dbDeleteWorkspace(workspaceId);
+    },
+
+    async switchWorkspace(workspaceId: string): Promise<WorkspaceInfo> {
+        if (!window.electronAPI?.dbSwitchWorkspace) {
+            throw new Error('Workspace switching is not supported in this environment.');
+        }
+        const info = await window.electronAPI.dbSwitchWorkspace(workspaceId);
+        const templates = await this.getAllTemplates();
+        if (templates.length === 0) {
+            await this.addDefaultTemplates();
+        }
+        return info;
+    },
+
+    async getActiveWorkspace(): Promise<WorkspaceInfo | null> {
+        if (!window.electronAPI?.dbGetActiveWorkspace) {
+            return {
+                workspaceId: 'browser-preview',
+                name: 'Browser Preview',
+                filePath: 'in-memory',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                lastOpenedAt: new Date().toISOString(),
+                isActive: true,
+            };
+        }
+        return window.electronAPI.dbGetActiveWorkspace();
+    },
+
+    async transferNodesToWorkspace(nodeIds: string[], targetWorkspaceId: string, targetParentId: string | null) {
+        if (!window.electronAPI?.dbTransferNodes) {
+            throw new Error('Transferring nodes between workspaces is not supported in this environment.');
+        }
+        return window.electronAPI.dbTransferNodes(nodeIds, targetWorkspaceId, targetParentId);
     },
 
     async getDbPath(): Promise<string> {

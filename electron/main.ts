@@ -157,6 +157,15 @@ ipcMain.handle('db:migrate-from-json', (_, data) => databaseService.migrateFromJ
 ipcMain.handle('db:duplicate-nodes', (_, nodeIds) => databaseService.duplicateNodes(nodeIds));
 ipcMain.handle('db:delete-versions', (_, documentId, versionIds) => databaseService.deleteVersions(documentId, versionIds));
 ipcMain.handle('db:get-path', () => databaseService.getDbPath());
+ipcMain.handle('db:list-workspaces', () => databaseService.listWorkspaces());
+ipcMain.handle('db:create-workspace', (_, name: string) => databaseService.createWorkspace(name));
+ipcMain.handle('db:rename-workspace', (_, workspaceId: string, newName: string) => databaseService.renameWorkspace(workspaceId, newName));
+ipcMain.handle('db:delete-workspace', (_, workspaceId: string) => databaseService.deleteWorkspace(workspaceId));
+ipcMain.handle('db:switch-workspace', (_, workspaceId: string) => databaseService.switchWorkspace(workspaceId));
+ipcMain.handle('db:get-active-workspace', () => databaseService.getActiveWorkspace());
+ipcMain.handle('db:transfer-nodes', (_, nodeIds: string[], targetWorkspaceId: string, targetParentId: string | null) =>
+  databaseService.transferNodesToWorkspace(nodeIds, targetWorkspaceId, targetParentId)
+);
 ipcMain.handle('db:import-files', async (_, filesData, targetParentId) => {
     try {
         const result = databaseService.importFiles(filesData, targetParentId);
