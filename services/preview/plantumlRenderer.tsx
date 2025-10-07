@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import ZoomPanContainer from '../../components/ZoomPanContainer';
 import type { IRenderer } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
 import { DEFAULT_SETTINGS } from '../../constants';
@@ -13,17 +14,27 @@ const PlantUMLPreview: React.FC<PlantUMLPreviewProps> = ({ content, settings }) 
   const trimmed = useMemo(() => content.trim(), [content]);
 
   return (
-    <div className="df-plantuml-preview" role="document">
+    <ZoomPanContainer
+      className="df-plantuml-preview"
+      contentClassName="df-plantuml-stage"
+      minScale={0.1}
+      maxScale={6}
+      role="document"
+    >
       <PlantUMLDiagram code={trimmed} mode={settings.plantumlRendererMode} />
       <style>{`
         .df-plantuml-preview {
           width: 100%;
           height: 100%;
-          overflow: auto;
           background: rgb(var(--color-secondary));
+          position: relative;
+          padding: clamp(1.5rem, 4vw, 3rem);
+        }
+
+        .df-plantuml-stage {
           display: flex;
           justify-content: center;
-          padding: clamp(1.5rem, 4vw, 3rem);
+          align-items: center;
         }
 
         .df-plantuml {
@@ -31,16 +42,21 @@ const PlantUMLPreview: React.FC<PlantUMLPreviewProps> = ({ content, settings }) 
           border-radius: 0.9rem;
           background: rgba(var(--color-background), 0.75);
           padding: 1.25rem 1.5rem;
-          overflow-x: auto;
           margin: 0 auto;
           text-align: center;
           width: min(100%, 960px);
+          max-width: 960px;
+          user-select: none;
+          -webkit-user-drag: none;
         }
 
         .df-plantuml img,
         .df-plantuml svg {
           width: 100%;
           height: auto;
+          display: block;
+          user-select: none;
+          -webkit-user-drag: none;
         }
 
         .df-plantuml-loading {
@@ -63,7 +79,7 @@ const PlantUMLPreview: React.FC<PlantUMLPreviewProps> = ({ content, settings }) 
           font-size: 0.85rem;
         }
       `}</style>
-    </div>
+    </ZoomPanContainer>
   );
 };
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import ZoomPanContainer from '../../components/ZoomPanContainer';
 import type { IRenderer } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
 
@@ -249,25 +250,31 @@ const ImagePreview = React.forwardRef<HTMLDivElement, ImagePreviewProps>(({ cont
   }
 
   return (
-    <div ref={ref} className={`w-full h-full overflow-auto bg-secondary ${className ?? ''}`} {...rest}>
-      <div className="min-h-full min-w-full flex flex-col items-center justify-center p-6">
-        <div className="relative max-w-full">
-          <img
-            src={url}
-            alt="Document preview"
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-            className="max-h-[80vh] max-w-full object-contain rounded-lg shadow-lg border border-border-color bg-background"
-          />
-          {dimensions && (
-            <div className="absolute bottom-3 right-3 rounded-full bg-black/60 px-3 py-1 text-xs text-white shadow-md">
-              {dimensions.width} × {dimensions.height} px
-              {mimeType ? ` • ${mimeType.replace('image/', '').toUpperCase()}` : ''}
-            </div>
-          )}
-        </div>
+    <ZoomPanContainer
+      ref={ref}
+      className={`w-full h-full ${className ?? ''}`}
+      contentClassName="p-6"
+      overlay={
+        dimensions ? (
+          <div className="absolute bottom-4 left-4 rounded-full bg-black/60 px-3 py-1 text-xs text-white shadow-md">
+            {dimensions.width} × {dimensions.height} px
+            {mimeType ? ` • ${mimeType.replace('image/', '').toUpperCase()}` : ''}
+          </div>
+        ) : null
+      }
+      {...rest}
+    >
+      <div className="max-w-full">
+        <img
+          src={url}
+          alt="Document preview"
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          className="block max-w-full max-h-[80vh] rounded-lg border border-border-color bg-background object-contain shadow-lg"
+          draggable={false}
+        />
       </div>
-    </div>
+    </ZoomPanContainer>
   );
 });
 

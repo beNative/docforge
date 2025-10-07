@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import plantumlEncoder from 'plantuml-encoder';
 import type { Settings } from '../../types';
 
@@ -72,11 +72,12 @@ const PlantUMLRemoteDiagram: React.FC<{ code: string }> = ({ code }) => {
   }
 
   return (
-    <div className="df-plantuml">
+    <div className="df-plantuml" draggable={false}>
       <img
         src={`${PLANTUML_SERVER}/${encoded}`}
         alt="PlantUML diagram"
         loading="lazy"
+        draggable={false}
         onError={() => {
           setHasError(true);
           setErrorDetails(`Request URL: ${PLANTUML_SERVER}/${encoded}`);
@@ -95,6 +96,25 @@ interface OfflineRenderState {
 
 const PlantUMLOfflineDiagram: React.FC<{ code: string }> = ({ code }) => {
   const [state, setState] = useState<OfflineRenderState>({ status: 'idle' });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (state.status !== 'success') {
+      return;
+    }
+
+    const node = containerRef.current;
+    if (!node) {
+      return;
+    }
+
+    const svg = node.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('draggable', 'false');
+      svg.style.userSelect = 'none';
+      (svg.style as any).webkitUserDrag = 'none';
+    }
+  }, [state.status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,9 +188,11 @@ const PlantUMLOfflineDiagram: React.FC<{ code: string }> = ({ code }) => {
   if (state.status === 'success' && state.svg) {
     return (
       <div
+        ref={containerRef}
         className="df-plantuml"
         role="img"
         aria-label="PlantUML diagram"
+        draggable={false}
         dangerouslySetInnerHTML={{ __html: state.svg }}
       />
     );
