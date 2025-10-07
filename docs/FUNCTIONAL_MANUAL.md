@@ -39,7 +39,8 @@ The entire list of documents and templates can be navigated using your keyboard'
 
 This is the largest part of the application and displays the active content.
 
-- **Welcome Screen:** Shown when no document is selected or when a folder is selected.
+- **Welcome Screen:** Shown when no document is selected.
+- **Folder Overview:** Selecting a folder opens the Folder Overview, providing a summary of its contents and quick actions.
 - **Document Editor:** The primary interface for writing and editing a document's content and title.
 - **Template Editor:** A similar editor for creating and modifying document templates.
 - **Settings View:** A dedicated screen for configuring the application.
