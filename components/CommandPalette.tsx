@@ -18,17 +18,50 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
   const listRef = useRef<HTMLUListElement>(null);
 
   const filteredCommands = useMemo(() => {
-    const sorted = [...commands].sort((a, b) => a.category.localeCompare(b.category));
-    if (!searchTerm.trim()) {
-      return sorted;
-    }
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return sorted.filter(
-      (command) =>
-        command.name.toLowerCase().includes(lowercasedTerm) ||
-        command.keywords?.toLowerCase().includes(lowercasedTerm)
-    );
+    const normalizedTerm = searchTerm.trim().toLowerCase();
+    const matches = commands.filter((command) => {
+      if (!normalizedTerm) {
+        return true;
+      }
+
+      const keywords = command.keywords?.toLowerCase() ?? '';
+      return (
+        command.name.toLowerCase().includes(normalizedTerm) ||
+        keywords.includes(normalizedTerm)
+      );
+    });
+
+    return matches.sort((a, b) => {
+      const categoryCompare = a.category.localeCompare(b.category);
+      if (categoryCompare !== 0) {
+        return categoryCompare;
+      }
+      return a.name.localeCompare(b.name);
+    });
   }, [commands, searchTerm]);
+
+  const groupedCommands = useMemo(() => {
+    const groups: Array<{ category: string; commands: Command[] }> = [];
+    const lookup = new Map<string, Command[]>();
+
+    filteredCommands.forEach((command) => {
+      let group = lookup.get(command.category);
+      if (!group) {
+        group = [];
+        lookup.set(command.category, group);
+        groups.push({ category: command.category, commands: group });
+      }
+      group.push(command);
+    });
+
+    return groups;
+  }, [filteredCommands]);
+
+  useEffect(() => {
+    if (selectedIndex >= filteredCommands.length) {
+      setSelectedIndex(filteredCommands.length > 0 ? filteredCommands.length - 1 : 0);
+    }
+  }, [filteredCommands.length, selectedIndex]);
 
   // Reset index when search term changes
   useEffect(() => {
@@ -121,44 +154,50 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
   }, [isOpen, onClose, onExecute, filteredCommands, selectedIndex]);
 
   const renderCommands = () => {
-    let lastCategory: string | undefined = undefined;
+    if (filteredCommands.length === 0) {
+      return null;
+    }
 
-    return filteredCommands.map((command, index) => {
-      const categoryHeader = command.category !== lastCategory ? (
-          <li key={`category-${command.category}`} className="text-xs font-semibold text-text-secondary uppercase px-2 pt-3 pb-1.5 sticky top-0 bg-secondary">
-            {command.category}
-          </li>
-        ) : null;
-        lastCategory = command.category;
-      
-      const isSelected = selectedIndex === index;
+    let runningIndex = 0;
 
-      return (
-        <React.Fragment key={command.id}>
-            {categoryHeader}
+    return groupedCommands.map(({ category, commands: groupCommands }) => (
+      <React.Fragment key={category}>
+        <li
+          className="text-xs font-semibold text-text-secondary uppercase px-2 pt-3 pb-1.5 sticky top-0 bg-secondary/95 backdrop-blur z-10"
+        >
+          {category}
+        </li>
+        {groupCommands.map((command) => {
+          const commandIndex = runningIndex;
+          runningIndex += 1;
+          const isSelected = selectedIndex === commandIndex;
+
+          return (
             <li
-            data-index={index}
-            onClick={() => {
+              key={command.id}
+              data-index={commandIndex}
+              onClick={() => {
                 command.action();
                 onExecute();
-            }}
-            className={`flex items-center justify-between px-2 py-1.5 mx-1 rounded-md cursor-pointer text-xs ${
+              }}
+              className={`flex items-center justify-between px-2 py-1.5 mx-1 rounded-md cursor-pointer text-xs ${
                 isSelected ? 'bg-primary text-primary-text' : 'text-text-main hover:bg-border-color/50'
-            }`}
+              }`}
             >
-            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
                 <command.icon className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-primary-text/90' : 'text-text-secondary'}`} />
                 <span className="truncate">{command.name}</span>
-            </div>
-            {command.shortcutString && (
-              <kbd className={`px-1.5 py-0.5 text-xs rounded font-sans transition-colors ${isSelected ? 'bg-primary/80 text-primary-text' : 'bg-border-color text-text-secondary'}`}>
-                {command.shortcutString}
-              </kbd>
-            )}
+              </div>
+              {command.shortcutString && (
+                <kbd className={`px-1.5 py-0.5 text-xs rounded font-sans transition-colors ${isSelected ? 'bg-primary/80 text-primary-text' : 'bg-border-color text-text-secondary'}`}>
+                  {command.shortcutString}
+                </kbd>
+              )}
             </li>
-        </React.Fragment>
-      );
-    });
+          );
+        })}
+      </React.Fragment>
+    ));
   };
 
   const overlayRoot = document.getElementById('overlay-root');

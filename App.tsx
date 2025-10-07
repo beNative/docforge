@@ -1630,6 +1630,7 @@ const MainApp: React.FC = () => {
 
         return monacoCommandTemplates.map(template => ({
             ...template,
+            icon: CodeIcon,
             action: () => {
                 if (template.monacoCommandId) {
                     monacoCommandRunner(template.monacoCommandId);
