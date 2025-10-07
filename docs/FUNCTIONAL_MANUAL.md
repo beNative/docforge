@@ -85,6 +85,16 @@ The document editor is powered by Monaco, the same editor core used in VS Code, 
     - **Refine with AI:** Send the document's content to your configured LLM to get an improved version (only for Markdown and plaintext files).
     - **Delete:** Delete the current document. A confirmation is required, where pressing `Enter` will confirm the action.
 
+#### Python Execution Panel
+
+DocForge includes an embedded Python runner that integrates with the editor when you're working on Python content.
+
+- **When It Appears:** The Python panel automatically becomes available when the active document uses the Python language mode or when you explicitly enable the panel from the Command Palette. The panel docks beneath the editor and can be resized like other views.
+- **Running Code:** Use the **Run** button or press `Shift+Enter` to execute the current document (or a selected code block). Execution happens inside the selected Python environment, and the panel keeps focus so you can iterate quickly without switching windows.
+- **Viewing Logs:** The right side of the panel displays structured run output, including stdout, stderr, and exit status. Each run is timestamped, and you can expand entries to inspect detailed logs.
+- **Managing Histories:** Every execution is stored in the document's history list within the panel. You can rename runs, pin important ones, clear individual entries, or purge the entire history. Switching documents automatically swaps in its associated Python run history.
+- **Environment Controls:** A dropdown shows the interpreter that will be used. From here you can create a new virtual environment, switch to a detected interpreter, or open the environment folder in your system file browser.
+
 ### Organizing with Drag and Drop
 
 You can organize your documents and folders by dragging and dropping them in the sidebar. You can select multiple items using `Ctrl+Click` (or `Cmd+Click` on macOS) and drag them all at once.
@@ -134,6 +144,7 @@ Accessed via the gear icon in the title bar. The settings are organized into cat
 - **Appearance:** Change the UI scale and choose from different icon sets.
 - **Keyboard Shortcuts:** View and customize keyboard shortcuts for all major application actions. You can record a new key combination for any command.
 - **General:** Configure application behavior, like auto-saving logs, opting into pre-release updates, and choosing how PlantUML diagrams are rendered.
+- **Python:** Choose the interpreter used by the integrated runner. DocForge auto-detects local interpreters, can bootstrap a dedicated virtual environment per workspace, and exposes console preferences such as default working directory, automatic history retention, and whether runs open in split view.
 - **Database:** View detailed statistics about your local database file, and perform maintenance tasks such as creating a compressed backup, checking file integrity, and optimizing the database size (`VACUUM`).
 - **Advanced:** View and edit the raw JSON configuration file using an interactive tree or a raw text editor, and import/export your settings.
 
