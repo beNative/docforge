@@ -39,6 +39,13 @@ The entire list of documents and templates can be navigated using your keyboard'
 
 This is the largest part of the application and displays the active content.
 
+- **Document Tab Strip:** Opened documents appear in a horizontal strip above the editor. Tabs show the document title, file
+  type badge, and an unsaved indicator so you can tell which files still need to be saved. Drag a tab to reorder it or tear it
+  away into a separate window when multi-window mode is available.
+- **Context Menu Actions:** Right-clicking a tab reveals commands to close the current document, close all other tabs, close
+  the tabs to the right, duplicate the document into a new tab, or pin the tab so it always stays visible.
+- **Overflow Picker:** When there are more tabs than can fit, the strip shows an overflow chevron. Clicking it opens a list of
+  all open documents with search-as-you-type filtering so you can quickly jump to any tab.
 - **Welcome Screen:** Shown when no document is selected.
 - **Folder Overview:** Selecting a folder opens the Folder Overview, providing a summary of its contents and quick actions.
 - **Document Editor:** The primary interface for writing and editing a document's content and title.
