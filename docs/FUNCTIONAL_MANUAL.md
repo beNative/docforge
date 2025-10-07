@@ -46,6 +46,19 @@ This is the largest part of the application and displays the active content.
 - **Settings View:** A dedicated screen for configuring the application.
 - **Info View:** Displays documentation like the README and this manual.
 
+#### Folder Overview Details
+
+The Folder Overview organizes key insights about the currently selected folder so you can triage and navigate quickly.
+
+- **Metrics Cards:** At the top of the overview, metric tiles display counts for documents, subfolders, and templates contained in the selection, along with the timestamp of the most recent change. Use these at-a-glance totals to gauge activity or verify that bulk operations completed as expected.
+- **Document Type & Language Summaries:** Pie charts and legend rows aggregate the detected document types and languages inside the folder. Hovering or focusing on a slice reveals the exact counts so you can spot imbalances (for example, many notes still in plaintext instead of Markdown).
+- **Recent Activity List:** The "Recent" section highlights the latest files touched within the folder. Entries include the title, relative path, and last modified time so you can reopen in-progress work or audit recent edits.
+- **Folder Search Workflow:** Use the search field within the overview to filter across the folder hierarchy. Typing immediately narrows results by title, while pressing `Enter` runs a full-text query.
+    - Matching documents show a contextual body snippet beneath the title. The snippet bolds the matched phrase, helping you confirm relevance without opening the document.
+    - Search results inherit the document type and language badges from the summaries, reinforcing how the item was classified.
+    - Clearing the input restores the unfiltered metrics and recent list.
+- **Opening Results:** Selecting an item from the recent list or search results opens it in the editor pane. Use `Ctrl+Enter` (`Cmd+Enter` on macOS) to open in a new tab if you have multi-tab editing enabled.
+
 ### The Status Bar
 
 The bar at the bottom of the window provides at-a-glance information about the application's state.
