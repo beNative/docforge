@@ -36,6 +36,7 @@ import { LOCAL_STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 import { repository } from './services/repository';
 import { DocumentNode } from './components/PromptTreeItem';
 import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './services/shortcutService';
+import { createMonacoCommands } from './services/editor/monacoKeybindings';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -118,6 +119,7 @@ const MainApp: React.FC = () => {
     const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
     const [loggerPanelHeight, setLoggerPanelHeight] = useState(DEFAULT_LOGGER_HEIGHT);
     const [availableModels, setAvailableModels] = useState<DiscoveredLLMModel[]>([]);
+    const [monacoCommandRunner, setMonacoCommandRunner] = useState<((commandId: string) => boolean) | null>(null);
     const [discoveredServices, setDiscoveredServices] = useState<DiscoveredLLMService[]>([]);
     const [isDetecting, setIsDetecting] = useState(false);
     const [appVersion, setAppVersion] = useState('');
@@ -1542,6 +1544,10 @@ const MainApp: React.FC = () => {
     const handleOpenCommandPalette = useCallback(() => {
         addLog('INFO', 'User action: Opened command palette.');
         setIsCommandPaletteOpen(true);
+        setTimeout(() => {
+            commandPaletteInputRef.current?.focus();
+            commandPaletteInputRef.current?.select();
+        }, 0);
     }, [addLog]);
 
     const handleCloseCommandPalette = useCallback(() => {
@@ -1564,6 +1570,10 @@ const MainApp: React.FC = () => {
             return isOpen;
         });
     }, [addLog, isCommandPaletteOpen]);
+
+    const handleMonacoCommandRunnerChange = useCallback((runner: ((commandId: string) => boolean) | null) => {
+        setMonacoCommandRunner(() => runner ?? null);
+    }, []);
     
     const handleOpenNewCodeFileModal = useCallback(() => {
         addLog('INFO', 'User action: Open "New Code File" modal.');
@@ -1594,7 +1604,7 @@ const MainApp: React.FC = () => {
         }
     }, [items, activeNodeId, view, addLog]);
 
-    const commands: Command[] = useMemo(() => [
+    const appCommands: Command[] = useMemo(() => [
         { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Control', 'N'], keywords: 'add create file' },
         { id: 'new-code-file', name: 'Create New Code File', action: handleOpenNewCodeFileModal, category: 'File', icon: CodeIcon, shortcut: ['Control', 'Shift', 'N'], keywords: 'add create script' },
         { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
@@ -1611,8 +1621,40 @@ const MainApp: React.FC = () => {
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
     ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout]);
 
+    const monacoCommandTemplates = useMemo(() => createMonacoCommands(), []);
+
+    const monacoEditorCommands = useMemo(() => {
+        if (!monacoCommandRunner) {
+            return [] as Command[];
+        }
+
+        return monacoCommandTemplates.map(template => ({
+            ...template,
+            action: () => {
+                if (template.monacoCommandId) {
+                    monacoCommandRunner(template.monacoCommandId);
+                }
+            },
+        }));
+    }, [monacoCommandRunner, monacoCommandTemplates]);
+
+    const combinedCommands = useMemo(() => {
+        return [...appCommands, ...monacoEditorCommands];
+    }, [appCommands, monacoEditorCommands]);
+
+    const enrichedAppCommands = useMemo(() => {
+        return appCommands.map(command => {
+            const custom = settings.customShortcuts[command.id];
+            const effectiveShortcut = custom !== undefined ? custom : command.shortcut;
+            return {
+                ...command,
+                shortcutString: effectiveShortcut ? formatShortcutForDisplay(effectiveShortcut) : undefined,
+            };
+        });
+    }, [appCommands, settings.customShortcuts]);
+
     const enrichedCommands = useMemo(() => {
-      return commands.map(command => {
+      return combinedCommands.map(command => {
           const custom = settings.customShortcuts[command.id];
           const effectiveShortcut = custom !== undefined ? custom : command.shortcut;
           return {
@@ -1620,7 +1662,7 @@ const MainApp: React.FC = () => {
               shortcutString: effectiveShortcut ? formatShortcutForDisplay(effectiveShortcut) : undefined,
           };
       });
-    }, [commands, settings.customShortcuts]);
+    }, [combinedCommands, settings.customShortcuts]);
 
     const handleContextMenu = useCallback((e: React.MouseEvent, nodeId: string | null) => {
         e.preventDefault();
@@ -1745,7 +1787,7 @@ const MainApp: React.FC = () => {
     }, [handleGlobalMouseMove, handleGlobalMouseUp]);
     
      useEffect(() => {
-        const shortcutMap = getShortcutMap(commands, settings.customShortcuts);
+        const shortcutMap = getShortcutMap(combinedCommands, settings.customShortcuts);
         
         const handleKeyDown = (e: KeyboardEvent) => {
             const activeEl = document.activeElement;
@@ -1764,7 +1806,7 @@ const MainApp: React.FC = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [commands, settings.customShortcuts]);
+    }, [combinedCommands, settings.customShortcuts]);
 
     const getSupportedIconSet = (iconSet: Settings['iconSet']): 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material' => {
         const supportedSets: Array<Settings['iconSet']> = ['heroicons', 'lucide', 'feather', 'tabler', 'material'];
@@ -1780,7 +1822,7 @@ const MainApp: React.FC = () => {
 
     const renderMainContent = () => {
         if (view === 'info') return <InfoView settings={settings} />;
-        if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} commands={enrichedCommands} />;
+        if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} commands={enrichedAppCommands} />;
         
         if (activeTemplate) {
             return <TemplateEditor 
@@ -1803,7 +1845,7 @@ const MainApp: React.FC = () => {
                     );
                 }
                 return (
-                    <DocumentEditor 
+                    <DocumentEditor
                         key={activeNode.id}
                         documentNode={activeNode}
                         onSave={handleSaveDocumentTitle}
@@ -1814,6 +1856,8 @@ const MainApp: React.FC = () => {
                         onLanguageChange={handleLanguageChange}
                         onViewModeChange={handleViewModeChange}
                         formatTrigger={formatTrigger}
+                        onRequestCommandPalette={handleOpenCommandPalette}
+                        onActiveMonacoCommandRunnerChange={handleMonacoCommandRunnerChange}
                     />
                 );
             }

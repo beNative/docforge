@@ -24,6 +24,8 @@ interface DocumentEditorProps {
   onLanguageChange: (language: string) => void;
   onViewModeChange: (mode: ViewMode) => void;
   formatTrigger: number;
+  onRequestCommandPalette: () => void;
+  onActiveMonacoCommandRunnerChange?: (runner: ((commandId: string) => boolean) | null) => void;
 }
 
 const PREVIEWABLE_LANGUAGES = new Set<string>([
@@ -71,7 +73,7 @@ const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint:
   return 'edit';
 };
 
-const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange, onViewModeChange, formatTrigger }) => {
+const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange, onViewModeChange, formatTrigger, onRequestCommandPalette, onActiveMonacoCommandRunnerChange }) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
   const [baselineContent, setBaselineContent] = useState(documentNode.content || '');
@@ -461,6 +463,55 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     target.addEventListener('pointercancel', handlePointerCancel);
   }, [pythonPanelHeight, pythonPanelMinHeight]);
   
+  useEffect(() => {
+    return () => {
+      onActiveMonacoCommandRunnerChange?.(null);
+    };
+  }, [onActiveMonacoCommandRunnerChange]);
+
+  useEffect(() => {
+    const shouldDisableRunner = isDiffMode || (viewMode === 'preview' && supportsPreview);
+    if (shouldDisableRunner) {
+      onActiveMonacoCommandRunnerChange?.(null);
+    }
+  }, [isDiffMode, viewMode, supportsPreview, onActiveMonacoCommandRunnerChange]);
+
+  const handleMonacoEditorReady = useCallback((editorInstance: any) => {
+    if (!onActiveMonacoCommandRunnerChange) {
+      return;
+    }
+
+    const runner = (commandId: string): boolean => {
+      if (!commandId) {
+        return false;
+      }
+
+      if (typeof editorInstance?.isDisposed === 'function' && editorInstance.isDisposed()) {
+        return false;
+      }
+
+      try {
+        const action = editorInstance?.getAction?.(commandId);
+        if (action) {
+          if (typeof action.isSupported === 'function' && !action.isSupported()) {
+            return false;
+          }
+          action.run();
+          return true;
+        }
+
+        editorInstance?.trigger?.('docforge.commandPalette', commandId, null);
+        return true;
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(`Failed to execute Monaco command: ${commandId}`, error);
+        return false;
+      }
+    };
+
+    onActiveMonacoCommandRunnerChange(runner);
+  }, [onActiveMonacoCommandRunnerChange]);
+
   const renderContent = () => {
     const editor = isDiffMode
       ? (
@@ -486,6 +537,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             customShortcuts={settings.customShortcuts}
             fontFamily={settings.editorFontFamily}
             fontSize={settings.editorFontSize}
+            onEditorReady={handleMonacoEditorReady}
+            onRequestCommandPalette={onRequestCommandPalette}
           />
         );
     const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} settings={settings} />;

@@ -15,6 +15,8 @@ interface CodeEditorProps {
   customShortcuts?: Record<string, string[]>;
   fontFamily?: string;
   fontSize?: number;
+  onEditorReady?: (editorInstance: any, monacoApi: any) => void;
+  onRequestCommandPalette?: () => void;
 }
 
 export interface CodeEditorHandle {
@@ -112,7 +114,7 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
     return keybinding | primaryKey;
 };
 
-const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize }, ref) => {
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize, onEditorReady, onRequestCommandPalette }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -120,6 +122,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     const contentRef = useRef(content);
     const customShortcutsRef = useRef<Record<string, string[]>>({});
     const actionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const commandPaletteListenerRef = useRef<{ dispose: () => void } | null>(null);
+    const onRequestCommandPaletteRef = useRef<CodeEditorProps['onRequestCommandPalette']>();
     const computedFontFamily = useMemo(() => {
         const candidate = (fontFamily ?? '').trim();
         return candidate || DEFAULT_SETTINGS.editorFontFamily;
@@ -274,8 +278,23 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     }
                 });
 
+                if (commandPaletteListenerRef.current) {
+                    try {
+                        commandPaletteListenerRef.current.dispose();
+                    } catch {}
+                }
+
+                commandPaletteListenerRef.current = editorInstance.onKeyDown((event: any) => {
+                    if (event.keyCode === monacoApi.KeyCode.F1 && typeof onRequestCommandPaletteRef.current === 'function') {
+                        event.preventDefault();
+                        onRequestCommandPaletteRef.current?.();
+                    }
+                });
+
                 monacoInstanceRef.current = editorInstance;
                 applyEditorShortcuts();
+
+                onEditorReady?.(editorInstance, monacoApi);
             } catch (error) {
                 // eslint-disable-next-line no-console
                 console.error('Failed to initialize Monaco editor', error);
@@ -291,9 +310,19 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 monacoInstanceRef.current.dispose();
                 monacoInstanceRef.current = null;
             }
+            if (commandPaletteListenerRef.current) {
+                try {
+                    commandPaletteListenerRef.current.dispose();
+                } catch {}
+                commandPaletteListenerRef.current = null;
+            }
             monacoApiRef.current = null;
         };
     }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, computedFontFamily, computedFontSize]);
+
+    useEffect(() => {
+        onRequestCommandPaletteRef.current = onRequestCommandPalette;
+    }, [onRequestCommandPalette]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {
