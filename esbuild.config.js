@@ -8,6 +8,8 @@ const sharedConfig = {
   minify: !isWatch,
   sourcemap: isWatch ? 'inline' : false,
   loader: {
+    '.ts': 'ts',
+    '.tsx': 'tsx',
     '.woff2': 'file',
     '.woff': 'file',
     '.ttf': 'file',
