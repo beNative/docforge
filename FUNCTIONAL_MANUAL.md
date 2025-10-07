@@ -25,7 +25,7 @@ The top-most bar of the application provides global controls and information.
 
 The resizable left panel is your main navigation and organization area.
 
-- **Search:** A search bar at the top allows you to filter your documents and folders by title.
+- **Search:** A search bar at the top lets you filter your documents and folders. It instantly checks titles while also running a background full-text search across document bodies, returning contextual snippets with the matched terms highlighted so you can quickly confirm relevance.
 - **Documents List:** A hierarchical tree view of all your documents and folders.
     - **Action Toolbar:** A toolbar at the top of the list provides icon buttons to quickly create a new document, create a new root folder, create a new document from a template, and expand/collapse all folders.
     - **Folders:** Can be expanded or collapsed.
@@ -62,6 +62,8 @@ The Folder Overview organizes key insights about the currently selected folder s
 - **Recent Activity List:** The "Recent" section highlights the latest files touched within the folder. Entries include the title, relative path, and last modified time so you can reopen in-progress work or audit recent edits.
 - **Folder Search Workflow:** Use the search field within the overview to filter across the folder hierarchy. Typing immediately narrows results by title, while pressing `Enter` runs a full-text query.
     - Matching documents show a contextual body snippet beneath the title. The snippet bolds the matched phrase, helping you confirm relevance without opening the document.
+    - Results include badges that indicate whether the title, the body, or both fields matched, and they prioritize the most relevant and recently updated content.
+    - A status pill above the results switches between "Searching…" and a match count, keeping you informed of the loading state while DocForge evaluates body matches.
     - Search results inherit the document type and language badges from the summaries, reinforcing how the item was classified.
     - Clearing the input restores the unfiltered metrics and recent list.
 - **Opening Results:** Selecting an item from the recent list or search results opens it in the editor pane. Use `Ctrl+Enter` (`Cmd+Enter` on macOS) to open in a new tab if you have multi-tab editing enabled.
