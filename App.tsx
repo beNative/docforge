@@ -291,6 +291,19 @@ const MainApp: React.FC = () => {
     const documentItems = useMemo(() => items.filter(item => item.type === 'document'), [items]);
     const activeDocumentId = activeDocument?.id ?? null;
 
+    const isTextDocumentActive = useMemo(() => {
+        if (view !== 'editor') {
+            return false;
+        }
+
+        if (!activeDocument) {
+            return false;
+        }
+
+        const docType = (activeDocument.doc_type ?? 'prompt') as DocType;
+        return docType === 'prompt' || docType === 'source_code';
+    }, [view, activeDocument]);
+
 
     useEffect(() => {
         const term = searchTerm.trim();
@@ -1623,8 +1636,31 @@ const MainApp: React.FC = () => {
 
     const monacoCommandTemplates = useMemo(() => createMonacoCommands(), []);
 
-    const monacoEditorCommands = useMemo(() => {
+    const runMonacoCommand = useCallback((commandId: string | undefined, commandName: string) => {
+        if (!commandId) {
+            addLog('WARNING', `Cannot execute command "${commandName}" because it is missing a Monaco identifier.`);
+            return false;
+        }
+
         if (!monacoCommandRunner) {
+            addLog('WARNING', `Cannot execute "${commandName}" because no Monaco editor is currently active.`);
+            return false;
+        }
+
+        try {
+            const executed = monacoCommandRunner(commandId);
+            if (!executed) {
+                addLog('WARNING', `Monaco command "${commandName}" is not available in the current editor state.`);
+            }
+            return executed;
+        } catch (error) {
+            addLog('ERROR', `Failed to execute Monaco command "${commandName}": ${error instanceof Error ? error.message : String(error)}`);
+            return false;
+        }
+    }, [addLog, monacoCommandRunner]);
+
+    const monacoEditorCommands = useMemo(() => {
+        if (!isTextDocumentActive) {
             return [] as Command[];
         }
 
@@ -1632,12 +1668,10 @@ const MainApp: React.FC = () => {
             ...template,
             icon: CodeIcon,
             action: () => {
-                if (template.monacoCommandId) {
-                    monacoCommandRunner(template.monacoCommandId);
-                }
+                runMonacoCommand(template.monacoCommandId, template.name);
             },
         }));
-    }, [monacoCommandRunner, monacoCommandTemplates]);
+    }, [isTextDocumentActive, monacoCommandTemplates, runMonacoCommand]);
 
     const combinedCommands = useMemo(() => {
         return [...appCommands, ...monacoEditorCommands];

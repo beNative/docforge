@@ -65,7 +65,9 @@ export const getShortcutMap = (
 
     if (shortcutKeys && shortcutKeys.length > 0) {
       const shortcutString = shortcutKeys.join('+');
-      shortcutMap.set(shortcutString, command);
+      if (!shortcutMap.has(shortcutString)) {
+        shortcutMap.set(shortcutString, command);
+      }
     }
   }
 
