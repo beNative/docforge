@@ -5,22 +5,49 @@ import type React from 'react';
 declare global {
   interface Window {
     electronAPI?: {
-      dbQuery: (sql: string, params?: any[]) => Promise<any[]>;
-      dbGet: (sql: string, params?: any[]) => Promise<any>;
-      dbRun: (sql: string, params?: any[]) => Promise<{ changes: number; lastInsertRowid: number | bigint; }>;
+      dbQuery: (sql: string, params?: any[], workspaceId?: string) => Promise<any[]>;
+      dbGet: (sql: string, params?: any[], workspaceId?: string) => Promise<any>;
+      dbRun: (
+        sql: string,
+        params?: any[],
+        workspaceId?: string
+      ) => Promise<{ changes: number; lastInsertRowid: number | bigint; }>;
       dbIsNew: () => Promise<boolean>;
       dbMigrateFromJson: (data: any) => Promise<{ success: boolean, error?: string }>;
-      dbDuplicateNodes: (nodeIds: string[]) => Promise<{ success: boolean; error?: string }>;
-      dbDeleteVersions: (documentId: number, versionIds: number[]) => Promise<{ success: boolean; error?: string }>;
-      dbBackup: () => Promise<{ success: boolean; message?: string; error?: string }>;
-      dbIntegrityCheck: () => Promise<{ success: boolean; results?: string; error?: string }>;
-      dbVacuum: () => Promise<{ success: boolean; error?: string }>;
-      dbGetStats: () => Promise<{ success: boolean; stats?: DatabaseStats; error?: string }>;
-      dbGetPath: () => Promise<string>;
+      dbDuplicateNodes: (nodeIds: string[], workspaceId?: string) => Promise<{ success: boolean; error?: string }>;
+      dbDeleteVersions: (
+        documentId: number,
+        versionIds: number[],
+        workspaceId?: string
+      ) => Promise<{ success: boolean; error?: string }>;
+      dbBackup: (workspaceId?: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+      dbIntegrityCheck: (workspaceId?: string) => Promise<{ success: boolean; results?: string; error?: string }>;
+      dbVacuum: (workspaceId?: string) => Promise<{ success: boolean; error?: string }>;
+      dbGetStats: (workspaceId?: string) => Promise<{ success: boolean; stats?: DatabaseStats; error?: string }>;
+      dbGetPath: (workspaceId?: string) => Promise<string>;
+      dbListWorkspaces: () => Promise<WorkspaceInfo[]>;
+      dbCreateWorkspace: (name: string) => Promise<WorkspaceInfo>;
+      dbRenameWorkspace: (workspaceId: string, newName: string) => Promise<WorkspaceInfo>;
+      dbDeleteWorkspace: (workspaceId: string) => Promise<{ success: boolean; error?: string }>;
+      dbSwitchWorkspace: (workspaceId: string) => Promise<WorkspaceInfo>;
+      dbGetActiveWorkspace: () => Promise<WorkspaceInfo | null>;
+      dbTransferNodes: (
+        nodeIds: string[],
+        targetWorkspaceId: string,
+        targetParentId: string | null,
+        sourceWorkspaceId?: string,
+      ) => Promise<{ success: boolean; createdNodeIds?: string[]; error?: string }>;
+      dbOpenWorkspaceConnection: (workspaceId: string) => Promise<WorkspaceInfo>;
+      dbCloseWorkspaceConnection: (workspaceId: string) => Promise<WorkspaceInfo>;
+      dbRefreshWorkspaceConnection: (workspaceId: string) => Promise<WorkspaceInfo>;
+      dbOnWorkspaceEvent: (
+        callback: (event: WorkspaceConnectionEvent) => void
+      ) => () => void;
       // FIX: Add missing `dbImportFiles` to the electronAPI type definition.
       dbImportFiles: (
         filesData: { path: string; name: string; content: string }[],
-        targetParentId: string | null
+        targetParentId: string | null,
+        workspaceId?: string
       ) => Promise<{ success: boolean; error?: string; createdNodes?: ImportedNodeSummary[] }>;
       legacyFileExists: (filename: string) => Promise<boolean>;
       readLegacyFile: (filename: string) => Promise<{ success: boolean, data?: string, error?: string }>;
@@ -80,6 +107,7 @@ export interface ImportedNodeSummary {
   docType: DocType;
   languageHint: string | null;
   defaultViewMode: ViewMode | null;
+  workspaceId: string;
 }
 
 export type PythonExecutionStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
@@ -181,6 +209,7 @@ export interface Node {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  workspaceId: string;
   // Client-side property
   children?: Node[];
   // For documents, this will be attached
@@ -195,6 +224,7 @@ export interface Document {
   language_hint: string | null;
   default_view_mode: ViewMode | null;
   current_version_id: number | null;
+  workspaceId?: string;
   // Client-side property, holds content of current version
   content?: string;
 }
@@ -228,6 +258,7 @@ export interface DocumentOrFolder {
   createdAt: string;
   updatedAt: string;
   parentId: string | null;
+  workspaceId?: string;
   // Document-specific properties for the UI adapter
   doc_type?: DocType;
   language_hint?: string | null;
@@ -322,6 +353,22 @@ export interface DiscoveredLLMModel {
   id: string;
   name: string;
 }
+
+export interface WorkspaceInfo {
+  workspaceId: string;
+  name: string;
+  filePath: string;
+  createdAt: string;
+  updatedAt: string;
+  lastOpenedAt: string | null;
+  isActive: boolean;
+  isOpen: boolean;
+}
+
+export type WorkspaceConnectionEvent =
+  | { type: 'workspace-opened'; workspace: WorkspaceInfo }
+  | { type: 'workspace-closed'; workspace: WorkspaceInfo }
+  | { type: 'workspace-activated'; workspace: WorkspaceInfo };
 
 export interface DatabaseStats {
   fileSize: string;

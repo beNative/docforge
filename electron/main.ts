@@ -61,6 +61,19 @@ const broadcastPythonEvent = (channel: string, payload: any) => {
 pythonManager.events.on('run-log', (payload) => broadcastPythonEvent('python:run-log', payload));
 pythonManager.events.on('run-status', (payload) => broadcastPythonEvent('python:run-status', payload));
 
+const broadcastWorkspaceEvent = (payload: any) => {
+  const targets = BrowserWindow.getAllWindows();
+  for (const window of targets) {
+    try {
+      window.webContents.send('db:workspace-event', payload);
+    } catch (error) {
+      console.error('Failed to broadcast workspace event:', error);
+    }
+  }
+};
+
+databaseService.events.on('workspace-event', broadcastWorkspaceEvent);
+
 // --- Auto Updater Setup ---
 // Note: For auto-updates to work, you need to configure `electron-builder` in package.json
 // and sign your application.
@@ -149,25 +162,38 @@ app.on('activate', () => {
 // --- IPC Handlers ---
 
 // Database
-ipcMain.handle('db:query', (_, sql, params) => databaseService.query(sql, params));
-ipcMain.handle('db:get', (_, sql, params) => databaseService.get(sql, params));
-ipcMain.handle('db:run', (_, sql, params) => databaseService.run(sql, params));
+ipcMain.handle('db:query', (_, sql, params, workspaceId) => databaseService.query(sql, params, workspaceId));
+ipcMain.handle('db:get', (_, sql, params, workspaceId) => databaseService.get(sql, params, workspaceId));
+ipcMain.handle('db:run', (_, sql, params, workspaceId) => databaseService.run(sql, params, workspaceId));
 ipcMain.handle('db:is-new', () => databaseService.isNew());
-ipcMain.handle('db:migrate-from-json', (_, data) => databaseService.migrateFromJson(data));
-ipcMain.handle('db:duplicate-nodes', (_, nodeIds) => databaseService.duplicateNodes(nodeIds));
-ipcMain.handle('db:delete-versions', (_, documentId, versionIds) => databaseService.deleteVersions(documentId, versionIds));
-ipcMain.handle('db:get-path', () => databaseService.getDbPath());
-ipcMain.handle('db:import-files', async (_, filesData, targetParentId) => {
+ipcMain.handle('db:migrate-from-json', (_, data, workspaceId) => databaseService.migrateFromJson(data, workspaceId));
+ipcMain.handle('db:duplicate-nodes', (_, nodeIds, workspaceId) => databaseService.duplicateNodes(nodeIds, workspaceId));
+ipcMain.handle('db:delete-versions', (_, documentId, versionIds, workspaceId) =>
+  databaseService.deleteVersions(documentId, versionIds, workspaceId)
+);
+ipcMain.handle('db:get-path', (_, workspaceId) => databaseService.getDbPath(workspaceId));
+ipcMain.handle('db:list-workspaces', () => databaseService.listWorkspaces());
+ipcMain.handle('db:create-workspace', (_, name: string) => databaseService.createWorkspace(name));
+ipcMain.handle('db:rename-workspace', (_, workspaceId: string, newName: string) => databaseService.renameWorkspace(workspaceId, newName));
+ipcMain.handle('db:delete-workspace', (_, workspaceId: string) => databaseService.deleteWorkspace(workspaceId));
+ipcMain.handle('db:switch-workspace', (_, workspaceId: string) => databaseService.switchWorkspace(workspaceId));
+ipcMain.handle('db:get-active-workspace', () => databaseService.getActiveWorkspace());
+ipcMain.handle('db:transfer-nodes', (_, nodeIds: string[], targetWorkspaceId: string, targetParentId: string | null, sourceWorkspaceId?: string) =>
+  databaseService.transferNodesToWorkspace(nodeIds, targetWorkspaceId, targetParentId, sourceWorkspaceId)
+);
+ipcMain.handle('db:open-workspace-connection', (_, workspaceId: string) => databaseService.openWorkspaceConnection(workspaceId));
+ipcMain.handle('db:close-workspace-connection', (_, workspaceId: string) => databaseService.closeWorkspaceConnection(workspaceId));
+ipcMain.handle('db:refresh-workspace-connection', (_, workspaceId: string) => databaseService.refreshWorkspaceConnection(workspaceId));
+ipcMain.handle('db:import-files', async (_, filesData, targetParentId, workspaceId) => {
     try {
-        const result = databaseService.importFiles(filesData, targetParentId);
-        return result;
+        return databaseService.importFiles(filesData, targetParentId, workspaceId);
     } catch (error) {
         console.error('File import failed:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Failed to import files.' };
     }
 });
 
-ipcMain.handle('db:backup', async () => {
+ipcMain.handle('db:backup', async (_, workspaceId?: string) => {
     if (!mainWindow) return { success: false, error: 'Main window not available' };
     const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
         title: 'Save Compressed Database Backup',
@@ -185,7 +211,7 @@ ipcMain.handle('db:backup', async () => {
 
     try {
         // 1. Backup to a temporary file
-        await databaseService.backupDatabase(tempDbPath);
+        await databaseService.backupDatabase(tempDbPath, workspaceId);
         console.log('Temporary backup file created successfully.');
 
         // 2. Gzip the temporary file to the final destination
@@ -214,9 +240,9 @@ ipcMain.handle('db:backup', async () => {
     }
 });
 
-ipcMain.handle('db:integrity-check', async () => {
+ipcMain.handle('db:integrity-check', async (_, workspaceId?: string) => {
     try {
-        const results = databaseService.runIntegrityCheck();
+        const results = databaseService.runIntegrityCheck(workspaceId);
         return { success: true, results };
     } catch (error) {
         console.error('Integrity check failed:', error);
@@ -224,9 +250,9 @@ ipcMain.handle('db:integrity-check', async () => {
     }
 });
 
-ipcMain.handle('db:vacuum', async () => {
+ipcMain.handle('db:vacuum', async (_, workspaceId?: string) => {
     try {
-        databaseService.runVacuum();
+        databaseService.runVacuum(workspaceId);
         return { success: true };
     } catch (error) {
         console.error('Vacuum failed:', error);
@@ -234,9 +260,9 @@ ipcMain.handle('db:vacuum', async () => {
     }
 });
 
-ipcMain.handle('db:get-stats', async () => {
+ipcMain.handle('db:get-stats', async (_, workspaceId?: string) => {
     try {
-        const stats = databaseService.getDatabaseStats();
+        const stats = databaseService.getDatabaseStats(workspaceId);
         return { success: true, stats };
     } catch (error) {
         console.error('Failed to get DB stats:', error);

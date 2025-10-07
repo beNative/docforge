@@ -15,6 +15,7 @@ const nodeToDocumentOrFolder = (node: Node): DocumentOrFolder => ({
   createdAt: node.created_at,
   updatedAt: node.updated_at,
   parentId: node.parent_id,
+  workspaceId: node.workspaceId,
   doc_type: node.document?.doc_type,
   language_hint: node.document?.language_hint,
   default_view_mode: node.document?.default_view_mode,

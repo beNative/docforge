@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Node, ViewMode, ImportedNodeSummary } from '../types';
 import { repository } from '../services/repository';
 import { useLogger } from './useLogger';
+import { useWorkspaceEvents } from './useWorkspaceEvents';
 
 export const useNodes = () => {
   const { addLog } = useLogger();
@@ -24,6 +25,20 @@ export const useNodes = () => {
   useEffect(() => {
     refreshNodes();
   }, [refreshNodes]);
+
+  const activeWorkspaceId = nodes[0]?.workspaceId ?? null;
+
+  useWorkspaceEvents(
+    event => {
+      if (event.type === 'workspace-activated') {
+        refreshNodes();
+      }
+      if (event.type === 'workspace-closed' && activeWorkspaceId && activeWorkspaceId === event.workspace.workspaceId) {
+        setNodes([]);
+      }
+    },
+    [refreshNodes, activeWorkspaceId],
+  );
 
   const addNode = useCallback(async (node: Omit<Node, 'node_id' | 'sort_order' | 'created_at' | 'updated_at'>): Promise<Node> => {
     const newNode = await repository.addNode(node);

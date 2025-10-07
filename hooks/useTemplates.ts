@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { DocumentTemplate } from '../types';
 import { repository } from '../services/repository';
 import { useLogger } from './useLogger';
+import { useWorkspaceEvents } from './useWorkspaceEvents';
 
 export const useTemplates = () => {
   const { addLog } = useLogger();
@@ -22,6 +23,15 @@ export const useTemplates = () => {
     // We just need to load them.
     refreshTemplates();
   }, [refreshTemplates]);
+
+  useWorkspaceEvents(
+    event => {
+      if (event.type === 'workspace-activated') {
+        refreshTemplates();
+      }
+    },
+    [refreshTemplates],
+  );
 
   const addTemplate = useCallback(async () => {
     const newTemplate = await repository.addTemplate({

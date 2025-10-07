@@ -2,19 +2,39 @@ import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // --- Database ---
-  dbQuery: (sql: string, params?: any[]) => ipcRenderer.invoke('db:query', sql, params),
-  dbGet: (sql: string, params?: any[]) => ipcRenderer.invoke('db:get', sql, params),
-  dbRun: (sql: string, params?: any[]) => ipcRenderer.invoke('db:run', sql, params),
+  dbQuery: (sql: string, params?: any[], workspaceId?: string) => ipcRenderer.invoke('db:query', sql, params, workspaceId),
+  dbGet: (sql: string, params?: any[], workspaceId?: string) => ipcRenderer.invoke('db:get', sql, params, workspaceId),
+  dbRun: (sql: string, params?: any[], workspaceId?: string) => ipcRenderer.invoke('db:run', sql, params, workspaceId),
   dbIsNew: () => ipcRenderer.invoke('db:is-new'),
   dbMigrateFromJson: (data: any) => ipcRenderer.invoke('db:migrate-from-json', data),
-  dbDuplicateNodes: (nodeIds: string[]) => ipcRenderer.invoke('db:duplicate-nodes', nodeIds),
-  dbDeleteVersions: (documentId: number, versionIds: number[]) => ipcRenderer.invoke('db:delete-versions', documentId, versionIds),
-  dbBackup: () => ipcRenderer.invoke('db:backup'),
-  dbIntegrityCheck: () => ipcRenderer.invoke('db:integrity-check'),
-  dbVacuum: () => ipcRenderer.invoke('db:vacuum'),
-  dbGetStats: () => ipcRenderer.invoke('db:get-stats'),
-  dbGetPath: () => ipcRenderer.invoke('db:get-path'),
-  dbImportFiles: (filesData: any[], targetParentId: string | null) => ipcRenderer.invoke('db:import-files', filesData, targetParentId),
+  dbDuplicateNodes: (nodeIds: string[], workspaceId?: string) => ipcRenderer.invoke('db:duplicate-nodes', nodeIds, workspaceId),
+  dbDeleteVersions: (documentId: number, versionIds: number[], workspaceId?: string) =>
+    ipcRenderer.invoke('db:delete-versions', documentId, versionIds, workspaceId),
+  dbBackup: (workspaceId?: string) => ipcRenderer.invoke('db:backup', workspaceId),
+  dbIntegrityCheck: (workspaceId?: string) => ipcRenderer.invoke('db:integrity-check', workspaceId),
+  dbVacuum: (workspaceId?: string) => ipcRenderer.invoke('db:vacuum', workspaceId),
+  dbGetStats: (workspaceId?: string) => ipcRenderer.invoke('db:get-stats', workspaceId),
+  dbGetPath: (workspaceId?: string) => ipcRenderer.invoke('db:get-path', workspaceId),
+  dbListWorkspaces: () => ipcRenderer.invoke('db:list-workspaces'),
+  dbCreateWorkspace: (name: string) => ipcRenderer.invoke('db:create-workspace', name),
+  dbRenameWorkspace: (workspaceId: string, newName: string) => ipcRenderer.invoke('db:rename-workspace', workspaceId, newName),
+  dbDeleteWorkspace: (workspaceId: string) => ipcRenderer.invoke('db:delete-workspace', workspaceId),
+  dbSwitchWorkspace: (workspaceId: string) => ipcRenderer.invoke('db:switch-workspace', workspaceId),
+  dbGetActiveWorkspace: () => ipcRenderer.invoke('db:get-active-workspace'),
+  dbTransferNodes: (nodeIds: string[], targetWorkspaceId: string, targetParentId: string | null, sourceWorkspaceId?: string) =>
+    ipcRenderer.invoke('db:transfer-nodes', nodeIds, targetWorkspaceId, targetParentId, sourceWorkspaceId),
+  dbOpenWorkspaceConnection: (workspaceId: string) => ipcRenderer.invoke('db:open-workspace-connection', workspaceId),
+  dbCloseWorkspaceConnection: (workspaceId: string) => ipcRenderer.invoke('db:close-workspace-connection', workspaceId),
+  dbRefreshWorkspaceConnection: (workspaceId: string) => ipcRenderer.invoke('db:refresh-workspace-connection', workspaceId),
+  dbOnWorkspaceEvent: (callback: (event: any) => void) => {
+    const handler = (_: IpcRendererEvent, payload: any) => callback(payload);
+    ipcRenderer.on('db:workspace-event', handler);
+    return () => {
+      ipcRenderer.removeListener('db:workspace-event', handler);
+    };
+  },
+  dbImportFiles: (filesData: any[], targetParentId: string | null, workspaceId?: string) =>
+    ipcRenderer.invoke('db:import-files', filesData, targetParentId, workspaceId),
 
   // --- Migration-related FS access ---
   legacyFileExists: (filename: string) => ipcRenderer.invoke('fs:legacy-file-exists', filename),
