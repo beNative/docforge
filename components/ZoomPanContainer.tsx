@@ -13,6 +13,9 @@ interface ZoomPanContainerProps extends React.HTMLAttributes<HTMLDivElement> {
   disablePan?: boolean;
   disableZoom?: boolean;
   contentClassName?: string;
+  wrapperClassName?: string;
+  layout?: 'overlay' | 'natural';
+  lockOverflow?: boolean;
 }
 
 const clamp = (value: number, min: number, max: number) => {
@@ -35,6 +38,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     overlay,
     className,
     contentClassName,
+    wrapperClassName,
     minScale = 0.25,
     maxScale = 5,
     initialScale = 1,
@@ -42,6 +46,8 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     disableControls = false,
     disablePan = false,
     disableZoom = false,
+    layout = 'overlay',
+    lockOverflow = true,
     ...rest
   } = props;
 
@@ -168,10 +174,40 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
   }, [offset.x, offset.y, scale]);
 
   const containerClasses = useMemo(() => {
-    const base = 'relative overflow-hidden touch-none bg-secondary';
-    const cursor = disablePan ? '' : isPanning ? ' cursor-grabbing' : ' cursor-grab';
-    return `${base}${cursor}${className ? ` ${className}` : ''}`;
-  }, [className, disablePan, isPanning]);
+    const classes = ['relative', 'bg-secondary'];
+    if (lockOverflow) {
+      classes.push('overflow-hidden');
+    }
+    if (!disablePan) {
+      classes.push('touch-none');
+      classes.push(isPanning ? 'cursor-grabbing' : 'cursor-grab');
+    }
+    if (className) {
+      classes.push(className);
+    }
+    return classes.join(' ');
+  }, [className, disablePan, isPanning, lockOverflow]);
+
+  const renderContent = useCallback(() => {
+    const content = (
+      <div className={`transform-gpu origin-center ${contentClassName ?? ''}`} style={transformStyle}>
+        {children}
+      </div>
+    );
+
+    if (layout === 'natural') {
+      if (wrapperClassName) {
+        return <div className={wrapperClassName}>{content}</div>;
+      }
+      return content;
+    }
+
+    return (
+      <div className={`absolute inset-0 flex items-center justify-center ${wrapperClassName ?? ''}`}>
+        {content}
+      </div>
+    );
+  }, [children, contentClassName, layout, transformStyle, wrapperClassName]);
 
   return (
     <div
@@ -186,11 +222,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
       onDoubleClick={handleDoubleClick}
       {...rest}
     >
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className={`transform-gpu origin-center ${contentClassName ?? ''}`} style={transformStyle}>
-          {children}
-        </div>
-      </div>
+      {renderContent()}
       {!disableControls && !disableZoom && (
         <div
           className="absolute bottom-4 right-4 flex items-center gap-2 rounded-lg border border-border-color bg-background/80 px-2 py-1 shadow-lg backdrop-blur"

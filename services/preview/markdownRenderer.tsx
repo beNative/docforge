@@ -14,6 +14,7 @@ import { DEFAULT_SETTINGS } from '../../constants';
 import { useTheme } from '../../hooks/useTheme';
 import { getSharedHighlighter } from './shikiHighlighter';
 import { PlantUMLDiagram, PLANTUML_LANGS } from './plantumlDiagram';
+import ZoomPanContainer from '../../components/ZoomPanContainer';
 
 import 'katex/dist/katex.min.css';
 
@@ -278,7 +279,14 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
 
   return (
     <div ref={ref} onScroll={onScroll} className={`w-full h-full overflow-auto bg-secondary df-markdown-container ${theme}`}>
-      <div className="df-markdown-shell">
+      <ZoomPanContainer
+        disablePan
+        layout="natural"
+        lockOverflow={false}
+        className="min-h-full"
+        wrapperClassName="df-markdown-shell"
+        contentClassName="df-markdown-stage origin-top"
+      >
         <ReactMarkdown
           className="df-markdown"
           remarkPlugins={remarkPlugins}
@@ -287,10 +295,16 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         >
           {content || ' '}
         </ReactMarkdown>
-      </div>
+      </ZoomPanContainer>
       <style>{`
         .df-markdown-container {
           background: rgb(var(--color-secondary));
+        }
+
+        .df-markdown-stage {
+          width: 100%;
+          display: flex;
+          justify-content: center;
         }
 
         .df-markdown-shell {

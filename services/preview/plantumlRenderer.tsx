@@ -46,12 +46,17 @@ const PlantUMLPreview: React.FC<PlantUMLPreviewProps> = ({ content, settings }) 
           text-align: center;
           width: min(100%, 960px);
           max-width: 960px;
+          user-select: none;
+          -webkit-user-drag: none;
         }
 
         .df-plantuml img,
         .df-plantuml svg {
           width: 100%;
           height: auto;
+          display: block;
+          user-select: none;
+          -webkit-user-drag: none;
         }
 
         .df-plantuml-loading {
