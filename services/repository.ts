@@ -1424,6 +1424,27 @@ export const repository = {
         return info;
     },
 
+    async openWorkspaceConnection(workspaceId: string): Promise<WorkspaceInfo> {
+        if (!window.electronAPI?.dbOpenWorkspaceConnection) {
+            throw new Error('Opening workspace connections is not supported in this environment.');
+        }
+        return window.electronAPI.dbOpenWorkspaceConnection(workspaceId);
+    },
+
+    async closeWorkspaceConnection(workspaceId: string): Promise<WorkspaceInfo> {
+        if (!window.electronAPI?.dbCloseWorkspaceConnection) {
+            throw new Error('Closing workspace connections is not supported in this environment.');
+        }
+        return window.electronAPI.dbCloseWorkspaceConnection(workspaceId);
+    },
+
+    async refreshWorkspaceConnection(workspaceId: string): Promise<WorkspaceInfo> {
+        if (!window.electronAPI?.dbRefreshWorkspaceConnection) {
+            throw new Error('Refreshing workspace connections is not supported in this environment.');
+        }
+        return window.electronAPI.dbRefreshWorkspaceConnection(workspaceId);
+    },
+
     async getActiveWorkspace(): Promise<WorkspaceInfo | null> {
         if (!window.electronAPI?.dbGetActiveWorkspace) {
             return {

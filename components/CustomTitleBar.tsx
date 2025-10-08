@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import IconButton from './IconButton';
 import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, SearchIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, PencilIcon, SparklesIcon } from './Icons';
 import ThemeToggleButton from './ThemeToggleButton';
+import WorkspaceTabs from './WorkspaceTabs';
 import { useLogger } from '../hooks/useLogger';
-import type { Command } from '../types';
+import type { Command, WorkspaceInfo } from '../types';
 
 interface CustomTitleBarProps {
   onToggleSettingsView: () => void;
@@ -20,6 +21,14 @@ interface CustomTitleBarProps {
   searchTerm: string;
   onSearchTermChange: (term: string) => void;
   commands: Command[];
+  workspaces: WorkspaceInfo[];
+  activeWorkspaceId: string | null;
+  isWorkspaceLoading: boolean;
+  onSelectWorkspace: (workspaceId: string) => void;
+  onAddWorkspace: () => void;
+  onOpenWorkspaceManager: () => void;
+  onCloseWorkspace?: (workspaceId: string) => void;
+  onWorkspaceContextMenu?: (event: React.MouseEvent, workspaceId: string) => void;
 }
 
 interface CommandPaletteSearchProps {
@@ -81,8 +90,28 @@ const WindowControls: React.FC<{ platform: string, isMaximized: boolean }> = ({ 
 };
 
 const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
-    onToggleSettingsView, onToggleInfoView, onShowEditorView, onToggleLogger, onOpenCommandPalette, onOpenAbout,
-    isInfoViewActive, isSettingsViewActive, isEditorViewActive, commandPaletteTargetRef, commandPaletteInputRef, searchTerm, onSearchTermChange, commands
+    onToggleSettingsView,
+    onToggleInfoView,
+    onShowEditorView,
+    onToggleLogger,
+    onOpenCommandPalette,
+    onOpenAbout,
+    isInfoViewActive,
+    isSettingsViewActive,
+    isEditorViewActive,
+    commandPaletteTargetRef,
+    commandPaletteInputRef,
+    searchTerm,
+    onSearchTermChange,
+    commands,
+    workspaces,
+    activeWorkspaceId,
+    isWorkspaceLoading,
+    onSelectWorkspace,
+    onAddWorkspace,
+    onOpenWorkspaceManager,
+    onCloseWorkspace,
+    onWorkspaceContextMenu,
 }) => {
     const [platform, setPlatform] = useState('');
     const [isMaximized, setIsMaximized] = useState(false);
@@ -105,9 +134,23 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
     
     return (
         <header className="draggable flex items-center justify-between h-7 flex-shrink-0 bg-secondary border-b border-border-color z-30 text-text-main">
-            <div className={`flex items-center flex-1 ${platform === 'darwin' ? 'pl-20' : 'pl-2'}`}>
-                <TerminalIcon className="w-4 h-4 text-primary mr-2" />
-                <span className="font-semibold text-xs">DocForge</span>
+            <div className={`flex items-center flex-1 ${platform === 'darwin' ? 'pl-20' : 'pl-2'} gap-2 overflow-hidden`}>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <TerminalIcon className="w-4 h-4 text-primary" />
+                    <span className="font-semibold text-xs">DocForge</span>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                    <WorkspaceTabs
+                        workspaces={workspaces}
+                        activeWorkspaceId={activeWorkspaceId}
+                        isLoading={isWorkspaceLoading}
+                        onSelectWorkspace={onSelectWorkspace}
+                        onAddWorkspace={onAddWorkspace}
+                        onOpenManager={onOpenWorkspaceManager}
+                        onCloseWorkspace={onCloseWorkspace}
+                        onContextMenu={onWorkspaceContextMenu}
+                    />
+                </div>
             </div>
 
             <div className="flex-1 flex justify-center">
