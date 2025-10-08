@@ -131,6 +131,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
     };
   }, [nodeLookup, parentLookup, serializeNode]);
 
+  const isKnownNodeId = useCallback((id: string) => nodeLookup.has(id), [nodeLookup]);
+
   const handleRootDrop = (e: React.DragEvent) => {
     e.preventDefault();
     // e.stopPropagation(); // Removed to allow event to bubble to App.tsx to reset drag state
@@ -151,7 +153,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
     if (draggedIdsJSON) {
       try {
         const draggedIds = JSON.parse(draggedIdsJSON);
-        if (Array.isArray(draggedIds) && draggedIds.length > 0) {
+        const hasKnownIds = Array.isArray(draggedIds) && draggedIds.length > 0 && draggedIds.every(isKnownNodeId);
+        if (hasKnownIds) {
           onMoveNode(draggedIds, null, 'inside');
           return;
         }
@@ -180,10 +183,19 @@ const DocumentList: React.FC<DocumentListProps> = ({
     ) {
       const target = e.target as HTMLElement;
       if (!target.closest('li[draggable="true"]')) {
-        const hasLocalIds = e.dataTransfer.types.includes('application/json');
+        let hasKnownLocalIds = false;
+        if (e.dataTransfer.types.includes('application/json')) {
+          try {
+            const raw = e.dataTransfer.getData('application/json');
+            const parsed = JSON.parse(raw);
+            hasKnownLocalIds = Array.isArray(parsed) && parsed.length > 0 && parsed.every(isKnownNodeId);
+          } catch {
+            hasKnownLocalIds = false;
+          }
+        }
         const hasDocforgePayload = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME);
         const hasFiles = e.dataTransfer.types.includes('Files');
-        const shouldCopy = hasFiles || (!hasLocalIds && hasDocforgePayload);
+        const shouldCopy = hasFiles || (hasDocforgePayload && !hasKnownLocalIds);
         e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
         setIsRootDropping(true);
       }
@@ -250,6 +262,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onContextMenu={onContextMenu}
                 renamingNodeId={renamingNodeId}
                 onRenameComplete={onRenameComplete}
+                isKnownNodeId={isKnownNodeId}
             />
         ))}
         {documents.length === 0 && (

@@ -29,6 +29,7 @@ interface DocumentTreeItemProps {
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onToggleExpand: (id: string) => void;
   onCopyNodeContent: (id: string) => void;
+  isKnownNodeId: (id: string) => boolean;
   searchTerm: string;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
@@ -113,6 +114,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     indentPerLevel,
     verticalSpacing,
     searchTerm,
+    isKnownNodeId,
   } = props;
   
   const [isRenaming, setIsRenaming] = useState(false);
@@ -178,6 +180,19 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     e.dataTransfer.effectAllowed = transferPayload ? 'copyMove' : 'move';
   };
 
+  const readLocalDragIds = (dataTransfer: DataTransfer): string[] | null => {
+    if (!dataTransfer.types.includes('application/json')) {
+      return null;
+    }
+    try {
+      const raw = dataTransfer.getData('application/json');
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -186,10 +201,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ||
       e.dataTransfer.types.includes('application/json')
     ) {
-      const hasLocalIds = e.dataTransfer.types.includes('application/json');
+      const localIds = readLocalDragIds(e.dataTransfer);
+      const hasKnownLocalIds = Array.isArray(localIds) && localIds.length > 0 && localIds.every(isKnownNodeId);
       const hasDocforgePayload = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME);
       const hasFiles = e.dataTransfer.types.includes('Files');
-      const shouldCopy = hasFiles || (!hasLocalIds && hasDocforgePayload);
+      const shouldCopy = hasFiles || (hasDocforgePayload && !hasKnownLocalIds);
       e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
       const position = getDropPosition(e, isFolder, itemRef.current);
       if (position !== dropPosition) {
@@ -216,19 +232,15 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         return;
     }
 
-    const draggedIdsJSON = e.dataTransfer.getData('application/json');
-    if (draggedIdsJSON && finalDropPosition) {
-      try {
-        const draggedIds = JSON.parse(draggedIdsJSON);
-        if (Array.isArray(draggedIds) && draggedIds.length > 0 && !draggedIds.includes(node.id)) {
-          onMoveNode(draggedIds, node.id, finalDropPosition);
-          if (finalDropPosition === 'inside' && isFolder && !isExpanded) {
-            onToggleExpand(node.id);
-          }
-          return;
+    const localDragIds = readLocalDragIds(e.dataTransfer);
+    if (finalDropPosition && Array.isArray(localDragIds) && localDragIds.length > 0) {
+      const allKnown = localDragIds.every(isKnownNodeId);
+      if (allKnown && !localDragIds.includes(node.id)) {
+        onMoveNode(localDragIds, node.id, finalDropPosition);
+        if (finalDropPosition === 'inside' && isFolder && !isExpanded) {
+          onToggleExpand(node.id);
         }
-      } catch (error) {
-        console.warn('Failed to parse local drag payload on drop:', error);
+        return;
       }
     }
 
