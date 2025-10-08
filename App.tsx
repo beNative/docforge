@@ -1063,14 +1063,21 @@ const MainApp: React.FC = () => {
         if (!target) {
             return;
         }
+
         ensureNodeVisible(target);
         setActiveTemplateId(null);
         setView('editor');
         setDocumentView('editor');
-        setActiveNodeId(nodeId);
+
+        if (target.type === 'document') {
+            activateDocumentTab(nodeId);
+        } else {
+            setActiveItem(nodeId);
+        }
+
         setSelectedIds(new Set([nodeId]));
         setLastClickedId(nodeId);
-    }, [items, ensureNodeVisible]);
+    }, [items, ensureNodeVisible, activateDocumentTab, setActiveItem]);
 
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document.');
