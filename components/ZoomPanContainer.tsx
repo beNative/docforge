@@ -172,8 +172,25 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
   }, [initialScale, setOffset, setScale]);
 
   const transformStyle = useMemo(() => {
-    return { transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})` };
-  }, [offset.x, offset.y, scale]);
+    return {
+      transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
+      transformOrigin: disablePan ? '0 0' : undefined,
+    } as React.CSSProperties;
+  }, [disablePan, offset.x, offset.y, scale]);
+
+  const naturalWrapperStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (layout !== 'natural' || !disablePan) {
+      return undefined;
+    }
+
+    const visualScale = Math.max(1, scale);
+
+    return {
+      width: `${visualScale * 100}%`,
+      minWidth: `${visualScale * 100}%`,
+      minHeight: `${visualScale * 100}%`,
+    };
+  }, [disablePan, layout, scale]);
 
   const containerClasses = useMemo(() => {
     const classes = ['relative', 'bg-secondary'];
@@ -199,8 +216,17 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
 
     if (layout === 'natural') {
       if (wrapperClassName) {
-        return <div className={wrapperClassName}>{content}</div>;
+        return (
+          <div className={wrapperClassName} style={naturalWrapperStyle}>
+            {content}
+          </div>
+        );
       }
+
+      if (naturalWrapperStyle) {
+        return <div style={naturalWrapperStyle}>{content}</div>;
+      }
+
       return content;
     }
 
@@ -209,7 +235,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
         {content}
       </div>
     );
-  }, [children, contentClassName, layout, transformStyle, wrapperClassName]);
+  }, [children, contentClassName, layout, naturalWrapperStyle, transformStyle, wrapperClassName]);
 
   return (
     <div
