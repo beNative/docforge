@@ -1584,14 +1584,42 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
 };
 
 const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
+    const { addLog } = useLogger();
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [jsonString, setJsonString] = useState(() => JSON.stringify(settings, null, 2));
     const [jsonError, setJsonError] = useState<string | null>(null);
     const [mode, setMode] = useState<'tree' | 'json'>('tree');
+    const [transferStatus, setTransferStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     useEffect(() => {
         setJsonString(JSON.stringify(settings, null, 2));
         setJsonError(null);
     },[settings]);
+
+    useEffect(() => {
+        if (!transferStatus) {
+            return;
+        }
+        const timeout = window.setTimeout(() => setTransferStatus(null), 5000);
+        return () => window.clearTimeout(timeout);
+    }, [transferStatus]);
+
+    const applyImportedSettings = useCallback((content: string) => {
+        try {
+            const parsed = JSON.parse(content);
+            if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+                throw new Error('Settings file must contain a JSON object.');
+            }
+            const merged = { ...DEFAULT_SETTINGS, ...parsed } as Settings;
+            setCurrentSettings(merged);
+            setTransferStatus({ type: 'success', message: 'Settings imported. Review changes and save to apply.' });
+            addLog('INFO', 'User action: Imported settings from JSON.');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to import settings.';
+            setTransferStatus({ type: 'error', message });
+            addLog('ERROR', `Settings import failed: ${message}`);
+        }
+    }, [addLog, setCurrentSettings]);
 
     const handleJsonChange = (value: string) => {
         setJsonString(value);
@@ -1623,10 +1651,97 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
       });
     };
 
+    const handleExport = useCallback(async () => {
+        const content = JSON.stringify(settings, null, 2);
+        addLog('INFO', 'User action: Export settings to JSON.');
+        if (window.electronAPI?.settingsExport) {
+            const result = await window.electronAPI.settingsExport(content);
+            if (result.success) {
+                setTransferStatus({ type: 'success', message: 'Settings exported successfully.' });
+                return;
+            }
+            const message = result.error ?? 'Failed to export settings.';
+            setTransferStatus({ type: 'error', message });
+            addLog('ERROR', `Settings export failed: ${message}`);
+            return;
+        }
+
+        try {
+            const blob = new Blob([content], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `docforge-settings-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            setTransferStatus({ type: 'success', message: 'Settings exported successfully.' });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to export settings.';
+            setTransferStatus({ type: 'error', message });
+            addLog('ERROR', `Settings export failed: ${message}`);
+        }
+    }, [addLog, settings]);
+
+    const handleImport = useCallback(async () => {
+        addLog('INFO', 'User action: Initiate settings import from JSON.');
+        if (window.electronAPI?.settingsImport) {
+            const result = await window.electronAPI.settingsImport();
+            if (result.success && result.content) {
+                applyImportedSettings(result.content);
+            } else if (!result.success && result.error) {
+                setTransferStatus({ type: 'error', message: result.error });
+                addLog('ERROR', `Settings import failed: ${result.error}`);
+            }
+            return;
+        }
+
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+            fileInputRef.current.click();
+        }
+    }, [addLog, applyImportedSettings]);
+
+    const handleFileInputChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+        try {
+            const text = await file.text();
+            applyImportedSettings(text);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to read settings file.';
+            setTransferStatus({ type: 'error', message });
+            addLog('ERROR', `Settings import failed: ${message}`);
+        }
+    }, [addLog, applyImportedSettings]);
+
     return (
          <div id="advanced" ref={sectionRef} className="py-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Advanced</h2>
             <div className="space-y-6">
+                <SettingRow label="Settings Transfer" description="Export the current configuration or import it from a JSON file.">
+                    <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap gap-2">
+                            <Button onClick={handleExport} variant="secondary" size="sm">Export Settings</Button>
+                            <Button onClick={handleImport} variant="secondary" size="sm">Import Settings</Button>
+                        </div>
+                        {transferStatus && (
+                            <p className={`text-xs ${transferStatus.type === 'success' ? 'text-success' : 'text-error'}`}>
+                                {transferStatus.message}
+                            </p>
+                        )}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="application/json"
+                            className="hidden"
+                            onChange={handleFileInputChange}
+                        />
+                    </div>
+                </SettingRow>
                 <SettingRow label="Settings Editor" description="Edit settings using an interactive tree or raw JSON for full control.">
                     <div className="w-full">
                         <div className="flex justify-end mb-2">
