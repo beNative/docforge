@@ -47,6 +47,13 @@ console.log(`Log file will be written to: ${log.transports.file.getFile().path}`
 
 let mainWindow: BrowserWindow | null;
 
+const isReadableStream = (candidate: unknown): candidate is stream.Readable => {
+  return !!candidate
+    && typeof (candidate as stream.Readable).on === 'function'
+    && typeof (candidate as stream.Readable).setEncoding === 'function'
+    && typeof (candidate as stream.Readable).removeAllListeners === 'function';
+};
+
 const broadcastPythonEvent = (channel: string, payload: any) => {
   const targets = BrowserWindow.getAllWindows();
   for (const window of targets) {
@@ -436,16 +443,27 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
 
     try {
         const generator = plantumlGenerate(trimmed, { format: 'svg' });
-        generator.out.setEncoding('utf-8');
-        generator.err.setEncoding('utf-8');
+
+        if (!generator || !isReadableStream(generator.out) || !isReadableStream(generator.err)) {
+            console.error('PlantUML renderer returned unexpected streams. Local renderer may be unavailable.');
+            return {
+                success: false,
+                error: 'Local PlantUML renderer is unavailable.',
+                details: 'Ensure Java is installed and restart DocForge, or switch back to the remote renderer in Settings.',
+            };
+        }
+
+        const { out, err } = generator;
+        out.setEncoding('utf-8');
+        err.setEncoding('utf-8');
 
         return await new Promise<{ success: boolean; svg?: string; error?: string; details?: string }>((resolve) => {
             let svgOutput = '';
             let errorOutput = '';
 
             const cleanup = () => {
-                generator.out.removeAllListeners();
-                generator.err.removeAllListeners();
+                out.removeAllListeners();
+                err.removeAllListeners();
             };
 
             const resolveWithError = (message: string) => {
@@ -457,15 +475,15 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
                 });
             };
 
-            generator.err.on('data', (chunk) => {
+            err.on('data', (chunk) => {
                 errorOutput += chunk.toString();
             });
 
-            generator.out.on('data', (chunk) => {
+            out.on('data', (chunk) => {
                 svgOutput += chunk.toString();
             });
 
-            generator.out.on('end', () => {
+            out.on('end', () => {
                 cleanup();
                 if (svgOutput.trim()) {
                     resolve({ success: true, svg: svgOutput });
@@ -478,12 +496,12 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
                 }
             });
 
-            generator.out.on('error', (streamError) => {
+            out.on('error', (streamError) => {
                 const message = streamError instanceof Error ? streamError.message : String(streamError);
                 resolveWithError(message);
             });
 
-            generator.err.on('error', (streamError) => {
+            err.on('error', (streamError) => {
                 const message = streamError instanceof Error ? streamError.message : String(streamError);
                 resolveWithError(message);
             });
