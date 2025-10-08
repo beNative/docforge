@@ -64,6 +64,18 @@
       "assets/**/*",
       "docs/**/*"
     ],
+    "asarUnpack": [
+      "node_modules/node-plantuml/vendor/**"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/node-plantuml/vendor",
+        "to": "plantuml",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
     "directories": {
       "buildResources": "assets",
       "output": "release"

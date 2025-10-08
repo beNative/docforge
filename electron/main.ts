@@ -4,7 +4,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { platform } from 'process';
 import path from 'path';
 import fs from 'fs/promises';
-import { createReadStream, createWriteStream } from 'fs';
+import { createReadStream, createWriteStream, existsSync } from 'fs';
 import { autoUpdater } from 'electron-updater';
 import { databaseService } from './database';
 import { pythonManager } from './pythonManager';
@@ -13,7 +13,6 @@ import * as zlib from 'zlib';
 import * as os from 'os';
 import * as stream from 'stream';
 import { promisify } from 'util';
-import { generate as plantumlGenerate } from 'node-plantuml';
 
 // Fix: Inform TypeScript about the __dirname global variable provided by Node.js, which is present in a CommonJS-like environment.
 declare const __dirname: string;
@@ -46,6 +45,99 @@ log.catchErrors({
 console.log(`Log file will be written to: ${log.transports.file.getFile().path}`);
 
 let mainWindow: BrowserWindow | null;
+
+type PlantUmlGenerate = typeof import('node-plantuml')['generate'];
+
+let plantumlGenerate: PlantUmlGenerate | null = null;
+let resolvedPlantumlJarPath: string | null = null;
+let plantumlInitializationError: string | null = null;
+let plantumlResolutionWarningLogged = false;
+
+const PLANTUML_RESOURCE_DIR = 'plantuml';
+
+const buildPlantumlJarCandidates = (): string[] => {
+  const candidates: string[] = [];
+
+  if (process.env.PLANTUML_HOME) {
+    candidates.push(process.env.PLANTUML_HOME);
+  }
+
+  candidates.push(path.join(process.resourcesPath, PLANTUML_RESOURCE_DIR, 'plantuml.jar'));
+
+  try {
+    const moduleRoot = path.dirname(require.resolve('node-plantuml/package.json'));
+    candidates.push(path.join(moduleRoot, 'vendor', 'plantuml.jar'));
+  } catch (error) {
+    if (!plantumlResolutionWarningLogged) {
+      console.warn('Unable to resolve node-plantuml package when locating PlantUML runtime.', error);
+      plantumlResolutionWarningLogged = true;
+    }
+  }
+
+  return candidates.filter((candidate, index, array) => candidate && array.indexOf(candidate) === index);
+};
+
+const ensurePlantumlRuntime = (): PlantUmlGenerate | null => {
+  if (plantumlGenerate && resolvedPlantumlJarPath && existsSync(resolvedPlantumlJarPath)) {
+    return plantumlGenerate;
+  }
+
+  const candidates = buildPlantumlJarCandidates();
+  const jarPath = candidates.find((candidate) => existsSync(candidate)) ?? null;
+
+  if (!jarPath) {
+    plantumlInitializationError = `PlantUML runtime assets were not found. Checked: ${candidates.join(', ')}`;
+    plantumlGenerate = null;
+    resolvedPlantumlJarPath = null;
+    return null;
+  }
+
+  process.env.PLANTUML_HOME = jarPath;
+  resolvedPlantumlJarPath = jarPath;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const module = require('node-plantuml') as typeof import('node-plantuml');
+    plantumlGenerate = module.generate;
+    plantumlInitializationError = null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Failed to initialize PlantUML generator module.', error);
+    plantumlGenerate = null;
+    plantumlInitializationError = message;
+  }
+
+  return plantumlGenerate;
+};
+
+const formatPlantumlTroubleshootingDetails = (
+  ...messages: Array<string | null | undefined>
+): string => {
+  const parts: string[] = [];
+
+  for (const message of messages) {
+    if (typeof message === 'string') {
+      const trimmed = message.trim();
+      if (trimmed && !parts.includes(trimmed)) {
+        parts.push(trimmed);
+      }
+    }
+  }
+
+  if (resolvedPlantumlJarPath) {
+    const jarMessage = `Resolved PlantUML jar: ${resolvedPlantumlJarPath}`;
+    if (!parts.includes(jarMessage)) {
+      parts.push(jarMessage);
+    }
+  }
+
+  const fallback = 'Ensure Java is installed and restart DocForge, or switch back to the remote renderer in Settings.';
+  if (!parts.includes(fallback)) {
+    parts.push(fallback);
+  }
+
+  return parts.join('\n');
+};
 
 const isReadableStream = (candidate: unknown): candidate is stream.Readable => {
   return !!candidate
@@ -442,14 +534,23 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
     }
 
     try {
-        const generator = plantumlGenerate(trimmed, { format: 'svg' });
+        const generatorFn = ensurePlantumlRuntime();
+        if (!generatorFn) {
+            return {
+                success: false,
+                error: 'Local PlantUML renderer could not be initialized.',
+                details: formatPlantumlTroubleshootingDetails(plantumlInitializationError),
+            };
+        }
+
+        const generator = generatorFn(trimmed, { format: 'svg' });
 
         if (!generator || !isReadableStream(generator.out) || !isReadableStream(generator.err)) {
             console.error('PlantUML renderer returned unexpected streams. Local renderer may be unavailable.');
             return {
                 success: false,
                 error: 'Local PlantUML renderer is unavailable.',
-                details: 'Ensure Java is installed and restart DocForge, or switch back to the remote renderer in Settings.',
+                details: formatPlantumlTroubleshootingDetails(plantumlInitializationError),
             };
         }
 
@@ -471,7 +572,7 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
                 resolve({
                     success: false,
                     error: message,
-                    details: errorOutput.trim() || undefined,
+                    details: formatPlantumlTroubleshootingDetails(errorOutput.trim() || plantumlInitializationError),
                 });
             };
 
@@ -491,7 +592,7 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
                     resolve({
                         success: false,
                         error: 'PlantUML renderer produced no SVG output.',
-                        details: errorOutput.trim() || undefined,
+                        details: formatPlantumlTroubleshootingDetails(errorOutput.trim() || plantumlInitializationError),
                     });
                 }
             });
@@ -509,7 +610,11 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error('PlantUML rendering failed:', error);
-        return { success: false, error: message };
+        return {
+            success: false,
+            error: message,
+            details: formatPlantumlTroubleshootingDetails(plantumlInitializationError),
+        };
     }
 });
 

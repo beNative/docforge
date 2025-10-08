@@ -22,6 +22,35 @@ const clamp = (value: number, min: number, max: number) => {
   return Math.min(Math.max(value, min), max);
 };
 
+const INTERACTIVE_SELECTOR = [
+  'a[href]',
+  'button',
+  'details',
+  'summary',
+  'input',
+  'textarea',
+  'select',
+  'label',
+  '[role="button"]',
+  '[role="link"]',
+  '[role="textbox"]',
+  '[contenteditable="true"]',
+  '[contenteditable=""]',
+  '[data-zoom-pan-ignore]'
+].join(', ');
+
+const isInteractiveElement = (target: EventTarget | null): target is Element => {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+
+  if (target instanceof HTMLElement && target.isContentEditable) {
+    return true;
+  }
+
+  return target.closest(INTERACTIVE_SELECTOR) !== null;
+};
+
 const normalizeWheelDelta = (event: React.WheelEvent<HTMLDivElement>) => {
   const lineHeight = 16;
   const pageHeight = event.currentTarget.clientHeight || 800;
@@ -80,6 +109,10 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
       return;
     }
 
+    if (isInteractiveElement(event.target)) {
+      return;
+    }
+
     if (!disableZoom && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       const { deltaY } = normalizeWheelDelta(event);
@@ -113,6 +146,10 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     }
 
     if (event.button !== 0 && event.button !== 1) {
+      return;
+    }
+
+    if (isInteractiveElement(event.target)) {
       return;
     }
 
@@ -158,6 +195,10 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
 
   const handleDoubleClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (disableZoom) {
+      return;
+    }
+
+    if (isInteractiveElement(event.target)) {
       return;
     }
     event.preventDefault();
