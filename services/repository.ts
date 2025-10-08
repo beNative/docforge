@@ -9,6 +9,7 @@ import type {
   ContentStore,
   ViewMode,
   ImportedNodeSummary,
+  DatabaseLoadResult,
 } from '../types';
 import { cryptoService } from './cryptoService';
 import { DEFAULT_SETTINGS, EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
@@ -1174,6 +1175,16 @@ export const repository = {
     async getDbPath(): Promise<string> {
         if (!window.electronAPI?.dbGetPath) throw new Error("getDbPath not supported.");
         return window.electronAPI.dbGetPath();
+    },
+
+    async loadDatabaseFromPath(filePath: string): Promise<DatabaseLoadResult> {
+        if (!window.electronAPI?.dbLoadFromPath) throw new Error("Database loading not supported.");
+        return window.electronAPI.dbLoadFromPath(filePath);
+    },
+
+    async selectDatabaseFile(): Promise<DatabaseLoadResult> {
+        if (!window.electronAPI?.dbSelectAndLoad) throw new Error("Database selection not supported.");
+        return window.electronAPI.dbSelectAndLoad();
     },
 
     async backupDatabase() {

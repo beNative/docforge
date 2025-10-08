@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbVacuum: () => ipcRenderer.invoke('db:vacuum'),
   dbGetStats: () => ipcRenderer.invoke('db:get-stats'),
   dbGetPath: () => ipcRenderer.invoke('db:get-path'),
+  dbLoadFromPath: (filePath: string) => ipcRenderer.invoke('db:load-from-path', filePath),
+  dbSelectAndLoad: () => ipcRenderer.invoke('db:select-and-load'),
   dbImportFiles: (filesData: any[], targetParentId: string | null) => ipcRenderer.invoke('db:import-files', filesData, targetParentId),
 
   // --- Migration-related FS access ---

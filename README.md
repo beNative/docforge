@@ -23,6 +23,7 @@ DocForge is a desktop application designed to streamline the process of creating
     - **Interface:** Switch between light and dark themes, adjust the UI scale, and choose from multiple icon sets.
     - **Keyboard Shortcuts:** Remap default shortcuts for core application commands to fit your preferences.
 - **Database Management:** A dedicated settings panel allows you to view database statistics, run integrity checks, and perform maintenance like backups and optimization.
+- **Configurable Data Storage:** Choose a custom SQLite database location or reopen an existing workspace file from the settings panel.
 - **Comprehensive Action Logging**: Every user action is logged, providing a clear audit trail and making debugging easier.
 - **Offline First:** All your data is stored locally on your machine.
 - **Auto-Update:** The application can automatically check for and install updates (pre-release versions are opt-in).

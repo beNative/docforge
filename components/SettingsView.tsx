@@ -1415,8 +1415,9 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
     const [dbPath, setDbPath] = useState<string>('Loading...');
     const [stats, setStats] = useState<DatabaseStats | null>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(true);
+    const [isSwitchingDb, setIsSwitchingDb] = useState(false);
     const [operation, setOperation] = useState<{
-        name: 'backup' | 'integrity' | 'vacuum';
+        name: 'backup' | 'integrity' | 'vacuum' | 'switch';
         status: 'running' | 'success' | 'error';
         message?: string;
     } | null>(null);
@@ -1480,14 +1481,57 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
             setOperation({ name: 'vacuum', status: 'error', message: result.error || 'Optimization failed.' });
         }
     };
-    
+
+    const handleChangeDatabase = async () => {
+        addLog('INFO', 'User action: Change database location.');
+        setOperation(null);
+        setIsSwitchingDb(true);
+        try {
+            const result = await repository.selectDatabaseFile();
+            if (!result.success) {
+                if (result.canceled) {
+                    return;
+                }
+                const message = result.error || 'Failed to load the selected database file.';
+                addLog('ERROR', `Database change failed: ${message}`);
+                setOperation({ name: 'switch', status: 'error', message });
+                return;
+            }
+
+            if (result.path) {
+                setDbPath(result.path);
+            }
+
+            const successMessage = `${result.message ?? 'Database location updated.'} Reloading interface...`;
+            addLog('INFO', successMessage);
+            setOperation({ name: 'switch', status: 'success', message: successMessage });
+
+            if (typeof window !== 'undefined') {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1200);
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to change database location.';
+            addLog('ERROR', `Database change failed: ${message}`);
+            setOperation({ name: 'switch', status: 'error', message });
+        } finally {
+            setIsSwitchingDb(false);
+        }
+    };
+
     return (
          <div id="database" ref={sectionRef} className="py-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Database Management</h2>
             <div className="space-y-6">
-                 <SettingRow label="Database File" description="This file contains all your documents, folders, and history.">
-                    <div className="text-sm text-text-main bg-background px-3 py-2 rounded-md border border-border-color w-full font-mono text-xs select-all break-all">
-                        {dbPath}
+                <SettingRow label="Database File" description="This file contains all your documents, folders, and history.">
+                    <div className="w-full flex flex-col md:flex-row md:items-center gap-2">
+                        <div className="text-sm text-text-main bg-background px-3 py-2 rounded-md border border-border-color w-full font-mono text-xs select-all break-all md:flex-1">
+                            {dbPath}
+                        </div>
+                        <Button onClick={handleChangeDatabase} variant="secondary" isLoading={isSwitchingDb} disabled={isSwitchingDb}>
+                            Change Location
+                        </Button>
                     </div>
                 </SettingRow>
                 <SettingRow label="Operations" description="Perform maintenance tasks on the application database.">
