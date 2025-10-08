@@ -181,12 +181,20 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) || e.dataTransfer.types.includes('application/json')) {
-        e.dataTransfer.dropEffect = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ? 'copy' : 'move';
-        const position = getDropPosition(e, isFolder, itemRef.current);
-        if (position !== dropPosition) {
-            setDropPosition(position);
-        }
+    if (
+      e.dataTransfer.types.includes('Files') ||
+      e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ||
+      e.dataTransfer.types.includes('application/json')
+    ) {
+      const hasLocalIds = e.dataTransfer.types.includes('application/json');
+      const hasDocforgePayload = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME);
+      const hasFiles = e.dataTransfer.types.includes('Files');
+      const shouldCopy = hasFiles || (!hasLocalIds && hasDocforgePayload);
+      e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
+      const position = getDropPosition(e, isFolder, itemRef.current);
+      if (position !== dropPosition) {
+        setDropPosition(position);
+      }
     }
   };
   
@@ -208,30 +216,33 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         return;
     }
 
-    const transferData = e.dataTransfer.getData(DOCFORGE_DRAG_MIME);
-    if (transferData && finalDropPosition) {
-        try {
-            const payload = JSON.parse(transferData) as DraggedNodeTransfer;
-            onImportNodes(payload, node.id, finalDropPosition);
-            if (finalDropPosition === 'inside' && isFolder && !isExpanded) {
-                onToggleExpand(node.id);
-            }
-            return;
-        } catch (error) {
-            console.warn('Failed to parse DocForge drag payload on drop:', error);
-        }
-    }
-
     const draggedIdsJSON = e.dataTransfer.getData('application/json');
     if (draggedIdsJSON && finalDropPosition) {
+      try {
         const draggedIds = JSON.parse(draggedIdsJSON);
-        if (!draggedIds.includes(node.id)) { // Prevent dropping on itself
-            onMoveNode(draggedIds, node.id, finalDropPosition);
-            // Auto-expand folder on drop for better UX
-            if (finalDropPosition === 'inside' && isFolder && !isExpanded) {
-                onToggleExpand(node.id);
-            }
+        if (Array.isArray(draggedIds) && draggedIds.length > 0 && !draggedIds.includes(node.id)) {
+          onMoveNode(draggedIds, node.id, finalDropPosition);
+          if (finalDropPosition === 'inside' && isFolder && !isExpanded) {
+            onToggleExpand(node.id);
+          }
+          return;
         }
+      } catch (error) {
+        console.warn('Failed to parse local drag payload on drop:', error);
+      }
+    }
+
+    const transferData = e.dataTransfer.getData(DOCFORGE_DRAG_MIME);
+    if (transferData && finalDropPosition) {
+      try {
+        const payload = JSON.parse(transferData) as DraggedNodeTransfer;
+        onImportNodes(payload, node.id, finalDropPosition);
+        if (finalDropPosition === 'inside' && isFolder && !isExpanded) {
+          onToggleExpand(node.id);
+        }
+      } catch (error) {
+        console.warn('Failed to parse DocForge drag payload on drop:', error);
+      }
     }
   };
   

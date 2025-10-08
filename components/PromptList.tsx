@@ -143,37 +143,50 @@ const DocumentList: React.FC<DocumentListProps> = ({
     }
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        onDropFiles(e.dataTransfer.files, null);
-        return;
-    }
-
-    const transferData = e.dataTransfer.getData(DOCFORGE_DRAG_MIME);
-    if (transferData) {
-        try {
-            const payload = JSON.parse(transferData) as DraggedNodeTransfer;
-            onImportNodes(payload, null, 'inside');
-            return;
-        } catch (error) {
-            console.warn('Failed to parse DocForge drag payload for root drop:', error);
-        }
+      onDropFiles(e.dataTransfer.files, null);
+      return;
     }
 
     const draggedIdsJSON = e.dataTransfer.getData('application/json');
     if (draggedIdsJSON) {
+      try {
         const draggedIds = JSON.parse(draggedIdsJSON);
-        // Dropping in the root area means targetId is null and position is 'inside' the root.
-        onMoveNode(draggedIds, null, 'inside');
+        if (Array.isArray(draggedIds) && draggedIds.length > 0) {
+          onMoveNode(draggedIds, null, 'inside');
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to parse local drag payload for root drop:', error);
+      }
+    }
+
+    const transferData = e.dataTransfer.getData(DOCFORGE_DRAG_MIME);
+    if (transferData) {
+      try {
+        const payload = JSON.parse(transferData) as DraggedNodeTransfer;
+        onImportNodes(payload, null, 'inside');
+      } catch (error) {
+        console.warn('Failed to parse DocForge drag payload for root drop:', error);
+      }
     }
   };
 
   const handleRootDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) || e.dataTransfer.types.includes('application/json')) {
-        const target = e.target as HTMLElement;
-        if (!target.closest('li[draggable="true"]')) {
-            e.dataTransfer.dropEffect = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ? 'copy' : 'move';
-            setIsRootDropping(true);
-        }
+    if (
+      e.dataTransfer.types.includes('Files') ||
+      e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ||
+      e.dataTransfer.types.includes('application/json')
+    ) {
+      const target = e.target as HTMLElement;
+      if (!target.closest('li[draggable="true"]')) {
+        const hasLocalIds = e.dataTransfer.types.includes('application/json');
+        const hasDocforgePayload = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME);
+        const hasFiles = e.dataTransfer.types.includes('Files');
+        const shouldCopy = hasFiles || (!hasLocalIds && hasDocforgePayload);
+        e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
+        setIsRootDropping(true);
+      }
     } else {
         e.dataTransfer.dropEffect = 'none';
     }
