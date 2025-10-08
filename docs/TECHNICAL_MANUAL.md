@@ -128,6 +128,7 @@ Electron Builder manages the packaging and publishing workflow for DocForge. The
 3. Review and update the Markdown documentation (README, manuals, release notes) so the written guidance reflects the final state of the build.
 4. Sync the Markdown files under `docs/` with the copies at the project root.
 5. Execute `npm run publish` to package the application and upload the release artifacts to GitHub.
+6. When the draft release is created, paste the freshly written `VERSION_LOG.md` entry into the GitHub release notes and verify the uploaded binaries before making the release public.
 
 ### Application Icon Pipeline
 
