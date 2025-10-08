@@ -1,6 +1,8 @@
 import React from 'react';
 import Modal from './Modal';
 
+const appIconUrl = new URL('../assets/icon.svg', import.meta.url).href;
+
 interface AboutModalProps {
   onClose: () => void;
 }
@@ -8,38 +10,24 @@ interface AboutModalProps {
 const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
   return (
     <Modal title="About DocForge" onClose={onClose}>
-      <div className="p-6 space-y-6 text-text-main">
-        <div className="text-center space-y-2">
-          <span className="uppercase text-[11px] tracking-[0.4em] text-text-secondary">Design &amp; Concept</span>
-          <h3 className="text-2xl font-bold text-primary">Tim Sinaeve</h3>
-          <p className="text-sm text-text-secondary max-w-xl mx-auto">
-            The DocForge experience was envisioned and artfully directed by Tim Sinaeve, whose design leadership shaped the product's concept and presentation.
-          </p>
+      <div className="p-8 text-center text-text-main space-y-6">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-border-color bg-background shadow-sm">
+            <img src={appIconUrl} alt="DocForge application icon" className="h-12 w-12" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-lg font-semibold">DocForge</p>
+            <p className="text-sm text-text-secondary">© 2025 Tim Sinaeve. All rights reserved.</p>
+          </div>
         </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <section className="rounded-lg border border-border-color bg-background/80 p-4 text-center shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-[0.3em] text-text-secondary mb-2">Creative Direction</h4>
-            <p className="text-base font-medium text-text-main">
-              Tim Sinaeve guided the visual system, interaction model, and product narrative that define DocForge.
-            </p>
-          </section>
-
-          <section className="rounded-lg border border-border-color bg-background/80 p-4 text-center shadow-sm">
-            <h4 className="text-xs font-semibold uppercase tracking-[0.3em] text-text-secondary mb-2">Implementation</h4>
-            <p className="text-base font-medium text-text-main">
-              Implementation executed by <span className="font-semibold">Gemini 2.5 Pro</span> and <span className="font-semibold">gpt-5-codex</span>, delivering the engineered application experience.
-            </p>
-          </section>
-        </div>
-
-        <p className="text-sm text-text-main text-center max-w-2xl mx-auto">
-          Design and concept were created by Tim Sinaeve, with implementation meticulously handled by Gemini 2.5 Pro and gpt-5-codex to ensure a reliable, production-ready platform.
-        </p>
-
-        <footer className="pt-4 border-t border-border-color text-center text-xs text-text-secondary">
-          © 2025 Tim Sinaeve. All rights reserved.
-        </footer>
+        <a
+          href="https://github.com/beNative/docforge"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold rounded-md border border-transparent bg-primary text-primary-text hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors duration-150"
+        >
+          View source on GitHub
+        </a>
       </div>
     </Modal>
   );
