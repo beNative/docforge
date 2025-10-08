@@ -1,5 +1,11 @@
 import React from 'react';
 import type { LLMStatus, DiscoveredLLMModel, DiscoveredLLMService } from '../types';
+import { DatabaseIcon, ChevronDownIcon } from './Icons';
+
+type DatabaseStatusHint = {
+  message: string;
+  tone?: 'info' | 'success' | 'error' | 'neutral';
+};
 
 interface StatusBarProps {
   status: LLMStatus;
@@ -13,6 +19,9 @@ interface StatusBarProps {
   discoveredServices: DiscoveredLLMService[];
   onProviderChange: (serviceId: string) => void;
   appVersion: string;
+  databasePath?: string | null;
+  databaseStatus?: DatabaseStatusHint | null;
+  onDatabaseMenu?: (event: React.MouseEvent<HTMLElement>) => void;
 }
 
 const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: string }> = {
@@ -33,11 +42,70 @@ const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: st
   },
 };
 
-const StatusBar: React.FC<StatusBarProps> = ({ 
-    status, modelName, llmProviderName, llmProviderUrl, documentCount, lastSaved, availableModels, onModelChange, discoveredServices, onProviderChange, appVersion
+const StatusBar: React.FC<StatusBarProps> = ({
+    status,
+    modelName,
+    llmProviderName,
+    llmProviderUrl,
+    documentCount,
+    lastSaved,
+    availableModels,
+    onModelChange,
+    discoveredServices,
+    onProviderChange,
+    appVersion,
+    databasePath,
+    databaseStatus,
+    onDatabaseMenu,
 }) => {
   const { text, color, tooltip } = statusConfig[status];
   const selectedService = discoveredServices.find(s => s.generateUrl === llmProviderUrl);
+
+  const databaseFileName = React.useMemo(() => {
+    if (!databasePath) {
+      return databaseStatus?.tone === 'error' ? 'Database unavailable' : 'Loading…';
+    }
+    const normalized = databasePath.replace(/\\/g, '/');
+    const parts = normalized.split('/');
+    return parts[parts.length - 1] || databasePath;
+  }, [databasePath, databaseStatus?.tone]);
+
+  const databaseTooltip = React.useMemo(() => {
+    const lines: string[] = [];
+    if (databasePath) {
+      lines.push(`Location: ${databasePath}`);
+    } else if (databaseStatus?.tone === 'error') {
+      lines.push('Database location unavailable.');
+    } else {
+      lines.push('Database location is loading...');
+    }
+    if (databaseStatus?.message) {
+      lines.push(`Status: ${databaseStatus.message}`);
+    }
+    if (!onDatabaseMenu) {
+      lines.push('Database actions are unavailable in this environment.');
+    }
+    return lines.join('\n');
+  }, [databasePath, databaseStatus?.message, onDatabaseMenu]);
+
+  const databaseStatusClass = React.useMemo(() => {
+    if (!databaseStatus) return 'text-text-secondary';
+    switch (databaseStatus.tone) {
+      case 'success':
+        return 'text-success';
+      case 'error':
+        return 'text-error';
+      case 'neutral':
+      case 'info':
+      default:
+        return 'text-text-secondary';
+    }
+  }, [databaseStatus]);
+
+  const handleDatabaseMenu = (event: React.MouseEvent<HTMLElement>) => {
+    if (!onDatabaseMenu) return;
+    onDatabaseMenu(event);
+  };
 
   const formatTimestamp = (isoString?: string) => {
     if (!isoString) return 'Not saved yet';
@@ -104,6 +172,29 @@ const StatusBar: React.FC<StatusBarProps> = ({
             )}
           </select>
         </div>
+        <div className="h-4 w-px bg-border-color"></div>
+        <button
+          type="button"
+          onClick={handleDatabaseMenu}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            handleDatabaseMenu(event);
+          }}
+          className={`flex items-center gap-2 px-2 py-1 -my-1 rounded-md transition-colors ${onDatabaseMenu ? 'hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer' : 'cursor-default'}`}
+          title={databaseTooltip}
+          disabled={!onDatabaseMenu}
+        >
+          <DatabaseIcon className="w-3.5 h-3.5" />
+          <span className="font-semibold text-text-main max-w-[180px] truncate" aria-label="Current database name">
+            {databaseFileName}
+          </span>
+          <ChevronDownIcon className="w-3 h-3 text-text-secondary" />
+        </button>
+        {databaseStatus?.message && (
+          <span className={`text-[11px] ${databaseStatusClass} max-w-[220px] truncate`} title={databaseStatus.message}>
+            {databaseStatus.message}
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-4">
         <span>Documents: <span className="font-semibold text-text-main">{documentCount}</span></span>

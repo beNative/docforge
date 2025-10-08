@@ -20,7 +20,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -93,6 +93,13 @@ type TabState = {
     order: string[];
 };
 
+type DatabaseStatusTone = 'info' | 'success' | 'error' | 'neutral';
+
+interface DatabaseStatusState {
+    message: string;
+    tone: DatabaseStatusTone;
+}
+
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
     const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles } = useDocuments();
@@ -131,6 +138,9 @@ const MainApp: React.FC = () => {
     const [folderSearchTerm, setFolderSearchTerm] = useState('');
     const [folderBodySearchMatches, setFolderBodySearchMatches] = useState<Map<string, string>>(new Map());
     const [isFolderSearchLoading, setIsFolderSearchLoading] = useState(false);
+    const [databasePath, setDatabasePath] = useState<string | null>(null);
+    const [databaseStatus, setDatabaseStatus] = useState<DatabaseStatusState | null>(null);
+    const [isDatabaseBusy, setIsDatabaseBusy] = useState(false);
 
     const activeNodeId = tabState.activeId;
     const openDocumentIds = tabState.order;
@@ -217,6 +227,38 @@ const MainApp: React.FC = () => {
     const llmStatus = useLLMStatus(settings.llmProviderUrl);
     const { logs, addLog } = useLogger();
     const lastLogRef = useRef<LogMessage | null>(null);
+
+    useEffect(() => {
+        if (!isElectron || !window.electronAPI?.dbGetPath) {
+            setDatabaseStatus({ message: 'Database actions unavailable in this environment.', tone: 'info' });
+            return;
+        }
+
+        let isCancelled = false;
+        const loadPath = async () => {
+            try {
+                const path = await repository.getDbPath();
+                if (isCancelled) {
+                    return;
+                }
+                setDatabasePath(path);
+                setDatabaseStatus(prev => prev ?? { message: 'Database ready', tone: 'info' });
+            } catch (error) {
+                if (isCancelled) {
+                    return;
+                }
+                const message = error instanceof Error ? error.message : 'Unable to determine database location.';
+                addLog('ERROR', `Failed to determine database path: ${message}`);
+                setDatabaseStatus({ message, tone: 'error' });
+            }
+        };
+
+        loadPath();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [addLog]);
 
     useEffect(() => {
         if (settingsLoaded) {
@@ -1594,6 +1636,188 @@ const MainApp: React.FC = () => {
         }
     }, [items, activeNodeId, view, addLog]);
 
+    const updateDatabaseStatus = useCallback((message: string, tone: DatabaseStatusTone = 'info') => {
+        setDatabaseStatus({ message, tone });
+    }, []);
+
+    const handleSelectDatabaseFile = useCallback(async () => {
+        if (!isElectron || !window.electronAPI?.dbSelectAndLoad) {
+            updateDatabaseStatus('Selecting a database requires the desktop application.', 'error');
+            return;
+        }
+        if (isDatabaseBusy) {
+            return;
+        }
+
+        setIsDatabaseBusy(true);
+        updateDatabaseStatus('Select a SQLite database to load...', 'info');
+
+        try {
+            const result = await repository.selectDatabaseFile();
+            if (!result.success) {
+                if (result.canceled) {
+                    updateDatabaseStatus('Database selection cancelled.', 'info');
+                    return;
+                }
+                const message = result.error || 'Failed to load the selected database file.';
+                addLog('ERROR', `Database change failed: ${message}`);
+                updateDatabaseStatus(message, 'error');
+                return;
+            }
+
+            if (result.path) {
+                setDatabasePath(result.path);
+            }
+
+            const successMessage = result.message ?? 'Database location updated. Reloading interface...';
+            addLog('INFO', successMessage);
+            updateDatabaseStatus(successMessage, 'success');
+
+            if (typeof window !== 'undefined') {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to load the selected database file.';
+            addLog('ERROR', `Database change failed: ${message}`);
+            updateDatabaseStatus(message, 'error');
+        } finally {
+            setIsDatabaseBusy(false);
+        }
+    }, [addLog, isDatabaseBusy, updateDatabaseStatus]);
+
+    const handleBackupDatabase = useCallback(async () => {
+        if (!isElectron || !window.electronAPI?.dbBackup) {
+            updateDatabaseStatus('Database backups are unavailable in this environment.', 'error');
+            return;
+        }
+        if (isDatabaseBusy) {
+            return;
+        }
+
+        setIsDatabaseBusy(true);
+        updateDatabaseStatus('Creating database backup...', 'info');
+
+        try {
+            const result = await repository.backupDatabase();
+            if (result.success) {
+                const message = result.message || 'Database backup completed successfully.';
+                addLog('INFO', message);
+                updateDatabaseStatus(message, 'success');
+            } else {
+                const message = result.error || 'Database backup failed.';
+                addLog('ERROR', message);
+                updateDatabaseStatus(message, 'error');
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Database backup failed.';
+            addLog('ERROR', `Database backup failed: ${message}`);
+            updateDatabaseStatus(message, 'error');
+        } finally {
+            setIsDatabaseBusy(false);
+        }
+    }, [addLog, isDatabaseBusy, updateDatabaseStatus]);
+
+    const handleDatabaseIntegrityCheck = useCallback(async () => {
+        if (!isElectron || !window.electronAPI?.dbIntegrityCheck) {
+            updateDatabaseStatus('Integrity checks require the desktop application.', 'error');
+            return;
+        }
+        if (isDatabaseBusy) {
+            return;
+        }
+
+        setIsDatabaseBusy(true);
+        updateDatabaseStatus('Running database integrity check...', 'info');
+
+        try {
+            const result = await repository.runIntegrityCheck();
+            if (result.success) {
+                const message = result.results || 'Integrity check completed successfully.';
+                addLog('INFO', message);
+                updateDatabaseStatus(message, 'success');
+            } else {
+                const message = result.error || 'Integrity check failed.';
+                addLog('ERROR', message);
+                updateDatabaseStatus(message, 'error');
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Integrity check failed.';
+            addLog('ERROR', `Integrity check failed: ${message}`);
+            updateDatabaseStatus(message, 'error');
+        } finally {
+            setIsDatabaseBusy(false);
+        }
+    }, [addLog, isDatabaseBusy, updateDatabaseStatus]);
+
+    const handleDatabaseVacuum = useCallback(async () => {
+        if (!isElectron || !window.electronAPI?.dbVacuum) {
+            updateDatabaseStatus('Vacuum requires the desktop application.', 'error');
+            return;
+        }
+        if (isDatabaseBusy) {
+            return;
+        }
+
+        setIsDatabaseBusy(true);
+        updateDatabaseStatus('Vacuuming database pages...', 'info');
+
+        try {
+            const result = await repository.runVacuum();
+            if (result.success) {
+                const message = 'Database vacuum completed successfully.';
+                addLog('INFO', message);
+                updateDatabaseStatus(message, 'success');
+            } else {
+                const message = result.error || 'Vacuum operation failed.';
+                addLog('ERROR', message);
+                updateDatabaseStatus(message, 'error');
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Vacuum operation failed.';
+            addLog('ERROR', `Vacuum operation failed: ${message}`);
+            updateDatabaseStatus(message, 'error');
+        } finally {
+            setIsDatabaseBusy(false);
+        }
+    }, [addLog, isDatabaseBusy, updateDatabaseStatus]);
+
+    const databaseMenuItems = useMemo<MenuItem[]>(() => {
+        if (!isElectron) {
+            return [
+                { label: 'Database management is unavailable in the browser preview.', action: () => undefined, disabled: true },
+            ];
+        }
+
+        return [
+            { label: 'Open Database…', action: handleSelectDatabaseFile, icon: FolderDownIcon, disabled: isDatabaseBusy },
+            { label: 'Back Up Database…', action: handleBackupDatabase, icon: SaveIcon, disabled: isDatabaseBusy },
+            { type: 'separator' },
+            { label: 'Run Integrity Check', action: handleDatabaseIntegrityCheck, icon: CheckIcon, disabled: isDatabaseBusy },
+            { label: 'Vacuum Database', action: handleDatabaseVacuum, icon: SparklesIcon, disabled: isDatabaseBusy },
+        ];
+    }, [handleSelectDatabaseFile, handleBackupDatabase, handleDatabaseIntegrityCheck, handleDatabaseVacuum, isDatabaseBusy]);
+
+    const handleDatabaseMenu = useCallback((event: React.MouseEvent<HTMLElement>) => {
+        if (databaseMenuItems.length === 0) {
+            return;
+        }
+
+        event.preventDefault();
+        const rect = event.currentTarget.getBoundingClientRect();
+        const position = {
+            x: event.clientX || rect.left,
+            y: rect.bottom + 4,
+        };
+
+        setContextMenu({
+            isOpen: true,
+            position,
+            items: databaseMenuItems,
+        });
+    }, [databaseMenuItems, setContextMenu]);
+
     const commands: Command[] = useMemo(() => [
         { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Control', 'N'], keywords: 'add create file' },
         { id: 'new-code-file', name: 'Create New Code File', action: handleOpenNewCodeFileModal, category: 'File', icon: CodeIcon, shortcut: ['Control', 'Shift', 'N'], keywords: 'add create script' },
@@ -1968,7 +2192,7 @@ const MainApp: React.FC = () => {
                         onResizeStart={handleLoggerMouseDown}
                     />
                 </div>
-                <StatusBar 
+                <StatusBar
                     status={llmStatus}
                     modelName={settings.llmModelName}
                     llmProviderName={settings.llmProviderName}
@@ -1980,6 +2204,9 @@ const MainApp: React.FC = () => {
                     discoveredServices={discoveredServices}
                     onProviderChange={handleProviderChange}
                     appVersion={appVersion}
+                    databasePath={databasePath}
+                    databaseStatus={databaseStatus}
+                    onDatabaseMenu={handleDatabaseMenu}
                 />
             </div>
             
