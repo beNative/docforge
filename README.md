@@ -2,8 +2,6 @@
 
 DocForge is a desktop application designed to streamline the process of creating, managing, and refining documents for Large Language Models (LLMs). It connects to local AI providers like Ollama, allowing you to leverage the power of AI to improve your documents in a secure, offline-first environment.
 
-![DocForge Screenshot](https://raw.githubusercontent.com/TimSirmov/docforge/main/assets/screenshot.png)
-
 ## Key Features
 
 - **Modern, Draggable Title Bar:** A sleek, VS Code-style custom title bar maximizes screen space and integrates essential functions (Electron version only).
