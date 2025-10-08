@@ -40,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   editorFontFamily: 'Consolas, "Courier New", monospace',
   editorFontSize: 12,
   editorActiveLineHighlightColor: '#fff59d',
+  editorActiveLineHighlightColorDark: '#2a2d2e',
   markdownCodeBlockBackgroundLight: '#f5f5f5',
   markdownCodeBlockBackgroundDark: '#1f2933',
   markdownContentPadding: 48,

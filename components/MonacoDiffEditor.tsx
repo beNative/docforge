@@ -17,10 +17,11 @@ interface MonacoDiffEditorProps {
   onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number }) => void;
   fontFamily?: string;
   fontSize?: number;
-  activeLineHighlightColor?: string;
+  activeLineHighlightColorLight?: string;
+  activeLineHighlightColorDark?: string;
 }
 
-const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily, fontSize, activeLineHighlightColor }) => {
+const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const editorInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -39,10 +40,19 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
         }
         return DEFAULT_SETTINGS.editorFontSize;
     }, [fontSize]);
-    const computedActiveLineHighlightColor = useMemo(() => {
-        const candidate = (activeLineHighlightColor ?? '').trim();
+    const computedActiveLineHighlightColorLight = useMemo(() => {
+        const candidate = (activeLineHighlightColorLight ?? '').trim();
         return candidate || DEFAULT_SETTINGS.editorActiveLineHighlightColor;
-    }, [activeLineHighlightColor]);
+    }, [activeLineHighlightColorLight]);
+    const computedActiveLineHighlightColorDark = useMemo(() => {
+        const candidate = (activeLineHighlightColorDark ?? '').trim();
+        return candidate || DEFAULT_SETTINGS.editorActiveLineHighlightColorDark;
+    }, [activeLineHighlightColorDark]);
+    const computedActiveLineHighlightColor = useMemo(() => {
+        return theme === 'dark'
+            ? computedActiveLineHighlightColorDark
+            : computedActiveLineHighlightColorLight;
+    }, [theme, computedActiveLineHighlightColorDark, computedActiveLineHighlightColorLight]);
     const themeRef = useRef(theme);
     const highlightColorRef = useRef(computedActiveLineHighlightColor);
 
