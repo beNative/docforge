@@ -109,7 +109,21 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
         height = boxSize.blockSize ?? height;
       }
 
-      setContentSize({ width, height });
+      const currentScale = scaleRef.current || 1;
+      const normalizedWidth = width / currentScale;
+      const normalizedHeight = height / currentScale;
+      const nextWidth = Number.isFinite(normalizedWidth) ? normalizedWidth : width;
+      const nextHeight = Number.isFinite(normalizedHeight) ? normalizedHeight : height;
+
+      setContentSize((prev) => {
+        const widthDiff = Math.abs(prev.width - nextWidth);
+        const heightDiff = Math.abs(prev.height - nextHeight);
+        if (widthDiff < 0.5 && heightDiff < 0.5) {
+          return prev;
+        }
+
+        return { width: nextWidth, height: nextHeight };
+      });
     });
 
     observer.observe(node);
