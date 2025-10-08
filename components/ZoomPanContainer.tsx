@@ -1,4 +1,4 @@
-import React, { useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import IconButton from './IconButton';
 import { MinusIcon, PlusIcon, RefreshIcon } from './Icons';
 
@@ -22,9 +22,9 @@ const clamp = (value: number, min: number, max: number) => {
   return Math.min(Math.max(value, min), max);
 };
 
-const normalizeWheelDelta = (event: React.WheelEvent<HTMLDivElement>) => {
+const normalizeWheelDelta = (event: Pick<WheelEvent, 'deltaX' | 'deltaY' | 'deltaMode'>, target: HTMLElement | null) => {
   const lineHeight = 16;
-  const pageHeight = event.currentTarget.clientHeight || 800;
+  const pageHeight = target?.clientHeight || 800;
   const scale = event.deltaMode === 1 ? lineHeight : event.deltaMode === 2 ? pageHeight : 1;
   return {
     deltaX: event.deltaX * scale,
@@ -75,14 +75,16 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     });
   }, []);
 
-  const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+  const handleWheelEvent = useCallback((event: WheelEvent) => {
     if (disablePan && disableZoom) {
       return;
     }
 
+    const target = containerRef.current;
+
     if (!disableZoom && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
-      const { deltaY } = normalizeWheelDelta(event);
+      const { deltaY } = normalizeWheelDelta(event, target);
       if (deltaY === 0) {
         return;
       }
@@ -98,7 +100,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
 
     if (!disablePan) {
       event.preventDefault();
-      const { deltaX, deltaY } = normalizeWheelDelta(event);
+      const { deltaX, deltaY } = normalizeWheelDelta(event, target);
       const scale = scaleRef.current || 1;
       setOffset((prev) => ({
         x: prev.x - deltaX / scale,
@@ -106,6 +108,23 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
       }));
     }
   }, [disablePan, disableZoom, setOffset, setScale, zoomStep]);
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) {
+      return;
+    }
+
+    const wheelListener = (event: WheelEvent) => {
+      handleWheelEvent(event);
+    };
+
+    node.addEventListener('wheel', wheelListener, { passive: false });
+
+    return () => {
+      node.removeEventListener('wheel', wheelListener);
+    };
+  }, [handleWheelEvent]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (disablePan) {
@@ -215,7 +234,6 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     <div
       ref={containerRef}
       className={containerClasses}
-      onWheel={handleWheel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={endPan}
