@@ -1,4 +1,5 @@
 import React, { useMemo, useRef } from 'react';
+import { SETTINGS_EDITOR_SURFACE_STYLE } from './settingsEditorSizing';
 
 // Let TypeScript know Prism is available on the window
 declare const Prism: any;
@@ -7,9 +8,11 @@ interface JsonEditorProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-const JsonEditor: React.FC<JsonEditorProps> = ({ value, onChange, readOnly = false }) => {
+const JsonEditor: React.FC<JsonEditorProps> = ({ value, onChange, readOnly = false, className, style }) => {
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
 
@@ -31,9 +34,17 @@ const JsonEditor: React.FC<JsonEditorProps> = ({ value, onChange, readOnly = fal
     }
   };
 
+  const combinedStyle: React.CSSProperties = {
+    ...SETTINGS_EDITOR_SURFACE_STYLE,
+    ...style,
+  };
+
   return (
-    <div 
-      className="editor-container relative w-full rounded-lg bg-background border border-border-color focus-within:ring-2 focus-within:ring-primary focus-within:border-primary h-96"
+    <div
+      className={`editor-container relative w-full h-full rounded-lg bg-background border border-border-color focus-within:ring-2 focus-within:ring-primary focus-within:border-primary ${
+        className ?? ''
+      }`}
+      style={combinedStyle}
     >
       <textarea
         ref={editorRef}

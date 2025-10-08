@@ -8,10 +8,9 @@ interface KeyboardShortcutsSectionProps {
     settings: Settings;
     setCurrentSettings: React.Dispatch<React.SetStateAction<Settings>>;
     commands: Command[];
-    sectionRef: (el: HTMLDivElement | null) => void;
 }
 
-const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ settings, setCurrentSettings, commands, sectionRef }) => {
+const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ settings, setCurrentSettings, commands }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const editorCommands = useMemo(() => createMonacoCommands(), []);
     const combinedCommands = useMemo(() => [...commands, ...editorCommands], [commands, editorCommands]);
@@ -65,7 +64,7 @@ const KeyboardShortcutsSection: React.FC<KeyboardShortcutsSectionProps> = ({ set
     const hasEditorResults = Object.keys(groupedEditorCommands).length > 0;
 
     return (
-        <div id="shortcuts" ref={sectionRef} className="py-6">
+        <div className="py-6">
             <h2 className="text-lg font-semibold text-text-main mb-1">Keyboard Shortcuts</h2>
             <p className="text-xs text-text-secondary mb-4">Customize shortcuts for application commands and Monaco editor keybindings.</p>
             

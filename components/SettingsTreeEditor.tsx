@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDownIcon, ChevronRightIcon } from './Icons';
 import ToggleSwitch from './ToggleSwitch';
+import { SETTINGS_EDITOR_SURFACE_STYLE } from './settingsEditorSizing';
 
 type ValueType = 'string' | 'number' | 'boolean' | 'object' | 'array' | 'null';
 
@@ -75,11 +76,26 @@ const TreeNode: React.FC<{
 interface SettingsTreeEditorProps {
   settings: object;
   onSettingChange: (path: (string | number)[], value: any) => void;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-const SettingsTreeEditor: React.FC<SettingsTreeEditorProps> = ({ settings, onSettingChange }) => {
+const SettingsTreeEditor: React.FC<SettingsTreeEditorProps> = ({ settings, onSettingChange, className, style }) => {
+  const resolvedClassName = [
+    'w-full h-full p-2 rounded-lg bg-background border border-border-color overflow-y-auto',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <div className="p-2 rounded-lg bg-background border border-border-color h-96 overflow-y-auto">
+    <div
+      className={resolvedClassName}
+      style={{
+        ...SETTINGS_EDITOR_SURFACE_STYLE,
+        ...style,
+      }}
+    >
       {Object.entries(settings).map(([key, value]) => (
         <TreeNode key={key} nodeKey={key} nodeValue={value} path={[key]} level={0} onSettingChange={onSettingChange} />
       ))}
