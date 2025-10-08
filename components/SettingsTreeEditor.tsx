@@ -90,7 +90,12 @@ const SettingsTreeEditor: React.FC<SettingsTreeEditorProps> = ({ settings, onSet
   return (
     <div
       className={resolvedClassName}
-      style={{ height: 'clamp(24rem, 70vh, 44rem)', ...style }}
+      style={{
+        minHeight: '24rem',
+        height: 'clamp(24rem, 70vh, 44rem)',
+        maxHeight: '44rem',
+        ...style,
+      }}
     >
       {Object.entries(settings).map(([key, value]) => (
         <TreeNode key={key} nodeKey={key} nodeValue={value} path={[key]} level={0} onSettingChange={onSettingChange} />

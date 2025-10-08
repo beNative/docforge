@@ -1674,7 +1674,14 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
     const [jsonError, setJsonError] = useState<string | null>(null);
     const [mode, setMode] = useState<'tree' | 'json'>('tree');
     const [transferStatus, setTransferStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-    const editorSurfaceStyle = useMemo<React.CSSProperties>(() => ({ height: 'clamp(24rem, 70vh, 44rem)' }), []);
+    const editorSurfaceStyle = useMemo<React.CSSProperties>(
+        () => ({
+            minHeight: '24rem',
+            height: 'clamp(24rem, 70vh, 44rem)',
+            maxHeight: '44rem',
+        }),
+        [],
+    );
 
     useEffect(() => {
         setJsonString(JSON.stringify(settings, null, 2));
