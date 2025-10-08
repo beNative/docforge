@@ -1,0 +1,257 @@
+{
+  "timestamp": "2025-10-04T19:14:02.925Z",
+  "validations": [
+    {
+      "name": "Heading present: ## 1. Prioritized Test Scenarios",
+      "status": "pass",
+      "details": "Heading located in document."
+    },
+    {
+      "name": "Heading present: ## 2. Test Execution Report",
+      "status": "pass",
+      "details": "Heading located in document."
+    },
+    {
+      "name": "Heading present: ### 2.1 Execution Summary",
+      "status": "pass",
+      "details": "Heading located in document."
+    },
+    {
+      "name": "Heading present: ### 2.2 Impact on Scenario Coverage",
+      "status": "pass",
+      "details": "Heading located in document."
+    },
+    {
+      "name": "Heading present: ### 2.3 Blocker Detail",
+      "status": "pass",
+      "details": "Heading located in document."
+    },
+    {
+      "name": "Heading present: ### 2.4 Mitigation Plan",
+      "status": "pass",
+      "details": "Heading located in document."
+    },
+    {
+      "name": "Execution status format: Application boot and sample workspace load",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Preview build cannot be generated because `npm install` fails (node-plantuml requires downloading `viz.js`, which is unreachable in the current offline environment).\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Application boot and sample workspace load",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Document creation and autosave persistence",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Depends on successful preview build; prerequisites unavailable.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Document creation and autosave persistence",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Layout responsiveness at critical breakpoints",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Requires running UI preview; assets not compiled due to dependency install failure.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Layout responsiveness at critical breakpoints",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Keyboard navigation starting focus",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Preview not available; see environment limitation above.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Keyboard navigation starting focus",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Global layout & typography consistency",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Screenshot capture requires a compiled build; build step failed.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Global layout & typography consistency",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Editor toolbar theming & state coherence",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – UI cannot be launched without build artifacts.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Editor toolbar theming & state coherence",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Modal/toast visual system check",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Requires running UI preview; blocked by dependency install failure.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Modal/toast visual system check",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Add Markdown document with live preview",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Test documents cannot be created without functioning preview environment.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Add Markdown document with live preview",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Add HTML document with preview parity",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Preview unavailable; blocked on dependency installation.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Add HTML document with preview parity",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Add PlantUML document preview",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – PlantUML renderer assets missing because `node-plantuml` post-install script could not download `viz.js`.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Add PlantUML document preview",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Add PDF document preview",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Preview environment not runnable without build artifacts.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Add PDF document preview",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Add image asset preview (PNG/JPG)",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – UI preview build blocked.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Add image asset preview (PNG/JPG)",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Add plaintext document workflow",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Dependent on preview build completion; blocked.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Add plaintext document workflow",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Template preview rendering",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Preview build artifacts unavailable.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Template preview rendering",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Status bar connection messaging",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Cannot verify without running UI.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Status bar connection messaging",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Cross-view iconography audit",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Requires visual inspection of preview build; blocked.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Cross-view iconography audit",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: Dark mode typography & contrast check",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – UI preview unavailable.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: Dark mode typography & contrast check",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Execution status format: High DPI rendering review",
+      "status": "pass",
+      "details": "Execution status \"**Blocked** – Preview build blocked; cannot execute scenario.\" uses an approved label."
+    },
+    {
+      "name": "Unique scenario name: High DPI rendering review",
+      "status": "pass",
+      "details": "Scenario name is unique within the matrix."
+    },
+    {
+      "name": "Markdown document scenario present",
+      "status": "pass",
+      "details": "Scenario covering Markdown documents is present."
+    },
+    {
+      "name": "HTML document scenario present",
+      "status": "pass",
+      "details": "Scenario covering HTML documents is present."
+    },
+    {
+      "name": "PlantUML document scenario present",
+      "status": "pass",
+      "details": "Scenario covering PlantUML documents is present."
+    },
+    {
+      "name": "PDF document scenario present",
+      "status": "pass",
+      "details": "Scenario covering PDF documents is present."
+    },
+    {
+      "name": "Image document scenario present",
+      "status": "pass",
+      "details": "Scenario covering PNG documents is present."
+    },
+    {
+      "name": "Plaintext document scenario present",
+      "status": "pass",
+      "details": "Scenario covering plaintext documents is present."
+    },
+    {
+      "name": "Scenario coverage summary",
+      "status": "pass",
+      "details": "Scenario counts — Pass: 0, Fail: 0, Blocked: 18, Not Run: 0."
+    }
+  ],
+  "failures": [],
+  "statusCounts": {
+    "pass": 0,
+    "fail": 0,
+    "blocked": 18,
+    "notRun": 0
+  }
+}
