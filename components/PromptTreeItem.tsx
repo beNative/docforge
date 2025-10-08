@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
-import type { DocumentOrFolder } from '../types';
+import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
 import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon } from './Icons';
 
 export interface DocumentNode extends DocumentOrFolder {
   children: DocumentNode[];
 }
+
+export const DOCFORGE_DRAG_MIME = 'application/vnd.docforge.nodes+json';
 
 interface DocumentTreeItemProps {
   node: DocumentNode;
@@ -22,6 +24,8 @@ interface DocumentTreeItemProps {
   onDeleteNode: (id: string, shiftKey: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onRequestNodeExport: (ids: string[]) => DraggedNodeTransfer | null;
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onToggleExpand: (id: string) => void;
   onCopyNodeContent: (id: string) => void;
@@ -94,6 +98,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onDeleteNode,
     onRenameNode,
     onMoveNode,
+    onImportNodes,
+    onRequestNodeExport,
     onDropFiles,
     onToggleExpand,
     onCopyNodeContent,
@@ -165,13 +171,18 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     e.stopPropagation();
     const draggedIds = Array.from(selectedIds.has(node.id) ? selectedIds : new Set([node.id]));
     e.dataTransfer.setData('application/json', JSON.stringify(draggedIds));
-    e.dataTransfer.effectAllowed = 'move';
+    const transferPayload = onRequestNodeExport(draggedIds);
+    if (transferPayload) {
+        e.dataTransfer.setData(DOCFORGE_DRAG_MIME, JSON.stringify(transferPayload));
+    }
+    e.dataTransfer.effectAllowed = transferPayload ? 'copyMove' : 'move';
   };
-  
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/json')) {
+    if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) || e.dataTransfer.types.includes('application/json')) {
+        e.dataTransfer.dropEffect = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ? 'copy' : 'move';
         const position = getDropPosition(e, isFolder, itemRef.current);
         if (position !== dropPosition) {
             setDropPosition(position);
@@ -195,6 +206,20 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         const parentId = finalDropPosition === 'inside' ? node.id : node.parentId;
         onDropFiles(e.dataTransfer.files, parentId);
         return;
+    }
+
+    const transferData = e.dataTransfer.getData(DOCFORGE_DRAG_MIME);
+    if (transferData && finalDropPosition) {
+        try {
+            const payload = JSON.parse(transferData) as DraggedNodeTransfer;
+            onImportNodes(payload, node.id, finalDropPosition);
+            if (finalDropPosition === 'inside' && isFolder && !isExpanded) {
+                onToggleExpand(node.id);
+            }
+            return;
+        } catch (error) {
+            console.warn('Failed to parse DocForge drag payload on drop:', error);
+        }
     }
 
     const draggedIdsJSON = e.dataTransfer.getData('application/json');

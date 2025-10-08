@@ -11,6 +11,11 @@ declare global {
       dbIsNew: () => Promise<boolean>;
       dbMigrateFromJson: (data: any) => Promise<{ success: boolean, error?: string }>;
       dbDuplicateNodes: (nodeIds: string[]) => Promise<{ success: boolean; error?: string }>;
+      dbInsertNodesFromTransfer: (
+        payload: DraggedNodeTransfer,
+        targetId: string | null,
+        position: 'before' | 'after' | 'inside'
+      ) => Promise<{ success: boolean; createdNodeIds?: string[]; error?: string }>;
       dbDeleteVersions: (documentId: number, versionIds: number[]) => Promise<{ success: boolean; error?: string }>;
       dbBackup: () => Promise<{ success: boolean; message?: string; error?: string }>;
       dbIntegrityCheck: () => Promise<{ success: boolean; results?: string; error?: string }>;
@@ -235,6 +240,23 @@ export interface DocumentOrFolder {
   language_hint?: string | null;
   default_view_mode?: ViewMode | null;
   searchSnippet?: string;
+}
+
+export interface SerializedNodeForTransfer {
+  type: NodeType;
+  title: string;
+  content?: string;
+  doc_type?: DocType;
+  language_hint?: string | null;
+  default_view_mode?: ViewMode | null;
+  children?: SerializedNodeForTransfer[];
+}
+
+export interface DraggedNodeTransfer {
+  schema: 'docforge/nodes';
+  version: 1;
+  exportedAt: string;
+  nodes: SerializedNodeForTransfer[];
 }
 
 // Fix: Renamed LegacyPromptVersion to DocumentVersion and aliased it to the new DocVersion type

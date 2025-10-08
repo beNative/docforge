@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbIsNew: () => ipcRenderer.invoke('db:is-new'),
   dbMigrateFromJson: (data: any) => ipcRenderer.invoke('db:migrate-from-json', data),
   dbDuplicateNodes: (nodeIds: string[]) => ipcRenderer.invoke('db:duplicate-nodes', nodeIds),
+  dbInsertNodesFromTransfer: (payload: any, targetId: string | null, position: 'before' | 'after' | 'inside') =>
+    ipcRenderer.invoke('db:insert-nodes-from-transfer', payload, targetId, position),
   dbDeleteVersions: (documentId: number, versionIds: number[]) => ipcRenderer.invoke('db:delete-versions', documentId, versionIds),
   dbBackup: () => ipcRenderer.invoke('db:backup'),
   dbIntegrityCheck: () => ipcRenderer.invoke('db:integrity-check'),

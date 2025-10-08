@@ -52,7 +52,7 @@ const getDescendantIdsRecursive = (nodeId: string, allNodes: Node[]): Set<string
  * This allows the UI to function without a full refactor of all components.
  */
 export const useDocuments = () => {
-  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes, importFiles, addLog } = useNodes();
+  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes, importFiles, importNodesFromTransfer, addLog } = useNodes();
 
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
@@ -162,5 +162,5 @@ export const useDocuments = () => {
       return getDescendantIdsRecursive(nodeId, allNodesFlat);
   }, [allNodesFlat]);
 
-  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles };
+  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer };
 };

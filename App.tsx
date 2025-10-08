@@ -28,7 +28,7 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType } from './types';
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
@@ -102,7 +102,7 @@ interface DatabaseStatusState {
 
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles } = useDocuments();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
     
@@ -962,6 +962,48 @@ const MainApp: React.FC = () => {
             }
         }
     }, [addDocumentsFromFiles, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
+
+    const handleImportNodesFromTransfer = useCallback(async (
+        payload: DraggedNodeTransfer,
+        targetId: string | null,
+        position: 'before' | 'after' | 'inside'
+    ) => {
+        try {
+            const createdIds = await importNodesFromTransfer(payload, targetId, position);
+            if (createdIds.length === 0) {
+                return;
+            }
+
+            const selection = new Set(createdIds);
+            setSelectedIds(selection);
+            const lastCreatedId = createdIds[createdIds.length - 1];
+            setLastClickedId(lastCreatedId);
+            setActiveTemplateId(null);
+
+            let parentIdForReveal: string | null = null;
+            if (position === 'inside') {
+                parentIdForReveal = targetId;
+            } else if (targetId) {
+                const targetItem = items.find(item => item.id === targetId);
+                parentIdForReveal = targetItem?.parentId ?? null;
+            }
+
+            const rootPairs = createdIds.map((id, index) => ({ id, node: payload.nodes?.[index] }));
+            const lastDocument = [...rootPairs].reverse().find(pair => pair.node?.type === 'document');
+
+            if (lastDocument) {
+                activateDocumentTab(lastDocument.id);
+                setDocumentView('editor');
+                setView('editor');
+                ensureNodeVisibleRef.current?.({ id: lastDocument.id, type: 'document', parentId: parentIdForReveal });
+            } else {
+                ensureNodeVisibleRef.current?.({ id: lastCreatedId, type: 'folder', parentId: parentIdForReveal });
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog('ERROR', `Failed to import nodes from drag payload: ${message}`);
+        }
+    }, [importNodesFromTransfer, items, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, ensureNodeVisibleRef, addLog]);
 
     const handleImportFilesIntoFolder = useCallback((files: FileList, parentId: string) => {
         if (!files || files.length === 0) {
@@ -2132,6 +2174,7 @@ const MainApp: React.FC = () => {
                                         onDeleteNode={handleDeleteNode}
                                         onRenameNode={handleRenameNode}
                                         onMoveNode={moveItems}
+                                        onImportNodes={handleImportNodesFromTransfer}
                                         onDropFiles={handleDropFiles}
                                         onNewDocument={() => handleNewDocument()}
                                         onNewRootFolder={handleNewRootFolder}
