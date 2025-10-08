@@ -344,6 +344,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
       if (nextIndex !== index) {
         event.preventDefault();
+        handleNavClick(categories[nextIndex].id);
         navButtonRefs.current[nextIndex]?.focus();
       }
     },
@@ -423,7 +424,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   }}
                   onKeyDown={(event) => handleNavKeyDown(event, index)}
                   onClick={() => handleNavClick(id)}
-                  className={`w-full flex items-center gap-3 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  className={`w-full flex items-center gap-3 px-2 py-1.5 text-xs font-medium rounded-md transition-colors focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 ${
                     visibleCategory === id
                       ? 'bg-primary/10 text-primary'
                       : 'text-text-secondary hover:bg-border-color/50 hover:text-text-main'
