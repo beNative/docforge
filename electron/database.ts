@@ -6,12 +6,76 @@ import { INITIAL_SCHEMA } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 // Fix: Import types to use for casting
-import type { Node, Document, DocVersion, DatabaseStats, DocType, ViewMode, ImportedNodeSummary } from '../types';
+import type { Node, Document, DocVersion, DatabaseStats, DocType, ViewMode, ImportedNodeSummary, DatabaseLoadResult } from '../types';
 
 let db: Database.Database;
-
+let hasInitializedDb = false;
 const DB_FILE_NAME = 'docforge.db';
-const DB_PATH = path.join(app.getPath('userData'), DB_FILE_NAME);
+const DB_CONFIG_FILE = 'database-config.json';
+
+let currentDbPath = '';
+let pendingNewDatabaseFlag = false;
+
+interface DatabaseConfig {
+  customPath?: string;
+}
+
+const getDefaultDbPath = () => path.join(app.getPath('userData'), DB_FILE_NAME);
+const getConfigFilePath = () => path.join(app.getPath('userData'), DB_CONFIG_FILE);
+
+const readDatabaseConfig = (): DatabaseConfig | null => {
+  try {
+    const raw = fs.readFileSync(getConfigFilePath(), 'utf-8');
+    return JSON.parse(raw) as DatabaseConfig;
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    console.warn('Failed to read database configuration, falling back to default path.', error);
+    return null;
+  }
+};
+
+const writeDatabaseConfig = (config: DatabaseConfig | null) => {
+  const configPath = getConfigFilePath();
+  try {
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    if (!config || Object.keys(config).length === 0) {
+      if (fs.existsSync(configPath)) {
+        fs.unlinkSync(configPath);
+      }
+    } else {
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    }
+  } catch (error) {
+    console.warn('Failed to persist database configuration.', error);
+  }
+};
+
+const resolveInitialDatabasePath = () => {
+  const envPath = process.env.DOCFORGE_DB_PATH;
+  if (envPath && envPath.trim().length > 0) {
+    return path.resolve(envPath);
+  }
+
+  const config = readDatabaseConfig();
+  if (config?.customPath) {
+    return path.resolve(config.customPath);
+  }
+
+  return getDefaultDbPath();
+};
+
+const persistDatabasePath = (targetPath: string) => {
+  const resolvedDefault = path.resolve(getDefaultDbPath());
+  const resolvedTarget = path.resolve(targetPath);
+
+  if (resolvedDefault === resolvedTarget) {
+    writeDatabaseConfig(null);
+  } else {
+    writeDatabaseConfig({ customPath: resolvedTarget });
+  }
+};
 
 const DOCUMENT_SEARCH_OBJECTS_SQL = `
   DROP TRIGGER IF EXISTS document_search_after_document_insert;
@@ -87,9 +151,9 @@ const DOCUMENT_SEARCH_OBJECTS_SQL = `
   END;
 `;
 
-const populateDocumentSearch = () => {
-  db.exec('DELETE FROM document_search;');
-  db.exec(`
+const populateDocumentSearch = (targetDb: Database.Database = db) => {
+  targetDb.exec('DELETE FROM document_search;');
+  targetDb.exec(`
     INSERT INTO document_search(rowid, document_id, node_id, title, body)
     SELECT
       d.document_id,
@@ -155,129 +219,227 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
     }
 };
 
+const configureConnection = (connection: Database.Database, dbExists: boolean) => {
+  if (!dbExists) {
+    console.log('Database does not exist, creating new one...');
+    connection.exec(INITIAL_SCHEMA);
+    // Set PRAGMAs for a new database
+    connection.pragma('user_version = 3');
+    connection.exec('PRAGMA journal_mode = WAL;');
+    connection.exec('PRAGMA foreign_keys = ON;');
+    console.log('Database created and schema applied.');
+    return;
+  }
+
+  console.log('Existing database found.');
+  // Ensure PRAGMAs are set for existing databases too
+  connection.exec('PRAGMA journal_mode = WAL;');
+  connection.exec('PRAGMA foreign_keys = ON;');
+
+  // Run migrations
+  const currentVersion = connection.pragma('user_version', { simple: true }) as number;
+  if (currentVersion < 1) {
+    console.log(`Migrating schema from version ${currentVersion} to 1...`);
+    try {
+      const transaction = connection.transaction(() => {
+        const columns = connection.prepare("PRAGMA table_info(documents)").all() as {name: string}[];
+        const hasColumn = columns.some(col => col.name === 'default_view_mode');
+        if (!hasColumn) {
+          connection.exec('ALTER TABLE documents ADD COLUMN default_view_mode TEXT');
+        }
+        connection.pragma('user_version = 1');
+      });
+      transaction();
+      console.log('Migration to version 1 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 1:', e);
+    }
+  }
+
+  if (currentVersion < 2) {
+    console.log(`Migrating schema from version ${currentVersion} to 2...`);
+    try {
+      const transaction = connection.transaction(() => {
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS python_environments (
+            env_id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            python_executable TEXT NOT NULL,
+            python_version TEXT NOT NULL,
+            managed INTEGER NOT NULL DEFAULT 1,
+            config_json TEXT NOT NULL,
+            working_directory TEXT,
+            description TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          );
+        `);
+
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS python_execution_runs (
+            run_id TEXT PRIMARY KEY,
+            node_id TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
+            env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
+            status TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            exit_code INTEGER,
+            error_message TEXT,
+            duration_ms INTEGER
+          );
+        `);
+
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS python_execution_logs (
+            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL REFERENCES python_execution_runs(run_id) ON DELETE CASCADE,
+            timestamp TEXT NOT NULL,
+            level TEXT NOT NULL,
+            message TEXT NOT NULL
+          );
+        `);
+
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS node_python_settings (
+            node_id TEXT PRIMARY KEY REFERENCES nodes(node_id) ON DELETE CASCADE,
+            env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
+            auto_detect_env INTEGER NOT NULL DEFAULT 1,
+            last_run_id TEXT REFERENCES python_execution_runs(run_id) ON DELETE SET NULL,
+            updated_at TEXT NOT NULL
+          );
+        `);
+
+        connection.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_node ON python_execution_runs(node_id);');
+        connection.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_env ON python_execution_runs(env_id);');
+        connection.exec('CREATE INDEX IF NOT EXISTS idx_python_logs_run ON python_execution_logs(run_id);');
+
+        connection.pragma('user_version = 2');
+      });
+      transaction();
+      console.log('Migration to version 2 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 2:', e);
+    }
+  }
+
+  if (currentVersion < 3) {
+    console.log(`Migrating schema from version ${currentVersion} to 3...`);
+    try {
+      const transaction = connection.transaction(() => {
+        connection.exec(DOCUMENT_SEARCH_OBJECTS_SQL);
+        populateDocumentSearch(connection);
+        connection.pragma('user_version = 3');
+      });
+      transaction();
+      console.log('Migration to version 3 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 3:', e);
+    }
+  }
+};
+
 export const databaseService = {
   init() {
-    const dbExists = fs.existsSync(DB_PATH);
-    db = new Database(DB_PATH);
-
-    if (!dbExists) {
-      console.log('Database does not exist, creating new one...');
-      db.exec(INITIAL_SCHEMA);
-      // Set PRAGMAs for a new database
-      db.pragma('user_version = 3');
-      db.exec('PRAGMA journal_mode = WAL;');
-      db.exec('PRAGMA foreign_keys = ON;');
-      console.log('Database created and schema applied.');
-    } else {
-      console.log('Existing database found.');
-      // Ensure PRAGMAs are set for existing databases too
-      db.exec('PRAGMA journal_mode = WAL;');
-      db.exec('PRAGMA foreign_keys = ON;');
-      
-      // Run migrations
-      const currentVersion = db.pragma('user_version', { simple: true }) as number;
-      if (currentVersion < 1) {
-        console.log(`Migrating schema from version ${currentVersion} to 1...`);
-        try {
-          const transaction = db.transaction(() => {
-            const columns = db.prepare("PRAGMA table_info(documents)").all() as {name: string}[];
-            const hasColumn = columns.some(col => col.name === 'default_view_mode');
-            if (!hasColumn) {
-              db.exec('ALTER TABLE documents ADD COLUMN default_view_mode TEXT');
-            }
-            db.pragma('user_version = 1');
-          });
-          transaction();
-          console.log('Migration to version 1 complete.');
-        } catch (e) {
-          console.error('Fatal: Failed to migrate database to version 1:', e);
-        }
-      }
-
-      if (currentVersion < 2) {
-        console.log(`Migrating schema from version ${currentVersion} to 2...`);
-        try {
-          const transaction = db.transaction(() => {
-            db.exec(`
-              CREATE TABLE IF NOT EXISTS python_environments (
-                env_id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                python_executable TEXT NOT NULL,
-                python_version TEXT NOT NULL,
-                managed INTEGER NOT NULL DEFAULT 1,
-                config_json TEXT NOT NULL,
-                working_directory TEXT,
-                description TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-              );
-            `);
-
-            db.exec(`
-              CREATE TABLE IF NOT EXISTS python_execution_runs (
-                run_id TEXT PRIMARY KEY,
-                node_id TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
-                env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
-                status TEXT NOT NULL,
-                started_at TEXT NOT NULL,
-                finished_at TEXT,
-                exit_code INTEGER,
-                error_message TEXT,
-                duration_ms INTEGER
-              );
-            `);
-
-            db.exec(`
-              CREATE TABLE IF NOT EXISTS python_execution_logs (
-                log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                run_id TEXT NOT NULL REFERENCES python_execution_runs(run_id) ON DELETE CASCADE,
-                timestamp TEXT NOT NULL,
-                level TEXT NOT NULL,
-                message TEXT NOT NULL
-              );
-            `);
-
-            db.exec(`
-              CREATE TABLE IF NOT EXISTS node_python_settings (
-                node_id TEXT PRIMARY KEY REFERENCES nodes(node_id) ON DELETE CASCADE,
-                env_id TEXT REFERENCES python_environments(env_id) ON DELETE SET NULL,
-                auto_detect_env INTEGER NOT NULL DEFAULT 1,
-                last_run_id TEXT REFERENCES python_execution_runs(run_id) ON DELETE SET NULL,
-                updated_at TEXT NOT NULL
-              );
-            `);
-
-            db.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_node ON python_execution_runs(node_id);');
-            db.exec('CREATE INDEX IF NOT EXISTS idx_python_runs_env ON python_execution_runs(env_id);');
-            db.exec('CREATE INDEX IF NOT EXISTS idx_python_logs_run ON python_execution_logs(run_id);');
-
-            db.pragma('user_version = 2');
-          });
-          transaction();
-          console.log('Migration to version 2 complete.');
-        } catch (e) {
-          console.error('Fatal: Failed to migrate database to version 2:', e);
-        }
-      }
-
-      if (currentVersion < 3) {
-        console.log(`Migrating schema from version ${currentVersion} to 3...`);
-        try {
-          const transaction = db.transaction(() => {
-            db.exec(DOCUMENT_SEARCH_OBJECTS_SQL);
-            populateDocumentSearch();
-            db.pragma('user_version = 3');
-          });
-          transaction();
-          console.log('Migration to version 3 complete.');
-        } catch (e) {
-          console.error('Fatal: Failed to migrate database to version 3:', e);
-        }
-      }
+    const result = this.loadFromPath(resolveInitialDatabasePath(), { persist: false });
+    if (!result.success) {
+      throw new Error(`Failed to initialize database: ${result.error}`);
     }
   },
 
+  loadFromPath(targetPath: string, options: { persist?: boolean } = {}): DatabaseLoadResult {
+    const { persist = true } = options;
+    const resolvedPath = path.resolve(targetPath);
+    const directory = path.dirname(resolvedPath);
+
+    try {
+      fs.mkdirSync(directory, { recursive: true });
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    let existedBefore = false;
+    try {
+      existedBefore = fs.existsSync(resolvedPath);
+      if (existedBefore) {
+        const stats = fs.statSync(resolvedPath);
+        if (stats.isDirectory()) {
+          return {
+            success: false,
+            error: 'The selected path is a directory. Please choose a SQLite database file.',
+          };
+        }
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    let connection: Database.Database;
+    try {
+      connection = new Database(resolvedPath);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    try {
+      configureConnection(connection, existedBefore);
+    } catch (error) {
+      connection.close();
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    const previousDb = hasInitializedDb ? db : undefined;
+    const previousPath = hasInitializedDb ? currentDbPath : undefined;
+
+    db = connection;
+    currentDbPath = resolvedPath;
+    pendingNewDatabaseFlag = !existedBefore;
+    hasInitializedDb = true;
+
+    if (persist) {
+      persistDatabasePath(resolvedPath);
+    }
+
+    if (previousDb && previousDb !== connection) {
+      try {
+        previousDb.close();
+      } catch (error) {
+        console.warn('Failed to close previous database connection cleanly.', error);
+      }
+    }
+
+    const message = existedBefore
+      ? `Loaded existing database from ${resolvedPath}`
+      : `Created new database at ${resolvedPath}`;
+
+    console.log(message);
+
+    return {
+      success: true,
+      path: resolvedPath,
+      created: !existedBefore,
+      message,
+      previousPath,
+    };
+  },
+
   isNew(): boolean {
+    if (pendingNewDatabaseFlag) {
+      pendingNewDatabaseFlag = false;
+      return true;
+    }
+
     const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='nodes'").get();
     return !tableCheck;
   },
@@ -635,7 +797,7 @@ export const databaseService = {
   },
 
   getDbPath(): string {
-    return DB_PATH;
+    return currentDbPath;
   },
 
   async backupDatabase(filePath: string): Promise<void> {
@@ -655,7 +817,7 @@ export const databaseService = {
   },
 
   getDatabaseStats(): DatabaseStats {
-    const fileSize = statSync(DB_PATH).size;
+    const fileSize = currentDbPath && fs.existsSync(currentDbPath) ? statSync(currentDbPath).size : 0;
     const pageSize = db.pragma('page_size', { simple: true }) as number;
     const pageCount = db.pragma('page_count', { simple: true }) as number;
     const schemaVersion = db.pragma('schema_version', { simple: true }) as number;
@@ -683,8 +845,10 @@ export const databaseService = {
   },
 
   close() {
-    if (db) {
+    if (hasInitializedDb) {
       db.close();
+      hasInitializedDb = false;
+      currentDbPath = '';
     }
   }
 };

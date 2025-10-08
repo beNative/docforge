@@ -157,6 +157,32 @@ ipcMain.handle('db:migrate-from-json', (_, data) => databaseService.migrateFromJ
 ipcMain.handle('db:duplicate-nodes', (_, nodeIds) => databaseService.duplicateNodes(nodeIds));
 ipcMain.handle('db:delete-versions', (_, documentId, versionIds) => databaseService.deleteVersions(documentId, versionIds));
 ipcMain.handle('db:get-path', () => databaseService.getDbPath());
+ipcMain.handle('db:load-from-path', (_, filePath: string) => databaseService.loadFromPath(filePath));
+ipcMain.handle('db:select-and-load', async () => {
+    if (!mainWindow) {
+        return { success: false, error: 'Main window not available' };
+    }
+
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+        title: 'Select DocForge Database',
+        properties: ['openFile'],
+        filters: [
+            { name: 'SQLite Database', extensions: ['db', 'sqlite', 'sqlite3'] },
+            { name: 'All Files', extensions: ['*'] },
+        ],
+    });
+
+    if (canceled || filePaths.length === 0) {
+        return { success: false, canceled: true };
+    }
+
+    const [selectedPath] = filePaths;
+    const result = databaseService.loadFromPath(selectedPath);
+    if (!result.success) {
+        console.error(`Failed to load database from ${selectedPath}:`, result.error);
+    }
+    return result;
+});
 ipcMain.handle('db:import-files', async (_, filesData, targetParentId) => {
     try {
         const result = databaseService.importFiles(filesData, targetParentId);

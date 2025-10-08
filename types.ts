@@ -17,6 +17,8 @@ declare global {
       dbVacuum: () => Promise<{ success: boolean; error?: string }>;
       dbGetStats: () => Promise<{ success: boolean; stats?: DatabaseStats; error?: string }>;
       dbGetPath: () => Promise<string>;
+      dbLoadFromPath: (filePath: string) => Promise<DatabaseLoadResult>;
+      dbSelectAndLoad: () => Promise<DatabaseLoadResult>;
       // FIX: Add missing `dbImportFiles` to the electronAPI type definition.
       dbImportFiles: (
         filesData: { path: string; name: string; content: string }[],
@@ -333,4 +335,14 @@ export interface DatabaseStats {
     rowCount: number;
     indexes: string[];
   }[];
+}
+
+export interface DatabaseLoadResult {
+  success: boolean;
+  path?: string;
+  created?: boolean;
+  message?: string;
+  previousPath?: string;
+  error?: string;
+  canceled?: boolean;
 }
