@@ -474,6 +474,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             onScroll={handleEditorScroll}
             fontFamily={settings.editorFontFamily}
             fontSize={settings.editorFontSize}
+            activeLineHighlightColor={settings.editorActiveLineHighlightColor}
           />
         )
       : (
@@ -486,6 +487,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             customShortcuts={settings.customShortcuts}
             fontFamily={settings.editorFontFamily}
             fontSize={settings.editorFontSize}
+            activeLineHighlightColor={settings.editorActiveLineHighlightColor}
           />
         );
     const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} settings={settings} />;

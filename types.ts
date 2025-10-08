@@ -303,6 +303,7 @@ export interface Settings {
   markdownCodeFontFamily: string;
   editorFontFamily: string;
   editorFontSize: number;
+  editorActiveLineHighlightColor: string;
   markdownCodeBlockBackgroundLight: string;
   markdownCodeBlockBackgroundDark: string;
   markdownContentPadding: number;

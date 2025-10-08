@@ -582,6 +582,11 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
     const editorFontOptions = useMemo(() => buildFontOptions('editorFontFamily', platform), [platform]);
     const lightCodeBlockBackground = settings.markdownCodeBlockBackgroundLight.trim() || DEFAULT_SETTINGS.markdownCodeBlockBackgroundLight;
     const darkCodeBlockBackground = settings.markdownCodeBlockBackgroundDark.trim() || DEFAULT_SETTINGS.markdownCodeBlockBackgroundDark;
+    const trimmedHighlightColor = settings.editorActiveLineHighlightColor.trim();
+    const resolvedHighlightColor = trimmedHighlightColor || DEFAULT_SETTINGS.editorActiveLineHighlightColor;
+    const isHighlightHex = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(resolvedHighlightColor);
+    const highlightColorPickerValue = isHighlightHex ? resolvedHighlightColor : DEFAULT_SETTINGS.editorActiveLineHighlightColor;
+    const highlightColorDisplay = isHighlightHex ? resolvedHighlightColor.toUpperCase() : resolvedHighlightColor;
 
 
 
@@ -823,6 +828,44 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                   onChange={(font) => handleFontChange('editorFontFamily', font)}
                   helperText="Affects both the primary editor and diff viewer."
                 />
+                <SettingRow
+                  label="Active Line Highlight"
+                  description="Customize the background color used for the active line in Monaco editors."
+                  htmlFor="editorActiveLineHighlightColor"
+                >
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <input
+                        id="editorActiveLineHighlightColor"
+                        type="color"
+                        value={highlightColorPickerValue}
+                        onChange={(event) => setCurrentSettings((prev) => ({ ...prev, editorActiveLineHighlightColor: event.target.value }))}
+                        className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
+                      />
+                      <span className="font-mono text-xs text-text-secondary break-all">
+                        {highlightColorDisplay}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="px-2 py-1 text-xs"
+                        onClick={() => setCurrentSettings((prev) => ({ ...prev, editorActiveLineHighlightColor: DEFAULT_SETTINGS.editorActiveLineHighlightColor }))}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                    <input
+                      type="text"
+                      value={settings.editorActiveLineHighlightColor}
+                      onChange={(event) => setCurrentSettings((prev) => ({ ...prev, editorActiveLineHighlightColor: event.target.value }))}
+                      placeholder={DEFAULT_SETTINGS.editorActiveLineHighlightColor}
+                      className="w-full p-2 text-sm border border-border-color rounded-md bg-background text-text-main focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                    />
+                    <p className="text-xs text-text-secondary">
+                      Enter any valid CSS color value, such as #fff59d, #fff59d80, or rgba(255,255,0,0.3).
+                    </p>
+                  </div>
+                </SettingRow>
                 <SettingRow
                   label="Code Block Background (Light Theme)"
                   description="Adjust the background color for Markdown code blocks when using the light theme."

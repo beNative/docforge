@@ -349,6 +349,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         readOnly
                         fontFamily={settings.editorFontFamily}
                         fontSize={settings.editorFontSize}
+                        activeLineHighlightColor={settings.editorActiveLineHighlightColor}
                     />
                 </div>
             </main>
