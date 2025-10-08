@@ -40,6 +40,22 @@ const normalizeWheelDelta = (event: Pick<WheelEvent, 'deltaX' | 'deltaY' | 'delt
   };
 };
 
+const isPointerOnScrollbar = (event: Pick<PointerEvent, 'clientX' | 'clientY'>, element: HTMLElement) => {
+  const rect = element.getBoundingClientRect();
+  const verticalScrollbarWidth = element.offsetWidth - element.clientWidth;
+  const horizontalScrollbarHeight = element.offsetHeight - element.clientHeight;
+
+  if (verticalScrollbarWidth > 0 && event.clientX >= rect.right - verticalScrollbarWidth) {
+    return true;
+  }
+
+  if (horizontalScrollbarHeight > 0 && event.clientY >= rect.bottom - horizontalScrollbarHeight) {
+    return true;
+  }
+
+  return false;
+};
+
 const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>((props, ref) => {
   const {
     children,
@@ -188,6 +204,10 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
 
     const node = containerRef.current;
     if (!node) {
+      return;
+    }
+
+    if (isPointerOnScrollbar(event.nativeEvent, node)) {
       return;
     }
 
