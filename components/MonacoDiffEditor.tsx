@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { DEFAULT_SETTINGS } from '../constants';
 import { ensureMonaco } from '../services/editor/monacoLoader';
+import { applyDocforgeTheme } from '../services/editor/monacoTheme';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -16,9 +17,11 @@ interface MonacoDiffEditorProps {
   onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number }) => void;
   fontFamily?: string;
   fontSize?: number;
+  activeLineHighlightColorLight?: string;
+  activeLineHighlightColorDark?: string;
 }
 
-const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily, fontSize }) => {
+const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const editorInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -37,6 +40,29 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
         }
         return DEFAULT_SETTINGS.editorFontSize;
     }, [fontSize]);
+    const computedActiveLineHighlightColorLight = useMemo(() => {
+        const candidate = (activeLineHighlightColorLight ?? '').trim();
+        return candidate || DEFAULT_SETTINGS.editorActiveLineHighlightColor;
+    }, [activeLineHighlightColorLight]);
+    const computedActiveLineHighlightColorDark = useMemo(() => {
+        const candidate = (activeLineHighlightColorDark ?? '').trim();
+        return candidate || DEFAULT_SETTINGS.editorActiveLineHighlightColorDark;
+    }, [activeLineHighlightColorDark]);
+    const computedActiveLineHighlightColor = useMemo(() => {
+        return theme === 'dark'
+            ? computedActiveLineHighlightColorDark
+            : computedActiveLineHighlightColorLight;
+    }, [theme, computedActiveLineHighlightColorDark, computedActiveLineHighlightColorLight]);
+    const themeRef = useRef(theme);
+    const highlightColorRef = useRef(computedActiveLineHighlightColor);
+
+    useEffect(() => {
+        themeRef.current = theme;
+    }, [theme]);
+
+    useEffect(() => {
+        highlightColorRef.current = computedActiveLineHighlightColor;
+    }, [computedActiveLineHighlightColor]);
 
     const disposeListeners = useCallback(() => {
         if (changeListenerRef.current) {
@@ -66,6 +92,9 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
                 monacoApiRef.current = monacoApi;
 
                 if (!editorInstanceRef.current) {
+                    const variant = themeRef.current === 'dark' ? 'dark' : 'light';
+                    const themeName = applyDocforgeTheme(monacoApi, variant, highlightColorRef.current);
+
                     editorInstanceRef.current = monacoApi.editor.createDiffEditor(editorRef.current, {
                         originalEditable: false,
                         readOnly,
@@ -76,6 +105,7 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
                         renderSideBySide: renderMode !== 'inline',
                         minimap: { enabled: false },
                         diffWordWrap: 'on',
+                        theme: themeName,
                     });
                 }
 
@@ -88,7 +118,8 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
                     fontSize: computedFontSize,
                 });
 
-                monacoApi.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
+                const variant = themeRef.current === 'dark' ? 'dark' : 'light';
+                applyDocforgeTheme(monacoApi, variant, highlightColorRef.current);
 
                 const originalModel = monacoApi.editor.createModel(oldText ?? '', language);
                 const modifiedModel = monacoApi.editor.createModel(newText ?? '', language);
@@ -140,6 +171,13 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
             editorInstanceRef.current.updateOptions({ fontFamily: computedFontFamily, fontSize: computedFontSize });
         }
     }, [computedFontFamily, computedFontSize]);
+
+    useEffect(() => {
+        if (monacoApiRef.current) {
+            const variant = theme === 'dark' ? 'dark' : 'light';
+            applyDocforgeTheme(monacoApiRef.current, variant, computedActiveLineHighlightColor);
+        }
+    }, [theme, computedActiveLineHighlightColor]);
 
     // Final cleanup on unmount
     useEffect(() => {

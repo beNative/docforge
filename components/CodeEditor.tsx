@@ -3,6 +3,7 @@ import { useTheme } from '../hooks/useTheme';
 import { MONACO_KEYBINDING_DEFINITIONS } from '../services/editor/monacoKeybindings';
 import { DEFAULT_SETTINGS } from '../constants';
 import { ensureMonaco } from '../services/editor/monacoLoader';
+import { applyDocforgeTheme } from '../services/editor/monacoTheme';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -15,6 +16,8 @@ interface CodeEditorProps {
   customShortcuts?: Record<string, string[]>;
   fontFamily?: string;
   fontSize?: number;
+  activeLineHighlightColorLight?: string;
+  activeLineHighlightColorDark?: string;
 }
 
 export interface CodeEditorHandle {
@@ -112,7 +115,7 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
     return keybinding | primaryKey;
 };
 
-const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize }, ref) => {
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -131,6 +134,29 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
         }
         return DEFAULT_SETTINGS.editorFontSize;
     }, [fontSize]);
+    const computedActiveLineHighlightColorLight = useMemo(() => {
+        const candidate = (activeLineHighlightColorLight ?? '').trim();
+        return candidate || DEFAULT_SETTINGS.editorActiveLineHighlightColor;
+    }, [activeLineHighlightColorLight]);
+    const computedActiveLineHighlightColorDark = useMemo(() => {
+        const candidate = (activeLineHighlightColorDark ?? '').trim();
+        return candidate || DEFAULT_SETTINGS.editorActiveLineHighlightColorDark;
+    }, [activeLineHighlightColorDark]);
+    const computedActiveLineHighlightColor = useMemo(() => {
+        return theme === 'dark'
+            ? computedActiveLineHighlightColorDark
+            : computedActiveLineHighlightColorLight;
+    }, [theme, computedActiveLineHighlightColorDark, computedActiveLineHighlightColorLight]);
+    const themeRef = useRef(theme);
+    const highlightColorRef = useRef(computedActiveLineHighlightColor);
+
+    useEffect(() => {
+        themeRef.current = theme;
+    }, [theme]);
+
+    useEffect(() => {
+        highlightColorRef.current = computedActiveLineHighlightColor;
+    }, [computedActiveLineHighlightColor]);
 
     useImperativeHandle(ref, () => ({
         format() {
@@ -239,10 +265,13 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     monacoInstanceRef.current.dispose();
                 }
 
+                const variant = themeRef.current === 'dark' ? 'dark' : 'light';
+                const themeName = applyDocforgeTheme(monacoApi, variant, highlightColorRef.current);
+
                 const editorInstance = monacoApi.editor.create(editorRef.current, {
                     value: content,
                     language: language || 'plaintext',
-                    theme: theme === 'dark' ? 'vs-dark' : 'vs',
+                    theme: themeName,
                     automaticLayout: true,
                     fontSize: computedFontSize,
                     fontFamily: computedFontFamily,
@@ -309,10 +338,11 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
 
     // Effect to update theme
     useEffect(() => {
-        if (monacoInstanceRef.current && monacoApiRef.current) {
-            monacoApiRef.current.editor.setTheme(theme === 'dark' ? 'vs-dark' : 'vs');
+        if (monacoApiRef.current) {
+            const variant = theme === 'dark' ? 'dark' : 'light';
+            applyDocforgeTheme(monacoApiRef.current, variant, computedActiveLineHighlightColor);
         }
-    }, [theme]);
+    }, [theme, computedActiveLineHighlightColor]);
 
     useEffect(() => {
         if (monacoInstanceRef.current) {
