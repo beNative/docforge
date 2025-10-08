@@ -1674,6 +1674,7 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
     const [jsonError, setJsonError] = useState<string | null>(null);
     const [mode, setMode] = useState<'tree' | 'json'>('tree');
     const [transferStatus, setTransferStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const editorSurfaceStyle = useMemo<React.CSSProperties>(() => ({ height: 'clamp(24rem, 70vh, 44rem)' }), []);
 
     useEffect(() => {
         setJsonString(JSON.stringify(settings, null, 2));
@@ -1853,14 +1854,16 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
                                 <SettingsTreeEditor
                                     settings={settings}
                                     onSettingChange={handleSettingChange}
-                                    className="flex-1 min-h-[24rem]"
+                                    className="flex-1"
+                                    style={editorSurfaceStyle}
                                 />
                             ) : (
                                 <>
                                     <JsonEditor
                                         value={jsonString}
                                         onChange={handleJsonChange}
-                                        className="flex-1 min-h-[24rem]"
+                                        className="flex-1"
+                                        style={editorSurfaceStyle}
                                     />
                                     {jsonError && <p className="text-sm text-destructive-text">{jsonError}</p>}
                                 </>

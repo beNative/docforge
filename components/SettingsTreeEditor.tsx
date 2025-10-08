@@ -76,14 +76,21 @@ interface SettingsTreeEditorProps {
   settings: object;
   onSettingChange: (path: (string | number)[], value: any) => void;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-const SettingsTreeEditor: React.FC<SettingsTreeEditorProps> = ({ settings, onSettingChange, className }) => {
+const SettingsTreeEditor: React.FC<SettingsTreeEditorProps> = ({ settings, onSettingChange, className, style }) => {
+  const resolvedClassName = [
+    'w-full p-2 rounded-lg bg-background border border-border-color overflow-y-auto',
+    className,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div
-      className={`p-2 rounded-lg bg-background border border-border-color overflow-y-auto ${
-        className ?? 'h-96'
-      }`}
+      className={resolvedClassName}
+      style={{ height: 'clamp(24rem, 70vh, 44rem)', ...style }}
     >
       {Object.entries(settings).map(([key, value]) => (
         <TreeNode key={key} nodeKey={key} nodeValue={value} path={[key]} level={0} onSettingChange={onSettingChange} />
