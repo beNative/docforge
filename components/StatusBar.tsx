@@ -1,4 +1,5 @@
 import React from 'react';
+import Tooltip from './Tooltip';
 import type { LLMStatus, DiscoveredLLMModel, DiscoveredLLMService } from '../types';
 import { DatabaseIcon, ChevronDownIcon } from './Icons';
 
@@ -60,6 +61,11 @@ const StatusBar: React.FC<StatusBarProps> = ({
 }) => {
   const { text, color, tooltip } = statusConfig[status];
   const selectedService = discoveredServices.find(s => s.generateUrl === llmProviderUrl);
+
+  const statusTriggerRef = React.useRef<HTMLDivElement>(null);
+  const [showStatusTooltip, setShowStatusTooltip] = React.useState(false);
+  const databaseTriggerRef = React.useRef<HTMLButtonElement>(null);
+  const [showDatabaseTooltip, setShowDatabaseTooltip] = React.useState(false);
 
   const databaseFileName = React.useMemo(() => {
     if (!databasePath) {
@@ -127,13 +133,21 @@ const StatusBar: React.FC<StatusBarProps> = ({
   return (
     <footer className="flex items-center justify-between px-4 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30">
       <div className="flex items-center gap-4">
-        <div className="relative group flex items-center gap-2 cursor-default">
+        <div
+          ref={statusTriggerRef}
+          className="flex items-center gap-2 cursor-default focus:outline-none"
+          onMouseEnter={() => setShowStatusTooltip(true)}
+          onMouseLeave={() => setShowStatusTooltip(false)}
+          onFocus={() => setShowStatusTooltip(true)}
+          onBlur={() => setShowStatusTooltip(false)}
+          tabIndex={0}
+        >
           <div className={`w-2 h-2 rounded-full ${color}`}></div>
           <span className="font-medium">{text}</span>
-          <span className="absolute bottom-full z-50 mb-2 w-max px-2 py-1 text-xs text-tooltip-text bg-tooltip-bg rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-            {tooltip}
-          </span>
         </div>
+        {showStatusTooltip && statusTriggerRef.current && (
+          <Tooltip targetRef={statusTriggerRef} content={tooltip} />
+        )}
         <div className="h-4 w-px bg-border-color"></div>
         <div className="flex items-center gap-1">
           <label htmlFor="status-bar-provider-select" className="shrink-0">Provider:</label>
@@ -181,8 +195,12 @@ const StatusBar: React.FC<StatusBarProps> = ({
             handleDatabaseMenu(event);
           }}
           className={`flex items-center gap-2 px-2 py-1 -my-1 rounded-md transition-colors ${onDatabaseMenu ? 'hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer' : 'cursor-default'}`}
-          title={databaseTooltip}
           disabled={!onDatabaseMenu}
+          ref={databaseTriggerRef}
+          onMouseEnter={() => setShowDatabaseTooltip(true)}
+          onMouseLeave={() => setShowDatabaseTooltip(false)}
+          onFocus={() => setShowDatabaseTooltip(true)}
+          onBlur={() => setShowDatabaseTooltip(false)}
         >
           <DatabaseIcon className="w-3.5 h-3.5" />
           <span className="font-semibold text-text-main max-w-[180px] truncate" aria-label="Current database name">
@@ -190,6 +208,13 @@ const StatusBar: React.FC<StatusBarProps> = ({
           </span>
           <ChevronDownIcon className="w-3 h-3 text-text-secondary" />
         </button>
+        {showDatabaseTooltip && databaseTriggerRef.current && (
+          <Tooltip
+            targetRef={databaseTriggerRef}
+            content={<span className="block whitespace-pre-line break-words leading-snug text-left">{databaseTooltip}</span>}
+            className="max-w-lg"
+          />
+        )}
         {databaseStatus?.message && (
           <span className={`text-[11px] ${databaseStatusClass} max-w-[220px] truncate`} title={databaseStatus.message}>
             {databaseStatus.message}
