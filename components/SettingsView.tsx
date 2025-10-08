@@ -391,7 +391,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </ul>
         </nav>
         <main className="flex-1 overflow-y-auto bg-secondary">
-          <div className="max-w-3xl mx-auto px-8 py-6">
+          <div className="w-full px-6 py-6">
             {renderActiveSection()}
           </div>
         </main>
