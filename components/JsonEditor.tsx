@@ -7,9 +7,11 @@ interface JsonEditorProps {
   value: string;
   onChange: (value: string) => void;
   readOnly?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
 }
 
-const JsonEditor: React.FC<JsonEditorProps> = ({ value, onChange, readOnly = false }) => {
+const JsonEditor: React.FC<JsonEditorProps> = ({ value, onChange, readOnly = false, className, style }) => {
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const preRef = useRef<HTMLPreElement>(null);
 
@@ -31,9 +33,19 @@ const JsonEditor: React.FC<JsonEditorProps> = ({ value, onChange, readOnly = fal
     }
   };
 
+  const combinedStyle: React.CSSProperties = {
+    minHeight: '24rem',
+    height: 'clamp(24rem, 70vh, 44rem)',
+    maxHeight: '44rem',
+    ...style,
+  };
+
   return (
-    <div 
-      className="editor-container relative w-full rounded-lg bg-background border border-border-color focus-within:ring-2 focus-within:ring-primary focus-within:border-primary h-96"
+    <div
+      className={`editor-container relative w-full rounded-lg bg-background border border-border-color focus-within:ring-2 focus-within:ring-primary focus-within:border-primary ${
+        className ?? ''
+      }`}
+      style={combinedStyle}
     >
       <textarea
         ref={editorRef}

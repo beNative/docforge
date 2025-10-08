@@ -284,9 +284,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const { addLog } = useLogger();
   const [pythonValidationError, setPythonValidationError] = useState<string | null>(null);
 
-  const sectionRefs = useRef<Partial<Record<SettingsCategory, HTMLDivElement | null>>>({});
-  const mainPanelRef = useRef<HTMLElement>(null);
-
   useEffect(() => {
     setCurrentSettings(settings);
   }, [settings]);
@@ -295,49 +292,111 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     setIsDirty(JSON.stringify(settings) !== JSON.stringify(currentSettings));
   }, [settings, currentSettings]);
 
-  useEffect(() => {
-    const panel = mainPanelRef.current;
-    if (!panel) {
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setVisibleCategory(entry.target.id as SettingsCategory);
-          }
-        });
-      },
-      {
-        root: panel,
-        rootMargin: '-40% 0px -60% 0px',
-        threshold: 0,
-      }
-    );
-
-    const sections = Object.values(sectionRefs.current).filter(
-      (section): section is HTMLDivElement => Boolean(section)
-    );
-    sections.forEach((section) => observer.observe(section));
-
-    return () => {
-      sections.forEach((section) => observer.unobserve(section));
-      observer.disconnect();
-    };
-  }, []);
-
   const handleSave = useCallback(() => {
     addLog('INFO', 'User action: Save settings.');
     onSave(currentSettings);
   }, [addLog, onSave, currentSettings]);
 
   const handleNavClick = useCallback((id: SettingsCategory) => {
-    sectionRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setVisibleCategory(id);
   }, []);
 
+  const navButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
   const isSaveDisabled = !isDirty || !!pythonValidationError;
+
+  const activeCategory = useMemo(
+    () => categories.find((category) => category.id === visibleCategory) ?? categories[0],
+    [visibleCategory]
+  );
+
+  const handleNavKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      const total = categories.length;
+      let nextIndex = index;
+
+      switch (event.key) {
+        case 'ArrowUp':
+        case 'ArrowLeft':
+          nextIndex = Math.max(0, index - 1);
+          break;
+        case 'ArrowDown':
+        case 'ArrowRight':
+          nextIndex = Math.min(total - 1, index + 1);
+          break;
+        case 'PageUp':
+        case 'Home':
+          nextIndex = 0;
+          break;
+        case 'PageDown':
+        case 'End':
+          nextIndex = total - 1;
+          break;
+        case 'Enter':
+        case ' ': // Space
+        case 'Spacebar':
+          event.preventDefault();
+          handleNavClick(categories[index].id);
+          return;
+        default:
+          return;
+      }
+
+      if (nextIndex !== index) {
+        event.preventDefault();
+        handleNavClick(categories[nextIndex].id);
+        navButtonRefs.current[nextIndex]?.focus();
+      }
+    },
+    [handleNavClick]
+  );
+
+  const renderActiveSection = () => {
+    switch (activeCategory.id) {
+      case 'provider':
+        return (
+          <ProviderSettingsSection
+            {...{
+              settings: currentSettings,
+              setCurrentSettings,
+              discoveredServices,
+              onDetectServices,
+              isDetecting,
+            }}
+          />
+        );
+      case 'appearance':
+        return <AppearanceSettingsSection {...{ settings: currentSettings, setCurrentSettings }} />;
+      case 'shortcuts':
+        return (
+          <KeyboardShortcutsSection
+            {...{
+              settings: currentSettings,
+              setCurrentSettings,
+              commands,
+            }}
+          />
+        );
+      case 'python':
+        return (
+          <PythonSettingsSection
+            {...{
+              settings: currentSettings,
+              setCurrentSettings,
+              onValidationChange: setPythonValidationError,
+            }}
+          />
+        );
+      case 'general':
+        return <GeneralSettingsSection {...{ settings: currentSettings, setCurrentSettings }} />;
+      case 'database':
+        return <DatabaseSettingsSection />;
+      case 'advanced':
+        return <AdvancedSettingsSection {...{ settings: currentSettings, setCurrentSettings }} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
@@ -357,11 +416,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="flex-1 flex overflow-hidden">
         <nav className="w-48 p-4 border-r border-border-color bg-secondary/50">
           <ul className="space-y-1">
-            {categories.map(({ id, label, icon: Icon }) => (
+            {categories.map(({ id, label, icon: Icon }, index) => (
               <li key={id}>
                 <button
+                  ref={(element) => {
+                    navButtonRefs.current[index] = element;
+                  }}
+                  onKeyDown={(event) => handleNavKeyDown(event, index)}
                   onClick={() => handleNavClick(id)}
-                  className={`w-full flex items-center gap-3 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  className={`w-full flex items-center gap-3 px-2 py-1.5 text-xs font-medium rounded-md transition-colors focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 ${
                     visibleCategory === id
                       ? 'bg-primary/10 text-primary'
                       : 'text-text-secondary hover:bg-border-color/50 hover:text-text-main'
@@ -374,56 +437,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             ))}
           </ul>
         </nav>
-        <main ref={mainPanelRef} className="flex-1 overflow-y-auto bg-secondary">
-          <div className="max-w-4xl mx-auto px-8 divide-y divide-border-color/50">
-            <ProviderSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                discoveredServices,
-                onDetectServices,
-                isDetecting,
-                sectionRef: (el) => (sectionRefs.current.provider = el),
-              }}
-            />
-            <AppearanceSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.appearance = el),
-              }}
-            />
-            <KeyboardShortcutsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                commands,
-                sectionRef: (el) => (sectionRefs.current.shortcuts = el),
-              }}
-            />
-            <PythonSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.python = el),
-                onValidationChange: setPythonValidationError,
-              }}
-            />
-            <GeneralSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.general = el),
-              }}
-            />
-            <DatabaseSettingsSection {...{ sectionRef: (el) => (sectionRefs.current.database = el) }} />
-            <AdvancedSettingsSection
-              {...{
-                settings: currentSettings,
-                setCurrentSettings,
-                sectionRef: (el) => (sectionRefs.current.advanced = el),
-              }}
-            />
+        <main className="flex-1 flex flex-col bg-secondary">
+          <div className="flex-1 overflow-y-auto px-6 py-3">
+            <div className="min-h-full flex flex-col">
+              {renderActiveSection()}
+            </div>
           </div>
         </main>
       </div>
@@ -437,10 +455,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 interface SectionProps {
     settings: Settings;
     setCurrentSettings: React.Dispatch<React.SetStateAction<Settings>>;
-    sectionRef: (el: HTMLDivElement | null) => void;
 }
 
-const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: DiscoveredLLMService[], onDetectServices: () => void, isDetecting: boolean }> = ({ settings, setCurrentSettings, discoveredServices, onDetectServices, isDetecting, sectionRef }) => {
+const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: DiscoveredLLMService[], onDetectServices: () => void, isDetecting: boolean }> = ({ settings, setCurrentSettings, discoveredServices, onDetectServices, isDetecting }) => {
     const [availableModels, setAvailableModels] = useState<DiscoveredLLMModel[]>([]);
     const [isFetchingModels, setIsFetchingModels] = useState(false);
     const [detectionError, setDetectionError] = useState<string | null>(null);
@@ -495,7 +512,7 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
     const selectedService = discoveredServices.find(s => s.generateUrl === settings.llmProviderUrl);
 
     return (
-        <div id="provider" ref={sectionRef} className="py-6">
+        <section className="pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">LLM Provider</h2>
             <div className="space-y-6">
                 <SettingRow label="Detect Services" description="Scan for locally running LLM services like Ollama and LM Studio.">
@@ -538,11 +555,11 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
                     </div>
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 
-const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
+const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings'>> = ({ settings, setCurrentSettings }) => {
     const CardButton: React.FC<{name: string, value: any, children: React.ReactNode, onClick: (value: any) => void, isSelected: boolean}> = ({ name, value, children, onClick, isSelected }) => (
 
         <button
@@ -569,7 +586,7 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
 
 
     return (
-        <div id="appearance" ref={sectionRef} className="py-6">
+        <section className="pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Appearance</h2>
             <div className="space-y-6">
                 <SettingRow label="Interface Scale" description="Adjust the size of all UI elements in the application.">
@@ -859,7 +876,7 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                   </div>
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -868,7 +885,7 @@ interface PythonSectionProps extends SectionProps {
   onValidationChange?: (message: string | null) => void;
 }
 
-const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurrentSettings, sectionRef, onValidationChange }) => {
+const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurrentSettings, onValidationChange }) => {
   const { addLog } = useLogger();
   const {
     environments,
@@ -1099,7 +1116,7 @@ const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurr
   const interpreterValue = formState.useCustomInterpreter ? 'custom' : formState.interpreterPath;
 
   return (
-    <div id="python" ref={sectionRef} className="py-6">
+    <section className="pt-2 pb-6">
       <h2 className="text-lg font-semibold text-text-main mb-4">Python Execution</h2>
       <p className="text-xs text-text-secondary max-w-3xl mb-6">
         Configure how DocForge prepares isolated Python environments. These defaults are applied when auto-creating a virtual
@@ -1364,24 +1381,24 @@ requests"
           </form>
         </Modal>
       )}
-    </div>
+    </section>
   );
 };
 
-const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
+const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings'>> = ({ settings, setCurrentSettings }) => {
     const isOfflineRendererAvailable = typeof window !== 'undefined' && !!window.electronAPI?.renderPlantUML;
     const offlineRendererMessage = 'Offline rendering requires the desktop application with a local Java runtime.';
     return (
-            <div id="general" ref={sectionRef} className="py-6">
+        <section className="pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">General</h2>
             <div className="space-y-6">
-                 <SettingRow htmlFor="allowPrerelease" label="Receive Pre-releases" description="Get notified about new beta versions and test features early.">
+                <SettingRow htmlFor="allowPrerelease" label="Receive Pre-releases" description="Get notified about new beta versions and test features early.">
                     <ToggleSwitch id="allowPrerelease" checked={settings.allowPrerelease} onChange={(val) => setCurrentSettings(s => ({...s, allowPrerelease: val}))} />
                 </SettingRow>
-                 <SettingRow htmlFor="autoSaveLogs" label="Auto-save Logs" description="Automatically save all logs to a daily file on your computer for debugging.">
+                <SettingRow htmlFor="autoSaveLogs" label="Auto-save Logs" description="Automatically save all logs to a daily file on your computer for debugging.">
                     <ToggleSwitch id="autoSaveLogs" checked={settings.autoSaveLogs} onChange={(val) => setCurrentSettings(s => ({...s, autoSaveLogs: val}))} />
                 </SettingRow>
-                 <SettingRow
+                <SettingRow
                     htmlFor="plantumlRendererMode"
                     label="PlantUML Rendering"
                     description="Choose whether PlantUML diagrams are rendered via the public server or the local renderer."
@@ -1407,11 +1424,11 @@ const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurre
                     </div>
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 
-const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null) => void}> = ({ sectionRef }) => {
+const DatabaseSettingsSection: React.FC = () => {
     const [dbPath, setDbPath] = useState<string>('Loading...');
     const [stats, setStats] = useState<DatabaseStats | null>(null);
     const [isLoadingStats, setIsLoadingStats] = useState(true);
@@ -1561,44 +1578,64 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
     };
 
     return (
-         <div id="database" ref={sectionRef} className="py-6">
+        <section className="pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Database Management</h2>
             <div className="space-y-6">
                 <SettingRow label="Database File" description="This file contains all your documents, folders, and history.">
-                        <div className="w-full flex flex-col md:flex-row md:items-center gap-2">
-                            <div className="text-sm text-text-main bg-background px-3 py-2 rounded-md border border-border-color w-full font-mono text-xs select-all break-all md:flex-1">
-                                {dbPath}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button onClick={handleCreateDatabase} variant="primary" isLoading={isCreatingDb} disabled={isSwitchingDb || isCreatingDb}>
-                                    <DatabaseIcon className="w-4 h-4 mr-2" /> New Database
-                                </Button>
-                                <Button onClick={handleChangeDatabase} variant="secondary" isLoading={isSwitchingDb} disabled={isSwitchingDb || isCreatingDb}>
-                                    Change Location
-                                </Button>
-                            </div>
+                    <div className="w-full flex flex-col md:flex-row md:items-center gap-2">
+                        <div className="text-sm text-text-main bg-background px-3 py-2 rounded-md border border-border-color w-full font-mono text-xs select-all break-all md:flex-1">
+                            {dbPath}
                         </div>
+                        <div className="flex items-center gap-2">
+                            <Button onClick={handleCreateDatabase} variant="primary" isLoading={isCreatingDb} disabled={isSwitchingDb || isCreatingDb}>
+                                <DatabaseIcon className="w-4 h-4 mr-2" /> New Database
+                            </Button>
+                            <Button onClick={handleChangeDatabase} variant="secondary" isLoading={isSwitchingDb} disabled={isSwitchingDb || isCreatingDb}>
+                                Change Location
+                            </Button>
+                        </div>
+                    </div>
                 </SettingRow>
                 <SettingRow label="Operations" description="Perform maintenance tasks on the application database.">
                     <div className="flex flex-col items-end w-full gap-2">
                         <div className="flex items-center gap-2">
-                            <Button onClick={handleBackup} variant="secondary" isLoading={operation?.name === 'backup' && operation.status === 'running'}><SaveIcon className="w-4 h-4 mr-2" /> Backup</Button>
-                            <Button onClick={handleIntegrityCheck} variant="secondary" isLoading={operation?.name === 'integrity' && operation.status === 'running'}><CheckIcon className="w-4 h-4 mr-2" /> Check Integrity</Button>
-                            <Button onClick={handleVacuum} variant="secondary" isLoading={operation?.name === 'vacuum' && operation.status === 'running'}><SparklesIcon className="w-4 h-4 mr-2" /> Vacuum</Button>
+                            <Button onClick={handleBackup} variant="secondary" isLoading={operation?.name === 'backup' && operation.status === 'running'}>
+                                <SaveIcon className="w-4 h-4 mr-2" /> Backup
+                            </Button>
+                            <Button onClick={handleIntegrityCheck} variant="secondary" isLoading={operation?.name === 'integrity' && operation.status === 'running'}>
+                                <CheckIcon className="w-4 h-4 mr-2" /> Check Integrity
+                            </Button>
+                            <Button onClick={handleVacuum} variant="secondary" isLoading={operation?.name === 'vacuum' && operation.status === 'running'}>
+                                <SparklesIcon className="w-4 h-4 mr-2" /> Vacuum
+                            </Button>
                         </div>
                         {operation && (
-                            <p className={`text-xs mt-2 text-right ${operation.status === 'error' ? 'text-error' : 'text-success'}`}>{operation.message}</p>
+                            <p className={`text-xs mt-2 text-right ${operation.status === 'error' ? 'text-error' : 'text-success'}`}>
+                                {operation.message}
+                            </p>
                         )}
                     </div>
                 </SettingRow>
                 <SettingRow label="Statistics" description="An overview of the database contents and size.">
-                     {isLoadingStats ? <Spinner/> : !stats ? <p className="text-sm text-error">Could not load stats.</p> : (
+                    {isLoadingStats ? (
+                        <Spinner />
+                    ) : !stats ? (
+                        <p className="text-sm text-error">Could not load stats.</p>
+                    ) : (
                         <div className="w-full space-y-4">
                             <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div className="bg-background p-3 rounded-md border border-border-color"><strong>File Size:</strong> {stats.fileSize}</div>
-                                <div className="bg-background p-3 rounded-md border border-border-color"><strong>Schema Version:</strong> {stats.schemaVersion}</div>
-                                <div className="bg-background p-3 rounded-md border border-border-color"><strong>Page Size:</strong> {stats.pageSize} bytes</div>
-                                <div className="bg-background p-3 rounded-md border border-border-color"><strong>Page Count:</strong> {stats.pageCount}</div>
+                                <div className="bg-background p-3 rounded-md border border-border-color">
+                                    <strong>File Size:</strong> {stats.fileSize}
+                                </div>
+                                <div className="bg-background p-3 rounded-md border border-border-color">
+                                    <strong>Schema Version:</strong> {stats.schemaVersion}
+                                </div>
+                                <div className="bg-background p-3 rounded-md border border-border-color">
+                                    <strong>Page Size:</strong> {stats.pageSize} bytes
+                                </div>
+                                <div className="bg-background p-3 rounded-md border border-border-color">
+                                    <strong>Page Count:</strong> {stats.pageCount}
+                                </div>
                             </div>
                             <div className="w-full overflow-hidden border border-border-color rounded-md">
                                 <table className="w-full text-left text-sm">
@@ -1610,31 +1647,41 @@ const DatabaseSettingsSection: React.FC<{sectionRef: (el: HTMLDivElement | null)
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border-color">
-                                        {stats.tables.map(table => (
+                                        {stats.tables.map((table) => (
                                             <tr key={table.name} className="bg-secondary">
                                                 <td className="p-2 font-mono">{table.name}</td>
                                                 <td className="p-2 font-mono text-right">{table.rowCount}</td>
-                                                <td className="p-2 font-mono text-xs text-text-secondary">{table.indexes.join(', ') || 'none'}</td>
+                                                <td className="p-2 font-mono text-xs text-text-secondary">
+                                                    {table.indexes.join(', ') || 'none'}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
-                     )}
+                    )}
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 
-const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings' | 'sectionRef'>> = ({ settings, setCurrentSettings, sectionRef }) => {
+const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings'>> = ({ settings, setCurrentSettings }) => {
     const { addLog } = useLogger();
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [jsonString, setJsonString] = useState(() => JSON.stringify(settings, null, 2));
     const [jsonError, setJsonError] = useState<string | null>(null);
     const [mode, setMode] = useState<'tree' | 'json'>('tree');
     const [transferStatus, setTransferStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const editorSurfaceStyle = useMemo<React.CSSProperties>(
+        () => ({
+            minHeight: '24rem',
+            height: 'clamp(24rem, 70vh, 44rem)',
+            maxHeight: '44rem',
+        }),
+        [],
+    );
 
     useEffect(() => {
         setJsonString(JSON.stringify(settings, null, 2));
@@ -1764,14 +1811,18 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
     }, [addLog, applyImportedSettings]);
 
     return (
-         <div id="advanced" ref={sectionRef} className="py-6">
+        <section className="flex flex-col min-h-full pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Advanced</h2>
-            <div className="space-y-6">
+            <div className="flex flex-col gap-6 flex-1 min-h-0">
                 <SettingRow label="Settings Transfer" description="Export the current configuration or import it from a JSON file.">
                     <div className="flex flex-col gap-3">
                         <div className="flex flex-wrap gap-2">
-                            <Button onClick={handleExport} variant="secondary" size="sm">Export Settings</Button>
-                            <Button onClick={handleImport} variant="secondary" size="sm">Import Settings</Button>
+                            <Button onClick={handleExport} variant="secondary" size="sm">
+                                Export Settings
+                            </Button>
+                            <Button onClick={handleImport} variant="secondary" size="sm">
+                                Import Settings
+                            </Button>
                         </div>
                         {transferStatus && (
                             <p className={`text-xs ${transferStatus.type === 'success' ? 'text-success' : 'text-error'}`}>
@@ -1788,30 +1839,47 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
                     </div>
                 </SettingRow>
                 <SettingRow label="Settings Editor" description="Edit settings using an interactive tree or raw JSON for full control.">
-                    <div className="w-full">
-                        <div className="flex justify-end mb-2">
+                    <div className="flex flex-col gap-3 w-full flex-1 min-h-0 self-stretch">
+                        <div className="flex justify-end">
                             <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
-                                <button onClick={() => setMode('tree')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'tree' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
+                                <button
+                                    onClick={() => setMode('tree')}
+                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'tree' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}
+                                >
                                     Tree
                                 </button>
-                                <button onClick={() => setMode('json')} className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'json' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}>
+                                <button
+                                    onClick={() => setMode('json')}
+                                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${mode === 'json' ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color/50'}`}
+                                >
                                     JSON
                                 </button>
                             </div>
                         </div>
-
-                        {mode === 'tree' ? (
-                            <SettingsTreeEditor settings={settings} onSettingChange={handleSettingChange} />
-                        ) : (
-                            <div>
-                                <JsonEditor value={jsonString} onChange={handleJsonChange} />
-                                {jsonError && <p className="text-sm text-destructive-text mt-2">{jsonError}</p>}
-                            </div>
-                        )}
+                        <div className="flex-1 min-h-0 flex flex-col gap-2">
+                            {mode === 'tree' ? (
+                                <SettingsTreeEditor
+                                    settings={settings}
+                                    onSettingChange={handleSettingChange}
+                                    className="flex-1"
+                                    style={editorSurfaceStyle}
+                                />
+                            ) : (
+                                <>
+                                    <JsonEditor
+                                        value={jsonString}
+                                        onChange={handleJsonChange}
+                                        className="flex-1"
+                                        style={editorSurfaceStyle}
+                                    />
+                                    {jsonError && <p className="text-sm text-destructive-text">{jsonError}</p>}
+                                </>
+                            )}
+                        </div>
                     </div>
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 

@@ -16,7 +16,7 @@ const SettingRow: React.FC<SettingRowProps> = ({ label, description, children, h
         </label>
         <p className="text-xs text-text-secondary mt-1">{description}</p>
       </div>
-      <div className="md:col-span-2 flex justify-start md:justify-end items-center w-full">
+      <div className="md:col-span-2 flex justify-start md:justify-end items-start w-full">
         {children}
       </div>
     </div>
