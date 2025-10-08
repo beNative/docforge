@@ -1,4 +1,12 @@
-import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import IconButton from './IconButton';
 import { MinusIcon, PlusIcon, RefreshIcon } from './Icons';
 
@@ -52,6 +60,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(ref, () => containerRef.current);
 
   const [scale, setScaleState] = useState(initialScale);
@@ -60,6 +69,39 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
   const scaleRef = useRef(scale);
   const offsetRef = useRef(offset);
   const panPointer = useRef<{ id: number | null; lastX: number; lastY: number }>({ id: null, lastX: 0, lastY: 0 });
+  const [contentSize, setContentSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+
+  useLayoutEffect(() => {
+    const node = contentRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+
+      let width = entry.contentRect.width;
+      let height = entry.contentRect.height;
+
+      const boxSize = Array.isArray(entry.contentBoxSize) ? entry.contentBoxSize[0] : entry.contentBoxSize;
+
+      if (boxSize) {
+        width = boxSize.inlineSize ?? width;
+        height = boxSize.blockSize ?? height;
+      }
+
+      setContentSize({ width, height });
+    });
+
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   const setScale = useCallback((next: number) => {
     const clamped = clamp(next, minScale, maxScale);
@@ -101,13 +143,22 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     if (!disablePan) {
       event.preventDefault();
       const { deltaX, deltaY } = normalizeWheelDelta(event, target);
-      const scale = scaleRef.current || 1;
-      setOffset((prev) => ({
-        x: prev.x - deltaX / scale,
-        y: prev.y - deltaY / scale,
-      }));
+
+      if (lockOverflow) {
+        const scale = scaleRef.current || 1;
+        setOffset((prev) => ({
+          x: prev.x - deltaX / scale,
+          y: prev.y - deltaY / scale,
+        }));
+        return;
+      }
+
+      const node = containerRef.current;
+      if (node) {
+        node.scrollBy({ left: deltaX, top: deltaY, behavior: 'auto' });
+      }
     }
-  }, [disablePan, disableZoom, setOffset, setScale, zoomStep]);
+  }, [disablePan, disableZoom, lockOverflow, setOffset, setScale, zoomStep]);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -158,9 +209,20 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     const dx = event.clientX - panPointer.current.lastX;
     const dy = event.clientY - panPointer.current.lastY;
     panPointer.current = { id: event.pointerId, lastX: event.clientX, lastY: event.clientY };
+
+    const node = containerRef.current;
+    if (!node) {
+      return;
+    }
+
+    if (!lockOverflow) {
+      node.scrollBy({ left: -dx, top: -dy, behavior: 'auto' });
+      return;
+    }
+
     const scale = scaleRef.current || 1;
     setOffset((prev) => ({ x: prev.x + dx / scale, y: prev.y + dy / scale }));
-  }, [disablePan, setOffset]);
+  }, [disablePan, lockOverflow, setOffset]);
 
   const endPan = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (panPointer.current.id !== event.pointerId) {
@@ -188,16 +250,29 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
   const handleResetView = useCallback(() => {
     setScale(initialScale);
     setOffset({ x: 0, y: 0 });
-  }, [initialScale, setOffset, setScale]);
+    if (!lockOverflow) {
+      const node = containerRef.current;
+      node?.scrollTo({ left: 0, top: 0, behavior: 'auto' });
+    }
+  }, [initialScale, lockOverflow, setOffset, setScale]);
 
   const transformStyle = useMemo(() => {
-    return { transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})` };
-  }, [offset.x, offset.y, scale]);
+    const translateX = lockOverflow ? offset.x : 0;
+    const translateY = lockOverflow ? offset.y : 0;
+    const origin = layout === 'natural' ? 'top left' : 'center';
+
+    return {
+      transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(${scale})`,
+      transformOrigin: origin,
+    };
+  }, [layout, lockOverflow, offset.x, offset.y, scale]);
 
   const containerClasses = useMemo(() => {
     const classes = ['relative', 'bg-secondary'];
     if (lockOverflow) {
       classes.push('overflow-hidden');
+    } else {
+      classes.push('overflow-auto');
     }
     if (!disablePan) {
       classes.push('touch-none');
@@ -209,16 +284,34 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     return classes.join(' ');
   }, [className, disablePan, isPanning, lockOverflow]);
 
+  const naturalWrapperStyle = useMemo(() => {
+    if (layout !== 'natural' || !contentSize.width || !contentSize.height) {
+      return undefined;
+    }
+
+    return {
+      width: `${contentSize.width * scale}px`,
+      height: `${contentSize.height * scale}px`,
+    };
+  }, [contentSize.height, contentSize.width, layout, scale]);
+
   const renderContent = useCallback(() => {
     const content = (
-      <div className={`transform-gpu origin-center ${contentClassName ?? ''}`} style={transformStyle}>
+      <div ref={contentRef} className={`transform-gpu ${contentClassName ?? ''}`} style={transformStyle}>
         {children}
       </div>
     );
 
     if (layout === 'natural') {
       if (wrapperClassName) {
-        return <div className={wrapperClassName}>{content}</div>;
+        return (
+          <div className={wrapperClassName} style={naturalWrapperStyle}>
+            {content}
+          </div>
+        );
+      }
+      if (naturalWrapperStyle) {
+        return <div style={naturalWrapperStyle}>{content}</div>;
       }
       return content;
     }
@@ -228,7 +321,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
         {content}
       </div>
     );
-  }, [children, contentClassName, layout, transformStyle, wrapperClassName]);
+  }, [children, contentClassName, layout, naturalWrapperStyle, transformStyle, wrapperClassName]);
 
   return (
     <div
