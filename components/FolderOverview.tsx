@@ -296,7 +296,7 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-tertiary" />
                             <input
                                 id="folder-search"
-                                type="search"
+                                type="text"
                                 value={folderSearchTerm}
                                 onChange={handleSearchChange}
                                 placeholder="Filter by title or body content"

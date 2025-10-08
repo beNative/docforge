@@ -4,7 +4,7 @@ import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
 import type { DocumentOrFolder, DocumentTemplate, Command, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon, XIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
@@ -334,8 +334,18 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-background border border-border-color rounded-md pl-9 pr-3 py-1 text-xs text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
+                className="w-full bg-background border border-border-color rounded-md pl-9 pr-9 py-1 text-xs text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
             />
+            {searchTerm.trim() && (
+                <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center text-text-tertiary transition hover:text-text-main"
+                    aria-label="Clear search"
+                >
+                    <XIcon className="h-4 w-4" />
+                </button>
+            )}
         </div>
       </div>
 
