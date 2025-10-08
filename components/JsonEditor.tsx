@@ -33,12 +33,19 @@ const JsonEditor: React.FC<JsonEditorProps> = ({ value, onChange, readOnly = fal
     }
   };
 
+  const combinedStyle: React.CSSProperties = {
+    minHeight: '24rem',
+    height: 'clamp(24rem, 70vh, 44rem)',
+    maxHeight: '44rem',
+    ...style,
+  };
+
   return (
     <div
       className={`editor-container relative w-full rounded-lg bg-background border border-border-color focus-within:ring-2 focus-within:ring-primary focus-within:border-primary ${
         className ?? ''
       }`}
-      style={{ height: 'clamp(24rem, 70vh, 44rem)', ...style }}
+      style={combinedStyle}
     >
       <textarea
         ref={editorRef}
