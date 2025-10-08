@@ -23,6 +23,7 @@ declare global {
       dbGetStats: () => Promise<{ success: boolean; stats?: DatabaseStats; error?: string }>;
       dbGetPath: () => Promise<string>;
       dbLoadFromPath: (filePath: string) => Promise<DatabaseLoadResult>;
+      dbCreateNew: () => Promise<DatabaseLoadResult>;
       dbSelectAndLoad: () => Promise<DatabaseLoadResult>;
       // FIX: Add missing `dbImportFiles` to the electronAPI type definition.
       dbImportFiles: (
