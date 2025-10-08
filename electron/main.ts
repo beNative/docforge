@@ -161,6 +161,64 @@ ipcMain.handle('db:insert-nodes-from-transfer', (_, payload, targetId, position)
 ipcMain.handle('db:delete-versions', (_, documentId, versionIds) => databaseService.deleteVersions(documentId, versionIds));
 ipcMain.handle('db:get-path', () => databaseService.getDbPath());
 ipcMain.handle('db:load-from-path', (_, filePath: string) => databaseService.loadFromPath(filePath));
+ipcMain.handle('db:create-new', async () => {
+    if (!mainWindow) {
+        return { success: false, error: 'Main window not available' };
+    }
+
+    const defaultDirectory = path.join(app.getPath('documents'), 'DocForge');
+    try {
+        await fs.mkdir(defaultDirectory, { recursive: true });
+    } catch (error) {
+        console.warn('Failed to ensure default database directory exists.', error);
+    }
+
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Create New DocForge Database',
+        defaultPath: path.join(defaultDirectory, 'docforge.db'),
+        buttonLabel: 'Create Database',
+        filters: [
+            { name: 'SQLite Database', extensions: ['db', 'sqlite', 'sqlite3'] },
+            { name: 'All Files', extensions: ['*'] },
+        ],
+        properties: ['createDirectory', 'showHiddenFiles', 'dontAddToRecent'],
+    });
+
+    if (canceled || !filePath) {
+        return { success: false, canceled: true };
+    }
+
+    let targetPath = filePath;
+    if (!path.extname(targetPath)) {
+        targetPath = `${targetPath}.db`;
+    }
+
+    try {
+        await fs.stat(targetPath);
+        return {
+            success: false,
+            error: 'A file already exists at the selected location. Please choose a different name for the new database.',
+        };
+    } catch (error) {
+        const err = error as NodeJS.ErrnoException;
+        if (err.code && err.code !== 'ENOENT') {
+            console.error('Failed to inspect target path for new database:', error);
+            return {
+                success: false,
+                error: err.message || 'Unable to create a database at the selected location.',
+            };
+        }
+    }
+
+    const result = databaseService.loadFromPath(targetPath);
+    if (!result.success) {
+        console.error(`Failed to create database at ${targetPath}:`, result.error);
+        return result;
+    }
+
+    const message = result.message ?? `Created new database at ${targetPath}`;
+    return { ...result, message };
+});
 ipcMain.handle('db:select-and-load', async () => {
     if (!mainWindow) {
         return { success: false, error: 'Main window not available' };

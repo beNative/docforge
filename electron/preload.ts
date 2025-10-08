@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbGetStats: () => ipcRenderer.invoke('db:get-stats'),
   dbGetPath: () => ipcRenderer.invoke('db:get-path'),
   dbLoadFromPath: (filePath: string) => ipcRenderer.invoke('db:load-from-path', filePath),
+  dbCreateNew: () => ipcRenderer.invoke('db:create-new'),
   dbSelectAndLoad: () => ipcRenderer.invoke('db:select-and-load'),
   dbImportFiles: (filesData: any[], targetParentId: string | null) => ipcRenderer.invoke('db:import-files', filesData, targetParentId),
 

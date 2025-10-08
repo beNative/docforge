@@ -1332,6 +1332,11 @@ export const repository = {
         return window.electronAPI.dbLoadFromPath(filePath);
     },
 
+    async createNewDatabase(): Promise<DatabaseLoadResult> {
+        if (!window.electronAPI?.dbCreateNew) throw new Error("Database creation not supported.");
+        return window.electronAPI.dbCreateNew();
+    },
+
     async selectDatabaseFile(): Promise<DatabaseLoadResult> {
         if (!window.electronAPI?.dbSelectAndLoad) throw new Error("Database selection not supported.");
         return window.electronAPI.dbSelectAndLoad();

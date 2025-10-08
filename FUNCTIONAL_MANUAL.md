@@ -169,7 +169,7 @@ Accessed via the gear icon in the title bar. The settings are organized into cat
 - **Keyboard Shortcuts:** View and customize keyboard shortcuts for all major application actions. You can record a new key combination for any command.
 - **General:** Configure application behavior, like auto-saving logs, opting into pre-release updates, and choosing how PlantUML diagrams are rendered.
 - **Python:** Choose the interpreter used by the integrated runner. DocForge auto-detects local interpreters, can bootstrap a dedicated virtual environment per workspace, and exposes console preferences such as default working directory, automatic history retention, and whether runs open in split view.
-- **Database:** View detailed statistics about your local database file, and perform maintenance tasks such as creating a compressed backup, checking file integrity, and optimizing the database size (`VACUUM`).
+- **Database:** View detailed statistics about your local database file, and perform maintenance tasks such as creating a compressed backup, checking file integrity, optimizing the database size (`VACUUM`), or bootstrapping a brand new workspace database.
 - **Advanced:** View and edit the raw JSON configuration file using an interactive tree or a raw text editor, and import/export your settings.
 
 ### Info View

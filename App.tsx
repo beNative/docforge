@@ -20,7 +20,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -1736,6 +1736,53 @@ const MainApp: React.FC = () => {
         }
     }, [addLog, isDatabaseBusy, updateDatabaseStatus]);
 
+    const handleCreateNewDatabase = useCallback(async () => {
+        if (!isElectron || !window.electronAPI?.dbCreateNew) {
+            updateDatabaseStatus('Creating a database requires the desktop application.', 'error');
+            return;
+        }
+        if (isDatabaseBusy) {
+            return;
+        }
+
+        setIsDatabaseBusy(true);
+        updateDatabaseStatus('Choose where to save the new database...', 'info');
+
+        try {
+            const result = await repository.createNewDatabase();
+            if (!result.success) {
+                if (result.canceled) {
+                    updateDatabaseStatus('Database creation cancelled.', 'info');
+                    return;
+                }
+                const message = result.error || 'Failed to create a new database file.';
+                addLog('ERROR', `Database creation failed: ${message}`);
+                updateDatabaseStatus(message, 'error');
+                return;
+            }
+
+            if (result.path) {
+                setDatabasePath(result.path);
+            }
+
+            const successMessage = result.message ?? 'New database created. Reloading interface...';
+            addLog('INFO', successMessage);
+            updateDatabaseStatus(successMessage, 'success');
+
+            if (typeof window !== 'undefined') {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to create a new database file.';
+            addLog('ERROR', `Database creation failed: ${message}`);
+            updateDatabaseStatus(message, 'error');
+        } finally {
+            setIsDatabaseBusy(false);
+        }
+    }, [addLog, isDatabaseBusy, updateDatabaseStatus]);
+
     const handleBackupDatabase = useCallback(async () => {
         if (!isElectron || !window.electronAPI?.dbBackup) {
             updateDatabaseStatus('Database backups are unavailable in this environment.', 'error');
@@ -1840,13 +1887,14 @@ const MainApp: React.FC = () => {
         }
 
         return [
+            { label: 'Create New Database…', action: handleCreateNewDatabase, icon: DatabaseIcon, disabled: isDatabaseBusy },
             { label: 'Open Database…', action: handleSelectDatabaseFile, icon: FolderDownIcon, disabled: isDatabaseBusy },
             { label: 'Back Up Database…', action: handleBackupDatabase, icon: SaveIcon, disabled: isDatabaseBusy },
             { type: 'separator' },
             { label: 'Run Integrity Check', action: handleDatabaseIntegrityCheck, icon: CheckIcon, disabled: isDatabaseBusy },
             { label: 'Vacuum Database', action: handleDatabaseVacuum, icon: SparklesIcon, disabled: isDatabaseBusy },
         ];
-    }, [handleSelectDatabaseFile, handleBackupDatabase, handleDatabaseIntegrityCheck, handleDatabaseVacuum, isDatabaseBusy]);
+    }, [handleCreateNewDatabase, handleSelectDatabaseFile, handleBackupDatabase, handleDatabaseIntegrityCheck, handleDatabaseVacuum, isDatabaseBusy]);
 
     const handleDatabaseMenu = useCallback((event: React.MouseEvent<HTMLElement>) => {
         if (databaseMenuItems.length === 0) {
