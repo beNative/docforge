@@ -436,9 +436,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             ))}
           </ul>
         </nav>
-        <main className="flex-1 overflow-y-auto bg-secondary">
-          <div className="w-full px-6 py-6">
-            {renderActiveSection()}
+        <main className="flex-1 flex flex-col bg-secondary">
+          <div className="flex-1 overflow-y-auto px-6 py-3">
+            <div className="min-h-full flex flex-col">
+              {renderActiveSection()}
+            </div>
           </div>
         </main>
       </div>
@@ -509,7 +511,7 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
     const selectedService = discoveredServices.find(s => s.generateUrl === settings.llmProviderUrl);
 
     return (
-        <div className="py-6">
+        <section className="pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">LLM Provider</h2>
             <div className="space-y-6">
                 <SettingRow label="Detect Services" description="Scan for locally running LLM services like Ollama and LM Studio.">
@@ -552,7 +554,7 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
                     </div>
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -583,7 +585,7 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
 
 
     return (
-        <div className="py-6">
+        <section className="pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Appearance</h2>
             <div className="space-y-6">
                 <SettingRow label="Interface Scale" description="Adjust the size of all UI elements in the application.">
@@ -873,7 +875,7 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                   </div>
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -1113,7 +1115,7 @@ const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurr
   const interpreterValue = formState.useCustomInterpreter ? 'custom' : formState.interpreterPath;
 
   return (
-    <div className="py-6">
+    <section className="pt-2 pb-6">
       <h2 className="text-lg font-semibold text-text-main mb-4">Python Execution</h2>
       <p className="text-xs text-text-secondary max-w-3xl mb-6">
         Configure how DocForge prepares isolated Python environments. These defaults are applied when auto-creating a virtual
@@ -1378,7 +1380,7 @@ requests"
           </form>
         </Modal>
       )}
-    </div>
+    </section>
   );
 };
 
@@ -1386,7 +1388,7 @@ const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurre
     const isOfflineRendererAvailable = typeof window !== 'undefined' && !!window.electronAPI?.renderPlantUML;
     const offlineRendererMessage = 'Offline rendering requires the desktop application with a local Java runtime.';
     return (
-        <div className="py-6">
+        <section className="pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">General</h2>
             <div className="space-y-6">
                 <SettingRow htmlFor="allowPrerelease" label="Receive Pre-releases" description="Get notified about new beta versions and test features early.">
@@ -1421,7 +1423,7 @@ const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurre
                     </div>
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -1575,7 +1577,7 @@ const DatabaseSettingsSection: React.FC = () => {
     };
 
     return (
-        <div className="py-6">
+        <section className="pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Database Management</h2>
             <div className="space-y-6">
                 <SettingRow label="Database File" description="This file contains all your documents, folders, and history.">
@@ -1660,7 +1662,7 @@ const DatabaseSettingsSection: React.FC = () => {
                     )}
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 
@@ -1800,9 +1802,9 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
     }, [addLog, applyImportedSettings]);
 
     return (
-        <div className="py-6">
+        <section className="flex flex-col min-h-full pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Advanced</h2>
-            <div className="space-y-6">
+            <div className="flex flex-col gap-6 flex-1 min-h-0">
                 <SettingRow label="Settings Transfer" description="Export the current configuration or import it from a JSON file.">
                     <div className="flex flex-col gap-3">
                         <div className="flex flex-wrap gap-2">
@@ -1828,8 +1830,8 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
                     </div>
                 </SettingRow>
                 <SettingRow label="Settings Editor" description="Edit settings using an interactive tree or raw JSON for full control.">
-                    <div className="w-full">
-                        <div className="flex justify-end mb-2">
+                    <div className="flex flex-col gap-3 w-full flex-1 min-h-0 self-stretch">
+                        <div className="flex justify-end">
                             <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
                                 <button
                                     onClick={() => setMode('tree')}
@@ -1845,19 +1847,28 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
                                 </button>
                             </div>
                         </div>
-
-                        {mode === 'tree' ? (
-                            <SettingsTreeEditor settings={settings} onSettingChange={handleSettingChange} />
-                        ) : (
-                            <div>
-                                <JsonEditor value={jsonString} onChange={handleJsonChange} />
-                                {jsonError && <p className="text-sm text-destructive-text mt-2">{jsonError}</p>}
-                            </div>
-                        )}
+                        <div className="flex-1 min-h-0 flex flex-col gap-2">
+                            {mode === 'tree' ? (
+                                <SettingsTreeEditor
+                                    settings={settings}
+                                    onSettingChange={handleSettingChange}
+                                    className="flex-1 min-h-[24rem]"
+                                />
+                            ) : (
+                                <>
+                                    <JsonEditor
+                                        value={jsonString}
+                                        onChange={handleJsonChange}
+                                        className="flex-1 min-h-[24rem]"
+                                    />
+                                    {jsonError && <p className="text-sm text-destructive-text">{jsonError}</p>}
+                                </>
+                            )}
+                        </div>
                     </div>
                 </SettingRow>
             </div>
-        </div>
+        </section>
     );
 };
 
