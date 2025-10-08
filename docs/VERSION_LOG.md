@@ -1,5 +1,22 @@
 # Version Log
 
+## v0.6.4 - The Checklist Confidence Update
+
+This maintenance release polishes the publishing checklist and documentation so
+preparing the GitHub release is straightforward every time.
+
+### 🛠 Improvements
+
+-   Clarified the release preparation steps to call out copying the latest
+    changelog entry into the GitHub release description after publishing.
+-   Reconfirmed that every Markdown guide and its counterpart in `docs/` are in
+    sync, ensuring the published documentation mirrors the repository sources.
+
+### 🐛 Fixes
+
+-   Tidied minor inconsistencies across the README and technical manual so the
+    release workflow references match the expected commands and sequencing.
+
 ## v0.6.3 - The Release Readiness Refresh
 
 This maintenance release aligns the publishing workflow documentation with the

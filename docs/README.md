@@ -46,6 +46,7 @@ To create a new public build of DocForge:
 3. Review the Markdown documentation (README, manuals, and release notes) so the written guidance matches the current workflow.
 4. Sync the documentation copies under `docs/` (README, manuals, version log) with any updates made at the project root.
 5. Run `npm run publish` to build the application and publish the artifacts to the configured GitHub release target via Electron Builder.
+6. Once the draft release appears on GitHub, copy the latest `VERSION_LOG.md` entry into the release description and confirm the uploaded artifacts look correct before publishing.
 
 ## Application Icon Workflow
 
