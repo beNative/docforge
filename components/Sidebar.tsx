@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
-import type { DocumentOrFolder, DocumentTemplate, Command } from '../types';
+import type { DocumentOrFolder, DocumentTemplate, Command, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
 import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
@@ -28,6 +28,7 @@ interface SidebarProps {
   onDeleteNode: (id: string, shiftKey?: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void | Promise<void>;
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onNewDocument: () => void;
   onNewRootFolder: () => void;
@@ -378,7 +379,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onSelectNode={props.onSelectNode}
                     onDeleteNode={props.onDeleteNode}
                     onRenameNode={props.onRenameNode}
-                    onMoveNode={props.onMoveNode}
+                                        onMoveNode={props.onMoveNode}
+                                        onImportNodes={props.onImportNodes}
                     onDropFiles={props.onDropFiles}
                     onCopyNodeContent={props.onCopyNodeContent}
                     searchTerm={searchTerm}

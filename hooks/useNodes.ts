@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Node, ViewMode, ImportedNodeSummary } from '../types';
+import type { Node, ViewMode, ImportedNodeSummary, DraggedNodeTransfer } from '../types';
 import { repository } from '../services/repository';
 import { useLogger } from './useLogger';
 
@@ -78,5 +78,15 @@ export const useNodes = () => {
     []
   );
 
-  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, addLog };
+  const importNodesFromTransfer = useCallback(
+    async (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => {
+      const createdIds = await repository.importNodesFromTransfer(payload, targetId, position);
+      addLog('INFO', `Copied ${createdIds.length} item(s) from external workspace.`);
+      await refreshNodes();
+      return createdIds;
+    },
+    [addLog, refreshNodes]
+  );
+
+  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, importNodesFromTransfer, addLog };
 };

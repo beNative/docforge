@@ -6,7 +6,18 @@ import { INITIAL_SCHEMA } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
 // Fix: Import types to use for casting
-import type { Node, Document, DocVersion, DatabaseStats, DocType, ViewMode, ImportedNodeSummary, DatabaseLoadResult } from '../types';
+import type {
+  Node,
+  Document,
+  DocVersion,
+  DatabaseStats,
+  DocType,
+  ViewMode,
+  ImportedNodeSummary,
+  DatabaseLoadResult,
+  SerializedNodeForTransfer,
+  DraggedNodeTransfer,
+} from '../types';
 
 let db: Database.Database;
 let hasInitializedDb = false;
@@ -652,6 +663,146 @@ export const databaseService = {
       return { success: true };
     } catch (error) {
       console.error('Duplicate nodes transaction failed:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+
+  insertNodesFromTransfer(
+    payload: DraggedNodeTransfer,
+    targetId: string | null,
+    position: 'before' | 'after' | 'inside'
+  ): { success: boolean; createdNodeIds?: string[]; error?: string } {
+    if (!payload || payload.schema !== 'docforge/nodes' || payload.version !== 1) {
+      return { success: false, error: 'Unsupported drag payload format.' };
+    }
+
+    const nodesToInsert = Array.isArray(payload.nodes) ? payload.nodes : [];
+    if (nodesToInsert.length === 0) {
+      return { success: true, createdNodeIds: [] };
+    }
+
+    const createdNodeIds: string[] = [];
+
+    const transaction = db.transaction((nodes: SerializedNodeForTransfer[]) => {
+      const resolveParentId = (): string | null => {
+        if (position === 'inside') {
+          return targetId;
+        }
+        if (!targetId) {
+          return null;
+        }
+        const parentRow = db.prepare('SELECT parent_id FROM nodes WHERE node_id = ?').get(targetId) as { parent_id: string | null } | undefined;
+        return parentRow ? parentRow.parent_id : null;
+      };
+
+      const parentId = resolveParentId();
+
+      const siblingQuery = parentId
+        ? db.prepare('SELECT node_id, sort_order FROM nodes WHERE parent_id = ? ORDER BY sort_order')
+        : db.prepare('SELECT node_id, sort_order FROM nodes WHERE parent_id IS NULL ORDER BY sort_order');
+      const siblings = (parentId ? siblingQuery.all(parentId) : siblingQuery.all()) as { node_id: string; sort_order: number }[];
+
+      const determineBaseSortOrder = (): number => {
+        if (position === 'inside') {
+          return siblings.length;
+        }
+        if (!targetId) {
+          return siblings.length;
+        }
+        const targetSibling = siblings.find(s => s.node_id === targetId);
+        if (!targetSibling) {
+          return siblings.length;
+        }
+        return position === 'before' ? targetSibling.sort_order : targetSibling.sort_order + 1;
+      };
+
+      const baseSortOrder = determineBaseSortOrder();
+
+      const siblingsToShift = siblings.filter(s => s.sort_order >= baseSortOrder);
+      for (let index = siblingsToShift.length - 1; index >= 0; index--) {
+        const sibling = siblingsToShift[index];
+        db.prepare('UPDATE nodes SET sort_order = ? WHERE node_id = ?').run(sibling.sort_order + nodes.length, sibling.node_id);
+      }
+
+      const insertRecursive = (
+        node: SerializedNodeForTransfer,
+        currentParentId: string | null,
+        sortOrder: number,
+        isRoot: boolean
+      ): string => {
+        const newNodeId = uuidv4();
+        const now = new Date().toISOString();
+        const nodeType = node.type === 'folder' ? 'folder' : 'document';
+        const title = node.title ?? 'Untitled';
+
+        db.prepare(
+          `INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).run(newNodeId, currentParentId, nodeType, title, sortOrder, now, now);
+
+        if (isRoot) {
+          createdNodeIds.push(newNodeId);
+        }
+
+        if (nodeType === 'document') {
+          const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image'];
+          const allowedViewModes: ViewMode[] = ['edit', 'preview', 'split-vertical', 'split-horizontal'];
+          const docType: DocType = allowedDocTypes.includes(node.doc_type as DocType)
+            ? (node.doc_type as DocType)
+            : 'prompt';
+          const languageHint = typeof node.language_hint === 'string' ? node.language_hint : null;
+          const defaultViewMode = allowedViewModes.includes(node.default_view_mode as ViewMode)
+            ? (node.default_view_mode as ViewMode)
+            : null;
+
+          const docResult = db.prepare(
+            `INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode, current_version_id)
+             VALUES (?, ?, ?, ?, NULL)`
+          ).run(newNodeId, docType, languageHint, defaultViewMode);
+
+          const newDocumentId = Number(docResult.lastInsertRowid);
+          const content = typeof node.content === 'string' ? node.content : '';
+
+          if (content && content.length > 0) {
+            const sha = crypto.createHash('sha256').update(content).digest('hex');
+            const existingContent = db
+              .prepare('SELECT content_id FROM content_store WHERE sha256_hex = ?')
+              .get(sha) as { content_id: number } | undefined;
+
+            const contentId = existingContent
+              ? existingContent.content_id
+              : Number(
+                  db
+                    .prepare('INSERT INTO content_store (sha256_hex, text_content) VALUES (?, ?)')
+                    .run(sha, content).lastInsertRowid
+                );
+
+            const versionResult = db
+              .prepare('INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)')
+              .run(newDocumentId, now, contentId);
+
+            const versionId = Number(versionResult.lastInsertRowid);
+            db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?').run(versionId, newDocumentId);
+          }
+        }
+
+        const children = Array.isArray(node.children) ? node.children : [];
+        children.forEach((child, index) => insertRecursive(child, newNodeId, index, false));
+
+        return newNodeId;
+      };
+
+      nodes.forEach((node, index) => {
+        insertRecursive(node, parentId, baseSortOrder + index, true);
+      });
+    });
+
+    try {
+      transaction(nodesToInsert);
+      populateDocumentSearch();
+      return { success: true, createdNodeIds };
+    } catch (error) {
+      console.error('Insert nodes from transfer failed:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   },

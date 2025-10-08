@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
-import type { DocumentOrFolder } from '../types';
-import DocumentTreeItem, { DocumentNode } from './PromptTreeItem';
+import type { DocumentOrFolder, DraggedNodeTransfer, SerializedNodeForTransfer } from '../types';
+import DocumentTreeItem, { DocumentNode, DOCFORGE_DRAG_MIME } from './PromptTreeItem';
 
 interface DocumentListProps {
   tree: DocumentNode[];
@@ -16,6 +16,7 @@ interface DocumentListProps {
   onDeleteNode: (id: string, shiftKey?: boolean) => void;
   onRenameNode: (id: string, newTitle: string) => void;
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void | Promise<void>;
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onCopyNodeContent: (id: string) => void;
   searchTerm: string;
@@ -41,6 +42,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
   onDeleteNode,
   onRenameNode,
   onMoveNode,
+  onImportNodes,
   onDropFiles,
   onCopyNodeContent,
   searchTerm,
@@ -55,6 +57,82 @@ const DocumentList: React.FC<DocumentListProps> = ({
   // Fix: Corrected useState declaration syntax from `=>` to `=`. This resolves all subsequent "cannot find name" errors.
   const [isRootDropping, setIsRootDropping] = useState(false);
   
+  const nodeLookup = useMemo(() => {
+    const map = new Map<string, DocumentNode>();
+    const traverse = (nodes: DocumentNode[]) => {
+        for (const node of nodes) {
+            map.set(node.id, node);
+            if (node.children.length > 0) {
+                traverse(node.children);
+            }
+        }
+    };
+    traverse(tree);
+    return map;
+  }, [tree]);
+
+  const parentLookup = useMemo(() => {
+    const map = new Map<string, string | null>();
+    const traverse = (nodes: DocumentNode[], parentId: string | null) => {
+        for (const node of nodes) {
+            map.set(node.id, parentId);
+            if (node.children.length > 0) {
+                traverse(node.children, node.id);
+            }
+        }
+    };
+    traverse(tree, null);
+    return map;
+  }, [tree]);
+
+  const serializeNode = useCallback(function serialize(node: DocumentNode): SerializedNodeForTransfer {
+    const children = node.children.length > 0 ? node.children.map(serialize) : undefined;
+    return {
+      type: node.type,
+      title: node.title,
+      content: node.content,
+      doc_type: node.doc_type,
+      language_hint: node.language_hint ?? null,
+      default_view_mode: node.default_view_mode ?? null,
+      children,
+    };
+  }, []);
+
+  const buildTransferPayload = useCallback((ids: string[]): DraggedNodeTransfer | null => {
+    if (!ids.length) {
+      return null;
+    }
+    const idSet = new Set(ids);
+    const rootIds = ids.filter(id => {
+      let current = parentLookup.get(id) ?? null;
+      while (current) {
+        if (idSet.has(current)) {
+          return false;
+        }
+        current = parentLookup.get(current) ?? null;
+      }
+      return true;
+    });
+
+    const nodes = rootIds
+      .map(id => nodeLookup.get(id))
+      .filter((node): node is DocumentNode => Boolean(node))
+      .map(serializeNode);
+
+    if (nodes.length === 0) {
+      return null;
+    }
+
+    return {
+      schema: 'docforge/nodes',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      nodes,
+    };
+  }, [nodeLookup, parentLookup, serializeNode]);
+
+  const isKnownNodeId = useCallback((id: string) => nodeLookup.has(id), [nodeLookup]);
+
   const handleRootDrop = (e: React.DragEvent) => {
     e.preventDefault();
     // e.stopPropagation(); // Removed to allow event to bubble to App.tsx to reset drag state
@@ -67,26 +145,60 @@ const DocumentList: React.FC<DocumentListProps> = ({
     }
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        onDropFiles(e.dataTransfer.files, null);
-        return;
+      onDropFiles(e.dataTransfer.files, null);
+      return;
     }
-    
+
     const draggedIdsJSON = e.dataTransfer.getData('application/json');
     if (draggedIdsJSON) {
+      try {
         const draggedIds = JSON.parse(draggedIdsJSON);
-        // Dropping in the root area means targetId is null and position is 'inside' the root.
-        onMoveNode(draggedIds, null, 'inside');
+        const hasKnownIds = Array.isArray(draggedIds) && draggedIds.length > 0 && draggedIds.every(isKnownNodeId);
+        if (hasKnownIds) {
+          onMoveNode(draggedIds, null, 'inside');
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to parse local drag payload for root drop:', error);
+      }
+    }
+
+    const transferData = e.dataTransfer.getData(DOCFORGE_DRAG_MIME);
+    if (transferData) {
+      try {
+        const payload = JSON.parse(transferData) as DraggedNodeTransfer;
+        onImportNodes(payload, null, 'inside');
+      } catch (error) {
+        console.warn('Failed to parse DocForge drag payload for root drop:', error);
+      }
     }
   };
 
   const handleRootDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/json')) {
-        const target = e.target as HTMLElement;
-        if (!target.closest('li[draggable="true"]')) {
-            e.dataTransfer.dropEffect = 'move';
-            setIsRootDropping(true);
+    if (
+      e.dataTransfer.types.includes('Files') ||
+      e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ||
+      e.dataTransfer.types.includes('application/json')
+    ) {
+      const target = e.target as HTMLElement;
+      if (!target.closest('li[draggable="true"]')) {
+        let hasKnownLocalIds = false;
+        if (e.dataTransfer.types.includes('application/json')) {
+          try {
+            const raw = e.dataTransfer.getData('application/json');
+            const parsed = JSON.parse(raw);
+            hasKnownLocalIds = Array.isArray(parsed) && parsed.length > 0 && parsed.every(isKnownNodeId);
+          } catch {
+            hasKnownLocalIds = false;
+          }
         }
+        const hasDocforgePayload = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME);
+        const hasFiles = e.dataTransfer.types.includes('Files');
+        const shouldCopy = hasFiles || (hasDocforgePayload && !hasKnownLocalIds);
+        e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
+        setIsRootDropping(true);
+      }
     } else {
         e.dataTransfer.dropEffect = 'none';
     }
@@ -137,6 +249,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onDeleteNode={onDeleteNode}
                 onRenameNode={onRenameNode}
                 onMoveNode={onMoveNode}
+                onImportNodes={onImportNodes}
+                onRequestNodeExport={buildTransferPayload}
                 onDropFiles={onDropFiles}
                 onToggleExpand={onToggleExpand}
                 onCopyNodeContent={onCopyNodeContent}
@@ -148,6 +262,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onContextMenu={onContextMenu}
                 renamingNodeId={renamingNodeId}
                 onRenameComplete={onRenameComplete}
+                isKnownNodeId={isKnownNodeId}
             />
         ))}
         {documents.length === 0 && (

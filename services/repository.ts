@@ -2,6 +2,8 @@ import type {
   Node,
   Document,
   DocVersion,
+  NodeType,
+  DocType,
   DocumentOrFolder,
   DocumentVersion,
   DocumentTemplate,
@@ -10,6 +12,8 @@ import type {
   ViewMode,
   ImportedNodeSummary,
   DatabaseLoadResult,
+  SerializedNodeForTransfer,
+  DraggedNodeTransfer,
 } from '../types';
 import { cryptoService } from './cryptoService';
 import { DEFAULT_SETTINGS, EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
@@ -1012,6 +1016,152 @@ export const repository = {
                 );
             }
         }
+    },
+
+    async importNodesFromTransfer(
+        payload: DraggedNodeTransfer,
+        targetId: string | null,
+        position: 'before' | 'after' | 'inside'
+    ): Promise<string[]> {
+        const nodesToInsert = Array.isArray(payload?.nodes) ? payload.nodes : [];
+        if (nodesToInsert.length === 0) {
+            return [];
+        }
+
+        if (!isElectron) {
+            const state = ensureBrowserState();
+
+            const resolveTarget = () => {
+                if (position === 'inside') {
+                    const targetInfo = targetId ? findNodeWithParent(targetId, state.nodes) : { node: null, parent: null, index: -1 };
+                    const targetNode = targetInfo.node;
+                    const collection = targetNode ? ensureChildrenArray(targetNode) : state.nodes;
+                    return {
+                        collection,
+                        parentId: targetNode ? targetNode.node_id : null,
+                        insertIndex: collection.length,
+                    };
+                }
+
+                const targetInfo = targetId ? findNodeWithParent(targetId, state.nodes) : { node: null, parent: null, index: -1 };
+                const parentNode = targetInfo.parent;
+                const collection = parentNode ? ensureChildrenArray(parentNode) : state.nodes;
+                const insertIndex = targetInfo.node
+                    ? (position === 'before' ? targetInfo.index : targetInfo.index + 1)
+                    : collection.length;
+                return {
+                    collection,
+                    parentId: parentNode ? parentNode.node_id : null,
+                    insertIndex,
+                };
+            };
+
+            const { collection, parentId, insertIndex } = resolveTarget();
+
+            const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image'];
+            const allowedViewModes: ViewMode[] = ['edit', 'preview', 'split-vertical', 'split-horizontal'];
+
+            const createdIds: string[] = [];
+
+            const insertRecursive = (
+                node: SerializedNodeForTransfer,
+                currentParentId: string | null,
+                sortOrder: number,
+                isRoot: boolean,
+            ): Node => {
+                const now = new Date().toISOString();
+                const nodeType: NodeType = node.type === 'folder' ? 'folder' : 'document';
+                const newNodeId = uuidv4();
+                const baseNode: Node = {
+                    node_id: newNodeId,
+                    parent_id: currentParentId,
+                    node_type: nodeType,
+                    title: node.title ?? 'Untitled',
+                    sort_order: sortOrder,
+                    created_at: now,
+                    updated_at: now,
+                    children: [],
+                };
+
+                if (isRoot) {
+                    createdIds.push(newNodeId);
+                }
+
+                if (nodeType === 'document') {
+                    const docType: DocType = allowedDocTypes.includes(node.doc_type as DocType)
+                        ? (node.doc_type as DocType)
+                        : 'prompt';
+                    const languageHint = typeof node.language_hint === 'string' ? node.language_hint : null;
+                    const defaultViewMode = allowedViewModes.includes(node.default_view_mode as ViewMode)
+                        ? (node.default_view_mode as ViewMode)
+                        : null;
+
+                    const documentId = state.nextDocumentId++;
+                    const content = typeof node.content === 'string' ? node.content : '';
+                    let versionId: number | null = null;
+
+                    if (!state.docVersions[documentId]) {
+                        state.docVersions[documentId] = [];
+                    }
+
+                    if (content) {
+                        versionId = state.nextVersionId++;
+                        state.docVersions[documentId].push({
+                            version_id: versionId,
+                            document_id: documentId,
+                            created_at: now,
+                            content_id: versionId,
+                            content,
+                        });
+                    }
+
+                    baseNode.document = {
+                        document_id: documentId,
+                        node_id: newNodeId,
+                        doc_type: docType,
+                        language_hint: languageHint,
+                        default_view_mode: defaultViewMode,
+                        current_version_id: versionId,
+                        content,
+                    } as Document;
+                }
+
+                const children = Array.isArray(node.children) ? node.children : [];
+                if (children.length > 0) {
+                    baseNode.children = [];
+                    children.forEach((child, index) => {
+                        const childNode = insertRecursive(child, newNodeId, index, false);
+                        baseNode.children!.push(childNode);
+                    });
+                } else {
+                    if (baseNode.children && baseNode.children.length === 0) {
+                        baseNode.children = undefined;
+                    }
+                }
+
+                return baseNode;
+            };
+
+            const insertedNodes = nodesToInsert.map((node, index) => insertRecursive(node, parentId, insertIndex + index, true));
+
+            collection.splice(insertIndex, 0, ...insertedNodes);
+            collection.forEach((node, index) => {
+                node.sort_order = index;
+            });
+
+            persistBrowserState(state);
+            return createdIds;
+        }
+
+        if (!window.electronAPI?.dbInsertNodesFromTransfer) {
+            throw new Error('Insert nodes from transfer is not supported in this environment.');
+        }
+
+        const result = await window.electronAPI.dbInsertNodesFromTransfer(payload, targetId, position);
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to copy nodes from transfer payload.');
+        }
+        return result.createdNodeIds ?? [];
     },
     
     async getVersionsForNode(nodeId: string): Promise<DocVersion[]> {

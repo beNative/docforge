@@ -155,6 +155,9 @@ ipcMain.handle('db:run', (_, sql, params) => databaseService.run(sql, params));
 ipcMain.handle('db:is-new', () => databaseService.isNew());
 ipcMain.handle('db:migrate-from-json', (_, data) => databaseService.migrateFromJson(data));
 ipcMain.handle('db:duplicate-nodes', (_, nodeIds) => databaseService.duplicateNodes(nodeIds));
+ipcMain.handle('db:insert-nodes-from-transfer', (_, payload, targetId, position) =>
+  databaseService.insertNodesFromTransfer(payload, targetId, position)
+);
 ipcMain.handle('db:delete-versions', (_, documentId, versionIds) => databaseService.deleteVersions(documentId, versionIds));
 ipcMain.handle('db:get-path', () => databaseService.getDbPath());
 ipcMain.handle('db:load-from-path', (_, filePath: string) => databaseService.loadFromPath(filePath));
