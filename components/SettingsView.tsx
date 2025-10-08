@@ -308,8 +308,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     [visibleCategory]
   );
 
-  const ActiveIcon = activeCategory.icon;
-
   const renderActiveSection = () => {
     switch (activeCategory.id) {
       case 'provider':
@@ -392,18 +390,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             ))}
           </ul>
         </nav>
-        <main className="flex-1 overflow-y-auto bg-secondary">
-          <div className="max-w-3xl mx-auto px-8 py-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-text-main">{activeCategory.label}</h2>
-                <p className="text-xs text-text-secondary">Fine-tune options for this category.</p>
-              </div>
-              <ActiveIcon className="w-6 h-6 text-primary" />
-            </div>
-            <div className="border border-border-color/70 rounded-lg bg-background/60">
-              {renderActiveSection()}
-            </div>
+        <main className="flex-1 overflow-y-auto bg-background">
+          <div className="max-w-3xl mx-auto px-8 py-6">
+            {renderActiveSection()}
           </div>
         </main>
       </div>
