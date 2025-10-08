@@ -301,11 +301,53 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     setVisibleCategory(id);
   }, []);
 
+  const navButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
   const isSaveDisabled = !isDirty || !!pythonValidationError;
 
   const activeCategory = useMemo(
     () => categories.find((category) => category.id === visibleCategory) ?? categories[0],
     [visibleCategory]
+  );
+
+  const handleNavKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      const total = categories.length;
+      let nextIndex = index;
+
+      switch (event.key) {
+        case 'ArrowUp':
+        case 'ArrowLeft':
+          nextIndex = Math.max(0, index - 1);
+          break;
+        case 'ArrowDown':
+        case 'ArrowRight':
+          nextIndex = Math.min(total - 1, index + 1);
+          break;
+        case 'PageUp':
+        case 'Home':
+          nextIndex = 0;
+          break;
+        case 'PageDown':
+        case 'End':
+          nextIndex = total - 1;
+          break;
+        case 'Enter':
+        case ' ': // Space
+        case 'Spacebar':
+          event.preventDefault();
+          handleNavClick(categories[index].id);
+          return;
+        default:
+          return;
+      }
+
+      if (nextIndex !== index) {
+        event.preventDefault();
+        navButtonRefs.current[nextIndex]?.focus();
+      }
+    },
+    [handleNavClick]
   );
 
   const renderActiveSection = () => {
@@ -373,9 +415,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="flex-1 flex overflow-hidden">
         <nav className="w-48 p-4 border-r border-border-color bg-secondary/50">
           <ul className="space-y-1">
-            {categories.map(({ id, label, icon: Icon }) => (
+            {categories.map(({ id, label, icon: Icon }, index) => (
               <li key={id}>
                 <button
+                  ref={(element) => {
+                    navButtonRefs.current[index] = element;
+                  }}
+                  onKeyDown={(event) => handleNavKeyDown(event, index)}
                   onClick={() => handleNavClick(id)}
                   className={`w-full flex items-center gap-3 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
                     visibleCategory === id
