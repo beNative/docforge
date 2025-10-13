@@ -228,6 +228,27 @@ const MainApp: React.FC = () => {
     const dragCounter = useRef(0);
     const ensureNodeVisibleRef = useRef<(node: Pick<DocumentOrFolder, 'id' | 'type' | 'parentId'>) => void>();
 
+    const ensureNodeVisible = useCallback((node: Pick<DocumentOrFolder, 'id' | 'type' | 'parentId'>) => {
+        const ancestry = new Map(items.map(item => [item.id, item.parentId ?? null]));
+        setExpandedFolderIds(prev => {
+            const next = new Set(prev);
+            let current = node.parentId;
+            while (current) {
+                next.add(current);
+                current = ancestry.get(current) ?? null;
+            }
+            if (node.type === 'folder') {
+                next.add(node.id);
+            }
+            return next;
+        });
+        setPendingRevealId(node.id);
+    }, [items, setPendingRevealId]);
+
+    useEffect(() => {
+        ensureNodeVisibleRef.current = ensureNodeVisible;
+    }, [ensureNodeVisible]);
+
     const llmStatus = useLLMStatus(settings.llmProviderUrl);
     const { logs, addLog } = useLogger();
     const lastLogRef = useRef<LogMessage | null>(null);
@@ -1210,27 +1231,6 @@ const MainApp: React.FC = () => {
         if (!activeNode) return null;
         return activeNode.type === 'folder' ? activeNode.id : activeNode.parentId;
     }, [activeNode]);
-
-    const ensureNodeVisible = useCallback((node: Pick<DocumentOrFolder, 'id' | 'type' | 'parentId'>) => {
-        const ancestry = new Map(items.map(item => [item.id, item.parentId ?? null]));
-        setExpandedFolderIds(prev => {
-            const next = new Set(prev);
-            let current = node.parentId;
-            while (current) {
-                next.add(current);
-                current = ancestry.get(current) ?? null;
-            }
-            if (node.type === 'folder') {
-                next.add(node.id);
-            }
-            return next;
-        });
-        setPendingRevealId(node.id);
-    }, [items, setPendingRevealId]);
-
-    useEffect(() => {
-        ensureNodeVisibleRef.current = ensureNodeVisible;
-    }, [ensureNodeVisible]);
 
     const handleNavigateToNode = useCallback((nodeId: string) => {
         const target = items.find(item => item.id === nodeId);
