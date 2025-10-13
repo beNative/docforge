@@ -102,7 +102,7 @@ interface DatabaseStatusState {
 
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer } = useDocuments();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
     
@@ -141,9 +141,12 @@ const MainApp: React.FC = () => {
     const [databasePath, setDatabasePath] = useState<string | null>(null);
     const [databaseStatus, setDatabaseStatus] = useState<DatabaseStatusState | null>(null);
     const [isDatabaseBusy, setIsDatabaseBusy] = useState(false);
+    const [isRestoringActiveDocument, setIsRestoringActiveDocument] = useState(true);
+    const [hasRestoredActiveDocument, setHasRestoredActiveDocument] = useState(false);
 
     const activeNodeId = tabState.activeId;
     const openDocumentIds = tabState.order;
+    const storedActiveDocumentIdRef = useRef<string | null>(null);
 
     const activateDocumentTab = useCallback((documentId: string) => {
         setTabState(prev => {
@@ -330,6 +333,68 @@ const MainApp: React.FC = () => {
 
     const documentItems = useMemo(() => items.filter(item => item.type === 'document'), [items]);
     const activeDocumentId = activeDocument?.id ?? null;
+
+    useEffect(() => {
+        let isCancelled = false;
+        storageService.load<string | null>(LOCAL_STORAGE_KEYS.ACTIVE_DOCUMENT_ID, null).then(savedId => {
+            if (isCancelled) {
+                return;
+            }
+            storedActiveDocumentIdRef.current = savedId;
+            setIsRestoringActiveDocument(false);
+        });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (isRestoringActiveDocument || hasRestoredActiveDocument) {
+            return;
+        }
+
+        const savedId = storedActiveDocumentIdRef.current;
+        if (!savedId) {
+            storedActiveDocumentIdRef.current = null;
+            setHasRestoredActiveDocument(true);
+            return;
+        }
+
+        if (items.length === 0) {
+            if (areDocumentsLoading) {
+                return;
+            }
+            storedActiveDocumentIdRef.current = null;
+            setHasRestoredActiveDocument(true);
+            return;
+        }
+
+        const target = items.find(item => item.id === savedId && item.type === 'document');
+        if (!target) {
+            storedActiveDocumentIdRef.current = null;
+            setHasRestoredActiveDocument(true);
+            return;
+        }
+
+        ensureNodeVisible(target);
+        setActiveTemplateId(null);
+        setView('editor');
+        setDocumentView('editor');
+        activateDocumentTab(savedId);
+        setSelectedIds(new Set([savedId]));
+        setLastClickedId(savedId);
+        storedActiveDocumentIdRef.current = null;
+        setHasRestoredActiveDocument(true);
+    }, [isRestoringActiveDocument, hasRestoredActiveDocument, items, ensureNodeVisible, activateDocumentTab, areDocumentsLoading]);
+
+    useEffect(() => {
+        if (!hasRestoredActiveDocument) {
+            return;
+        }
+
+        storageService.save(LOCAL_STORAGE_KEYS.ACTIVE_DOCUMENT_ID, activeDocumentId);
+    }, [activeDocumentId, hasRestoredActiveDocument]);
 
 
     useEffect(() => {
@@ -853,6 +918,10 @@ const MainApp: React.FC = () => {
     }, [expandedFolderIds, settingsLoaded]);
 
     useEffect(() => {
+        if (isRestoringActiveDocument || !hasRestoredActiveDocument) {
+            return;
+        }
+
         if (items.length === 0) {
             if (openDocumentIds.length > 0 || activeNodeId !== null) {
                 setTabState({ activeId: null, order: [] });
@@ -876,7 +945,7 @@ const MainApp: React.FC = () => {
             setSelectedIds(new Set([firstItem.id]));
             setLastClickedId(firstItem.id);
         }
-    }, [items, activeNodeId, activeTemplateId, openDocumentIds.length, activateDocumentTab, setActiveItem]);
+    }, [items, activeNodeId, activeTemplateId, openDocumentIds.length, activateDocumentTab, setActiveItem, isRestoringActiveDocument, hasRestoredActiveDocument]);
 
     useEffect(() => {
         const documentIds = new Set(items.filter(item => item.type === 'document').map(item => item.id));
