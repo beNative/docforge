@@ -102,7 +102,7 @@ interface DatabaseStatusState {
 
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer } = useDocuments();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
     
@@ -111,6 +111,7 @@ const MainApp: React.FC = () => {
     const [lastClickedId, setLastClickedId] = useState<string | null>(null);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
     const [expandedFolderIds, setExpandedFolderIds] = useState(new Set<string>());
+    const [hasLoadedExpandedFolders, setHasLoadedExpandedFolders] = useState(false);
     const [pendingRevealId, setPendingRevealId] = useState<string | null>(null);
     const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
 
@@ -141,9 +142,12 @@ const MainApp: React.FC = () => {
     const [databasePath, setDatabasePath] = useState<string | null>(null);
     const [databaseStatus, setDatabaseStatus] = useState<DatabaseStatusState | null>(null);
     const [isDatabaseBusy, setIsDatabaseBusy] = useState(false);
+    const [isRestoringActiveDocument, setIsRestoringActiveDocument] = useState(true);
+    const [hasRestoredActiveDocument, setHasRestoredActiveDocument] = useState(false);
 
     const activeNodeId = tabState.activeId;
     const openDocumentIds = tabState.order;
+    const storedActiveDocumentIdRef = useRef<string | null>(null);
 
     const activateDocumentTab = useCallback((documentId: string) => {
         setTabState(prev => {
@@ -223,6 +227,27 @@ const MainApp: React.FC = () => {
     const commandPaletteInputRef = useRef<HTMLInputElement>(null);
     const dragCounter = useRef(0);
     const ensureNodeVisibleRef = useRef<(node: Pick<DocumentOrFolder, 'id' | 'type' | 'parentId'>) => void>();
+
+    const ensureNodeVisible = useCallback((node: Pick<DocumentOrFolder, 'id' | 'type' | 'parentId'>) => {
+        const ancestry = new Map(items.map(item => [item.id, item.parentId ?? null]));
+        setExpandedFolderIds(prev => {
+            const next = new Set(prev);
+            let current = node.parentId;
+            while (current) {
+                next.add(current);
+                current = ancestry.get(current) ?? null;
+            }
+            if (node.type === 'folder') {
+                next.add(node.id);
+            }
+            return next;
+        });
+        setPendingRevealId(node.id);
+    }, [items, setPendingRevealId]);
+
+    useEffect(() => {
+        ensureNodeVisibleRef.current = ensureNodeVisible;
+    }, [ensureNodeVisible]);
 
     const llmStatus = useLLMStatus(settings.llmProviderUrl);
     const { logs, addLog } = useLogger();
@@ -330,6 +355,68 @@ const MainApp: React.FC = () => {
 
     const documentItems = useMemo(() => items.filter(item => item.type === 'document'), [items]);
     const activeDocumentId = activeDocument?.id ?? null;
+
+    useEffect(() => {
+        let isCancelled = false;
+        storageService.load<string | null>(LOCAL_STORAGE_KEYS.ACTIVE_DOCUMENT_ID, null).then(savedId => {
+            if (isCancelled) {
+                return;
+            }
+            storedActiveDocumentIdRef.current = savedId;
+            setIsRestoringActiveDocument(false);
+        });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (isRestoringActiveDocument || hasRestoredActiveDocument || !hasLoadedExpandedFolders) {
+            return;
+        }
+
+        const savedId = storedActiveDocumentIdRef.current;
+        if (!savedId) {
+            storedActiveDocumentIdRef.current = null;
+            setHasRestoredActiveDocument(true);
+            return;
+        }
+
+        if (items.length === 0) {
+            if (areDocumentsLoading) {
+                return;
+            }
+            storedActiveDocumentIdRef.current = null;
+            setHasRestoredActiveDocument(true);
+            return;
+        }
+
+        const target = items.find(item => item.id === savedId && item.type === 'document');
+        if (!target) {
+            storedActiveDocumentIdRef.current = null;
+            setHasRestoredActiveDocument(true);
+            return;
+        }
+
+        ensureNodeVisibleRef.current?.(target);
+        setActiveTemplateId(null);
+        setView('editor');
+        setDocumentView('editor');
+        activateDocumentTab(savedId);
+        setSelectedIds(new Set([savedId]));
+        setLastClickedId(savedId);
+        storedActiveDocumentIdRef.current = null;
+        setHasRestoredActiveDocument(true);
+    }, [isRestoringActiveDocument, hasRestoredActiveDocument, items, activateDocumentTab, areDocumentsLoading, hasLoadedExpandedFolders, ensureNodeVisibleRef]);
+
+    useEffect(() => {
+        if (!hasRestoredActiveDocument) {
+            return;
+        }
+
+        storageService.save(LOCAL_STORAGE_KEYS.ACTIVE_DOCUMENT_ID, activeDocumentId);
+    }, [activeDocumentId, hasRestoredActiveDocument]);
 
 
     useEffect(() => {
@@ -841,18 +928,42 @@ const MainApp: React.FC = () => {
         storageService.load(LOCAL_STORAGE_KEYS.LOGGER_PANEL_HEIGHT, DEFAULT_LOGGER_HEIGHT).then(height => {
             if (typeof height === 'number') setLoggerPanelHeight(height);
         });
-        storageService.load<string[]>(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, []).then(ids => {
-            setExpandedFolderIds(new Set(ids));
-        });
+
+        let isCancelled = false;
+
+        storageService
+            .load<string[]>(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, [])
+            .then(ids => {
+                if (isCancelled) {
+                    return;
+                }
+                setExpandedFolderIds(new Set(ids));
+            })
+            .catch(() => {
+                // Loading failed; we'll fall back to the default empty set.
+            })
+            .finally(() => {
+                if (!isCancelled) {
+                    setHasLoadedExpandedFolders(true);
+                }
+            });
+
+        return () => {
+            isCancelled = true;
+        };
     }, []);
 
     useEffect(() => {
-        if (settingsLoaded) { 
+        if (settingsLoaded && hasLoadedExpandedFolders) {
             storageService.save(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, Array.from(expandedFolderIds));
         }
-    }, [expandedFolderIds, settingsLoaded]);
+    }, [expandedFolderIds, settingsLoaded, hasLoadedExpandedFolders]);
 
     useEffect(() => {
+        if (isRestoringActiveDocument || !hasRestoredActiveDocument) {
+            return;
+        }
+
         if (items.length === 0) {
             if (openDocumentIds.length > 0 || activeNodeId !== null) {
                 setTabState({ activeId: null, order: [] });
@@ -876,7 +987,7 @@ const MainApp: React.FC = () => {
             setSelectedIds(new Set([firstItem.id]));
             setLastClickedId(firstItem.id);
         }
-    }, [items, activeNodeId, activeTemplateId, openDocumentIds.length, activateDocumentTab, setActiveItem]);
+    }, [items, activeNodeId, activeTemplateId, openDocumentIds.length, activateDocumentTab, setActiveItem, isRestoringActiveDocument, hasRestoredActiveDocument]);
 
     useEffect(() => {
         const documentIds = new Set(items.filter(item => item.type === 'document').map(item => item.id));
@@ -1120,27 +1231,6 @@ const MainApp: React.FC = () => {
         if (!activeNode) return null;
         return activeNode.type === 'folder' ? activeNode.id : activeNode.parentId;
     }, [activeNode]);
-
-    const ensureNodeVisible = useCallback((node: Pick<DocumentOrFolder, 'id' | 'type' | 'parentId'>) => {
-        const ancestry = new Map(items.map(item => [item.id, item.parentId ?? null]));
-        setExpandedFolderIds(prev => {
-            const next = new Set(prev);
-            let current = node.parentId;
-            while (current) {
-                next.add(current);
-                current = ancestry.get(current) ?? null;
-            }
-            if (node.type === 'folder') {
-                next.add(node.id);
-            }
-            return next;
-        });
-        setPendingRevealId(node.id);
-    }, [items, setPendingRevealId]);
-
-    useEffect(() => {
-        ensureNodeVisibleRef.current = ensureNodeVisible;
-    }, [ensureNodeVisible]);
 
     const handleNavigateToNode = useCallback((nodeId: string) => {
         const target = items.find(item => item.id === nodeId);
