@@ -31,6 +31,19 @@ const createBody = (apiType: 'ollama' | 'openai' | 'unknown', model: string, con
     });
 };
 
+const extractEmoji = (raw: string): string | null => {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const chars = Array.from(trimmed);
+  const emojiRegex = /\p{Extended_Pictographic}/u;
+  for (const char of chars) {
+    if (emojiRegex.test(char)) {
+      return char;
+    }
+  }
+  return null;
+};
+
 const makeLLMRequest = async (
   metaPrompt: string,
   settings: Settings,
@@ -113,5 +126,19 @@ Title:`;
     const cleanedTitle = result.replace(/["'“”]/g, '').trim();
     addLog('INFO', `Successfully generated and cleaned title: "${cleanedTitle}"`);
     return cleanedTitle;
+  },
+  generateEmojiForTitle: async (title: string, settings: Settings, addLog: (level: LogLevel, message: string) => void): Promise<string> => {
+    const metaPrompt = `You will be given the title of a document. Respond with exactly one emoji that best represents the theme or mood of that title. Do not include any additional words, punctuation, or explanation. If no emoji is appropriate, respond with a single page icon emoji.
+
+Title:
+---
+${title}
+---
+Emoji:`;
+
+    const result = await makeLLMRequest(metaPrompt, settings, addLog);
+    const emoji = extractEmoji(result) ?? '📄';
+    addLog('INFO', `Generated emoji "${emoji}" for title "${title}"`);
+    return emoji;
   },
 };
