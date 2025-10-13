@@ -83,6 +83,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
+  const [isGeneratingEmoji, setIsGeneratingEmoji] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
   const [splitSize, setSplitSize] = useState(50);
@@ -389,6 +390,31 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     }
   };
 
+  const handleAddEmojiToTitle = async () => {
+    if (!settings.llmProviderUrl || !settings.llmModelName || !title.trim()) return;
+    setIsGeneratingEmoji(true);
+    setError(null);
+    addLog('INFO', `Attempting to generate emoji for title "${title}".`);
+    try {
+      const emoji = await llmService.generateEmojiForTitle(title, settings, addLog);
+      setTitle((currentTitle) => {
+        const baseTitle = currentTitle.trim();
+        const emojiPrefixRegex = /^[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji}\ufe0f]+\s*/u;
+        const strippedTitle = baseTitle.replace(emojiPrefixRegex, '').trim();
+        if (!strippedTitle) {
+          return `${emoji}`;
+        }
+        return `${emoji} ${strippedTitle}`;
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(`Could not generate emoji: ${message}`);
+      addLog('ERROR', `Could not generate emoji: ${message}`);
+    } finally {
+      setIsGeneratingEmoji(false);
+    }
+  };
+
   const acceptRefinement = () => {
     if (refinedContent) {
       setContent(refinedContent);
@@ -527,6 +553,23 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate"/>
+            {supportsAiTools && (
+              <IconButton
+                onClick={handleAddEmojiToTitle}
+                disabled={
+                  isGeneratingEmoji ||
+                  !title.trim() ||
+                  !settings.llmProviderUrl ||
+                  !settings.llmModelName
+                }
+                tooltip="Add Emoji to Title"
+                size="xs"
+                variant="ghost"
+                className="flex-shrink-0"
+              >
+                {isGeneratingEmoji ? <Spinner /> : <span className="text-base">😊</span>}
+              </IconButton>
+            )}
             {supportsAiTools && (
               <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl} tooltip="Regenerate Title with AI" size="xs" variant="ghost" className="flex-shrink-0">
                 {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-4 h-4 text-primary" />}
