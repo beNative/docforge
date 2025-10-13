@@ -111,6 +111,7 @@ const MainApp: React.FC = () => {
     const [lastClickedId, setLastClickedId] = useState<string | null>(null);
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
     const [expandedFolderIds, setExpandedFolderIds] = useState(new Set<string>());
+    const [hasLoadedExpandedFolders, setHasLoadedExpandedFolders] = useState(false);
     const [pendingRevealId, setPendingRevealId] = useState<string | null>(null);
     const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
 
@@ -350,7 +351,7 @@ const MainApp: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (isRestoringActiveDocument || hasRestoredActiveDocument) {
+        if (isRestoringActiveDocument || hasRestoredActiveDocument || !hasLoadedExpandedFolders) {
             return;
         }
 
@@ -386,7 +387,7 @@ const MainApp: React.FC = () => {
         setLastClickedId(savedId);
         storedActiveDocumentIdRef.current = null;
         setHasRestoredActiveDocument(true);
-    }, [isRestoringActiveDocument, hasRestoredActiveDocument, items, ensureNodeVisible, activateDocumentTab, areDocumentsLoading]);
+    }, [isRestoringActiveDocument, hasRestoredActiveDocument, items, ensureNodeVisible, activateDocumentTab, areDocumentsLoading, hasLoadedExpandedFolders]);
 
     useEffect(() => {
         if (!hasRestoredActiveDocument) {
@@ -906,16 +907,36 @@ const MainApp: React.FC = () => {
         storageService.load(LOCAL_STORAGE_KEYS.LOGGER_PANEL_HEIGHT, DEFAULT_LOGGER_HEIGHT).then(height => {
             if (typeof height === 'number') setLoggerPanelHeight(height);
         });
-        storageService.load<string[]>(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, []).then(ids => {
-            setExpandedFolderIds(new Set(ids));
-        });
+
+        let isCancelled = false;
+
+        storageService
+            .load<string[]>(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, [])
+            .then(ids => {
+                if (isCancelled) {
+                    return;
+                }
+                setExpandedFolderIds(new Set(ids));
+            })
+            .catch(() => {
+                // Loading failed; we'll fall back to the default empty set.
+            })
+            .finally(() => {
+                if (!isCancelled) {
+                    setHasLoadedExpandedFolders(true);
+                }
+            });
+
+        return () => {
+            isCancelled = true;
+        };
     }, []);
 
     useEffect(() => {
-        if (settingsLoaded) { 
+        if (settingsLoaded && hasLoadedExpandedFolders) {
             storageService.save(LOCAL_STORAGE_KEYS.EXPANDED_FOLDERS, Array.from(expandedFolderIds));
         }
-    }, [expandedFolderIds, settingsLoaded]);
+    }, [expandedFolderIds, settingsLoaded, hasLoadedExpandedFolders]);
 
     useEffect(() => {
         if (isRestoringActiveDocument || !hasRestoredActiveDocument) {
