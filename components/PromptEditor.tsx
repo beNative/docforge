@@ -4,7 +4,9 @@ import { llmService } from '../services/llmService';
 import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
+import EmojiPickerDialog from './EmojiPickerDialog';
 import { useLogger } from '../hooks/useLogger';
+import type { EmojiEntry } from '../constants/emojiList';
 import { useDocumentAutoSave } from '../hooks/useDocumentAutoSave';
 import IconButton from './IconButton';
 import Button from './Button';
@@ -84,6 +86,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isGeneratingEmoji, setIsGeneratingEmoji] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
   const [splitSize, setSplitSize] = useState(50);
@@ -390,6 +393,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     }
   };
 
+  const applyEmojiToTitle = useCallback((emoji: string) => {
+    setTitle((currentTitle) => {
+      const baseTitle = currentTitle.trim();
+      const emojiPrefixRegex = /^[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji}\ufe0f]+\s*/u;
+      const strippedTitle = baseTitle.replace(emojiPrefixRegex, '').trim();
+      if (!strippedTitle) {
+        return `${emoji}`;
+      }
+      return `${emoji} ${strippedTitle}`;
+    });
+  }, []);
+
   const handleAddEmojiToTitle = async () => {
     if (!settings.llmProviderUrl || !settings.llmModelName || !title.trim()) return;
     setIsGeneratingEmoji(true);
@@ -397,15 +412,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     addLog('INFO', `Attempting to generate emoji for title "${title}".`);
     try {
       const emoji = await llmService.generateEmojiForTitle(title, settings, addLog);
-      setTitle((currentTitle) => {
-        const baseTitle = currentTitle.trim();
-        const emojiPrefixRegex = /^[\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Emoji}\ufe0f]+\s*/u;
-        const strippedTitle = baseTitle.replace(emojiPrefixRegex, '').trim();
-        if (!strippedTitle) {
-          return `${emoji}`;
-        }
-        return `${emoji} ${strippedTitle}`;
-      });
+      applyEmojiToTitle(emoji);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       setError(`Could not generate emoji: ${message}`);
@@ -414,6 +421,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
       setIsGeneratingEmoji(false);
     }
   };
+
+  const handleEmojiSelected = useCallback((entry: EmojiEntry) => {
+    applyEmojiToTitle(entry.emoji);
+    setIsEmojiPickerOpen(false);
+  }, [applyEmojiToTitle]);
 
   const acceptRefinement = () => {
     if (refinedContent) {
@@ -550,26 +562,38 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-background overflow-y-auto">
+    <>
+      <div className="flex-1 flex flex-col bg-background overflow-y-auto">
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate"/>
             {canAddEmojiToTitle && (
-              <IconButton
-                onClick={handleAddEmojiToTitle}
-                disabled={
-                  isGeneratingEmoji ||
-                  !title.trim() ||
-                  !settings.llmProviderUrl ||
-                  !settings.llmModelName
-                }
-                tooltip="Add Emoji to Title"
-                size="xs"
-                variant="ghost"
-                className="flex-shrink-0"
-              >
-                {isGeneratingEmoji ? <Spinner /> : <span className="text-base">😊</span>}
-              </IconButton>
+              <>
+                <IconButton
+                  onClick={() => setIsEmojiPickerOpen(true)}
+                  tooltip="Browse Emojis"
+                  size="xs"
+                  variant="ghost"
+                  className="flex-shrink-0"
+                >
+                  <span className="text-base" role="img" aria-label="emoji picker">😊</span>
+                </IconButton>
+                <IconButton
+                  onClick={handleAddEmojiToTitle}
+                  disabled={
+                    isGeneratingEmoji ||
+                    !title.trim() ||
+                    !settings.llmProviderUrl ||
+                    !settings.llmModelName
+                  }
+                  tooltip="Generate Emoji with AI"
+                  size="xs"
+                  variant="ghost"
+                  className="flex-shrink-0"
+                >
+                  {isGeneratingEmoji ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}
+                </IconButton>
+              </>
             )}
             {supportsAiTools && (
               <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl} tooltip="Regenerate Title with AI" size="xs" variant="ghost" className="flex-shrink-0">
@@ -662,7 +686,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
           </form>
         </Modal>
       )}
-    </div>
+      </div>
+      {isEmojiPickerOpen && (
+        <EmojiPickerDialog
+          onClose={() => setIsEmojiPickerOpen(false)}
+          onSelect={handleEmojiSelected}
+        />
+      )}
+    </>
   );
 };
 
