@@ -3,7 +3,6 @@ import type { DocumentOrFolder, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
 import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, CloseIcon } from './Icons';
 import Spinner from './Spinner';
-import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
 import { useDocumentAutoSave } from '../hooks/useDocumentAutoSave';
 import IconButton from './IconButton';
@@ -192,12 +191,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     selectionInfoRef.current = { text: '', range: null };
     setHasSelection(false);
   }, [documentNode.id]);
-
-  useEffect(() => {
-    if (isAskPanelOpen) {
-      handleCloseAskPanel();
-    }
-  }, [documentNode.id, handleCloseAskPanel, isAskPanelOpen]);
 
   useEffect(() => {
     if (viewMode === 'preview' && isDiffMode) {
@@ -437,6 +430,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     askSelectionRangeRef.current = null;
     editorRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!isAskPanelOpen) {
+      return;
+    }
+    handleCloseAskPanel();
+  }, [documentNode.id, handleCloseAskPanel, isAskPanelOpen]);
 
   const handleAskQuestionChange = useCallback((value: string) => {
     setAskQuestion(value);
