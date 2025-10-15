@@ -141,4 +141,25 @@ Emoji:`;
     addLog('INFO', `Generated emoji "${emoji}" for title "${title}"`);
     return emoji;
   },
+  answerQuestionAboutSelection: async (
+    selectedText: string,
+    question: string,
+    settings: Settings,
+    addLog: (level: LogLevel, message: string) => void,
+  ): Promise<string> => {
+    const metaPrompt = `You are an expert writing assistant. A user has selected some text from their document and wants help understanding or improving it. Using only the provided selection, answer the user's question in a clear, concise manner. If the selection does not contain enough information to answer the question, explain what is missing instead of guessing.
+
+Selected Text:
+---
+${selectedText}
+---
+Question:
+${question}
+---
+Answer:`;
+
+    const result = await makeLLMRequest(metaPrompt, settings, addLog);
+    addLog('INFO', 'Successfully received answer for selected text question.');
+    return result;
+  },
 };

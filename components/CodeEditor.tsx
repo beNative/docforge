@@ -13,6 +13,7 @@ interface CodeEditorProps {
   language: string | null;
   onChange: (newContent: string) => void;
   onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number; }) => void;
+  onSelectionChange?: (selection: { text: string; isEmpty: boolean; range: EditorSelectionRange | null }) => void;
   customShortcuts?: Record<string, string[]>;
   fontFamily?: string;
   fontSize?: number;
@@ -24,6 +25,17 @@ export interface CodeEditorHandle {
   format: () => void;
   setScrollTop: (scrollTop: number) => void;
   getScrollInfo: () => Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number; }>;
+  getSelectedText: () => string;
+  getSelectionRange: () => EditorSelectionRange | null;
+  replaceSelection: (text: string, options?: { selectReplacement?: boolean; range?: EditorSelectionRange | null }) => void;
+  focus: () => void;
+}
+
+export interface EditorSelectionRange {
+  startLineNumber: number;
+  startColumn: number;
+  endLineNumber: number;
+  endColumn: number;
 }
 
 const LETTER_REGEX = /^[A-Z]$/;
@@ -115,7 +127,7 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
     return keybinding | primaryKey;
 };
 
-const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark }, ref) => {
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, onSelectionChange, customShortcuts = {}, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -123,6 +135,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     const contentRef = useRef(content);
     const customShortcutsRef = useRef<Record<string, string[]>>({});
     const actionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const selectionListenerRef = useRef<{ dispose: () => void } | null>(null);
+    const onSelectionChangeRef = useRef<typeof onSelectionChange | null>(onSelectionChange);
     const computedFontFamily = useMemo(() => {
         const candidate = (fontFamily ?? '').trim();
         return candidate || DEFAULT_SETTINGS.editorFontFamily;
@@ -183,7 +197,93 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     resolve({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
                 }
             });
-        }
+        },
+        getSelectedText() {
+            const editor = monacoInstanceRef.current;
+            if (!editor) {
+                return '';
+            }
+            const selection = editor.getSelection();
+            const model = editor.getModel();
+            if (!selection || !model) {
+                return '';
+            }
+            return model.getValueInRange(selection);
+        },
+        getSelectionRange() {
+            const editor = monacoInstanceRef.current;
+            if (!editor) {
+                return null;
+            }
+            const selection = editor.getSelection();
+            if (!selection) {
+                return null;
+            }
+            return {
+                startLineNumber: selection.startLineNumber,
+                startColumn: selection.startColumn,
+                endLineNumber: selection.endLineNumber,
+                endColumn: selection.endColumn,
+            };
+        },
+        replaceSelection(text: string, options) {
+            const editor = monacoInstanceRef.current;
+            const monacoApi = monacoApiRef.current;
+            if (!editor || !monacoApi) {
+                return;
+            }
+
+            const model = editor.getModel();
+            if (!model) {
+                return;
+            }
+
+            const normalizedText = typeof text === 'string' ? text : '';
+            let targetRange = editor.getSelection();
+
+            if (!targetRange && typeof editor.getPosition === 'function') {
+                const position = editor.getPosition();
+                if (position) {
+                    targetRange = new monacoApi.Range(position.lineNumber, position.column, position.lineNumber, position.column);
+                }
+            }
+
+            if (options?.range && monacoApi) {
+                const provided = options.range;
+                targetRange = new monacoApi.Range(provided.startLineNumber, provided.startColumn, provided.endLineNumber, provided.endColumn);
+            }
+
+            if (!targetRange) {
+                targetRange = model.getFullModelRange();
+            }
+
+            editor.executeEdits('docforge', [{ range: targetRange, text: normalizedText, forceMoveMarkers: true }]);
+
+            if (options?.selectReplacement === false) {
+                return;
+            }
+
+            const startLineNumber = targetRange.startLineNumber;
+            const startColumn = targetRange.startColumn;
+            const lines = normalizedText.split('\n');
+            const lastLineIndex = lines.length - 1;
+            const endLineNumber = startLineNumber + lastLineIndex;
+            let endColumn = startColumn;
+
+            if (lines.length === 1) {
+                endColumn = startColumn + lines[0].length;
+            } else {
+                endColumn = (lines[lastLineIndex]?.length ?? 0) + 1;
+            }
+
+            const selectionRange = new monacoApi.Range(startLineNumber, startColumn, endLineNumber, endColumn);
+            editor.setSelection(selectionRange);
+            editor.revealRangeInCenter(selectionRange);
+            editor.focus();
+        },
+        focus() {
+            monacoInstanceRef.current?.focus();
+        },
     }));
 
     const disposeEditorShortcuts = useCallback(() => {
@@ -245,6 +345,10 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     }, [content]);
 
     useEffect(() => {
+        onSelectionChangeRef.current = onSelectionChange ?? null;
+    }, [onSelectionChange]);
+
+    useEffect(() => {
         let isCancelled = false;
 
         const initializeEditor = async () => {
@@ -303,6 +407,37 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     }
                 });
 
+                if (selectionListenerRef.current) {
+                    selectionListenerRef.current.dispose();
+                    selectionListenerRef.current = null;
+                }
+
+                const emitSelectionChange = () => {
+                    const selection = editorInstance.getSelection();
+                    const model = editorInstance.getModel();
+                    if (!selection || !model) {
+                        onSelectionChangeRef.current?.({ text: '', isEmpty: true, range: null });
+                        return;
+                    }
+                    const selectedText = model.getValueInRange(selection);
+                    onSelectionChangeRef.current?.({
+                        text: selectedText,
+                        isEmpty: selectedText.length === 0,
+                        range: {
+                            startLineNumber: selection.startLineNumber,
+                            startColumn: selection.startColumn,
+                            endLineNumber: selection.endLineNumber,
+                            endColumn: selection.endColumn,
+                        }
+                    });
+                };
+
+                selectionListenerRef.current = editorInstance.onDidChangeCursorSelection(() => {
+                    emitSelectionChange();
+                });
+
+                emitSelectionChange();
+
                 monacoInstanceRef.current = editorInstance;
                 applyEditorShortcuts();
             } catch (error) {
@@ -316,6 +451,12 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
         return () => {
             isCancelled = true;
             disposeEditorShortcuts();
+            if (selectionListenerRef.current) {
+                try {
+                    selectionListenerRef.current.dispose();
+                } catch {}
+                selectionListenerRef.current = null;
+            }
             if (monacoInstanceRef.current) {
                 monacoInstanceRef.current.dispose();
                 monacoInstanceRef.current = null;
