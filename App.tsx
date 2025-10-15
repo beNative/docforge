@@ -2159,14 +2159,18 @@ const MainApp: React.FC = () => {
         const shortcutMap = getShortcutMap(commands, settings.customShortcuts);
         
         const handleKeyDown = (e: KeyboardEvent) => {
+            const shortcut = formatShortcut(e);
+            const command = shortcutMap.get(shortcut);
+
             const activeEl = document.activeElement;
-            if (activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName) && activeEl !== commandPaletteInputRef.current) {
+            const isFormElement = activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
+            const isPaletteInput = activeEl === commandPaletteInputRef.current;
+            const isCommandPaletteToggle = command?.id === 'toggle-command-palette';
+
+            if (isFormElement && !isPaletteInput && !isCommandPaletteToggle) {
                 return;
             }
 
-            const shortcut = formatShortcut(e);
-            const command = shortcutMap.get(shortcut);
-            
             if (command) {
                 e.preventDefault();
                 command.action();
