@@ -24,6 +24,7 @@ export interface CodeEditorHandle {
   format: () => void;
   setScrollTop: (scrollTop: number) => void;
   getScrollInfo: () => Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number; }>;
+  insertTextAtSelection: (text: string) => void;
 }
 
 const LETTER_REGEX = /^[A-Z]$/;
@@ -183,6 +184,23 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     resolve({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
                 }
             });
+        },
+        insertTextAtSelection(text: string) {
+            if (typeof text !== 'string' || !text) {
+                return;
+            }
+            const editor = monacoInstanceRef.current;
+            if (!editor) {
+                return;
+            }
+            editor.focus();
+            try {
+                editor.trigger('emoji-picker', 'type', { text });
+            } catch {
+                // If the trigger fails for any reason, fall back to updating the value directly.
+                const currentValue = editor.getValue();
+                editor.setValue(`${currentValue}${text}`);
+            }
         }
     }));
 

@@ -86,7 +86,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isGeneratingEmoji, setIsGeneratingEmoji] = useState(false);
-  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [emojiPickerContext, setEmojiPickerContext] = useState<{ target: 'title' | 'content' } | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
   const [splitSize, setSplitSize] = useState(50);
@@ -423,9 +423,28 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   };
 
   const handleEmojiSelected = useCallback((entry: EmojiEntry) => {
-    applyEmojiToTitle(entry.emoji);
-    setIsEmojiPickerOpen(false);
-  }, [applyEmojiToTitle]);
+    if (!emojiPickerContext) {
+      return;
+    }
+
+    if (emojiPickerContext.target === 'title') {
+      applyEmojiToTitle(entry.emoji);
+      addLog('INFO', `Emoji ":${entry.shortcode}:" applied to document title.`);
+    } else {
+      if (editorRef.current) {
+        editorRef.current.insertTextAtSelection(entry.emoji);
+      } else {
+        setContent((current) => `${current}${entry.emoji}`);
+      }
+      addLog('INFO', `Emoji ":${entry.shortcode}:" inserted into document content.`);
+    }
+
+    setEmojiPickerContext(null);
+  }, [emojiPickerContext, applyEmojiToTitle, addLog]);
+
+  const handleCloseEmojiPicker = useCallback(() => {
+    setEmojiPickerContext(null);
+  }, []);
 
   const acceptRefinement = () => {
     if (refinedContent) {
@@ -570,8 +589,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             {canAddEmojiToTitle && (
               <>
                 <IconButton
-                  onClick={() => setIsEmojiPickerOpen(true)}
-                  tooltip="Browse Emojis"
+                  onClick={() => setEmojiPickerContext({ target: 'title' })}
+                  tooltip="Browse Emojis for Title"
                   size="xs"
                   variant="ghost"
                   className="flex-shrink-0"
@@ -614,6 +633,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
               </div>
             )}
             <div className="h-5 w-px bg-border-color mx-1"></div>
+            <IconButton
+              onClick={() => setEmojiPickerContext({ target: 'content' })}
+              tooltip="Insert Emoji into Content"
+              size="xs"
+              variant="ghost"
+            >
+              <span className="text-base" role="img" aria-label="insert emoji">🎨</span>
+            </IconButton>
             {supportsFormatting && (
               <IconButton onClick={handleFormatDocument} tooltip="Format Document" size="xs" variant="ghost">
                 <FormatIcon className="w-4 h-4" />
@@ -687,10 +714,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
         </Modal>
       )}
       </div>
-      {isEmojiPickerOpen && (
+      {emojiPickerContext && (
         <EmojiPickerDialog
-          onClose={() => setIsEmojiPickerOpen(false)}
+          onClose={handleCloseEmojiPicker}
           onSelect={handleEmojiSelected}
+          contextLabel={emojiPickerContext.target === 'title' ? 'document title' : 'document content'}
         />
       )}
     </>
