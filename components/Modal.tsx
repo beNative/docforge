@@ -8,9 +8,20 @@ interface ModalProps {
   children: React.ReactNode;
   title: string;
   initialFocusRef?: React.RefObject<HTMLElement>;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
 }
 
-const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef }) => {
+const sizeClasses: Record<NonNullable<ModalProps['size']>, string> = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
+  '4xl': 'max-w-4xl',
+};
+
+const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef, size = 'xl' }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -92,7 +103,7 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef
     >
       <div
         ref={modalRef}
-        className="bg-secondary rounded-lg shadow-xl w-full max-w-xl mx-4 border border-border-color"
+        className={`bg-secondary rounded-lg shadow-xl w-full ${sizeClasses[size]} mx-4 border border-border-color`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center px-4 py-3 border-b border-border-color">
