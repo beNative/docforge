@@ -434,6 +434,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const language = documentNode.language_hint || 'plaintext';
   const normalizedLanguage = language.toLowerCase();
   const supportsAiTools = ['markdown', 'plaintext'].includes(normalizedLanguage);
+  const canAddEmojiToTitle = documentNode.type === 'document';
   const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
   const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
   const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
@@ -553,7 +554,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate"/>
-            {supportsAiTools && (
+            {canAddEmojiToTitle && (
               <IconButton
                 onClick={handleAddEmojiToTitle}
                 disabled={
