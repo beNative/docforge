@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { DocumentOrFolder, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon } from './Icons';
+import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, CloseIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
@@ -85,7 +85,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isGeneratingEmoji, setIsGeneratingEmoji] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [isAskModalOpen, setIsAskModalOpen] = useState(false);
+  const [isAskPanelOpen, setIsAskPanelOpen] = useState(false);
   const [askQuestion, setAskQuestion] = useState('');
   const [askSelectedText, setAskSelectedText] = useState('');
   const [askAnswer, setAskAnswer] = useState<string | null>(null);
@@ -192,6 +192,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     selectionInfoRef.current = { text: '', range: null };
     setHasSelection(false);
   }, [documentNode.id]);
+
+  useEffect(() => {
+    if (isAskPanelOpen) {
+      handleCloseAskPanel();
+    }
+  }, [documentNode.id, handleCloseAskPanel, isAskPanelOpen]);
 
   useEffect(() => {
     if (viewMode === 'preview' && isDiffMode) {
@@ -383,7 +389,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     selectionInfoRef.current = { text, range };
     const hasMeaningfulSelection = text.trim().length > 0;
     setHasSelection(prev => (prev === hasMeaningfulSelection ? prev : hasMeaningfulSelection));
-  }, []);
+    if (isAskPanelOpen && hasMeaningfulSelection) {
+      askSelectionRangeRef.current = range;
+      setAskSelectedText(text);
+    } else if (isAskPanelOpen && !hasMeaningfulSelection) {
+      askSelectionRangeRef.current = null;
+      setAskSelectedText('');
+    }
+  }, [isAskPanelOpen]);
 
   const handleRefine = async () => {
     setIsRefining(true);
@@ -401,7 +414,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     }
   };
 
-  const handleOpenAskModal = useCallback(() => {
+  const handleOpenAskPanel = useCallback(() => {
     const selectionInfo = selectionInfoRef.current;
     if (!selectionInfo.text.trim()) {
       return;
@@ -411,12 +424,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     setAskQuestion('');
     setAskAnswer(null);
     setAskErrorMessage(null);
-    setIsAskModalOpen(true);
+    setIsAskPanelOpen(true);
     addLog('INFO', `User action: Ask AI about selected text in document "${title}".`);
   }, [addLog, title]);
 
-  const handleCloseAskModal = useCallback(() => {
-    setIsAskModalOpen(false);
+  const handleCloseAskPanel = useCallback(() => {
+    setIsAskPanelOpen(false);
     setAskAnswer(null);
     setAskQuestion('');
     setAskSelectedText('');
@@ -429,6 +442,21 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     setAskQuestion(value);
     setAskErrorMessage(null);
   }, []);
+
+  useEffect(() => {
+    if (isAskPanelOpen) {
+      askQuestionInputRef.current?.focus();
+    }
+  }, [isAskPanelOpen]);
+
+  useEffect(() => {
+    if (!isAskPanelOpen) {
+      return;
+    }
+    if (isDiffMode || viewMode === 'preview') {
+      handleCloseAskPanel();
+    }
+  }, [handleCloseAskPanel, isAskPanelOpen, isDiffMode, viewMode]);
 
   const handleSubmitSelectionQuestion = useCallback(async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -470,8 +498,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     }
     editorRef.current?.replaceSelection(askAnswer, { range: askSelectionRangeRef.current });
     addLog('INFO', `Replaced selected text with AI answer in document "${title}".`);
-    handleCloseAskModal();
-  }, [addLog, askAnswer, handleCloseAskModal, title]);
+    handleCloseAskPanel();
+  }, [addLog, askAnswer, handleCloseAskPanel, title]);
   
   const handleGenerateTitle = async () => {
     if (!settings.llmProviderUrl || !settings.llmModelName || !content.trim()) return;
@@ -668,7 +696,60 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
                 </div>
             );
     }
+    return editor;
   }
+
+  const renderedContent = renderContent();
+  const askPanel = isAskPanelOpen ? (
+    <div className="w-[360px] max-w-full border-l border-border-color bg-background flex-shrink-0 flex flex-col h-full">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-color">
+        <h2 className="text-sm font-semibold text-text-main">Ask AI About Selection</h2>
+        <IconButton onClick={handleCloseAskPanel} tooltip="Close" size="xs" variant="ghost">
+          <CloseIcon className="w-4 h-4" />
+        </IconButton>
+      </div>
+      <form onSubmit={handleSubmitSelectionQuestion} className="flex-1 flex flex-col overflow-hidden">
+        <div className="p-4 space-y-4 overflow-y-auto">
+          <div>
+            <p className="text-xs font-semibold uppercase text-text-secondary tracking-wide mb-2">Selected Text</p>
+            <div className="p-3 bg-secondary border border-border-color rounded-md max-h-48 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed">
+              {askSelectedText ? askSelectedText : <span className="italic text-text-secondary">No text selected.</span>}
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <label htmlFor="ask-question" className="text-sm font-medium text-text-main">Question for the AI</label>
+            <textarea
+              id="ask-question"
+              ref={askQuestionInputRef}
+              value={askQuestion}
+              onChange={(event) => handleAskQuestionChange(event.target.value)}
+              className="w-full min-h-[96px] rounded-md border border-border-color bg-background px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="What do you want to know about the selected text?"
+              disabled={isAskingSelection}
+            />
+          </div>
+          {askErrorMessage && <p className="text-sm text-destructive-text">{askErrorMessage}</p>}
+          {askAnswer && (
+            <div>
+              <p className="text-sm font-medium text-text-main mb-2">AI Response</p>
+              <div className="p-3 bg-secondary border border-border-color rounded-md whitespace-pre-wrap text-sm leading-relaxed max-h-48 overflow-y-auto">
+                {askAnswer}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="px-4 py-3 border-t border-border-color flex justify-end gap-3">
+          <Button type="button" variant="secondary" onClick={handleCloseAskPanel}>Close</Button>
+          {askAnswer && (
+            <Button type="button" onClick={handleReplaceSelectionWithAnswer} variant="primary">Replace Selection</Button>
+          )}
+          <Button type="submit" variant="primary" isLoading={isAskingSelection} disabled={isAskingSelection}>
+            {askAnswer ? 'Ask Again' : 'Ask AI'}
+          </Button>
+        </div>
+      </form>
+    </div>
+  ) : null;
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
@@ -743,7 +824,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             </IconButton>
             <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
             <IconButton
-              onClick={handleOpenAskModal}
+              onClick={handleOpenAskPanel}
               disabled={isAskButtonDisabled}
               tooltip={askButtonTooltip}
               size="xs"
@@ -755,7 +836,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             <IconButton onClick={handleDeleteDocument} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
         </div>
       </div>
-      <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>
+      <div className="flex-1 flex flex-col bg-secondary overflow-hidden">
+        {isAskPanelOpen ? (
+          <div className="flex h-full">
+            <div className="flex-1 min-w-0">{renderedContent}</div>
+            {askPanel}
+          </div>
+        ) : (
+          renderedContent
+        )}
+      </div>
       {isPythonDocument && (
         <div
           className="flex-shrink-0 flex flex-col bg-secondary"
@@ -781,50 +871,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
         </div>
       )}
       {error && <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-destructive-text p-3 bg-destructive-bg rounded-md shadow-lg z-20">{error}</div>}
-      {isAskModalOpen && (
-        <Modal onClose={handleCloseAskModal} title="Ask AI About Selection" initialFocusRef={askQuestionInputRef}>
-          <form onSubmit={handleSubmitSelectionQuestion}>
-            <div className="p-6 text-text-main space-y-4">
-              <div>
-                <p className="text-xs font-semibold uppercase text-text-secondary tracking-wide mb-2">Selected Text</p>
-                <div className="p-3 bg-background border border-border-color rounded-md max-h-48 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed">
-                  {askSelectedText ? askSelectedText : <span className="italic text-text-secondary">No text selected.</span>}
-                </div>
-              </div>
-              <div className="flex flex-col gap-2">
-                <label htmlFor="ask-question" className="text-sm font-medium text-text-main">Question for the AI</label>
-                <textarea
-                  id="ask-question"
-                  ref={askQuestionInputRef}
-                  value={askQuestion}
-                  onChange={(event) => handleAskQuestionChange(event.target.value)}
-                  className="w-full min-h-[96px] rounded-md border border-border-color bg-background px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="What do you want to know about the selected text?"
-                  disabled={isAskingSelection}
-                />
-              </div>
-              {askErrorMessage && <p className="text-sm text-destructive-text">{askErrorMessage}</p>}
-              {askAnswer && (
-                <div>
-                  <p className="text-sm font-medium text-text-main mb-2">AI Response</p>
-                  <div className="p-3 bg-background border border-border-color rounded-md whitespace-pre-wrap text-sm leading-relaxed max-h-48 overflow-y-auto">
-                    {askAnswer}
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="secondary" onClick={handleCloseAskModal}>Close</Button>
-                {askAnswer && (
-                  <Button type="button" onClick={handleReplaceSelectionWithAnswer} variant="primary">Replace Selection</Button>
-                )}
-                <Button type="submit" variant="primary" isLoading={isAskingSelection} disabled={isAskingSelection}>
-                  {askAnswer ? 'Ask Again' : 'Ask AI'}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </Modal>
-      )}
       {refinedContent && (
         <Modal onClose={() => setRefinedContent(null)} title="AI Refinement Suggestion" initialFocusRef={acceptButtonRef}>
           <form onSubmit={(e) => { e.preventDefault(); acceptRefinement(); }}>
