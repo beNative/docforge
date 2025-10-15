@@ -4,7 +4,7 @@ import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
 import type { DocumentOrFolder, DocumentTemplate, Command, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon, XIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon, XIcon, FolderDownIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
@@ -83,6 +83,14 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   const { addLog } = useLogger();
 
   const openDocumentIdSet = useMemo(() => new Set(props.openDocumentIds), [props.openDocumentIds]);
+
+  const canCreateSubfolder = useMemo(() => {
+    if (!props.activeNodeId) {
+      return false;
+    }
+    const activeItem = props.documents.find(item => item.id === props.activeNodeId);
+    return activeItem?.type === 'folder' ?? false;
+  }, [props.documents, props.activeNodeId]);
 
 
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -370,6 +378,16 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     </IconButton>
                     <IconButton onClick={props.onNewCodeFile} tooltip={getTooltip('new-code-file', 'New Code File')} size="xs" tooltipPosition="bottom">
                         <CodeIcon className="w-4 h-4" />
+                    </IconButton>
+                    <IconButton
+                        onClick={props.onNewSubfolder}
+                        tooltip={canCreateSubfolder ? getTooltip('new-subfolder', 'New Subfolder') : 'Select a folder to add a subfolder'}
+                        size="xs"
+                        tooltipPosition="bottom"
+                        disabled={!canCreateSubfolder}
+                        className={!canCreateSubfolder ? 'opacity-40 cursor-not-allowed' : ''}
+                    >
+                        <FolderDownIcon className="w-4 h-4" />
                     </IconButton>
                     <IconButton onClick={props.onNewRootFolder} tooltip={getTooltip('new-folder', 'New Root Folder')} size="xs" tooltipPosition="bottom">
                         <FolderPlusIcon className="w-4 h-4" />
