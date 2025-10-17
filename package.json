@@ -14,7 +14,8 @@
     "build:css": "tailwindcss -i ./styles/tailwind.css -o ./dist/tailwind.css --minify",
     "dev:web": "npm run build && http-server -c-1 -p 4173 ."
   },
-  "author": "DocForge Team",
+  "author": "Tim Sinaeve",
+  "email": "tim.sinaeve@gmail.com",
   "license": "MIT",
   "repository": {
     "type": "git",
