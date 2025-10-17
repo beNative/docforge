@@ -20,8 +20,10 @@
     "package:linux:arm64": "npm run build && electron-builder --linux AppImage deb tar.gz --arm64",
     "package:linux:armv7l": "npm run build && electron-builder --linux AppImage deb tar.gz --armv7l"
   },
-  "author": "Tim Sinaeve",
-  "email": "tim.sinaeve@gmail.com",
+  "author": {
+    "name": "Tim Sinaeve",
+    "email": "tim.sinaeve@gmail.com"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
