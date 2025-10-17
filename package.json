@@ -12,10 +12,18 @@
     "prepare:icons": "node scripts/prepare-icons.mjs",
     "postinstall": "electron-builder install-app-deps",
     "build:css": "tailwindcss -i ./styles/tailwind.css -o ./dist/tailwind.css --minify",
-    "dev:web": "npm run build && http-server -c-1 -p 4173 ."
+    "dev:web": "npm run build && http-server -c-1 -p 4173 .",
+    "package:mac:x64": "npm run build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg --x64",
+    "package:win:x64": "npm run build && electron-builder --win nsis --x64",
+    "package:win:ia32": "npm run build && electron-builder --win nsis --ia32",
+    "package:linux:x64": "npm run build && electron-builder --linux AppImage deb tar.gz --x64",
+    "package:linux:arm64": "npm run build && electron-builder --linux AppImage deb tar.gz --arm64",
+    "package:linux:armv7l": "npm run build && electron-builder --linux AppImage deb tar.gz --armv7l"
   },
-  "author": "Tim Sinaeve",
-  "email": "tim.sinaeve@gmail.com",
+  "author": {
+    "name": "Tim Sinaeve",
+    "email": "tim.sinaeve@gmail.com"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
