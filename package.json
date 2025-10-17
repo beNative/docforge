@@ -77,7 +77,20 @@
       "icon": "assets/icon.icns"
     },
     "linux": {
-      "target": "AppImage",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64", "arm64", "armv7l"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64", "arm64", "armv7l"]
+        },
+        {
+          "target": "tar.gz",
+          "arch": ["x64", "arm64", "armv7l"]
+        }
+      ],
       "icon": "assets/icon.png"
     }
   }
