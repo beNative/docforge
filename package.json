@@ -65,6 +65,7 @@
     "typescript": "^5.5.3"
   },
   "build": {
+    "publish": null,
     "appId": "com.electron.docforge",
     "productName": "DocForge",
     "files": [
