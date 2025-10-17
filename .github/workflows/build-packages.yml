@@ -1,0 +1,152 @@
+name: Build & Package
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: ${{ matrix.display-name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - display-name: macOS x64
+            os: macos-latest
+            script: package:mac:x64
+            arch: x64
+            npm-platform: darwin
+            cache-paths: |
+              ~/Library/Caches/electron
+              ~/Library/Caches/electron-builder
+            artifact-name: docforge-macos-x64
+          - display-name: Windows x64
+            os: windows-latest
+            script: package:win:x64
+            arch: x64
+            npm-platform: win32
+            cache-paths: |
+              ~/AppData/Local/electron/Cache
+              ~/AppData/Local/electron-builder/Cache
+            artifact-name: docforge-windows-x64
+          - display-name: Windows ia32
+            os: windows-latest
+            script: package:win:ia32
+            arch: ia32
+            npm-platform: win32
+            cache-paths: |
+              ~/AppData/Local/electron/Cache
+              ~/AppData/Local/electron-builder/Cache
+            artifact-name: docforge-windows-ia32
+          - display-name: Linux x64
+            os: ubuntu-latest
+            script: package:linux:x64
+            arch: x64
+            npm-platform: linux
+            cache-paths: |
+              ~/.cache/electron
+              ~/.cache/electron-builder
+            artifact-name: docforge-linux-x64
+          - display-name: Linux armv7l
+            os: ubuntu-latest
+            script: package:linux:armv7l
+            arch: armv7l
+            npm-platform: linux
+            cache-paths: |
+              ~/.cache/electron
+              ~/.cache/electron-builder
+            artifact-name: docforge-linux-armv7l
+          - display-name: Linux arm64
+            os: ubuntu-latest
+            script: package:linux:arm64
+            arch: arm64
+            npm-platform: linux
+            cache-paths: |
+              ~/.cache/electron
+              ~/.cache/electron-builder
+            artifact-name: docforge-linux-arm64
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      NODE_OPTIONS: --max_old_space_size=4096
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Cache Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.cache-paths }}
+          key: ${{ runner.os }}-electron-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-${{ matrix.arch }}-
+            ${{ runner.os }}-electron-
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y rpm libarchive-tools libfuse2
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+          npm_config_platform: ${{ matrix.npm-platform }}
+
+      - name: Prepare native modules
+        run: npm run postinstall --if-present
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+          npm_config_platform: ${{ matrix.npm-platform }}
+
+      - name: Package application
+        run: npm run ${{ matrix.script }}
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+          npm_config_platform: ${{ matrix.npm-platform }}
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            release/**
+            !**/*.blockmap
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}-logs
+          path: |
+            npm-debug.log
+            *.log
+            release/**/*.log
+          if-no-files-found: ignore
+          retention-days: 7
