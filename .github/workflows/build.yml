@@ -17,6 +17,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Graphviz (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y graphviz
+
+      - name: Install Graphviz (macOS)
+        if: runner.os == 'macOS'
+        run: brew install graphviz
+
+      - name: Install Graphviz (Windows)
+        if: runner.os == 'Windows'
+        run: choco install graphviz --no-progress
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
