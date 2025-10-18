@@ -3,53 +3,14 @@ name: Publish Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*'   # e.g. v0.25.5
 
 permissions:
-  contents: write
+  contents: write   # needed to create releases & upload assets
 
 jobs:
-  create_release:
-    runs-on: ubuntu-latest
-    env:
-      TAG_NAME: ${{ github.ref_name }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Build release notes
-        id: notes
-        run: |
-          awk '
-            /^## / {
-              if (found) exit
-              found = 1
-            }
-            found { print }
-          ' VERSION_LOG.md > release-notes.md
-          if [ ! -s release-notes.md ]; then
-            echo "Failed to extract release notes" >&2
-            exit 1
-          fi
-          echo "Release notes:" >&2
-          cat release-notes.md >&2
-
-      - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            gh release delete "$TAG_NAME" -y
-          fi
-          gh release create "$TAG_NAME" \
-            --title "DocForge $TAG_NAME" \
-            --notes-file release-notes.md
-
-  package:
-    needs: create_release
+  # 1) Build & package on each platform, then upload artifacts
+  build:
     name: ${{ matrix.display_name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -104,17 +65,15 @@ jobs:
             cache_paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-    defaults:
-      run:
-        shell: bash
+
     env:
       NODE_OPTIONS: --max_old_space_size=4096
       TAG_NAME: ${{ github.ref_name }}
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: { fetch-depth: 0 }
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -132,7 +91,7 @@ jobs:
             ${{ runner.os }}-electron-${{ matrix.arch }}-
             ${{ runner.os }}-electron-
 
-      - name: Install system dependencies (Linux)
+      - name: Install system deps (Linux)
         if: ${{ runner.os == 'Linux' }}
         run: |
           sudo apt-get update
@@ -162,46 +121,46 @@ jobs:
           npm_config_target_arch: ${{ matrix.arch }}
           npm_config_platform: ${{ matrix.npm_platform }}
 
-      # Upload only installer files and updater manifests (no unpacked trees)
-      - name: Upload release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-
-          # Collect files; keep it simple to avoid YAML parsing issues
-          FILES=()
-          for f in \
-            release/*.exe \
-            release/*.exe.blockmap \
-            release/*.dmg \
-            release/*.dmg.blockmap \
-            release/*.AppImage \
-            release/*.deb \
-            release/latest*.yml
-          do
-            [ -e "$f" ] && FILES+=("$f")
-          done
-
-          if [ ${#FILES[@]} -eq 0 ]; then
-            echo "No release files found" >&2
-            exit 1
-          fi
-
-          for file in "${FILES[@]}"; do
-            echo "Uploading $(basename "$file")"
-            gh release upload "$TAG_NAME" "$file" --clobber
-          done
-
-      - name: Upload build logs on failure
-        if: ${{ failure() }}
+      # Only upload installers + updater manifests (keep releases clean)
+      - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.display_name }}-logs
+          name: ${{ matrix.display_name }}-artifacts
+          if-no-files-found: error
           path: |
-            npm-debug.log
-            *.log
-            release/**/*.log
-          if-no-files-found: ignore
-          retention-days: 7
+            release/*.exe
+            release/*.exe.blockmap
+            release/*.dmg
+            release/*.dmg.blockmap
+            release/*.AppImage
+            release/*.deb
+            release/latest*.yml
+
+  # 2) Create the Release and attach all artifacts
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List files (debug)
+        run: ls -alR dist
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/*.dmg
+            dist/*.dmg.blockmap
+            dist/*.AppImage
+            dist/*.deb
+            dist/latest*.yml
