@@ -46,6 +46,38 @@ log.catchErrors({
 console.log(`Log file will be written to: ${log.transports.file.getFile().path}`);
 
 let mainWindow: BrowserWindow | null;
+let autoCheckEnabled = true;
+let pendingAutoUpdateCheck: NodeJS.Timeout | null = null;
+
+const cancelScheduledAutoUpdateCheck = () => {
+  if (pendingAutoUpdateCheck) {
+    clearTimeout(pendingAutoUpdateCheck);
+    pendingAutoUpdateCheck = null;
+  }
+};
+
+const scheduleAutoUpdateCheck = (delayMs = 3000) => {
+  if (!autoCheckEnabled) {
+    console.log('Automatic update checks are disabled; skipping schedule.');
+    return;
+  }
+
+  cancelScheduledAutoUpdateCheck();
+
+  pendingAutoUpdateCheck = setTimeout(async () => {
+    pendingAutoUpdateCheck = null;
+    if (!autoCheckEnabled) {
+      console.log('Automatic update checks disabled before execution; skipping update check.');
+      return;
+    }
+
+    try {
+      await autoUpdater.checkForUpdatesAndNotify();
+    } catch (error) {
+      console.error('Automatic update check failed:', error);
+    }
+  }, delayMs);
+};
 
 const broadcastPythonEvent = (channel: string, payload: any) => {
   const targets = BrowserWindow.getAllWindows();
@@ -153,10 +185,25 @@ app.on('ready', () => {
     // The renderer process will detect the failure when it tries to communicate
     // via IPC and will display the fatal error screen. We still create the window.
   }
-  
+
   createWindow();
-  // Check for updates after window is created
-  setTimeout(() => autoUpdater.checkForUpdatesAndNotify(), 3000);
+
+  try {
+    const storedPreference = databaseService.getSetting('autoCheckForUpdates');
+    if (typeof storedPreference === 'boolean') {
+      autoCheckEnabled = storedPreference;
+    } else if (typeof storedPreference !== 'undefined') {
+      autoCheckEnabled = Boolean(storedPreference);
+    }
+  } catch (error) {
+    console.error('Failed to read auto-update preference from settings:', error);
+  }
+
+  if (autoCheckEnabled) {
+    scheduleAutoUpdateCheck();
+  } else {
+    console.log('Automatic update checks are disabled via settings.');
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -393,8 +440,37 @@ ipcMain.handle('app:get-log-path', () => log.transports.file.getFile().path);
 ipcMain.on('updater:set-allow-prerelease', (_, allow: boolean) => {
     autoUpdater.allowPrerelease = allow;
 });
+ipcMain.on('updater:set-auto-check-enabled', (_, enabled: boolean) => {
+    autoCheckEnabled = enabled;
+    if (enabled) {
+        scheduleAutoUpdateCheck();
+    } else {
+        cancelScheduledAutoUpdateCheck();
+    }
+});
 ipcMain.on('updater:quit-and-install', () => {
     autoUpdater.quitAndInstall();
+});
+ipcMain.handle('updater:check-now', async () => {
+    try {
+        const result = await autoUpdater.checkForUpdates();
+        const updateInfo = result?.updateInfo;
+        const version = updateInfo?.version ?? null;
+        const releaseName = updateInfo?.releaseName ?? null;
+        const currentVersion = app.getVersion();
+        const updateAvailable = Boolean(version && version !== currentVersion);
+
+        return {
+            success: true,
+            updateAvailable,
+            version,
+            releaseName,
+        };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('Manual update check failed:', message);
+        return { success: false, error: message };
+    }
 });
 
 

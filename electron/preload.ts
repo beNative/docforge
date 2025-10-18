@@ -13,6 +13,14 @@ type UpdateDownloadProgress = {
   bytesPerSecond: number;
 };
 
+type ManualUpdateCheckResult = {
+  success: boolean;
+  updateAvailable?: boolean;
+  version?: string | null;
+  releaseName?: string | null;
+  error?: string;
+};
+
 contextBridge.exposeInMainWorld('electronAPI', {
   // --- Database ---
   dbQuery: (sql: string, params?: any[]) => ipcRenderer.invoke('db:query', sql, params),
@@ -44,6 +52,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLogPath: () => ipcRenderer.invoke('app:get-log-path'),
   renderPlantUML: (diagram: string, format: 'svg' = 'svg') => ipcRenderer.invoke('plantuml:render-svg', diagram, format),
   updaterSetAllowPrerelease: (allow: boolean) => ipcRenderer.send('updater:set-allow-prerelease', allow),
+  updaterSetAutoCheckEnabled: (enabled: boolean) => ipcRenderer.send('updater:set-auto-check-enabled', enabled),
+  updaterCheckForUpdates: () => ipcRenderer.invoke('updater:check-now') as Promise<ManualUpdateCheckResult>,
   onUpdateAvailable: (callback: (info: UpdateAvailableInfo) => void) => {
     const handler = (_: IpcRendererEvent, info: UpdateAvailableInfo) => callback(info);
     ipcRenderer.on('update:available', handler);
