@@ -95,34 +95,99 @@ pythonManager.events.on('run-log', (payload) => broadcastPythonEvent('python:run
 pythonManager.events.on('run-status', (payload) => broadcastPythonEvent('python:run-status', payload));
 
 // Work around GitHub returning HTTP 406 for JSON-only requests to the
-// `/releases/latest` endpoint by attempting to resolve the latest tag via the
-// REST API before falling back to the default behaviour implemented by
-// electron-updater. This avoids the auto-update check failing on startup.
+// `/releases/latest` endpoint by resolving the latest tag via the REST API.
+// We attempt to use the official "latest" endpoint first and then fall back to
+// listing the most recent releases if that endpoint reports that no production
+// release exists (HTTP 404). This avoids the auto-update check failing on
+// startup while still respecting the expectation that only published,
+// non-prerelease builds are considered when automatic updates are disabled for
+// prerelease channels.
 const originalGetLatestTagName = GitHubProvider.prototype.getLatestTagName;
 GitHubProvider.prototype.getLatestTagName = async function (this: GitHubProvider, cancellationToken) {
-    const { owner, repo } = this.options;
-    const apiUrl = new URL(`/repos/${owner}/${repo}/releases/latest`, 'https://api.github.com');
+    const { owner, repo, host } = this.options;
+    const apiHost = !host || host === 'github.com' ? 'https://api.github.com' : `https://${host}`;
+    const apiPathPrefix = host && !['github.com', 'api.github.com'].includes(host) ? '/api/v3' : '';
 
-    try {
-        const rawResponse = await this.httpRequest(
-            apiUrl,
-            {
-                Accept: 'application/vnd.github+json',
-                'User-Agent': 'docforge-auto-updater'
-            },
-            cancellationToken
-        );
+    const buildApiUrl = (suffix: string) => {
+        const normalizedSuffix = suffix.startsWith('/') ? suffix : `/${suffix}`;
+        return new URL(`${apiPathPrefix}${normalizedSuffix}`, apiHost);
+    };
 
-        if (rawResponse) {
-            const parsed = JSON.parse(rawResponse) as { tag_name?: string };
-            if (parsed.tag_name) {
-                return parsed.tag_name;
+    const requestHeaders = {
+        Accept: 'application/vnd.github+json',
+        'User-Agent': 'docforge-auto-updater',
+        'X-GitHub-Api-Version': '2022-11-28',
+    } as const;
+
+    const tryResolveFromLatestEndpoint = async (): Promise<string | null> => {
+        try {
+            const rawResponse = await this.httpRequest(
+                buildApiUrl(`/repos/${owner}/${repo}/releases/latest`),
+                requestHeaders,
+                cancellationToken
+            );
+
+            if (!rawResponse) {
+                return null;
             }
+
+            const parsed = JSON.parse(rawResponse) as { tag_name?: string | null } | null;
+            return parsed?.tag_name ?? null;
+        } catch (error: unknown) {
+            const statusCode = typeof error === 'object' && error !== null && 'statusCode' in error
+                ? (error as { statusCode?: number }).statusCode
+                : undefined;
+
+            if (statusCode !== 404) {
+                console.warn('Failed to query GitHub latest release endpoint for auto-update.', error);
+            }
+
+            return null;
         }
-    } catch (error) {
-        console.warn('Failed to resolve latest release tag via GitHub API, falling back to default behaviour.', error);
+    };
+
+    const tryResolveFromReleaseList = async (): Promise<string | null> => {
+        try {
+            const rawResponse = await this.httpRequest(
+                buildApiUrl(`/repos/${owner}/${repo}/releases?per_page=15`),
+                requestHeaders,
+                cancellationToken
+            );
+
+            if (!rawResponse) {
+                return null;
+            }
+
+            const releases = JSON.parse(rawResponse) as Array<{
+                tag_name?: string | null;
+                draft?: boolean | null;
+                prerelease?: boolean | null;
+            }>;
+
+            for (const release of releases) {
+                if (release?.tag_name && !release?.draft && !release?.prerelease) {
+                    return release.tag_name;
+                }
+            }
+
+            return null;
+        } catch (error) {
+            console.warn('Failed to query GitHub releases list for auto-update fallback.', error);
+            return null;
+        }
+    };
+
+    const latestTag = await tryResolveFromLatestEndpoint();
+    if (latestTag) {
+        return latestTag;
     }
 
+    const fallbackTag = await tryResolveFromReleaseList();
+    if (fallbackTag) {
+        return fallbackTag;
+    }
+
+    console.warn('Falling back to the default electron-updater GitHub provider behaviour for tag resolution.');
     return originalGetLatestTagName.call(this, cancellationToken);
 };
 
