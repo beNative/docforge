@@ -1,15 +1,53 @@
-name: Build & Package
+name: Release
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
+    tags:
+      - 'v*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  create_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build release notes
+        id: notes
+        run: |
+          awk '
+            /^## / {
+              if (found) exit
+              found = 1
+            }
+            found { print }
+          ' VERSION_LOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "Failed to extract release notes" >&2
+            exit 1
+          fi
+          echo "Release notes:" >&2
+          cat release-notes.md >&2
+
+      - name: Create GitHub release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: DocForge ${{ github.ref_name }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+
   package:
+    needs: create_release
     name: ${{ matrix.display-name }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -24,7 +62,6 @@ jobs:
             cache-paths: |
               ~/Library/Caches/electron
               ~/Library/Caches/electron-builder
-            artifact-name: docforge-macos-x64
           - display-name: Windows x64
             os: windows-latest
             script: package:win:x64
@@ -33,7 +70,6 @@ jobs:
             cache-paths: |
               ~/AppData/Local/electron/Cache
               ~/AppData/Local/electron-builder/Cache
-            artifact-name: docforge-windows-x64
           - display-name: Windows ia32
             os: windows-latest
             script: package:win:ia32
@@ -42,7 +78,6 @@ jobs:
             cache-paths: |
               ~/AppData/Local/electron/Cache
               ~/AppData/Local/electron-builder/Cache
-            artifact-name: docforge-windows-ia32
           - display-name: Linux x64
             os: ubuntu-latest
             script: package:linux:x64
@@ -51,7 +86,6 @@ jobs:
             cache-paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-            artifact-name: docforge-linux-x64
           - display-name: Linux armv7l
             os: ubuntu-latest
             script: package:linux:armv7l
@@ -60,7 +94,6 @@ jobs:
             cache-paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-            artifact-name: docforge-linux-armv7l
           - display-name: Linux arm64
             os: ubuntu-latest
             script: package:linux:arm64
@@ -69,15 +102,12 @@ jobs:
             cache-paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-            artifact-name: docforge-linux-arm64
-
     defaults:
       run:
         shell: bash
-
     env:
       NODE_OPTIONS: --max_old_space_size=4096
-
+      TAG_NAME: ${{ github.ref_name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -130,22 +160,34 @@ jobs:
           npm_config_target_arch: ${{ matrix.arch }}
           npm_config_platform: ${{ matrix.npm-platform }}
 
-      - name: Upload build artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact-name }}
-          path: |
-            release/**
-            !**/*.blockmap
-          if-no-files-found: error
-          retention-days: 14
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          files=()
+          while IFS= read -r -d '' file; do
+            case "$file" in
+              *.blockmap) continue ;;
+            esac
+            files+=("$file")
+          done < <(find release -type f -print0)
+
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No release files found" >&2
+            exit 1
+          fi
+
+          for file in "${files[@]}"; do
+            echo "Uploading $(basename "$file")"
+            gh release upload "$TAG_NAME" "$file" --clobber
+          done
 
       - name: Upload build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact-name }}-logs
+          name: ${{ matrix.display-name }}-logs
           path: |
             npm-debug.log
             *.log
