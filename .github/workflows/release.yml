@@ -160,6 +160,62 @@ jobs:
           npm_config_target_arch: ${{ matrix.arch }}
           npm_config_platform: ${{ matrix.npm-platform }}
 
+      - name: Normalize Windows artifact names
+        if: runner.os == 'Windows'
+        env:
+          MATRIX_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+
+          arch="$MATRIX_ARCH"
+          shopt -s nullglob
+
+          exe_name=""
+          for file in release/*.exe; do
+            dir=$(dirname "$file")
+            base=$(basename "$file")
+            ext="${base##*.}"
+            stem="${base%.$ext}"
+
+            if [[ "$arch" != "x64" ]]; then
+              renamed="$dir/${stem}-${arch}.${ext}"
+              mv "$file" "$renamed"
+              file="$renamed"
+            fi
+
+            exe_name=$(basename "$file")
+          done
+
+          latest_file=""
+          if [[ -f release/latest.yml ]]; then
+            if [[ "$arch" != "x64" ]]; then
+              latest_file="release/latest-${arch}.yml"
+              mv release/latest.yml "$latest_file"
+            else
+              latest_file="release/latest.yml"
+            fi
+          fi
+
+          if [[ -n "$exe_name" && -n "$latest_file" ]]; then
+            export WINDOWS_EXE_NAME="$exe_name"
+            export WINDOWS_LATEST_FILE="$latest_file"
+            python - <<'PY'
+import os
+import re
+from pathlib import Path
+from urllib.parse import quote
+
+latest = Path(os.environ["WINDOWS_LATEST_FILE"])
+exe_name = os.environ["WINDOWS_EXE_NAME"]
+content = latest.read_text(encoding="utf-8")
+
+content = re.sub(r"^(\s*path:\s*).+$", rf"\1{exe_name}", content, flags=re.MULTILINE)
+content = re.sub(r"^(\s*url:\s*).+$", rf"\1{quote(exe_name)}", content, flags=re.MULTILINE)
+
+latest.write_text(content, encoding="utf-8")
+PY
+          fi
+
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
