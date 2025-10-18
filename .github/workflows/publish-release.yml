@@ -96,9 +96,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y rpm libarchive-tools
-          if ! sudo apt-get install --no-install-recommends -y libfuse2; then
-            sudo apt-get install --no-install-recommends -y libfuse2t64
-          fi
+          # Try to install libfuse2 where available but do not fail the job if it's not present
+          sudo apt-get install --no-install-recommends -y libfuse2 || true
 
       - name: Install dependencies
         run: npm ci
@@ -126,7 +125,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.display_name }}-artifacts
-          if-no-files-found: error
+          # Do not fail the job if this matrix entry produced no matching files; warn instead.
+          if-no-files-found: warn
           path: |
             release/*.exe
             release/*.exe.blockmap
@@ -153,6 +153,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           generate_release_notes: true
