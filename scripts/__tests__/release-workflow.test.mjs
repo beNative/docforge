@@ -25,8 +25,9 @@ async function createTemporaryWorkspace(t) {
   return dir;
 }
 
-async function writeFixtureInstaller(directory, version) {
-  const releaseDir = path.join(directory, 'release-artifacts', 'docforge-windows-x64', 'release');
+async function writeFixtureInstaller(directory, version, options = {}) {
+  const { artifactDir = 'docforge-windows-x64' } = options;
+  const releaseDir = path.join(directory, 'release-artifacts', artifactDir, 'release');
   await fs.mkdir(releaseDir, { recursive: true });
   const originalName = `DocForge Setup ${version}.exe`;
   const installerPath = path.join(releaseDir, originalName);
@@ -50,7 +51,7 @@ async function writeFixtureInstaller(directory, version) {
   const latestPath = path.join(releaseDir, 'latest.yml');
   await fs.writeFile(latestPath, YAML.stringify(latestMetadata), 'utf8');
 
-  return { releaseDir, latestPath };
+  return { releaseDir, latestPath, artifactDir };
 }
 
 async function runGenerateReleaseNotes({
@@ -162,6 +163,83 @@ test('release tooling rewrites metadata and keeps latest.yml published', async (
   assert.equal(metadata.files[0].size, installerBuffer.length);
 
   await runLocalVerification(releaseDir);
+});
+
+test('metadata updates remain isolated across artifact directories with identical installer names', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const version = '0.0.3';
+  const x64 = await writeFixtureInstaller(workspace, version, { artifactDir: 'docforge-windows-x64' });
+  const arm64 = await writeFixtureInstaller(workspace, version, { artifactDir: 'docforge-windows-arm64' });
+
+  const changelogPath = path.join(workspace, 'CHANGELOG.md');
+  await fs.writeFile(
+    changelogPath,
+    [`## v${version}`, '', '- Test release entry for duplicate installer validation.'].join('\n'),
+    'utf8',
+  );
+
+  const notesPath = path.join(workspace, 'release-notes.md');
+  const manifestPath = path.join(workspace, 'release-files.txt');
+
+  await runGenerateReleaseNotes({
+    workspace,
+    version,
+    tag: `v${version}`,
+    changelogPath,
+    outputPath: notesPath,
+    filesOutputPath: manifestPath,
+  });
+
+  const renamedInstallerName = `DocForge-Setup-${version}.exe`;
+  const renamedX64 = path.join(x64.releaseDir, renamedInstallerName);
+  const renamedArm64 = path.join(arm64.releaseDir, renamedInstallerName);
+
+  await Promise.all([
+    assert.doesNotReject(() => fs.access(renamedX64)),
+    assert.doesNotReject(() => fs.access(renamedArm64)),
+  ]);
+
+  const [x64Buffer, arm64Buffer] = await Promise.all([
+    fs.readFile(renamedX64),
+    fs.readFile(renamedArm64),
+  ]);
+
+  const [x64Metadata, arm64Metadata] = await Promise.all([
+    fs.readFile(x64.latestPath, 'utf8').then((source) => YAML.parse(source)),
+    fs.readFile(arm64.latestPath, 'utf8').then((source) => YAML.parse(source)),
+  ]);
+
+  const x64Sha = computeSha512Base64(x64Buffer);
+  const arm64Sha = computeSha512Base64(arm64Buffer);
+
+  assert.notEqual(x64Sha, arm64Sha, 'installer binaries should differ between architectures');
+
+  const manifest = await fs.readFile(manifestPath, 'utf8');
+  const entries = readManifestEntries(manifest);
+  const expectedX64Entry = path.relative(repoPath(), renamedX64);
+  const expectedArm64Entry = path.relative(repoPath(), renamedArm64);
+  assert(entries.includes(expectedX64Entry), 'x64 installer should be listed in manifest');
+  assert(entries.includes(expectedArm64Entry), 'arm64 installer should be listed in manifest');
+
+  const assertMetadataMatches = (metadata, expectedSha, bufferLength) => {
+    assert.equal(metadata.path, renamedInstallerName);
+    assert.equal(metadata.sha512, expectedSha);
+    if (Object.prototype.hasOwnProperty.call(metadata, 'size')) {
+      assert.equal(metadata.size, bufferLength);
+    }
+    assert(Array.isArray(metadata.files) && metadata.files.length === 1);
+    assert.equal(metadata.files[0].url, renamedInstallerName);
+    assert.equal(metadata.files[0].sha512, expectedSha);
+    assert.equal(metadata.files[0].size, bufferLength);
+  };
+
+  assertMetadataMatches(x64Metadata, x64Sha, x64Buffer.length);
+  assertMetadataMatches(arm64Metadata, arm64Sha, arm64Buffer.length);
+
+  await Promise.all([
+    runLocalVerification(x64.releaseDir),
+    runLocalVerification(arm64.releaseDir),
+  ]);
 });
 
 test('local auto-update verification fails when metadata assets are missing', async (t) => {

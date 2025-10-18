@@ -204,8 +204,9 @@ async function collectAssets(artifactRoot) {
       const { filePath: normalisedPath, fileName: normalisedName, originalFileName } = await normaliseReleaseAsset(file);
       const fileName = normalisedName;
       const filePath = normalisedPath;
+      const artifactDir = path.relative(artifactRoot, path.dirname(filePath));
       if (isAutoUpdateSupportFile(fileName)) {
-        updateSupportFiles.push(filePath);
+        updateSupportFiles.push({ filePath, artifactDir });
         continue;
       }
 
@@ -224,6 +225,7 @@ async function collectAssets(artifactRoot) {
         fileName,
         filePath,
         originalFileName,
+        artifactDir,
         format: detectFormat(fileName),
         sha512,
         size,
@@ -244,7 +246,7 @@ async function collectAssets(artifactRoot) {
     }
     return a.fileName.localeCompare(b.fileName);
   });
-  updateSupportFiles.sort();
+  updateSupportFiles.sort((a, b) => a.filePath.localeCompare(b.filePath));
   return { releaseAssets, updateSupportFiles };
 }
 
@@ -253,54 +255,68 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
     return;
   }
 
-  const assetByName = new Map();
+  const assetsByDirectory = new Map();
   for (const asset of releaseAssets) {
-    assetByName.set(asset.fileName, asset);
-    const originalName = asset.originalFileName;
-    if (originalName && originalName !== asset.fileName && !assetByName.has(originalName)) {
-      assetByName.set(originalName, asset);
+    const key = asset.artifactDir;
+    if (!assetsByDirectory.has(key)) {
+      assetsByDirectory.set(key, []);
     }
+    assetsByDirectory.get(key).push(asset);
   }
 
-  const ensureEntryMatchesAsset = (entry) => {
-    if (!entry) {
-      return false;
+  for (const { filePath: metadataPath, artifactDir } of metadataFiles) {
+    const relevantAssets = assetsByDirectory.get(artifactDir);
+    if (!relevantAssets || relevantAssets.length === 0) {
+      continue;
     }
-    const key = entry.url || entry.path;
-    if (!key) {
-      return false;
-    }
-    let asset = assetByName.get(key);
-    if (!asset) {
-      const normalisedKey = normaliseInstallerFileName(key);
-      if (normalisedKey !== key && assetByName.has(normalisedKey)) {
-        asset = assetByName.get(normalisedKey);
+
+    const assetByName = new Map();
+    for (const asset of relevantAssets) {
+      assetByName.set(asset.fileName, asset);
+      const originalName = asset.originalFileName;
+      if (originalName && originalName !== asset.fileName && !assetByName.has(originalName)) {
+        assetByName.set(originalName, asset);
       }
     }
-    if (!asset) {
-      return false;
-    }
-    let changed = false;
-    if (entry.url && entry.url !== asset.fileName) {
-      entry.url = asset.fileName;
-      changed = true;
-    }
-    if (entry.path && entry.path !== asset.fileName) {
-      entry.path = asset.fileName;
-      changed = true;
-    }
-    if (typeof asset.size === 'number' && entry.size !== asset.size) {
-      entry.size = asset.size;
-      changed = true;
-    }
-    if (asset.sha512 && entry.sha512 !== asset.sha512) {
-      entry.sha512 = asset.sha512;
-      changed = true;
-    }
-    return changed;
-  };
 
-  for (const metadataPath of metadataFiles) {
+    const ensureEntryMatchesAsset = (entry) => {
+      if (!entry) {
+        return false;
+      }
+      const key = entry.url || entry.path;
+      if (!key) {
+        return false;
+      }
+      let asset = assetByName.get(key);
+      if (!asset) {
+        const normalisedKey = normaliseInstallerFileName(key);
+        if (normalisedKey !== key && assetByName.has(normalisedKey)) {
+          asset = assetByName.get(normalisedKey);
+        }
+      }
+      if (!asset) {
+        return false;
+      }
+      let changed = false;
+      if (entry.url && entry.url !== asset.fileName) {
+        entry.url = asset.fileName;
+        changed = true;
+      }
+      if (entry.path && entry.path !== asset.fileName) {
+        entry.path = asset.fileName;
+        changed = true;
+      }
+      if (typeof asset.size === 'number' && entry.size !== asset.size) {
+        entry.size = asset.size;
+        changed = true;
+      }
+      if (asset.sha512 && entry.sha512 !== asset.sha512) {
+        entry.sha512 = asset.sha512;
+        changed = true;
+      }
+      return changed;
+    };
+
     let parsed;
     try {
       const source = await fs.readFile(metadataPath, 'utf8');
@@ -416,7 +432,7 @@ async function main() {
 
   const manifestEntries = [
     ...releaseAssets.map((asset) => path.relative(process.cwd(), asset.filePath)),
-    ...updateSupportFiles.map((filePath) => path.relative(process.cwd(), filePath)),
+    ...updateSupportFiles.map((file) => path.relative(process.cwd(), file.filePath)),
   ];
   const manifest = manifestEntries.join('\n');
   await fs.writeFile(filesOutputPath, `${manifest}\n`, 'utf8');
