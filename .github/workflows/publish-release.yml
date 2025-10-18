@@ -1,4 +1,4 @@
-name: Release
+name: Publish Release
 
 on:
   push:
@@ -11,6 +11,8 @@ permissions:
 jobs:
   create_release:
     runs-on: ubuntu-latest
+    env:
+      TAG_NAME: ${{ github.ref_name }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -35,26 +37,26 @@ jobs:
           cat release-notes.md >&2
 
       - name: Create GitHub release
-        id: create_release
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: DocForge ${{ github.ref_name }}
-          body_path: release-notes.md
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release delete "$TAG_NAME" -y
+          fi
+          gh release create "$TAG_NAME" \
+            --title "DocForge $TAG_NAME" \
+            --notes-file release-notes.md
 
   package:
     needs: create_release
-    name: ${{ matrix.display-name }}
+    name: ${{ matrix.display_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - display-name: macOS x64
+          - display_name: macOS x64
             os: macos-latest
             script: package:mac:x64
             arch: x64
@@ -62,7 +64,7 @@ jobs:
             cache-paths: |
               ~/Library/Caches/electron
               ~/Library/Caches/electron-builder
-          - display-name: Windows x64
+          - display_name: Windows x64
             os: windows-latest
             script: package:win:x64
             arch: x64
@@ -70,7 +72,7 @@ jobs:
             cache-paths: |
               ~/AppData/Local/electron/Cache
               ~/AppData/Local/electron-builder/Cache
-          - display-name: Windows ia32
+          - display_name: Windows ia32
             os: windows-latest
             script: package:win:ia32
             arch: ia32
@@ -78,7 +80,7 @@ jobs:
             cache-paths: |
               ~/AppData/Local/electron/Cache
               ~/AppData/Local/electron-builder/Cache
-          - display-name: Linux x64
+          - display_name: Linux x64
             os: ubuntu-latest
             script: package:linux:x64
             arch: x64
@@ -86,7 +88,7 @@ jobs:
             cache-paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-          - display-name: Linux armv7l
+          - display_name: Linux armv7l
             os: ubuntu-latest
             script: package:linux:armv7l
             arch: armv7l
@@ -94,7 +96,7 @@ jobs:
             cache-paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-          - display-name: Linux arm64
+          - display_name: Linux arm64
             os: ubuntu-latest
             script: package:linux:arm64
             arch: arm64
@@ -274,7 +276,7 @@ PY
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.display-name }}-logs
+          name: ${{ matrix.display_name }}-logs
           path: |
             npm-debug.log
             *.log
