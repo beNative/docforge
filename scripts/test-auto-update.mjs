@@ -1,9 +1,12 @@
 #!/usr/bin/env node
+import { createReadStream } from 'fs';
 import { promises as fs } from 'fs';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
+import crypto from 'crypto';
 import path from 'path';
 import process from 'process';
 import { promisify } from 'util';
+import YAML from 'yaml';
 
 const DEFAULT_OWNER = 'beNative';
 const DEFAULT_REPO = 'docforge';
@@ -70,6 +73,45 @@ function extractMetadataReferences(source) {
   return Array.from(references);
 }
 
+function extractMetadataTargets(metadata) {
+  if (!metadata || typeof metadata !== 'object') {
+    return [];
+  }
+  const targets = new Map();
+  const record = (name, label, entry = {}) => {
+    if (!name) {
+      return;
+    }
+    const normalised = name.trim();
+    if (!normalised) {
+      return;
+    }
+    const current = targets.get(normalised) ?? { name: normalised, contexts: [] };
+    const expectedSha512 = typeof entry.sha512 === 'string' ? entry.sha512.trim() || null : null;
+    const expectedSize = typeof entry.size === 'number' ? entry.size : null;
+    current.contexts.push({ label, expectedSha512, expectedSize });
+    targets.set(normalised, current);
+  };
+
+  if (Array.isArray(metadata.files)) {
+    metadata.files.forEach((entry, index) => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      record(entry.url || entry.path, `files[${index}]`, entry);
+    });
+  }
+
+  if (typeof metadata.path === 'string' && metadata.path.trim()) {
+    record(metadata.path, 'path', {
+      sha512: metadata.sha512,
+      size: typeof metadata.size === 'number' ? metadata.size : null,
+    });
+  }
+
+  return Array.from(targets.values());
+}
+
 const execFileAsync = promisify(execFile);
 
 async function curlGet(url, headers) {
@@ -121,6 +163,55 @@ function reportIssue(prefix, values) {
   }
 }
 
+async function computeLocalDigest(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha512');
+    const stream = createReadStream(filePath);
+    let size = 0;
+    stream.on('data', (chunk) => {
+      hash.update(chunk);
+      size += chunk.length;
+    });
+    stream.on('error', reject);
+    stream.on('end', () => {
+      resolve({ sha512: hash.digest('base64'), size });
+    });
+  });
+}
+
+function downloadAndComputeDigest(url, headers) {
+  return new Promise((resolve, reject) => {
+    const args = ['-sS', '-L', '--fail'];
+    for (const [key, value] of Object.entries(headers)) {
+      args.push('-H', `${key}: ${value}`);
+    }
+    args.push(url);
+
+    const child = spawn('curl', args);
+    const hash = crypto.createHash('sha512');
+    let size = 0;
+    let stderr = '';
+
+    child.stdout.on('data', (chunk) => {
+      hash.update(chunk);
+      size += chunk.length;
+    });
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(stderr.trim() || `curl exited with code ${code}`));
+        return;
+      }
+      resolve({ sha512: hash.digest('base64'), size });
+    });
+  });
+}
+
 async function analyseMetadataEntry({
   metadataName,
   metadataSource,
@@ -129,11 +220,24 @@ async function analyseMetadataEntry({
   tag,
   assets,
   skipHttp,
+  skipDownload,
+  digestCache,
 }) {
   const references = extractMetadataReferences(metadataSource);
   const missing = [];
   const unreachable = [];
   const suggestions = [];
+  const mismatchedHashes = [];
+  const missingHashes = [];
+  const mismatchedSizes = [];
+  let parseError = null;
+  let metadataDocument = null;
+
+  try {
+    metadataDocument = YAML.parse(metadataSource);
+  } catch (error) {
+    parseError = error instanceof Error ? error : new Error(String(error));
+  }
 
   for (const reference of references) {
     const asset = assets.get(reference);
@@ -176,10 +280,84 @@ async function analyseMetadataEntry({
     reportIssue('', suggestions);
   }
 
-  return { missing, unreachable };
+  if (parseError) {
+    console.log(`  ✗ Failed to parse metadata: ${parseError.message}`);
+    return { missing, unreachable, mismatchedHashes, missingHashes, mismatchedSizes, parseError };
+  }
+
+  if (!metadataDocument || typeof metadataDocument !== 'object') {
+    console.log('  ✗ Metadata did not contain a valid YAML object.');
+    return { missing, unreachable, mismatchedHashes, missingHashes, mismatchedSizes, parseError: new Error('invalid-metadata') };
+  }
+
+  const targets = extractMetadataTargets(metadataDocument);
+  if (targets.length === 0) {
+    console.log('  • No asset references were found after parsing the metadata; skipping checksum verification.');
+    return { missing, unreachable, mismatchedHashes, missingHashes, mismatchedSizes };
+  }
+
+  const downloadHeaders = {
+    'User-Agent': 'docforge-auto-update-tester',
+    Accept: 'application/octet-stream',
+  };
+
+  for (const target of targets) {
+    const asset = assets.get(target.name);
+    if (!asset) {
+      continue;
+    }
+
+    let digest = digestCache.get(target.name) ?? null;
+    if (!digest && !skipDownload) {
+      try {
+        digest = await downloadAndComputeDigest(asset.browser_download_url, downloadHeaders);
+        digestCache.set(target.name, digest);
+      } catch (error) {
+        mismatchedHashes.push(`${target.name} - failed to download for verification (${error instanceof Error ? error.message : error})`);
+        continue;
+      }
+    }
+
+    for (const context of target.contexts) {
+      if (!context.expectedSha512) {
+        missingHashes.push(`${target.name} (${context.label}) - missing sha512 in metadata`);
+      } else if (digest && context.expectedSha512 !== digest.sha512) {
+        mismatchedHashes.push(`${target.name} (${context.label}) - expected ${context.expectedSha512} got ${digest.sha512}`);
+      }
+
+      if (typeof context.expectedSize === 'number') {
+        if (digest && context.expectedSize !== digest.size) {
+          mismatchedSizes.push(`${target.name} (${context.label}) - expected size ${context.expectedSize} got ${digest.size}`);
+        }
+      }
+    }
+  }
+
+  if (!skipDownload && mismatchedHashes.length === 0 && missingHashes.length === 0) {
+    console.log('  ✓ All referenced asset checksums match the published files.');
+  } else if (skipDownload && missingHashes.length === 0) {
+    console.log('  ✓ Metadata includes sha512 values for all referenced assets.');
+  }
+
+  if (mismatchedHashes.length > 0) {
+    console.log('  ✗ SHA512 mismatches detected:');
+    reportIssue('', mismatchedHashes);
+  }
+
+  if (missingHashes.length > 0) {
+    console.log('  ✗ Missing SHA512 entries:');
+    reportIssue('', missingHashes);
+  }
+
+  if (mismatchedSizes.length > 0) {
+    console.log('  ✗ Size mismatches detected:');
+    reportIssue('', mismatchedSizes);
+  }
+
+  return { missing, unreachable, mismatchedHashes, missingHashes, mismatchedSizes };
 }
 
-async function runRemoteCheck({ owner, repo, tag, skipHttp }) {
+async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload }) {
   const headers = {
     'User-Agent': 'docforge-auto-update-tester',
     Accept: 'application/vnd.github+json',
@@ -200,9 +378,10 @@ async function runRemoteCheck({ owner, repo, tag, skipHttp }) {
   console.log(`Found ${assetEntries.length} total assets and ${metadataAssets.length} metadata files.`);
 
   let failures = false;
+  const digestCache = new Map();
   for (const asset of metadataAssets) {
     const content = await fetchText(asset.browser_download_url, { 'User-Agent': 'docforge-auto-update-tester' });
-    const { missing, unreachable } = await analyseMetadataEntry({
+    const result = await analyseMetadataEntry({
       metadataName: asset.name,
       metadataSource: content,
       owner,
@@ -210,8 +389,16 @@ async function runRemoteCheck({ owner, repo, tag, skipHttp }) {
       tag,
       assets: assetMap,
       skipHttp,
+      skipDownload,
+      digestCache,
     });
-    if (missing.length > 0 || unreachable.length > 0) {
+    if (
+      result.missing.length > 0 ||
+      result.unreachable.length > 0 ||
+      result.mismatchedHashes.length > 0 ||
+      result.missingHashes.length > 0 ||
+      result.mismatchedSizes.length > 0
+    ) {
       failures = true;
     }
   }
@@ -220,13 +407,15 @@ async function runRemoteCheck({ owner, repo, tag, skipHttp }) {
     throw new Error('Auto-update verification failed. See details above.');
   }
 
-  console.log('\nAll metadata files reference available and reachable assets.');
+  console.log('\nAll metadata files reference available, reachable assets with matching hashes.');
 }
 
-async function runLocalCheck({ directory }) {
+async function runLocalCheck({ directory, skipDownload }) {
   const resolvedDirectory = path.resolve(directory);
   const entries = await fs.readdir(resolvedDirectory);
-  const metadataFiles = entries.filter((entry) => entry.endsWith('.yml'));
+  const metadataFiles = entries.filter(
+    (entry) => entry.endsWith('.yml') && entry !== 'builder-debug.yml',
+  );
   if (metadataFiles.length === 0) {
     throw new Error(`No metadata files were found in ${resolvedDirectory}`);
   }
@@ -240,6 +429,21 @@ async function runLocalCheck({ directory }) {
     const source = await fs.readFile(metadataPath, 'utf8');
     const references = extractMetadataReferences(source);
     const missing = [];
+    const mismatchedHashes = [];
+    const missingHashes = [];
+    const mismatchedSizes = [];
+    let metadataDocument = null;
+    let parseError = null;
+
+    try {
+      metadataDocument = YAML.parse(source);
+    } catch (error) {
+      parseError = error instanceof Error ? error : new Error(String(error));
+    }
+
+    console.log(`\nMetadata: ${metadataFile}`);
+    console.log(`  Referenced files: ${references.length}`);
+
     for (const reference of references) {
       const targetPath = path.join(resolvedDirectory, reference);
       try {
@@ -248,8 +452,7 @@ async function runLocalCheck({ directory }) {
         missing.push(reference);
       }
     }
-    console.log(`\nMetadata: ${metadataFile}`);
-    console.log(`  Referenced files: ${references.length}`);
+
     if (missing.length > 0) {
       failures = true;
       console.log('  ✗ Missing assets:');
@@ -257,22 +460,91 @@ async function runLocalCheck({ directory }) {
     } else {
       console.log('  ✓ All referenced files exist locally.');
     }
+
+    if (parseError) {
+      failures = true;
+      console.log(`  ✗ Failed to parse metadata: ${parseError.message}`);
+      continue;
+    }
+
+    if (!metadataDocument || typeof metadataDocument !== 'object') {
+      failures = true;
+      console.log('  ✗ Metadata did not contain a valid YAML object.');
+      continue;
+    }
+
+    const targets = extractMetadataTargets(metadataDocument);
+    const digestCache = new Map();
+
+    for (const target of targets) {
+      const assetPath = path.join(resolvedDirectory, target.name);
+      try {
+        await fs.access(assetPath);
+      } catch {
+        continue;
+      }
+
+      let digest = digestCache.get(target.name) ?? null;
+      if (!digest && !skipDownload) {
+        digest = await computeLocalDigest(assetPath);
+        digestCache.set(target.name, digest);
+      }
+
+      for (const context of target.contexts) {
+        if (!context.expectedSha512) {
+          missingHashes.push(`${target.name} (${context.label}) - missing sha512 in metadata`);
+        } else if (digest && context.expectedSha512 !== digest.sha512) {
+          mismatchedHashes.push(`${target.name} (${context.label}) - expected ${context.expectedSha512} got ${digest.sha512}`);
+        }
+
+        if (typeof context.expectedSize === 'number') {
+          if (digest && context.expectedSize !== digest.size) {
+            mismatchedSizes.push(`${target.name} (${context.label}) - expected size ${context.expectedSize} got ${digest.size}`);
+          }
+        }
+      }
+    }
+
+    if (!skipDownload && mismatchedHashes.length === 0 && missingHashes.length === 0) {
+      console.log('  ✓ All referenced asset checksums match the local files.');
+    } else if (skipDownload && missingHashes.length === 0) {
+      console.log('  ✓ Metadata includes sha512 values for all referenced assets.');
+    }
+
+    if (mismatchedHashes.length > 0) {
+      failures = true;
+      console.log('  ✗ SHA512 mismatches detected:');
+      reportIssue('', mismatchedHashes);
+    }
+
+    if (missingHashes.length > 0) {
+      failures = true;
+      console.log('  ✗ Missing SHA512 entries:');
+      reportIssue('', missingHashes);
+    }
+
+    if (mismatchedSizes.length > 0) {
+      failures = true;
+      console.log('  ✗ Size mismatches detected:');
+      reportIssue('', mismatchedSizes);
+    }
   }
 
   if (failures) {
     throw new Error('Local auto-update verification failed.');
   }
 
-  console.log('\nAll local metadata files reference existing assets.');
+  console.log('\nAll local metadata files reference existing assets with matching hashes.');
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const localDir = args.local ?? null;
   const skipHttp = Boolean(args['skip-http']);
+  const skipDownload = Boolean(args['skip-download']);
 
   if (localDir) {
-    await runLocalCheck({ directory: localDir });
+    await runLocalCheck({ directory: localDir, skipDownload });
     return;
   }
 
@@ -292,7 +564,7 @@ async function main() {
   }
 
   ensure(tag, 'A release tag must be provided via --tag, --version, or package.json');
-  await runRemoteCheck({ owner, repo, tag, skipHttp });
+  await runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload });
 }
 
 main().catch((error) => {

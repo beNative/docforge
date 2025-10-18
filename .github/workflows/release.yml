@@ -236,6 +236,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Generate release notes
         id: notes
         run: |
@@ -252,6 +255,37 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Verify auto-update manifests
+        run: |
+          set -euo pipefail
+          metadata_dirs=()
+          while IFS= read -r -d '' metadata_file; do
+            dir=$(dirname "$metadata_file")
+            if [[ "$metadata_file" == *"/builder-debug.yml" ]]; then
+              continue
+            fi
+            skip=0
+            for existing in "${metadata_dirs[@]}"; do
+              if [[ "$existing" == "$dir" ]]; then
+                skip=1
+                break
+              fi
+            done
+            if [[ $skip -eq 0 ]]; then
+              metadata_dirs+=("$dir")
+            fi
+          done < <(find release-artifacts -type f -name '*.yml' -print0)
+
+          if [[ ${#metadata_dirs[@]} -eq 0 ]]; then
+            echo "::error::No auto-update metadata (.yml) files were found in the release artifacts." >&2
+            exit 1
+          fi
+
+          for dir in "${metadata_dirs[@]}"; do
+            echo "Verifying auto-update metadata in ${dir}" >&2
+            node scripts/test-auto-update.mjs --local "$dir"
+          done
 
       - name: Display release notes
         run: |
