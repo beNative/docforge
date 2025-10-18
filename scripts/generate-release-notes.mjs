@@ -255,63 +255,119 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
     return;
   }
 
+  const digestCache = new Map();
   const assetsByDirectory = new Map();
   for (const asset of releaseAssets) {
     const key = asset.artifactDir;
     if (!assetsByDirectory.has(key)) {
-      assetsByDirectory.set(key, []);
+      assetsByDirectory.set(key, { assets: [], byName: new Map() });
     }
-    assetsByDirectory.get(key).push(asset);
+    const entry = assetsByDirectory.get(key);
+    entry.assets.push(asset);
+    entry.byName.set(asset.fileName, asset);
+    const originalName = asset.originalFileName;
+    if (originalName && originalName !== asset.fileName && !entry.byName.has(originalName)) {
+      entry.byName.set(originalName, asset);
+    }
   }
 
+  const getDigestForPath = async (filePath, knownSize = null) => {
+    let digest = digestCache.get(filePath);
+    if (!digest) {
+      const [sha512, size] = await Promise.all([
+        computeFileSha512(filePath),
+        knownSize !== null ? Promise.resolve(knownSize) : getFileSize(filePath),
+      ]);
+      digest = { sha512, size };
+      digestCache.set(filePath, digest);
+    } else if (knownSize !== null && typeof knownSize === 'number' && digest.size !== knownSize) {
+      digest = { sha512: digest.sha512, size: knownSize };
+      digestCache.set(filePath, digest);
+    }
+    return digest;
+  };
+
   for (const { filePath: metadataPath, artifactDir } of metadataFiles) {
-    const relevantAssets = assetsByDirectory.get(artifactDir);
-    if (!relevantAssets || relevantAssets.length === 0) {
-      continue;
-    }
+    const metadataDir = path.dirname(metadataPath);
+    const assetGroup = assetsByDirectory.get(artifactDir) ?? { assets: [], byName: new Map() };
+    const assetByName = assetGroup.byName;
 
-    const assetByName = new Map();
-    for (const asset of relevantAssets) {
-      assetByName.set(asset.fileName, asset);
-      const originalName = asset.originalFileName;
-      if (originalName && originalName !== asset.fileName && !assetByName.has(originalName)) {
-        assetByName.set(originalName, asset);
-      }
-    }
-
-    const ensureEntryMatchesAsset = (entry) => {
-      if (!entry) {
-        return false;
-      }
-      const key = entry.url || entry.path;
+    const resolveAssetInfo = async (key) => {
       if (!key) {
-        return false;
+        return null;
       }
-      let asset = assetByName.get(key);
+
+      let asset = assetByName.get(key) ?? null;
       if (!asset) {
         const normalisedKey = normaliseInstallerFileName(key);
         if (normalisedKey !== key && assetByName.has(normalisedKey)) {
           asset = assetByName.get(normalisedKey);
         }
       }
-      if (!asset) {
+
+      if (asset && path.dirname(asset.filePath) !== metadataDir) {
+        asset = null;
+      }
+
+      if (asset) {
+        const digest = await getDigestForPath(
+          asset.filePath,
+          typeof asset.size === 'number' ? asset.size : null,
+        );
+        return {
+          name: asset.fileName,
+          sha512: digest.sha512,
+          size: digest.size,
+        };
+      }
+
+      const candidatePath = path.join(metadataDir, key);
+      try {
+        const stats = await fs.stat(candidatePath);
+        if (!stats.isFile()) {
+          return null;
+        }
+        const digest = await getDigestForPath(candidatePath, stats.size);
+        return {
+          name: key,
+          sha512: digest.sha512,
+          size: digest.size,
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    const ensureEntryMatchesAsset = async (entry) => {
+      if (!entry || typeof entry !== 'object') {
         return false;
       }
+
+      const key = entry.url || entry.path;
+      if (!key) {
+        return false;
+      }
+
+      const info = await resolveAssetInfo(key);
+      if (!info) {
+        return false;
+      }
+
       let changed = false;
-      if (entry.url && entry.url !== asset.fileName) {
-        entry.url = asset.fileName;
+      if (entry.url && entry.url !== info.name) {
+        entry.url = info.name;
         changed = true;
       }
-      if (entry.path && entry.path !== asset.fileName) {
-        entry.path = asset.fileName;
+      if (entry.path && entry.path !== info.name) {
+        entry.path = info.name;
         changed = true;
       }
-      if (typeof asset.size === 'number' && entry.size !== asset.size) {
-        entry.size = asset.size;
+      if (typeof info.size === 'number' && entry.size !== info.size) {
+        entry.size = info.size;
         changed = true;
       }
-      if (asset.sha512 && entry.sha512 !== asset.sha512) {
-        entry.sha512 = asset.sha512;
+      if (info.sha512 && entry.sha512 !== info.sha512) {
+        entry.sha512 = info.sha512;
         changed = true;
       }
       return changed;
@@ -334,48 +390,65 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
 
     if (Array.isArray(parsed.files)) {
       for (const entry of parsed.files) {
-        if (ensureEntryMatchesAsset(entry)) {
+        if (await ensureEntryMatchesAsset(entry)) {
           changed = true;
         }
       }
     }
 
-    const primaryKey =
+    const primarySource =
       (typeof parsed.path === 'string' && parsed.path) ||
       (Array.isArray(parsed.files) && parsed.files[0] && (parsed.files[0].path || parsed.files[0].url));
 
-    if (primaryKey) {
-      const asset = assetByName.get(primaryKey);
-      if (asset) {
-        if (parsed.path !== asset.fileName) {
-          parsed.path = asset.fileName;
+    if (primarySource) {
+      const info = await resolveAssetInfo(primarySource);
+      if (info) {
+        if (parsed.path !== info.name) {
+          parsed.path = info.name;
           changed = true;
         }
-        if (asset.sha512 && parsed.sha512 !== asset.sha512) {
-          parsed.sha512 = asset.sha512;
+        if (info.sha512 && parsed.sha512 !== info.sha512) {
+          parsed.sha512 = info.sha512;
           changed = true;
         }
-        if (typeof asset.size === 'number' && parsed.size !== undefined && parsed.size !== asset.size) {
-          parsed.size = asset.size;
+        if (typeof info.size === 'number' && parsed.size !== undefined && parsed.size !== info.size) {
+          parsed.size = info.size;
+          changed = true;
+        }
+
+        if (!Array.isArray(parsed.files)) {
+          parsed.files = [
+            {
+              url: info.name,
+              sha512: info.sha512,
+              size: info.size,
+            },
+          ];
           changed = true;
         }
       }
     }
 
-    if (!parsed.sha512 && parsed.path && assetByName.has(parsed.path)) {
-      parsed.sha512 = assetByName.get(parsed.path).sha512;
-      changed = true;
+    if (!parsed.sha512 && parsed.path) {
+      const info = await resolveAssetInfo(parsed.path);
+      if (info && info.sha512) {
+        parsed.sha512 = info.sha512;
+        changed = true;
+      }
     }
 
-    if (!Array.isArray(parsed.files) && parsed.path && assetByName.has(parsed.path)) {
-      parsed.files = [
-        {
-          url: parsed.path,
-          sha512: parsed.sha512,
-          size: assetByName.get(parsed.path).size,
-        },
-      ];
-      changed = true;
+    if (!Array.isArray(parsed.files) && parsed.path) {
+      const info = await resolveAssetInfo(parsed.path);
+      if (info) {
+        parsed.files = [
+          {
+            url: info.name,
+            sha512: info.sha512,
+            size: info.size,
+          },
+        ];
+        changed = true;
+      }
     }
 
     if (!changed) {

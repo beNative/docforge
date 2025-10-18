@@ -242,6 +242,62 @@ test('metadata updates remain isolated across artifact directories with identica
   ]);
 });
 
+test('metadata updates compute digests for non-release assets referenced locally', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const version = '0.0.4';
+  const { releaseDir } = await writeFixtureInstaller(workspace, version);
+
+  const nupkgName = `DocForge-${version}-full.nupkg`;
+  const nupkgPath = path.join(releaseDir, nupkgName);
+  const nupkgBuffer = crypto.randomBytes(2048);
+  await fs.writeFile(nupkgPath, nupkgBuffer);
+
+  const metadataPath = path.join(releaseDir, 'nupkg.yml');
+  const initialMetadata = {
+    files: [
+      {
+        url: nupkgName,
+        sha512: 'placeholder',
+        size: 0,
+      },
+    ],
+    path: nupkgName,
+    sha512: 'placeholder',
+  };
+  await fs.writeFile(metadataPath, YAML.stringify(initialMetadata), 'utf8');
+
+  const changelogPath = path.join(workspace, 'CHANGELOG.md');
+  await fs.writeFile(
+    changelogPath,
+    [`## v${version}`, '', '- Non-release asset metadata validation.'].join('\n'),
+    'utf8',
+  );
+
+  const notesPath = path.join(workspace, 'release-notes.md');
+  const manifestPath = path.join(workspace, 'release-files.txt');
+
+  await runGenerateReleaseNotes({
+    workspace,
+    version,
+    tag: `v${version}`,
+    changelogPath,
+    outputPath: notesPath,
+    filesOutputPath: manifestPath,
+  });
+
+  const metadata = YAML.parse(await fs.readFile(metadataPath, 'utf8'));
+  const expectedSha = computeSha512Base64(nupkgBuffer);
+
+  assert.equal(metadata.path, nupkgName);
+  assert.equal(metadata.sha512, expectedSha);
+  assert(Array.isArray(metadata.files) && metadata.files.length === 1);
+  assert.equal(metadata.files[0].url, nupkgName);
+  assert.equal(metadata.files[0].sha512, expectedSha);
+  assert.equal(metadata.files[0].size, nupkgBuffer.length);
+
+  await runLocalVerification(releaseDir);
+});
+
 test('local auto-update verification fails when metadata assets are missing', async (t) => {
   const workspace = await createTemporaryWorkspace(t);
   const { releaseDir, latestPath } = await writeFixtureInstaller(workspace, '0.0.2');
