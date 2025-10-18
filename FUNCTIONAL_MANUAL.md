@@ -181,7 +181,7 @@ Accessed via the info icon in the title bar. This view contains tabs for reading
 The **General** settings category includes a **PlantUML Rendering** selector. Choose between:
 
 - **Remote (plantuml.com):** Encodes the diagram and requests the SVG from the public PlantUML server.
-- **Offline (local renderer):** Invokes the bundled PlantUML engine inside the desktop application. This mode requires a local Java Runtime Environment and access to Graphviz (or the bundled `viz.js` assets) so the renderer can generate diagrams without contacting plantuml.com.
+- **Offline (local renderer):** Invokes the PlantUML jar bundled with the application (`assets/plantuml/plantuml.jar`) through the local Java Runtime Environment, letting the app render diagrams without contacting plantuml.com.
 
 If the Java runtime is unavailable, DocForge will report the error in the preview and you can switch back to remote rendering at any time.
 

@@ -13,7 +13,7 @@ import * as zlib from 'zlib';
 import * as os from 'os';
 import * as stream from 'stream';
 import { promisify } from 'util';
-import { generate as plantumlGenerate } from 'node-plantuml';
+import { spawn } from 'child_process';
 
 // Fix: Inform TypeScript about the __dirname global variable provided by Node.js, which is present in a CommonJS-like environment.
 declare const __dirname: string;
@@ -435,58 +435,86 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
     }
 
     try {
-        const generator = plantumlGenerate(trimmed, { format: 'svg' });
-        generator.out.setEncoding('utf-8');
-        generator.err.setEncoding('utf-8');
+        const jarPath = await resolvePlantUmlJar();
 
         return await new Promise<{ success: boolean; svg?: string; error?: string; details?: string }>((resolve) => {
+            const child = spawn('java', ['-Djava.awt.headless=true', '-jar', jarPath, '-pipe', '-tsvg'], {
+                stdio: ['pipe', 'pipe', 'pipe'],
+            });
+
             let svgOutput = '';
             let errorOutput = '';
+            let resolved = false;
 
-            const cleanup = () => {
-                generator.out.removeAllListeners();
-                generator.err.removeAllListeners();
+            const finalize = (payload: { success: boolean; svg?: string; error?: string; details?: string }) => {
+                if (resolved) {
+                    return;
+                }
+                resolved = true;
+                resolve(payload);
             };
 
-            const resolveWithError = (message: string) => {
-                cleanup();
-                resolve({
+            const stdout = child.stdout;
+            const stderr = child.stderr;
+            const stdin = child.stdin;
+
+            if (!stdout || !stderr || !stdin) {
+                child.kill();
+                finalize({
+                    success: false,
+                    error: 'Local PlantUML renderer could not be started.',
+                    details: 'The renderer process did not expose the expected stdio streams.',
+                });
+                return;
+            }
+
+            stdout.setEncoding('utf-8');
+            stderr.setEncoding('utf-8');
+
+            stdout.on('data', (chunk) => {
+                svgOutput += chunk.toString();
+            });
+
+            stderr.on('data', (chunk) => {
+                errorOutput += chunk.toString();
+            });
+
+            child.on('error', (err) => {
+                const message =
+                    err instanceof Error
+                        ? err.message
+                        : 'Failed to start the local PlantUML renderer process.';
+                finalize({
                     success: false,
                     error: message,
                     details: errorOutput.trim() || undefined,
                 });
-            };
-
-            generator.err.on('data', (chunk) => {
-                errorOutput += chunk.toString();
             });
 
-            generator.out.on('data', (chunk) => {
-                svgOutput += chunk.toString();
-            });
-
-            generator.out.on('end', () => {
-                cleanup();
-                if (svgOutput.trim()) {
-                    resolve({ success: true, svg: svgOutput });
-                } else {
-                    resolve({
-                        success: false,
-                        error: 'PlantUML renderer produced no SVG output.',
-                        details: errorOutput.trim() || undefined,
-                    });
+            child.on('close', (code) => {
+                if (code === 0 && svgOutput.trim()) {
+                    finalize({ success: true, svg: svgOutput });
+                    return;
                 }
+
+                const exitDetails = errorOutput.trim() || `Renderer exited with code ${code}.`;
+                finalize({
+                    success: false,
+                    error: 'Local PlantUML renderer failed to produce output.',
+                    details: exitDetails,
+                });
             });
 
-            generator.out.on('error', (streamError) => {
-                const message = streamError instanceof Error ? streamError.message : String(streamError);
-                resolveWithError(message);
+            stdin.on('error', (err) => {
+                const message = err instanceof Error ? err.message : String(err);
+                finalize({
+                    success: false,
+                    error: 'Failed to send diagram to the PlantUML renderer.',
+                    details: message,
+                });
             });
 
-            generator.err.on('error', (streamError) => {
-                const message = streamError instanceof Error ? streamError.message : String(streamError);
-                resolveWithError(message);
-            });
+            stdin.end(trimmed);
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -494,6 +522,54 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
         return { success: false, error: message };
     }
 });
+
+let cachedPlantumlJarPath: string | null = null;
+let plantumlJarLookupPromise: Promise<string> | null = null;
+
+const PLANTUML_JAR_RELATIVE_PATH = path.join('assets', 'plantuml', 'plantuml.jar');
+
+async function resolvePlantUmlJar(): Promise<string> {
+    if (cachedPlantumlJarPath) {
+        return cachedPlantumlJarPath;
+    }
+    if (plantumlJarLookupPromise) {
+        return plantumlJarLookupPromise;
+    }
+
+    const candidates = [
+        path.join(app.getAppPath(), PLANTUML_JAR_RELATIVE_PATH),
+        path.join(process.resourcesPath ?? '', PLANTUML_JAR_RELATIVE_PATH),
+        path.join(__dirname, '..', PLANTUML_JAR_RELATIVE_PATH),
+        path.join(__dirname, PLANTUML_JAR_RELATIVE_PATH),
+    ].reduce<string[]>((paths, candidate) => {
+        const normalized = path.normalize(candidate);
+        if (!paths.includes(normalized)) {
+            paths.push(normalized);
+        }
+        return paths;
+    }, []);
+
+    plantumlJarLookupPromise = (async () => {
+        for (const candidate of candidates) {
+            try {
+                await fs.access(candidate);
+                cachedPlantumlJarPath = candidate;
+                return candidate;
+            } catch {
+                // Continue searching
+            }
+        }
+        throw new Error(
+            'Bundled PlantUML renderer is missing. Ensure assets/plantuml/plantuml.jar is included alongside the application.'
+        );
+    })();
+
+    try {
+        return await plantumlJarLookupPromise;
+    } finally {
+        plantumlJarLookupPromise = null;
+    }
+}
 
 // Python environments & execution
 ipcMain.handle('python:list-envs', async () => {
