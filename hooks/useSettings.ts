@@ -66,6 +66,13 @@ export const useSettings = () => {
     }
   }, [settings.allowPrerelease, loaded, addLog]);
 
+  useEffect(() => {
+    if (loaded && isElectron && window.electronAPI?.updaterSetAutoCheckEnabled) {
+      addLog('DEBUG', `Notifying main process: autoCheckForUpdates is ${settings.autoCheckForUpdates}`);
+      window.electronAPI.updaterSetAutoCheckEnabled(settings.autoCheckForUpdates);
+    }
+  }, [settings.autoCheckForUpdates, loaded, addLog]);
+
   const saveSettings = useCallback(async (newSettings: Settings) => {
     setSettings(newSettings);
     await repository.saveAllSettings(newSettings);

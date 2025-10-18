@@ -472,7 +472,24 @@ export const databaseService = {
       throw e;
     }
   },
-  
+
+  getSetting(key: string): unknown {
+    try {
+      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined;
+      if (!row) {
+        return undefined;
+      }
+      try {
+        return JSON.parse(row.value);
+      } catch {
+        return row.value;
+      }
+    } catch (error) {
+      console.error('DB Get Setting Error:', key, error);
+      throw error;
+    }
+  },
+
   run(sql: string, params: any[] = []): Database.RunResult {
     try {
       return db.prepare(sql).run(...(params || []));

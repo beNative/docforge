@@ -40,6 +40,8 @@ declare global {
         format?: 'svg'
       ) => Promise<{ success: boolean; svg?: string; error?: string; details?: string }>;
       updaterSetAllowPrerelease: (allow: boolean) => void;
+      updaterSetAutoCheckEnabled?: (enabled: boolean) => void;
+      updaterCheckForUpdates?: () => Promise<ManualUpdateCheckResult>;
       onUpdateAvailable?: (callback: (info: UpdateAvailableInfo) => void) => () => void;
       onUpdateDownloadProgress?: (callback: (progress: UpdateDownloadProgress) => void) => () => void;
       onUpdateDownloaded: (callback: (info: string | UpdateAvailableInfo) => void) => () => void;
@@ -92,6 +94,14 @@ export interface UpdateDownloadProgress {
   transferred: number;
   total: number;
   bytesPerSecond: number;
+}
+
+export interface ManualUpdateCheckResult {
+  success: boolean;
+  updateAvailable?: boolean;
+  version?: string | null;
+  releaseName?: string | null;
+  error?: string;
 }
 
 export type NodeType = 'folder' | 'document';
@@ -304,6 +314,7 @@ export interface Settings {
   iconSet: 'heroicons' | 'lucide' | 'feather' | 'tabler' | 'material';
   autoSaveLogs: boolean;
   allowPrerelease: boolean;
+  autoCheckForUpdates: boolean;
   plantumlRendererMode: 'remote' | 'offline';
   uiScale: number;
   documentTreeIndent: number;
