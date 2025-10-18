@@ -64,9 +64,36 @@ pythonManager.events.on('run-status', (payload) => broadcastPythonEvent('python:
 // --- Auto Updater Setup ---
 // Note: For auto-updates to work, you need to configure `electron-builder` in package.json
 // and sign your application.
+autoUpdater.logger = log;
 autoUpdater.autoDownload = true; // Enable auto-downloading of updates
+autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info.version ?? info.releaseName ?? 'unknown version');
+    mainWindow?.webContents.send('update:available', {
+        version: info.version ?? null,
+        releaseName: info.releaseName ?? null,
+        releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null,
+    });
+});
+autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('update:download-progress', {
+        percent: progress.percent,
+        transferred: progress.transferred,
+        total: progress.total,
+        bytesPerSecond: progress.bytesPerSecond,
+    });
+});
 autoUpdater.on('update-downloaded', (info) => {
-    mainWindow?.webContents.send('update:downloaded', info.version);
+    console.log('Update downloaded:', info.version ?? info.releaseName ?? 'unknown version');
+    mainWindow?.webContents.send('update:downloaded', {
+        version: info.version ?? null,
+        releaseName: info.releaseName ?? null,
+        releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null,
+    });
+});
+autoUpdater.on('error', (error) => {
+    console.error('Auto-update error:', error);
+    const message = error instanceof Error ? error.message : String(error);
+    mainWindow?.webContents.send('update:error', message);
 });
 
 function createWindow() {
