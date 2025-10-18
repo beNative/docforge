@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>GUI Test Plan Validation Results</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  body {
+    margin: 2rem;
+    background: #f6f7fb;
+    color: #1f2933;
+  }
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  }
+  th, td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: top;
+  }
+  th {
+    background: #1f2937;
+    color: #f9fafb;
+    text-align: left;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  tr.pass td.status {
+    color: #047857;
+    font-weight: 600;
+  }
+  tr.fail td.status {
+    color: #b91c1c;
+    font-weight: 600;
+  }
+  tr.info td.status {
+    color: #0f172a;
+    font-weight: 600;
+  }
+  tr:nth-child(even) td {
+    background: rgba(15, 23, 42, 0.03);
+  }
+  .meta {
+    margin-bottom: 1rem;
+    color: #4b5563;
+  }
+</style>
+</head>
+<body>
+  <h1>GUI Test Plan Validation Results</h1>
+  <p class="meta">Generated: 2025-10-04T19:14:02.925Z</p>
+  <table>
+    <thead>
+      <tr><th>Test</th><th>Status</th><th>Details</th></tr>
+    </thead>
+    <tbody>
+      <tr class="pass"><td>Heading present: ## 1. Prioritized Test Scenarios</td><td>PASS</td><td>Heading located in document.</td></tr>
+<tr class="pass"><td>Heading present: ## 2. Test Execution Report</td><td>PASS</td><td>Heading located in document.</td></tr>
+<tr class="pass"><td>Heading present: ### 2.1 Execution Summary</td><td>PASS</td><td>Heading located in document.</td></tr>
+<tr class="pass"><td>Heading present: ### 2.2 Impact on Scenario Coverage</td><td>PASS</td><td>Heading located in document.</td></tr>
+<tr class="pass"><td>Heading present: ### 2.3 Blocker Detail</td><td>PASS</td><td>Heading located in document.</td></tr>
+<tr class="pass"><td>Heading present: ### 2.4 Mitigation Plan</td><td>PASS</td><td>Heading located in document.</td></tr>
+<tr class="pass"><td>Execution status format: Application boot and sample workspace load</td><td>PASS</td><td>Execution status "**Blocked** – Preview build cannot be generated because `npm install` fails (node-plantuml requires downloading `viz.js`, which is unreachable in the current offline environment)." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Application boot and sample workspace load</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Document creation and autosave persistence</td><td>PASS</td><td>Execution status "**Blocked** – Depends on successful preview build; prerequisites unavailable." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Document creation and autosave persistence</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Layout responsiveness at critical breakpoints</td><td>PASS</td><td>Execution status "**Blocked** – Requires running UI preview; assets not compiled due to dependency install failure." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Layout responsiveness at critical breakpoints</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Keyboard navigation starting focus</td><td>PASS</td><td>Execution status "**Blocked** – Preview not available; see environment limitation above." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Keyboard navigation starting focus</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Global layout & typography consistency</td><td>PASS</td><td>Execution status "**Blocked** – Screenshot capture requires a compiled build; build step failed." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Global layout & typography consistency</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Editor toolbar theming & state coherence</td><td>PASS</td><td>Execution status "**Blocked** – UI cannot be launched without build artifacts." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Editor toolbar theming & state coherence</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Modal/toast visual system check</td><td>PASS</td><td>Execution status "**Blocked** – Requires running UI preview; blocked by dependency install failure." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Modal/toast visual system check</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Add Markdown document with live preview</td><td>PASS</td><td>Execution status "**Blocked** – Test documents cannot be created without functioning preview environment." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Add Markdown document with live preview</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Add HTML document with preview parity</td><td>PASS</td><td>Execution status "**Blocked** – Preview unavailable; blocked on dependency installation." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Add HTML document with preview parity</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Add PlantUML document preview</td><td>PASS</td><td>Execution status "**Blocked** – PlantUML renderer assets missing because `node-plantuml` post-install script could not download `viz.js`." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Add PlantUML document preview</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Add PDF document preview</td><td>PASS</td><td>Execution status "**Blocked** – Preview environment not runnable without build artifacts." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Add PDF document preview</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Add image asset preview (PNG/JPG)</td><td>PASS</td><td>Execution status "**Blocked** – UI preview build blocked." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Add image asset preview (PNG/JPG)</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Add plaintext document workflow</td><td>PASS</td><td>Execution status "**Blocked** – Dependent on preview build completion; blocked." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Add plaintext document workflow</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Template preview rendering</td><td>PASS</td><td>Execution status "**Blocked** – Preview build artifacts unavailable." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Template preview rendering</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Status bar connection messaging</td><td>PASS</td><td>Execution status "**Blocked** – Cannot verify without running UI." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Status bar connection messaging</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Cross-view iconography audit</td><td>PASS</td><td>Execution status "**Blocked** – Requires visual inspection of preview build; blocked." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Cross-view iconography audit</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: Dark mode typography & contrast check</td><td>PASS</td><td>Execution status "**Blocked** – UI preview unavailable." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: Dark mode typography & contrast check</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Execution status format: High DPI rendering review</td><td>PASS</td><td>Execution status "**Blocked** – Preview build blocked; cannot execute scenario." uses an approved label.</td></tr>
+<tr class="pass"><td>Unique scenario name: High DPI rendering review</td><td>PASS</td><td>Scenario name is unique within the matrix.</td></tr>
+<tr class="pass"><td>Markdown document scenario present</td><td>PASS</td><td>Scenario covering Markdown documents is present.</td></tr>
+<tr class="pass"><td>HTML document scenario present</td><td>PASS</td><td>Scenario covering HTML documents is present.</td></tr>
+<tr class="pass"><td>PlantUML document scenario present</td><td>PASS</td><td>Scenario covering PlantUML documents is present.</td></tr>
+<tr class="pass"><td>PDF document scenario present</td><td>PASS</td><td>Scenario covering PDF documents is present.</td></tr>
+<tr class="pass"><td>Image document scenario present</td><td>PASS</td><td>Scenario covering PNG documents is present.</td></tr>
+<tr class="pass"><td>Plaintext document scenario present</td><td>PASS</td><td>Scenario covering plaintext documents is present.</td></tr>
+<tr class="pass"><td>Scenario coverage summary</td><td>PASS</td><td>Scenario counts — Pass: 0, Fail: 0, Blocked: 18, Not Run: 0.</td></tr>
+      <tr class="info"><td colspan="3"><strong>Summary:</strong> Pass 0, Fail 0, Blocked 18, Not Run 0</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>
