@@ -124,11 +124,20 @@ Electron Builder manages the packaging and publishing workflow for DocForge. The
 ### Publishing a Release
 
 1. Run `npm version <new-version> --no-git-tag-version` to bump the version in both `package.json` and `package-lock.json` without creating a Git tag.
-2. Update `VERSION_LOG.md` with a new section that captures the highlights of the release.
+2. Update `VERSION_LOG.md` with a new section that captures the highlights of the release—the automated workflow copies the top entry into the GitHub release body.
 3. Review and update the Markdown documentation (README, manuals, release notes) so the written guidance reflects the final state of the build.
 4. Sync the Markdown files under `docs/` with the copies at the project root.
-5. Execute `npm run publish` to package the application and upload the release artifacts to GitHub.
-6. When the draft release is created, paste the freshly written `VERSION_LOG.md` entry into the GitHub release notes and verify the uploaded binaries before making the release public.
+5. Commit and push the changes so the release tag points at the finished documentation.
+6. Create and push a matching version tag (for example, `git tag v0.6.5` followed by `git push origin v0.6.5`) to trigger the automated release pipeline.
+7. Monitor the "Release" workflow run and verify the published GitHub release lists the correct notes and includes the installers for every supported platform before announcing availability.
+
+### Automated Release Workflow
+
+-   Tag pushes that match `v*` trigger the `Release` GitHub Actions workflow.
+-   An initial job extracts the latest section from `VERSION_LOG.md` and creates the GitHub release with those notes.
+-   A platform matrix rebuilds DocForge via the existing packaging scripts (`npm run package:*`) for macOS, Windows (x64/ia32), and Linux (x64/arm64/armv7l).
+-   Each job uploads its generated installers (and accompanying update manifests) to the release using the GitHub CLI.
+-   `npm run publish` remains available for manual distribution, but the automated workflow is the canonical path for tagged releases.
 
 ### Application Icon Pipeline
 

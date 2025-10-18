@@ -43,11 +43,12 @@ To review the history of changes, see the [Version Log](./VERSION_LOG.md).
 To create a new public build of DocForge:
 
 1. Update the version in `package.json` and regenerate the lockfile with `npm version <new-version> --no-git-tag-version`.
-2. Draft the release notes by updating `VERSION_LOG.md` with a new section that summarizes the changes included in the release.
+2. Draft the release notes by updating `VERSION_LOG.md` with a new section that summarizes the changes included in the release (the automated workflow copies the top entry into the GitHub release body).
 3. Review the Markdown documentation (README, manuals, and release notes) so the written guidance matches the current workflow.
 4. Sync the documentation copies under `docs/` (README, manuals, version log) with any updates made at the project root.
-5. Run `npm run publish` to build the application and publish the artifacts to the configured GitHub release target via Electron Builder.
-6. Once the draft release appears on GitHub, copy the latest `VERSION_LOG.md` entry into the release description and confirm the uploaded artifacts look correct before publishing.
+5. Commit the changes and push them to the default branch so the release tag points at the finalized documentation.
+6. Create and push a tag that matches the new version (for example, `git tag v0.6.5` followed by `git push origin v0.6.5`) to trigger the automated release workflow.
+7. Monitor the "Release" workflow run, then confirm that the published GitHub release lists the correct notes and includes installers for every platform before announcing availability.
 
 ## Application Icon Workflow
 

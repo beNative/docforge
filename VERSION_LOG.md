@@ -1,5 +1,27 @@
 # Version Log
 
+## v0.6.5 - The Automated Release Update
+
+This maintenance release introduces a hands-free publishing workflow so tagged
+builds automatically land on GitHub with installers for every supported
+platform.
+
+### 🛠 Improvements
+
+-   Added a GitHub Actions release pipeline that rebuilds the application for
+    macOS, Windows (x64/ia32), and Linux (x64/arm64/armv7l) whenever a tagged
+    version is pushed and attaches the generated installers to the release.
+-   Refreshed the release preparation checklist across the documentation set to
+    describe the tagging workflow and clarify how release notes flow from the
+    version log into GitHub releases.
+-   Synced all Markdown documentation so the published guides continue to match
+    the repository sources.
+
+### 🐛 Fixes
+
+-   Removed stale guidance that referenced manually uploading binaries, keeping
+    the publishing process consistent with the automated workflow.
+
 ## v0.6.4 - The Checklist Confidence Update
 
 This maintenance release polishes the publishing checklist and documentation so
