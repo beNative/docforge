@@ -183,6 +183,52 @@ async function getFileSize(filePath) {
   return stats.size;
 }
 
+function hasLatestMetadataFile(filePath) {
+  const name = path.basename(filePath).toLowerCase();
+  return name.startsWith('latest') && name.endsWith('.yml');
+}
+
+function ensureLatestMetadataPresence({ artifactRoot, releaseAssets, updateSupportFiles }) {
+  if (releaseAssets.length === 0) {
+    return;
+  }
+
+  const releaseAssetsByDirectory = new Map();
+  for (const asset of releaseAssets) {
+    const entry = releaseAssetsByDirectory.get(asset.artifactDir) ?? { assets: [] };
+    entry.assets.push(asset);
+    releaseAssetsByDirectory.set(asset.artifactDir, entry);
+  }
+
+  const metadataByDirectory = new Map();
+  for (const file of updateSupportFiles) {
+    const entry = metadataByDirectory.get(file.artifactDir) ?? [];
+    entry.push(file.filePath);
+    metadataByDirectory.set(file.artifactDir, entry);
+  }
+
+  const missing = [];
+  for (const [artifactDir, { assets }] of releaseAssetsByDirectory) {
+    const metadataFiles = metadataByDirectory.get(artifactDir) ?? [];
+    const hasLatest = metadataFiles.some((filePath) => hasLatestMetadataFile(filePath));
+    if (!hasLatest) {
+      const installers = assets.map((asset) => asset.fileName).join(', ');
+      const relativeDir = artifactDir || '.';
+      const displayDir = path.join(artifactRoot, relativeDir);
+      missing.push(`${displayDir} (installer(s): ${installers})`);
+    }
+  }
+
+  if (missing.length > 0) {
+    const details = missing.map((entry) => ` - ${entry}`).join('\n');
+    throw new Error([
+      'Missing required auto-update metadata (.yml) for the following artifact directories:',
+      details,
+      'Each installer must ship with a latest*.yml manifest in the same directory as the binary.',
+    ].join('\n'));
+  }
+}
+
 async function collectAssets(artifactRoot) {
   const releaseAssets = [];
   const updateSupportFiles = [];
@@ -488,6 +534,7 @@ async function main() {
 
   const { releaseAssets, updateSupportFiles } = await collectAssets(artifactRoot);
   await updateMetadataFiles(updateSupportFiles, releaseAssets);
+  ensureLatestMetadataPresence({ artifactRoot, releaseAssets, updateSupportFiles });
   const table = buildDownloadTable(releaseAssets, repository, tag);
 
   const sections = [`# DocForge v${version}`];

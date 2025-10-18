@@ -26,32 +26,88 @@ async function createTemporaryWorkspace(t) {
 }
 
 async function writeFixtureInstaller(directory, version, options = {}) {
-  const { artifactDir = 'docforge-windows-x64' } = options;
+  const {
+    artifactDir = 'docforge-windows-x64',
+    assetName = `DocForge Setup ${version}.exe`,
+    metadataFileName = 'latest.yml',
+    includeMetadata = true,
+    additionalMetadata = [],
+    assetSize = 1024,
+  } = options;
+
   const releaseDir = path.join(directory, 'release-artifacts', artifactDir, 'release');
   await fs.mkdir(releaseDir, { recursive: true });
-  const originalName = `DocForge Setup ${version}.exe`;
-  const installerPath = path.join(releaseDir, originalName);
-  const binary = crypto.randomBytes(1024);
+
+  const installerPath = path.join(releaseDir, assetName);
+  const binary = crypto.randomBytes(assetSize);
   await fs.writeFile(installerPath, binary);
 
-  const latestMetadata = {
-    version,
-    files: [
-      {
-        url: originalName,
-        sha512: 'placeholder',
-        size: 0,
-      },
-    ],
-    path: originalName,
-    sha512: 'placeholder',
-    releaseDate: new Date().toISOString(),
+  let metadataPath = null;
+  if (includeMetadata && metadataFileName) {
+    const metadata = {
+      version,
+      files: [
+        {
+          url: assetName,
+          sha512: 'placeholder',
+          size: 0,
+        },
+      ],
+      path: assetName,
+      sha512: 'placeholder',
+      releaseDate: new Date().toISOString(),
+    };
+    metadataPath = path.join(releaseDir, metadataFileName);
+    await fs.writeFile(metadataPath, YAML.stringify(metadata), 'utf8');
+  }
+
+  for (const entry of additionalMetadata) {
+    const targetPath = path.join(releaseDir, entry.relativePath);
+    await fs.mkdir(path.dirname(targetPath), { recursive: true });
+    const source = entry.source
+      ? entry.source
+      : YAML.stringify(
+          entry.data ?? {
+            version,
+            files: [],
+            path: entry.path ?? assetName,
+            sha512: 'placeholder',
+          },
+        );
+    await fs.writeFile(targetPath, source, 'utf8');
+  }
+
+  return {
+    releaseDir,
+    metadataPath,
+    artifactDir,
+    assetPath: installerPath,
+    assetName,
   };
+}
 
-  const latestPath = path.join(releaseDir, 'latest.yml');
-  await fs.writeFile(latestPath, YAML.stringify(latestMetadata), 'utf8');
+async function listMetadataDirectories(rootDirectory) {
+  const directories = new Set();
 
-  return { releaseDir, latestPath, artifactDir };
+  async function walk(current) {
+    const entries = await fs.readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+        continue;
+      }
+
+      if (!entry.isFile() || !entry.name.endsWith('.yml') || entry.name === 'builder-debug.yml') {
+        continue;
+      }
+
+      directories.add(path.dirname(fullPath));
+    }
+  }
+
+  await walk(rootDirectory);
+  return Array.from(directories).sort();
 }
 
 async function runGenerateReleaseNotes({
@@ -116,7 +172,7 @@ function computeSha512Base64(buffer) {
 
 test('release tooling rewrites metadata and keeps latest.yml published', async (t) => {
   const workspace = await createTemporaryWorkspace(t);
-  const { releaseDir, latestPath } = await writeFixtureInstaller(workspace, '0.0.1');
+  const { releaseDir, metadataPath: latestPath } = await writeFixtureInstaller(workspace, '0.0.1');
 
   const changelogPath = path.join(workspace, 'CHANGELOG.md');
   await fs.writeFile(
@@ -205,8 +261,8 @@ test('metadata updates remain isolated across artifact directories with identica
   ]);
 
   const [x64Metadata, arm64Metadata] = await Promise.all([
-    fs.readFile(x64.latestPath, 'utf8').then((source) => YAML.parse(source)),
-    fs.readFile(arm64.latestPath, 'utf8').then((source) => YAML.parse(source)),
+    fs.readFile(x64.metadataPath, 'utf8').then((source) => YAML.parse(source)),
+    fs.readFile(arm64.metadataPath, 'utf8').then((source) => YAML.parse(source)),
   ]);
 
   const x64Sha = computeSha512Base64(x64Buffer);
@@ -240,6 +296,106 @@ test('metadata updates remain isolated across artifact directories with identica
     runLocalVerification(x64.releaseDir),
     runLocalVerification(arm64.releaseDir),
   ]);
+});
+
+test('release workflow verifies metadata directories across platforms and publishes manifests', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const version = '0.0.5';
+
+  const ia32 = await writeFixtureInstaller(workspace, version, {
+    artifactDir: 'docforge-windows-ia32',
+    additionalMetadata: [
+      {
+        relativePath: path.join('win-ia32-unpacked', 'resources', 'app-update.yml'),
+        data: {
+          version,
+          files: [],
+        },
+      },
+    ],
+  });
+
+  const x64 = await writeFixtureInstaller(workspace, version, {
+    artifactDir: 'docforge-windows-x64',
+  });
+
+  const linux = await writeFixtureInstaller(workspace, version, {
+    artifactDir: 'docforge-linux-arm64',
+    assetName: `DocForge-${version}-arm64.AppImage`,
+    metadataFileName: 'latest-linux-arm64.yml',
+  });
+
+  const mac = await writeFixtureInstaller(workspace, version, {
+    artifactDir: 'docforge-macos-x64',
+    assetName: `DocForge-${version}.dmg`,
+    metadataFileName: 'latest-mac.yml',
+  });
+
+  const changelogPath = path.join(workspace, 'CHANGELOG.md');
+  await fs.writeFile(
+    changelogPath,
+    [`## v${version}`, '', '- Test entry for multi-platform metadata verification.'].join('\n'),
+    'utf8',
+  );
+
+  const notesPath = path.join(workspace, 'release-notes.md');
+  const manifestPath = path.join(workspace, 'release-files.txt');
+
+  await runGenerateReleaseNotes({
+    workspace,
+    version,
+    tag: `v${version}`,
+    changelogPath,
+    outputPath: notesPath,
+    filesOutputPath: manifestPath,
+  });
+
+  const manifestEntries = new Set(readManifestEntries(await fs.readFile(manifestPath, 'utf8')));
+  const metadataFiles = [ia32.metadataPath, x64.metadataPath, linux.metadataPath, mac.metadataPath];
+  for (const metadataPath of metadataFiles) {
+    assert(metadataPath, 'metadataPath should be defined for all fixtures');
+    const relativePath = path.relative(repoPath(), metadataPath);
+    assert(manifestEntries.has(relativePath), `${relativePath} must be included in release manifest`);
+  }
+
+  const metadataDirs = await listMetadataDirectories(path.join(workspace, 'release-artifacts'));
+  assert(metadataDirs.length >= metadataFiles.length, 'expected to discover metadata directories');
+
+  for (const dir of metadataDirs) {
+    await runLocalVerification(dir);
+  }
+});
+
+test('release generation fails when required latest metadata is missing', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const version = '0.0.7';
+  await writeFixtureInstaller(workspace, version, {
+    artifactDir: 'docforge-windows-ia32',
+    includeMetadata: false,
+  });
+
+  const changelogPath = path.join(workspace, 'CHANGELOG.md');
+  await fs.writeFile(
+    changelogPath,
+    [`## v${version}`, '', '- Test entry for missing metadata detection.'].join('\n'),
+    'utf8',
+  );
+
+  const notesPath = path.join(workspace, 'release-notes.md');
+  const manifestPath = path.join(workspace, 'release-files.txt');
+
+  await assert.rejects(
+    () =>
+      runGenerateReleaseNotes({
+        workspace,
+        version,
+        tag: `v${version}`,
+        changelogPath,
+        outputPath: notesPath,
+        filesOutputPath: manifestPath,
+      }),
+    /Missing required auto-update metadata/,
+  );
 });
 
 test('metadata updates compute digests for non-release assets referenced locally', async (t) => {
@@ -300,7 +456,7 @@ test('metadata updates compute digests for non-release assets referenced locally
 
 test('local auto-update verification fails when metadata assets are missing', async (t) => {
   const workspace = await createTemporaryWorkspace(t);
-  const { releaseDir, latestPath } = await writeFixtureInstaller(workspace, '0.0.2');
+  const { releaseDir, metadataPath: latestPath } = await writeFixtureInstaller(workspace, '0.0.2');
 
   await fs.rm(latestPath);
 
