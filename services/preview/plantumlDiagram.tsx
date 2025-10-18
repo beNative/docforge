@@ -15,9 +15,21 @@ interface PlantUMLErrorProps {
   details?: string | null;
 }
 
+const stopPointerEvent = (event: React.SyntheticEvent) => {
+  event.stopPropagation();
+};
+
 const PlantUMLError: React.FC<PlantUMLErrorProps> = ({ message, details }) => (
   <div className="df-plantuml" role="alert">
-    <div className="df-plantuml-error">
+    <div
+      className="df-plantuml-error"
+      onPointerDown={stopPointerEvent}
+      onPointerMove={stopPointerEvent}
+      onPointerUp={stopPointerEvent}
+      onDoubleClick={stopPointerEvent}
+      onClick={stopPointerEvent}
+      onWheel={stopPointerEvent}
+    >
       <div className="df-plantuml-error__message">{message}</div>
       {details && details.trim() && (
         <details className="df-plantuml-error__details">

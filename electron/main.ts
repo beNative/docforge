@@ -483,11 +483,11 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
                     return;
                 }
 
-                const exitDetails = errorOutput.trim() || `Renderer exited with code ${code}.`;
+                const exitDetails = errorOutput.trim();
                 finalize({
                     success: false,
-                    error: 'Local PlantUML renderer failed to produce output.',
-                    details: exitDetails,
+                    error: derivePlantumlFriendlyError(exitDetails, code ?? undefined),
+                    details: exitDetails || (typeof code === 'number' ? `Renderer exited with code ${code}.` : undefined),
                 });
             });
 
@@ -514,6 +514,88 @@ let plantumlJarLookupPromise: Promise<string> | null = null;
 
 const PLANTUML_JAR_RELATIVE_PATH = path.join('assets', 'plantuml', 'plantuml.jar');
 
+function derivePlantumlFriendlyError(details?: string | null, exitCode?: number): string {
+    if (details) {
+        const normalized = details.toLowerCase();
+
+        if (normalized.includes('cannot run program') && normalized.includes('"dot"')) {
+            return 'Graphviz (the "dot" executable) is required for the local PlantUML renderer. Install Graphviz or add it to your PATH.';
+        }
+
+        if (normalized.includes('graphviz') && normalized.includes('not found')) {
+            return 'Graphviz binaries were not found. Install Graphviz to enable the local PlantUML renderer.';
+        }
+
+        if (normalized.includes('unsupportedclassversionerror')) {
+            return 'The bundled PlantUML renderer requires a newer Java runtime. Update Java and try again.';
+        }
+
+        if (normalized.includes('could not find or load main class') || normalized.includes('classnotfoundexception')) {
+            return 'The PlantUML renderer could not start. Ensure assets/plantuml/plantuml.jar is present and accessible.';
+        }
+
+        if (normalized.includes('permission denied')) {
+            return 'The PlantUML renderer could not be executed because of missing file permissions.';
+        }
+    }
+
+    if (typeof exitCode === 'number' && exitCode !== 0) {
+        return `Local PlantUML renderer exited with code ${exitCode}.`;
+    }
+
+    return 'Local PlantUML renderer failed to produce output.';
+}
+
+function isPackagedAsarPath(filePath: string): boolean {
+    return /\.asar($|[\\/])/.test(filePath);
+}
+
+async function ensurePlantumlJarExtracted(sourcePath: string): Promise<string> {
+    if (!isPackagedAsarPath(sourcePath)) {
+        return sourcePath;
+    }
+
+    const tempDir = path.join(app.getPath('temp'), 'docforge-plantuml');
+    const destinationPath = path.join(tempDir, 'plantuml.jar');
+
+    await fs.mkdir(tempDir, { recursive: true });
+
+    let needsExtraction = true;
+    try {
+        const [sourceStats, destStats] = await Promise.all([fs.stat(sourcePath), fs.stat(destinationPath)]);
+        if (sourceStats.size === destStats.size) {
+            needsExtraction = false;
+        }
+    } catch {
+        // Either the destination does not exist yet or we could not stat one of the files.
+        needsExtraction = true;
+    }
+
+    if (!needsExtraction) {
+        return destinationPath;
+    }
+
+    const pipeline = promisify(stream.pipeline);
+
+    try {
+        await pipeline(createReadStream(sourcePath), createWriteStream(destinationPath));
+    } catch (error) {
+        try {
+            await fs.unlink(destinationPath);
+        } catch {
+            // Ignore cleanup failures; we'll retry extraction later if needed.
+        }
+
+        const message =
+            error instanceof Error
+                ? error.message
+                : 'Failed to extract bundled PlantUML renderer from application archive.';
+        throw new Error(`Unable to prepare PlantUML renderer: ${message}`);
+    }
+
+    return destinationPath;
+}
+
 async function resolvePlantUmlJar(): Promise<string> {
     if (cachedPlantumlJarPath) {
         return cachedPlantumlJarPath;
@@ -539,8 +621,9 @@ async function resolvePlantUmlJar(): Promise<string> {
         for (const candidate of candidates) {
             try {
                 await fs.access(candidate);
-                cachedPlantumlJarPath = candidate;
-                return candidate;
+                const usablePath = await ensurePlantumlJarExtracted(candidate);
+                cachedPlantumlJarPath = usablePath;
+                return usablePath;
             } catch {
                 // Continue searching
             }

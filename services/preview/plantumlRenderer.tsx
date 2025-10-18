@@ -73,10 +73,12 @@ const PlantUMLPreview: React.FC<PlantUMLPreviewProps> = ({ content, settings }) 
           gap: 0.5rem;
           align-items: flex-start;
           text-align: left;
+          user-select: text;
         }
 
         .df-plantuml-error__details {
           font-size: 0.85rem;
+          user-select: text;
         }
       `}</style>
     </ZoomPanContainer>
