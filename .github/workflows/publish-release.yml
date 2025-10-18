@@ -1,4 +1,4 @@
-name: Release
+name: Publish Release
 
 on:
   push:
@@ -11,6 +11,8 @@ permissions:
 jobs:
   create_release:
     runs-on: ubuntu-latest
+    env:
+      TAG_NAME: ${{ github.ref_name }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -35,16 +37,16 @@ jobs:
           cat release-notes.md >&2
 
       - name: Create GitHub release
-        id: create_release
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: DocForge ${{ github.ref_name }}
-          body_path: release-notes.md
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release delete "$TAG_NAME" -y
+          fi
+          gh release create "$TAG_NAME" \
+            --title "DocForge $TAG_NAME" \
+            --notes-file release-notes.md
 
   package:
     needs: create_release
