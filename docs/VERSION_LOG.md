@@ -1,5 +1,25 @@
 # Version Log
 
+## v0.6.6 - The Documentation Assurance Update
+
+This patch release keeps the publishing workflow aligned ahead of the next
+build by refreshing the documentation set and confirming the release checklist
+continues to match the automated pipeline.
+
+### 🛠 Improvements
+
+-   Bumped the application version to `v0.6.6` and refreshed the release
+    tagging examples so contributors follow the current command sequence when
+    preparing a build.
+-   Revalidated every Markdown guide (README, manuals, version log) and synced
+    the `docs/` copies to ensure the published documentation mirrors the
+    repository sources.
+
+### 🐛 Fixes
+
+-   Replaced outdated tag references that still pointed to `v0.6.5`, avoiding
+    confusion when publishing the release to GitHub.
+
 ## v0.6.5 - The Automated Release Update
 
 This maintenance release introduces a hands-free publishing workflow so tagged
