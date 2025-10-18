@@ -100,6 +100,10 @@ function detectFormat(filename) {
 }
 
 function isReleaseAsset(filename) {
+  if (filename.toLowerCase() === 'elevate.exe') {
+    return false;
+  }
+
   return (
     filename.endsWith('.exe') ||
     filename.endsWith('.dmg') ||
