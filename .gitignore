@@ -15,6 +15,7 @@ assets/icon*.png
 assets/icon.ico
 assets/icon.icns
 assets/favicon.ico
+assets/plantuml/plantuml.jar
 
 # Editor directories and files
 .vscode/*
