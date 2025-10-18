@@ -168,22 +168,7 @@ async function normaliseReleaseAsset(filePath) {
   return { filePath: targetPath, fileName: normalisedName, originalFileName: fileName };
 }
 
-async function computeSha512(filePath) {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha512');
-    const stream = createReadStream(filePath);
-    stream.on('data', (chunk) => hash.update(chunk));
-    stream.on('error', reject);
-    stream.on('end', () => resolve(hash.digest('base64')));
-  });
-}
-
-async function getFileSize(filePath) {
-  const stats = await fs.stat(filePath);
-  return stats.size;
-}
-
-async function computeSha512(filePath) {
+async function computeFileSha512(filePath) {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash('sha512');
     const stream = createReadStream(filePath);
@@ -229,7 +214,7 @@ async function collectAssets(artifactRoot) {
       }
 
       const [sha512, size] = await Promise.all([
-        computeSha512(filePath),
+        computeFileSha512(filePath),
         getFileSize(filePath),
       ]);
 
@@ -268,7 +253,14 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
     return;
   }
 
-  const assetByName = new Map(releaseAssets.map((asset) => [asset.fileName, asset]));
+  const assetByName = new Map();
+  for (const asset of releaseAssets) {
+    assetByName.set(asset.fileName, asset);
+    const originalName = asset.originalFileName;
+    if (originalName && originalName !== asset.fileName && !assetByName.has(originalName)) {
+      assetByName.set(originalName, asset);
+    }
+  }
 
   const ensureEntryMatchesAsset = (entry) => {
     if (!entry) {
@@ -278,7 +270,13 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
     if (!key) {
       return false;
     }
-    const asset = assetByName.get(key);
+    let asset = assetByName.get(key);
+    if (!asset) {
+      const normalisedKey = normaliseInstallerFileName(key);
+      if (normalisedKey !== key && assetByName.has(normalisedKey)) {
+        asset = assetByName.get(normalisedKey);
+      }
+    }
     if (!asset) {
       return false;
     }
