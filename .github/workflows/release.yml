@@ -171,6 +171,7 @@ jobs:
           shopt -s nullglob
 
           exe_name=""
+          blockmap_name=""
           for file in release/*.exe; do
             dir=$(dirname "$file")
             base=$(basename "$file")
@@ -184,6 +185,15 @@ jobs:
             fi
 
             exe_name=$(basename "$file")
+
+            original_blockmap="$dir/${stem}.${ext}.blockmap"
+            if [[ -f "$original_blockmap" ]]; then
+              target_blockmap="$dir/${exe_name}.blockmap"
+              if [[ "$original_blockmap" != "$target_blockmap" ]]; then
+                mv "$original_blockmap" "$target_blockmap"
+              fi
+              blockmap_name=$(basename "$target_blockmap")
+            fi
           done
 
           latest_file=""
@@ -198,6 +208,7 @@ jobs:
 
           if [[ -n "$exe_name" && -n "$latest_file" ]]; then
             export WINDOWS_EXE_NAME="$exe_name"
+            export WINDOWS_BLOCKMAP_NAME="$blockmap_name"
             export WINDOWS_LATEST_FILE="$latest_file"
             python - <<'PY'
 import os
@@ -207,12 +218,32 @@ from urllib.parse import quote
 
 latest = Path(os.environ["WINDOWS_LATEST_FILE"])
 exe_name = os.environ["WINDOWS_EXE_NAME"]
-content = latest.read_text(encoding="utf-8")
+blockmap_name = os.environ.get("WINDOWS_BLOCKMAP_NAME") or ""
 
-content = re.sub(r"^(\s*path:\s*).+$", rf"\1{exe_name}", content, flags=re.MULTILINE)
-content = re.sub(r"^(\s*url:\s*).+$", rf"\1{quote(exe_name)}", content, flags=re.MULTILINE)
+def replace_line(line: str, needle: str, replacement: str) -> str:
+    prefix, _, _ = line.partition(needle)
+    return f"{prefix}{needle}{replacement}\n"
 
-latest.write_text(content, encoding="utf-8")
+lines = latest.read_text(encoding="utf-8").splitlines(keepends=True)
+updated = []
+for line in lines:
+    stripped = line.strip()
+    if stripped.startswith("path:") and ".exe" in stripped:
+        updated.append(replace_line(line, "path:", f" {exe_name}"))
+        continue
+
+    if stripped.startswith("url:") and ".exe" in stripped:
+        value = stripped.split(None, 1)[1] if len(stripped.split(None, 1)) == 2 else ""
+        if value.endswith(".exe.blockmap") and blockmap_name:
+            updated.append(replace_line(line, "url:", f" {quote(blockmap_name)}"))
+            continue
+        if value.endswith(".exe"):
+            updated.append(replace_line(line, "url:", f" {quote(exe_name)}"))
+            continue
+
+    updated.append(line)
+
+latest.write_text("".join(updated), encoding="utf-8")
 PY
           fi
 
