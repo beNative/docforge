@@ -50,58 +50,58 @@ jobs:
 
   package:
     needs: create_release
-    name: ${{ matrix.display-name }}
+    name: ${{ matrix.display_name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - display-name: macOS x64
+          - display_name: macOS x64
             os: macos-latest
             script: package:mac:x64
             arch: x64
-            npm-platform: darwin
-            cache-paths: |
+            npm_platform: darwin
+            cache_paths: |
               ~/Library/Caches/electron
               ~/Library/Caches/electron-builder
-          - display-name: Windows x64
+          - display_name: Windows x64
             os: windows-latest
             script: package:win:x64
             arch: x64
-            npm-platform: win32
-            cache-paths: |
+            npm_platform: win32
+            cache_paths: |
               ~/AppData/Local/electron/Cache
               ~/AppData/Local/electron-builder/Cache
-          - display-name: Windows ia32
+          - display_name: Windows ia32
             os: windows-latest
             script: package:win:ia32
             arch: ia32
-            npm-platform: win32
-            cache-paths: |
+            npm_platform: win32
+            cache_paths: |
               ~/AppData/Local/electron/Cache
               ~/AppData/Local/electron-builder/Cache
-          - display-name: Linux x64
+          - display_name: Linux x64
             os: ubuntu-latest
             script: package:linux:x64
             arch: x64
-            npm-platform: linux
-            cache-paths: |
+            npm_platform: linux
+            cache_paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-          - display-name: Linux armv7l
+          - display_name: Linux armv7l
             os: ubuntu-latest
             script: package:linux:armv7l
             arch: armv7l
-            npm-platform: linux
-            cache-paths: |
+            npm_platform: linux
+            cache_paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-          - display-name: Linux arm64
+          - display_name: Linux arm64
             os: ubuntu-latest
             script: package:linux:arm64
             arch: arm64
-            npm-platform: linux
-            cache-paths: |
+            npm_platform: linux
+            cache_paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
     defaults:
@@ -126,7 +126,7 @@ jobs:
       - name: Cache Electron downloads
         uses: actions/cache@v4
         with:
-          path: ${{ matrix.cache-paths }}
+          path: ${{ matrix.cache_paths }}
           key: ${{ runner.os }}-electron-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-electron-${{ matrix.arch }}-
@@ -146,21 +146,21 @@ jobs:
         env:
           npm_config_arch: ${{ matrix.arch }}
           npm_config_target_arch: ${{ matrix.arch }}
-          npm_config_platform: ${{ matrix.npm-platform }}
+          npm_config_platform: ${{ matrix.npm_platform }}
 
       - name: Prepare native modules
         run: npm run postinstall --if-present
         env:
           npm_config_arch: ${{ matrix.arch }}
           npm_config_target_arch: ${{ matrix.arch }}
-          npm_config_platform: ${{ matrix.npm-platform }}
+          npm_config_platform: ${{ matrix.npm_platform }}
 
       - name: Package application
         run: npm run ${{ matrix.script }}
         env:
           npm_config_arch: ${{ matrix.arch }}
           npm_config_target_arch: ${{ matrix.arch }}
-          npm_config_platform: ${{ matrix.npm-platform }}
+          npm_config_platform: ${{ matrix.npm_platform }}
 
       - name: Normalize Windows artifact names
         if: runner.os == 'Windows'
@@ -168,9 +168,8 @@ jobs:
           MATRIX_ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-
-          arch="$MATRIX_ARCH"
           shopt -s nullglob
+          arch="$MATRIX_ARCH"
 
           exe_name=""
           blockmap_name=""
@@ -212,9 +211,8 @@ jobs:
             export WINDOWS_EXE_NAME="$exe_name"
             export WINDOWS_BLOCKMAP_NAME="$blockmap_name"
             export WINDOWS_LATEST_FILE="$latest_file"
-            python - <<'PY'
+            python3 - <<'PY'
 import os
-import re
 from pathlib import Path
 from urllib.parse import quote
 
@@ -233,7 +231,6 @@ for line in lines:
     if stripped.startswith("path:") and ".exe" in stripped:
         updated.append(replace_line(line, "path:", f" {exe_name}"))
         continue
-
     if stripped.startswith("url:") and ".exe" in stripped:
         value = stripped.split(None, 1)[1] if len(stripped.split(None, 1)) == 2 else ""
         if value.endswith(".exe.blockmap") and blockmap_name:
@@ -242,25 +239,29 @@ for line in lines:
         if value.endswith(".exe"):
             updated.append(replace_line(line, "url:", f" {quote(exe_name)}"))
             continue
-
     updated.append(line)
 
 latest.write_text("".join(updated), encoding="utf-8")
 PY
           fi
 
+      # Only upload the real deliverables, not unpacked app trees
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           shopt -s nullglob
-          files=()
-          while IFS= read -r -d '' file; do
-            case "$file" in
-              *.blockmap) continue ;;
-            esac
-            files+=("$file")
-          done < <(find release -type f -print0)
+
+          mapfile -t files < <(printf '%s\0' \
+            release/*.exe \
+            release/*.exe.blockmap \
+            release/*.dmg \
+            release/*.dmg.blockmap \
+            release/*.AppImage \
+            release/*.deb \
+            release/latest*.yml \
+            | xargs -0 -r ls 2>/dev/null | sed '/^ls:/d')
 
           if [ ${#files[@]} -eq 0 ]; then
             echo "No release files found" >&2
@@ -276,7 +277,7 @@ PY
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.display-name }}-logs
+          name: ${{ matrix.display_name }}-logs
           path: |
             npm-debug.log
             *.log
