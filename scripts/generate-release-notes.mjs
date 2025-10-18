@@ -183,6 +183,52 @@ async function getFileSize(filePath) {
   return stats.size;
 }
 
+function hasLatestMetadataFile(filePath) {
+  const name = path.basename(filePath).toLowerCase();
+  return name.startsWith('latest') && name.endsWith('.yml');
+}
+
+function ensureLatestMetadataPresence({ artifactRoot, releaseAssets, updateSupportFiles }) {
+  if (releaseAssets.length === 0) {
+    return;
+  }
+
+  const releaseAssetsByDirectory = new Map();
+  for (const asset of releaseAssets) {
+    const entry = releaseAssetsByDirectory.get(asset.artifactDir) ?? { assets: [] };
+    entry.assets.push(asset);
+    releaseAssetsByDirectory.set(asset.artifactDir, entry);
+  }
+
+  const metadataByDirectory = new Map();
+  for (const file of updateSupportFiles) {
+    const entry = metadataByDirectory.get(file.artifactDir) ?? [];
+    entry.push(file.filePath);
+    metadataByDirectory.set(file.artifactDir, entry);
+  }
+
+  const missing = [];
+  for (const [artifactDir, { assets }] of releaseAssetsByDirectory) {
+    const metadataFiles = metadataByDirectory.get(artifactDir) ?? [];
+    const hasLatest = metadataFiles.some((filePath) => hasLatestMetadataFile(filePath));
+    if (!hasLatest) {
+      const installers = assets.map((asset) => asset.fileName).join(', ');
+      const relativeDir = artifactDir || '.';
+      const displayDir = path.join(artifactRoot, relativeDir);
+      missing.push(`${displayDir} (installer(s): ${installers})`);
+    }
+  }
+
+  if (missing.length > 0) {
+    const details = missing.map((entry) => ` - ${entry}`).join('\n');
+    throw new Error([
+      'Missing required auto-update metadata (.yml) for the following artifact directories:',
+      details,
+      'Each installer must ship with a latest*.yml manifest in the same directory as the binary.',
+    ].join('\n'));
+  }
+}
+
 async function collectAssets(artifactRoot) {
   const releaseAssets = [];
   const updateSupportFiles = [];
@@ -204,8 +250,14 @@ async function collectAssets(artifactRoot) {
       const { filePath: normalisedPath, fileName: normalisedName, originalFileName } = await normaliseReleaseAsset(file);
       const fileName = normalisedName;
       const filePath = normalisedPath;
+      const artifactDir = path.relative(artifactRoot, path.dirname(filePath));
       if (isAutoUpdateSupportFile(fileName)) {
-        updateSupportFiles.push(filePath);
+        updateSupportFiles.push({
+          filePath,
+          artifactDir,
+          assetName: path.basename(filePath),
+          upload: true,
+        });
         continue;
       }
 
@@ -224,9 +276,11 @@ async function collectAssets(artifactRoot) {
         fileName,
         filePath,
         originalFileName,
+        artifactDir,
         format: detectFormat(fileName),
         sha512,
         size,
+        assetName: fileName,
       });
     }
   }
@@ -244,8 +298,76 @@ async function collectAssets(artifactRoot) {
     }
     return a.fileName.localeCompare(b.fileName);
   });
-  updateSupportFiles.sort();
+  updateSupportFiles.sort((a, b) => a.filePath.localeCompare(b.filePath));
   return { releaseAssets, updateSupportFiles };
+}
+
+function normaliseWindowsChannelName(arch) {
+  if (!arch) {
+    return null;
+  }
+  const normalised = arch.toLowerCase();
+  if (['x64', 'ia32', 'arm64'].includes(normalised)) {
+    return `win32-${normalised}`;
+  }
+  return `win32-${normalised.replace(/[^a-z0-9]+/gi, '-')}`;
+}
+
+async function prepareMetadataUploads({ releaseAssets, updateSupportFiles }) {
+  if (updateSupportFiles.length === 0) {
+    return;
+  }
+
+  const releaseAssetsByDir = new Map();
+  for (const asset of releaseAssets) {
+    if (!releaseAssetsByDir.has(asset.artifactDir)) {
+      releaseAssetsByDir.set(asset.artifactDir, { assets: [], arch: asset.arch });
+    }
+    const entry = releaseAssetsByDir.get(asset.artifactDir);
+    entry.assets.push(asset);
+    if (!entry.arch && asset.arch) {
+      entry.arch = asset.arch;
+    }
+  }
+
+  const windowsMetadata = updateSupportFiles.filter((file) => {
+    const name = path.basename(file.filePath).toLowerCase();
+    return name === 'latest.yml' && file.artifactDir.startsWith('docforge-windows-');
+  });
+
+  if (windowsMetadata.length === 0) {
+    return;
+  }
+
+  const canonical =
+    windowsMetadata.find((file) => {
+      const info = releaseAssetsByDir.get(file.artifactDir);
+      return info?.arch === 'x64';
+    }) ?? windowsMetadata[0];
+
+  for (const file of windowsMetadata) {
+    const info = releaseAssetsByDir.get(file.artifactDir);
+    const channelName = normaliseWindowsChannelName(info?.arch ?? 'windows');
+    if (!channelName) {
+      continue;
+    }
+    const aliasName = `${channelName}.yml`;
+    const aliasPath = path.join(path.dirname(file.filePath), aliasName);
+    await fs.copyFile(file.filePath, aliasPath);
+    updateSupportFiles.push({
+      filePath: aliasPath,
+      artifactDir: file.artifactDir,
+      assetName: aliasName,
+      upload: true,
+    });
+
+    file.assetName = path.basename(file.filePath);
+    if (file === canonical) {
+      file.upload = true;
+    } else {
+      file.upload = false;
+    }
+  }
 }
 
 async function updateMetadataFiles(metadataFiles, releaseAssets) {
@@ -253,54 +375,124 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
     return;
   }
 
-  const assetByName = new Map();
+  const digestCache = new Map();
+  const assetsByDirectory = new Map();
   for (const asset of releaseAssets) {
-    assetByName.set(asset.fileName, asset);
+    const key = asset.artifactDir;
+    if (!assetsByDirectory.has(key)) {
+      assetsByDirectory.set(key, { assets: [], byName: new Map() });
+    }
+    const entry = assetsByDirectory.get(key);
+    entry.assets.push(asset);
+    entry.byName.set(asset.fileName, asset);
     const originalName = asset.originalFileName;
-    if (originalName && originalName !== asset.fileName && !assetByName.has(originalName)) {
-      assetByName.set(originalName, asset);
+    if (originalName && originalName !== asset.fileName && !entry.byName.has(originalName)) {
+      entry.byName.set(originalName, asset);
     }
   }
 
-  const ensureEntryMatchesAsset = (entry) => {
-    if (!entry) {
-      return false;
+  const getDigestForPath = async (filePath, knownSize = null) => {
+    let digest = digestCache.get(filePath);
+    if (!digest) {
+      const [sha512, size] = await Promise.all([
+        computeFileSha512(filePath),
+        knownSize !== null ? Promise.resolve(knownSize) : getFileSize(filePath),
+      ]);
+      digest = { sha512, size };
+      digestCache.set(filePath, digest);
+    } else if (knownSize !== null && typeof knownSize === 'number' && digest.size !== knownSize) {
+      digest = { sha512: digest.sha512, size: knownSize };
+      digestCache.set(filePath, digest);
     }
-    const key = entry.url || entry.path;
-    if (!key) {
-      return false;
-    }
-    let asset = assetByName.get(key);
-    if (!asset) {
-      const normalisedKey = normaliseInstallerFileName(key);
-      if (normalisedKey !== key && assetByName.has(normalisedKey)) {
-        asset = assetByName.get(normalisedKey);
-      }
-    }
-    if (!asset) {
-      return false;
-    }
-    let changed = false;
-    if (entry.url && entry.url !== asset.fileName) {
-      entry.url = asset.fileName;
-      changed = true;
-    }
-    if (entry.path && entry.path !== asset.fileName) {
-      entry.path = asset.fileName;
-      changed = true;
-    }
-    if (typeof asset.size === 'number' && entry.size !== asset.size) {
-      entry.size = asset.size;
-      changed = true;
-    }
-    if (asset.sha512 && entry.sha512 !== asset.sha512) {
-      entry.sha512 = asset.sha512;
-      changed = true;
-    }
-    return changed;
+    return digest;
   };
 
-  for (const metadataPath of metadataFiles) {
+  for (const { filePath: metadataPath, artifactDir } of metadataFiles) {
+    const metadataDir = path.dirname(metadataPath);
+    const assetGroup = assetsByDirectory.get(artifactDir) ?? { assets: [], byName: new Map() };
+    const assetByName = assetGroup.byName;
+
+    const resolveAssetInfo = async (key) => {
+      if (!key) {
+        return null;
+      }
+
+      let asset = assetByName.get(key) ?? null;
+      if (!asset) {
+        const normalisedKey = normaliseInstallerFileName(key);
+        if (normalisedKey !== key && assetByName.has(normalisedKey)) {
+          asset = assetByName.get(normalisedKey);
+        }
+      }
+
+      if (asset && path.dirname(asset.filePath) !== metadataDir) {
+        asset = null;
+      }
+
+      if (asset) {
+        const digest = await getDigestForPath(
+          asset.filePath,
+          typeof asset.size === 'number' ? asset.size : null,
+        );
+        return {
+          name: asset.fileName,
+          sha512: digest.sha512,
+          size: digest.size,
+        };
+      }
+
+      const candidatePath = path.join(metadataDir, key);
+      try {
+        const stats = await fs.stat(candidatePath);
+        if (!stats.isFile()) {
+          return null;
+        }
+        const digest = await getDigestForPath(candidatePath, stats.size);
+        return {
+          name: key,
+          sha512: digest.sha512,
+          size: digest.size,
+        };
+      } catch {
+        return null;
+      }
+    };
+
+    const ensureEntryMatchesAsset = async (entry) => {
+      if (!entry || typeof entry !== 'object') {
+        return false;
+      }
+
+      const key = entry.url || entry.path;
+      if (!key) {
+        return false;
+      }
+
+      const info = await resolveAssetInfo(key);
+      if (!info) {
+        return false;
+      }
+
+      let changed = false;
+      if (entry.url && entry.url !== info.name) {
+        entry.url = info.name;
+        changed = true;
+      }
+      if (entry.path && entry.path !== info.name) {
+        entry.path = info.name;
+        changed = true;
+      }
+      if (typeof info.size === 'number' && entry.size !== info.size) {
+        entry.size = info.size;
+        changed = true;
+      }
+      if (info.sha512 && entry.sha512 !== info.sha512) {
+        entry.sha512 = info.sha512;
+        changed = true;
+      }
+      return changed;
+    };
+
     let parsed;
     try {
       const source = await fs.readFile(metadataPath, 'utf8');
@@ -318,48 +510,65 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
 
     if (Array.isArray(parsed.files)) {
       for (const entry of parsed.files) {
-        if (ensureEntryMatchesAsset(entry)) {
+        if (await ensureEntryMatchesAsset(entry)) {
           changed = true;
         }
       }
     }
 
-    const primaryKey =
+    const primarySource =
       (typeof parsed.path === 'string' && parsed.path) ||
       (Array.isArray(parsed.files) && parsed.files[0] && (parsed.files[0].path || parsed.files[0].url));
 
-    if (primaryKey) {
-      const asset = assetByName.get(primaryKey);
-      if (asset) {
-        if (parsed.path !== asset.fileName) {
-          parsed.path = asset.fileName;
+    if (primarySource) {
+      const info = await resolveAssetInfo(primarySource);
+      if (info) {
+        if (parsed.path !== info.name) {
+          parsed.path = info.name;
           changed = true;
         }
-        if (asset.sha512 && parsed.sha512 !== asset.sha512) {
-          parsed.sha512 = asset.sha512;
+        if (info.sha512 && parsed.sha512 !== info.sha512) {
+          parsed.sha512 = info.sha512;
           changed = true;
         }
-        if (typeof asset.size === 'number' && parsed.size !== undefined && parsed.size !== asset.size) {
-          parsed.size = asset.size;
+        if (typeof info.size === 'number' && parsed.size !== undefined && parsed.size !== info.size) {
+          parsed.size = info.size;
+          changed = true;
+        }
+
+        if (!Array.isArray(parsed.files)) {
+          parsed.files = [
+            {
+              url: info.name,
+              sha512: info.sha512,
+              size: info.size,
+            },
+          ];
           changed = true;
         }
       }
     }
 
-    if (!parsed.sha512 && parsed.path && assetByName.has(parsed.path)) {
-      parsed.sha512 = assetByName.get(parsed.path).sha512;
-      changed = true;
+    if (!parsed.sha512 && parsed.path) {
+      const info = await resolveAssetInfo(parsed.path);
+      if (info && info.sha512) {
+        parsed.sha512 = info.sha512;
+        changed = true;
+      }
     }
 
-    if (!Array.isArray(parsed.files) && parsed.path && assetByName.has(parsed.path)) {
-      parsed.files = [
-        {
-          url: parsed.path,
-          sha512: parsed.sha512,
-          size: assetByName.get(parsed.path).size,
-        },
-      ];
-      changed = true;
+    if (!Array.isArray(parsed.files) && parsed.path) {
+      const info = await resolveAssetInfo(parsed.path);
+      if (info) {
+        parsed.files = [
+          {
+            url: info.name,
+            sha512: info.sha512,
+            size: info.size,
+          },
+        ];
+        changed = true;
+      }
     }
 
     if (!changed) {
@@ -399,6 +608,7 @@ async function main() {
 
   const { releaseAssets, updateSupportFiles } = await collectAssets(artifactRoot);
   await updateMetadataFiles(updateSupportFiles, releaseAssets);
+  ensureLatestMetadataPresence({ artifactRoot, releaseAssets, updateSupportFiles });
   const table = buildDownloadTable(releaseAssets, repository, tag);
 
   const sections = [`# DocForge v${version}`];
@@ -414,9 +624,26 @@ async function main() {
   const releaseNotes = sections.join('\n').replace(/\n{3,}/g, '\n\n');
   await fs.writeFile(outputPath, `${releaseNotes}\n`, 'utf8');
 
+  await prepareMetadataUploads({ releaseAssets, updateSupportFiles });
+  updateSupportFiles.sort((a, b) => a.filePath.localeCompare(b.filePath));
+
   const manifestEntries = [
-    ...releaseAssets.map((asset) => path.relative(process.cwd(), asset.filePath)),
-    ...updateSupportFiles.map((filePath) => path.relative(process.cwd(), filePath)),
+    ...releaseAssets.map((asset) => {
+      const relative = path.relative(process.cwd(), asset.filePath);
+      if (asset.assetName && path.basename(asset.filePath) !== asset.assetName) {
+        return `${relative}#${asset.assetName}`;
+      }
+      return relative;
+    }),
+    ...updateSupportFiles
+      .filter((file) => file.upload !== false)
+      .map((file) => {
+        const relative = path.relative(process.cwd(), file.filePath);
+        if (file.assetName && path.basename(file.filePath) !== file.assetName) {
+          return `${relative}#${file.assetName}`;
+        }
+        return relative;
+      }),
   ];
   const manifest = manifestEntries.join('\n');
   await fs.writeFile(filesOutputPath, `${manifest}\n`, 'utf8');
