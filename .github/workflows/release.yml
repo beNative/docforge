@@ -236,6 +236,13 @@ jobs:
         with:
           node-version: 20
 
+      - name: Ensure auto-update manifests
+        run: |
+          set -euo pipefail
+          node scripts/ensure-latest-manifests.mjs \
+            --artifact-root "release-artifacts" \
+            --version "${{ needs.validate.outputs.version }}"
+
       - name: Generate release notes
         id: notes
         run: |
