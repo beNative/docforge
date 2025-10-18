@@ -621,6 +621,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           gap: 0.5rem;
           align-items: flex-start;
           text-align: left;
+          user-select: text;
         }
 
         .df-mermaid-error__message,
@@ -636,6 +637,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           padding: 0.75rem 0.85rem;
           background: rgba(var(--color-background), 0.6);
           color: rgba(var(--color-text-secondary), 0.95);
+          user-select: text;
         }
 
         .df-mermaid-error__details > summary,
