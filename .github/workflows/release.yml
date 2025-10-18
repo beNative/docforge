@@ -236,6 +236,12 @@ jobs:
         with:
           node-version: 20
 
+      - name: Generate auto-update manifests
+        run: |
+          node scripts/generate-auto-update-manifests.mjs \
+            --artifact-root "release-artifacts" \
+            --version "${{ needs.validate.outputs.version }}"
+
       - name: Generate release notes
         id: notes
         run: |
