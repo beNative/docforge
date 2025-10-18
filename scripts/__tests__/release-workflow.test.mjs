@@ -201,9 +201,17 @@ test('release tooling rewrites metadata and keeps latest.yml published', async (
   const entries = readManifestEntries(manifest);
   const relativeInstaller = path.relative(repoPath(), renamedInstaller);
   const relativeLatest = path.relative(repoPath(), latestPath);
+  const relativeWinChannel = path.relative(
+    repoPath(),
+    path.join(releaseDir, 'win32-x64.yml'),
+  );
 
   assert(entries.includes(relativeInstaller), 'Installer should be present in manifest after renaming');
   assert(entries.includes(relativeLatest), 'latest.yml must be uploaded as part of the release');
+  assert(
+    entries.includes(relativeWinChannel),
+    'win32-x64.yml must be uploaded for architecture-specific Windows updates',
+  );
 
   const installerBuffer = await fs.readFile(renamedInstaller);
   const expectedSha = computeSha512Base64(installerBuffer);
@@ -352,15 +360,37 @@ test('release workflow verifies metadata directories across platforms and publis
   });
 
   const manifestEntries = new Set(readManifestEntries(await fs.readFile(manifestPath, 'utf8')));
-  const metadataFiles = [ia32.metadataPath, x64.metadataPath, linux.metadataPath, mac.metadataPath];
-  for (const metadataPath of metadataFiles) {
-    assert(metadataPath, 'metadataPath should be defined for all fixtures');
+  const expectedMetadataUploads = [x64.metadataPath, linux.metadataPath, mac.metadataPath];
+  for (const metadataPath of expectedMetadataUploads) {
+    assert(metadataPath, 'metadataPath should be defined for uploaded manifests');
     const relativePath = path.relative(repoPath(), metadataPath);
     assert(manifestEntries.has(relativePath), `${relativePath} must be included in release manifest`);
   }
 
+  const ia32LatestRelative = path.relative(repoPath(), ia32.metadataPath);
+  assert(
+    !manifestEntries.has(ia32LatestRelative),
+    'Windows ia32 latest.yml should be replaced by architecture-specific manifest to avoid duplicate assets',
+  );
+
+  const windowsChannels = [
+    path.relative(repoPath(), path.join(ia32.releaseDir, 'win32-ia32.yml')),
+    path.relative(repoPath(), path.join(x64.releaseDir, 'win32-x64.yml')),
+  ];
+  for (const channel of windowsChannels) {
+    assert(manifestEntries.has(channel), `${channel} must be uploaded for Windows auto-update`);
+  }
+
   const metadataDirs = await listMetadataDirectories(path.join(workspace, 'release-artifacts'));
-  assert(metadataDirs.length >= metadataFiles.length, 'expected to discover metadata directories');
+  const expectedDirs = [ia32.metadataPath, x64.metadataPath, linux.metadataPath, mac.metadataPath]
+    .filter(Boolean)
+    .map((metadataPath) => path.dirname(metadataPath));
+  for (const expectedDir of expectedDirs) {
+    assert(
+      metadataDirs.includes(expectedDir),
+      `${expectedDir} should be discovered for metadata verification`,
+    );
+  }
 
   for (const dir of metadataDirs) {
     await runLocalVerification(dir);
@@ -423,8 +453,8 @@ test('remote auto-update check fails when Windows release metadata is absent', a
       assert(error instanceof Error, 'Expected runRemoteCheck to reject with an Error instance');
       assert.match(
         error.message,
-        /Missing required auto-update metadata asset[\s\S]*latest\.yml/,
-        'Error message should mention latest.yml as the missing manifest',
+        /Missing required auto-update metadata asset[\s\S]*latest\.yml[\s\S]*win32-<arch>\.yml/,
+        'Error message should mention both legacy and architecture-specific manifests',
       );
       return true;
     },

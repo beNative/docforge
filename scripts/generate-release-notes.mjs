@@ -252,7 +252,12 @@ async function collectAssets(artifactRoot) {
       const filePath = normalisedPath;
       const artifactDir = path.relative(artifactRoot, path.dirname(filePath));
       if (isAutoUpdateSupportFile(fileName)) {
-        updateSupportFiles.push({ filePath, artifactDir });
+        updateSupportFiles.push({
+          filePath,
+          artifactDir,
+          assetName: path.basename(filePath),
+          upload: true,
+        });
         continue;
       }
 
@@ -275,6 +280,7 @@ async function collectAssets(artifactRoot) {
         format: detectFormat(fileName),
         sha512,
         size,
+        assetName: fileName,
       });
     }
   }
@@ -294,6 +300,74 @@ async function collectAssets(artifactRoot) {
   });
   updateSupportFiles.sort((a, b) => a.filePath.localeCompare(b.filePath));
   return { releaseAssets, updateSupportFiles };
+}
+
+function normaliseWindowsChannelName(arch) {
+  if (!arch) {
+    return null;
+  }
+  const normalised = arch.toLowerCase();
+  if (['x64', 'ia32', 'arm64'].includes(normalised)) {
+    return `win32-${normalised}`;
+  }
+  return `win32-${normalised.replace(/[^a-z0-9]+/gi, '-')}`;
+}
+
+async function prepareMetadataUploads({ releaseAssets, updateSupportFiles }) {
+  if (updateSupportFiles.length === 0) {
+    return;
+  }
+
+  const releaseAssetsByDir = new Map();
+  for (const asset of releaseAssets) {
+    if (!releaseAssetsByDir.has(asset.artifactDir)) {
+      releaseAssetsByDir.set(asset.artifactDir, { assets: [], arch: asset.arch });
+    }
+    const entry = releaseAssetsByDir.get(asset.artifactDir);
+    entry.assets.push(asset);
+    if (!entry.arch && asset.arch) {
+      entry.arch = asset.arch;
+    }
+  }
+
+  const windowsMetadata = updateSupportFiles.filter((file) => {
+    const name = path.basename(file.filePath).toLowerCase();
+    return name === 'latest.yml' && file.artifactDir.startsWith('docforge-windows-');
+  });
+
+  if (windowsMetadata.length === 0) {
+    return;
+  }
+
+  const canonical =
+    windowsMetadata.find((file) => {
+      const info = releaseAssetsByDir.get(file.artifactDir);
+      return info?.arch === 'x64';
+    }) ?? windowsMetadata[0];
+
+  for (const file of windowsMetadata) {
+    const info = releaseAssetsByDir.get(file.artifactDir);
+    const channelName = normaliseWindowsChannelName(info?.arch ?? 'windows');
+    if (!channelName) {
+      continue;
+    }
+    const aliasName = `${channelName}.yml`;
+    const aliasPath = path.join(path.dirname(file.filePath), aliasName);
+    await fs.copyFile(file.filePath, aliasPath);
+    updateSupportFiles.push({
+      filePath: aliasPath,
+      artifactDir: file.artifactDir,
+      assetName: aliasName,
+      upload: true,
+    });
+
+    file.assetName = path.basename(file.filePath);
+    if (file === canonical) {
+      file.upload = true;
+    } else {
+      file.upload = false;
+    }
+  }
 }
 
 async function updateMetadataFiles(metadataFiles, releaseAssets) {
@@ -550,9 +624,26 @@ async function main() {
   const releaseNotes = sections.join('\n').replace(/\n{3,}/g, '\n\n');
   await fs.writeFile(outputPath, `${releaseNotes}\n`, 'utf8');
 
+  await prepareMetadataUploads({ releaseAssets, updateSupportFiles });
+  updateSupportFiles.sort((a, b) => a.filePath.localeCompare(b.filePath));
+
   const manifestEntries = [
-    ...releaseAssets.map((asset) => path.relative(process.cwd(), asset.filePath)),
-    ...updateSupportFiles.map((file) => path.relative(process.cwd(), file.filePath)),
+    ...releaseAssets.map((asset) => {
+      const relative = path.relative(process.cwd(), asset.filePath);
+      if (asset.assetName && path.basename(asset.filePath) !== asset.assetName) {
+        return `${relative}#${asset.assetName}`;
+      }
+      return relative;
+    }),
+    ...updateSupportFiles
+      .filter((file) => file.upload !== false)
+      .map((file) => {
+        const relative = path.relative(process.cwd(), file.filePath);
+        if (file.assetName && path.basename(file.filePath) !== file.assetName) {
+          return `${relative}#${file.assetName}`;
+        }
+        return relative;
+      }),
   ];
   const manifest = manifestEntries.join('\n');
   await fs.writeFile(filesOutputPath, `${manifest}\n`, 'utf8');

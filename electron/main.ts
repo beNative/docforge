@@ -46,6 +46,15 @@ log.catchErrors({
 
 console.log(`Log file will be written to: ${log.transports.file.getFile().path}`);
 
+if (process.platform === 'win32') {
+  const arch = process.arch === 'ia32' ? 'ia32' : process.arch === 'arm64' ? 'arm64' : 'x64';
+  const channel = `win32-${arch}`;
+  if (autoUpdater.channel !== channel) {
+    console.log(`Configuring auto-updater channel for Windows architecture: ${channel}`);
+    autoUpdater.channel = channel;
+  }
+}
+
 let mainWindow: BrowserWindow | null;
 let autoCheckEnabled = true;
 let pendingAutoUpdateCheck: NodeJS.Timeout | null = null;

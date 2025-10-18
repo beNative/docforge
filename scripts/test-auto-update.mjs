@@ -363,14 +363,33 @@ export async function analyseMetadataEntry({
 function describeMissingMetadataAssets(assetEntries, metadataAssets) {
   const missing = [];
   const windowsInstallers = assetEntries.filter((asset) => asset.name.endsWith('.exe'));
-  const hasLatest = metadataAssets.some((asset) => asset.name === 'latest.yml');
 
-  if (windowsInstallers.length > 0 && !hasLatest) {
-    const installers = windowsInstallers.map((asset) => asset.name).join(', ');
+  if (windowsInstallers.length === 0) {
+    return missing;
+  }
+
+  const installerList = windowsInstallers.map((asset) => asset.name).join(', ');
+  const hasLatest = metadataAssets.some((asset) => asset.name === 'latest.yml');
+  const hasWindowsChannel = metadataAssets.some(
+    (asset) => asset.name.startsWith('win32-') && asset.name.endsWith('.yml'),
+  );
+
+  if (!hasLatest) {
     missing.push(
       [
-        'latest.yml (required for Windows auto-update)',
-        installers ? `Windows installers detected: ${installers}` : null,
+        'latest.yml (required for legacy Windows auto-update clients)',
+        installerList ? `Windows installers detected: ${installerList}` : null,
+      ]
+        .filter(Boolean)
+        .join(' - '),
+    );
+  }
+
+  if (!hasWindowsChannel) {
+    missing.push(
+      [
+        'win32-<arch>.yml (required for architecture-specific Windows auto-update channels)',
+        installerList ? `Windows installers detected: ${installerList}` : null,
       ]
         .filter(Boolean)
         .join(' - '),
