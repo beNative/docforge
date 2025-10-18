@@ -183,6 +183,21 @@ async function getFileSize(filePath) {
   return stats.size;
 }
 
+async function computeSha512(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha512');
+    const stream = createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('base64')));
+  });
+}
+
+async function getFileSize(filePath) {
+  const stats = await fs.stat(filePath);
+  return stats.size;
+}
+
 async function collectAssets(artifactRoot) {
   const releaseAssets = [];
   const updateSupportFiles = [];
@@ -253,14 +268,7 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
     return;
   }
 
-  const assetByName = new Map();
-  for (const asset of releaseAssets) {
-    assetByName.set(asset.fileName, asset);
-    const originalName = asset.originalFileName;
-    if (originalName && originalName !== asset.fileName && !assetByName.has(originalName)) {
-      assetByName.set(originalName, asset);
-    }
-  }
+  const assetByName = new Map(releaseAssets.map((asset) => [asset.fileName, asset]));
 
   const ensureEntryMatchesAsset = (entry) => {
     if (!entry) {
@@ -270,13 +278,7 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
     if (!key) {
       return false;
     }
-    let asset = assetByName.get(key);
-    if (!asset) {
-      const normalisedKey = normaliseInstallerFileName(key);
-      if (normalisedKey !== key && assetByName.has(normalisedKey)) {
-        asset = assetByName.get(normalisedKey);
-      }
-    }
+    const asset = assetByName.get(key);
     if (!asset) {
       return false;
     }
