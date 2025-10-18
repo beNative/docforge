@@ -413,7 +413,9 @@ async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload }) {
 async function runLocalCheck({ directory, skipDownload }) {
   const resolvedDirectory = path.resolve(directory);
   const entries = await fs.readdir(resolvedDirectory);
-  const metadataFiles = entries.filter((entry) => entry.endsWith('.yml'));
+  const metadataFiles = entries.filter(
+    (entry) => entry.endsWith('.yml') && entry !== 'builder-debug.yml',
+  );
   if (metadataFiles.length === 0) {
     throw new Error(`No metadata files were found in ${resolvedDirectory}`);
   }

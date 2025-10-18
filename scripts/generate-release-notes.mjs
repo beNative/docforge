@@ -118,6 +118,9 @@ function isReleaseAsset(filename) {
 }
 
 function isAutoUpdateSupportFile(filename) {
+  if (filename === 'builder-debug.yml') {
+    return false;
+  }
   if (filename.endsWith('.blockmap')) {
     return true;
   }
@@ -156,13 +159,28 @@ async function normaliseReleaseAsset(filePath) {
   const fileName = path.basename(filePath);
   const normalisedName = normaliseInstallerFileName(fileName);
   if (normalisedName === fileName) {
-    return { filePath, fileName };
+    return { filePath, fileName, originalFileName: fileName };
   }
 
   const targetPath = path.join(path.dirname(filePath), normalisedName);
   await fs.rename(filePath, targetPath);
   console.log(`Normalised release asset name: ${fileName} -> ${normalisedName}`);
-  return { filePath: targetPath, fileName: normalisedName };
+  return { filePath: targetPath, fileName: normalisedName, originalFileName: fileName };
+}
+
+async function computeSha512(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha512');
+    const stream = createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('base64')));
+  });
+}
+
+async function getFileSize(filePath) {
+  const stats = await fs.stat(filePath);
+  return stats.size;
 }
 
 async function computeSha512(filePath) {
@@ -198,7 +216,7 @@ async function collectAssets(artifactRoot) {
     const arch = normaliseArch(parts.slice(1).join('-') || parts[0]);
     const files = await walkFiles(path.join(artifactRoot, dirName));
     for (const file of files) {
-      const { filePath: normalisedPath, fileName: normalisedName } = await normaliseReleaseAsset(file);
+      const { filePath: normalisedPath, fileName: normalisedName, originalFileName } = await normaliseReleaseAsset(file);
       const fileName = normalisedName;
       const filePath = normalisedPath;
       if (isAutoUpdateSupportFile(fileName)) {
@@ -220,6 +238,7 @@ async function collectAssets(artifactRoot) {
         arch,
         fileName,
         filePath,
+        originalFileName,
         format: detectFormat(fileName),
         sha512,
         size,
