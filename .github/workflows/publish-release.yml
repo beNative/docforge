@@ -56,49 +56,49 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - display_name: macOS x64
+          - display_name: "macOS x64"
             os: macos-latest
-            script: package:mac:x64
+            script: "package:mac:x64"
             arch: x64
             npm_platform: darwin
             cache_paths: |
               ~/Library/Caches/electron
               ~/Library/Caches/electron-builder
-          - display_name: Windows x64
+          - display_name: "Windows x64"
             os: windows-latest
-            script: package:win:x64
+            script: "package:win:x64"
             arch: x64
             npm_platform: win32
             cache_paths: |
               ~/AppData/Local/electron/Cache
               ~/AppData/Local/electron-builder/Cache
-          - display_name: Windows ia32
+          - display_name: "Windows ia32"
             os: windows-latest
-            script: package:win:ia32
+            script: "package:win:ia32"
             arch: ia32
             npm_platform: win32
             cache_paths: |
               ~/AppData/Local/electron/Cache
               ~/AppData/Local/electron-builder/Cache
-          - display_name: Linux x64
+          - display_name: "Linux x64"
             os: ubuntu-latest
-            script: package:linux:x64
+            script: "package:linux:x64"
             arch: x64
             npm_platform: linux
             cache_paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-          - display_name: Linux armv7l
+          - display_name: "Linux armv7l"
             os: ubuntu-latest
-            script: package:linux:armv7l
+            script: "package:linux:armv7l"
             arch: armv7l
             npm_platform: linux
             cache_paths: |
               ~/.cache/electron
               ~/.cache/electron-builder
-          - display_name: Linux arm64
+          - display_name: "Linux arm64"
             os: ubuntu-latest
-            script: package:linux:arm64
+            script: "package:linux:arm64"
             arch: arm64
             npm_platform: linux
             cache_paths: |
@@ -133,7 +133,7 @@ jobs:
             ${{ runner.os }}-electron-
 
       - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
+        if: ${{ runner.os == 'Linux' }}
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y rpm libarchive-tools
@@ -162,90 +162,7 @@ jobs:
           npm_config_target_arch: ${{ matrix.arch }}
           npm_config_platform: ${{ matrix.npm_platform }}
 
-      - name: Normalize Windows artifact names
-        if: runner.os == 'Windows'
-        env:
-          MATRIX_ARCH: ${{ matrix.arch }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          arch="$MATRIX_ARCH"
-
-          exe_name=""
-          blockmap_name=""
-          for file in release/*.exe; do
-            dir=$(dirname "$file")
-            base=$(basename "$file")
-            ext="${base##*.}"
-            stem="${base%.$ext}"
-
-            if [[ "$arch" != "x64" ]]; then
-              renamed="$dir/${stem}-${arch}.${ext}"
-              mv "$file" "$renamed"
-              file="$renamed"
-            fi
-
-            exe_name=$(basename "$file")
-
-            original_blockmap="$dir/${stem}.${ext}.blockmap"
-            if [[ -f "$original_blockmap" ]]; then
-              target_blockmap="$dir/${exe_name}.blockmap"
-              if [[ "$original_blockmap" != "$target_blockmap" ]]; then
-                mv "$original_blockmap" "$target_blockmap"
-              fi
-              blockmap_name=$(basename "$target_blockmap")
-            fi
-          done
-
-          latest_file=""
-          if [[ -f release/latest.yml ]]; then
-            if [[ "$arch" != "x64" ]]; then
-              latest_file="release/latest-${arch}.yml"
-              mv release/latest.yml "$latest_file"
-            else
-              latest_file="release/latest.yml"
-            fi
-          fi
-
-          if [[ -n "$exe_name" && -n "$latest_file" ]]; then
-            export WINDOWS_EXE_NAME="$exe_name"
-            export WINDOWS_BLOCKMAP_NAME="$blockmap_name"
-            export WINDOWS_LATEST_FILE="$latest_file"
-            python3 - <<'PY'
-import os
-from pathlib import Path
-from urllib.parse import quote
-
-latest = Path(os.environ["WINDOWS_LATEST_FILE"])
-exe_name = os.environ["WINDOWS_EXE_NAME"]
-blockmap_name = os.environ.get("WINDOWS_BLOCKMAP_NAME") or ""
-
-def replace_line(line: str, needle: str, replacement: str) -> str:
-    prefix, _, _ = line.partition(needle)
-    return f"{prefix}{needle}{replacement}\n"
-
-lines = latest.read_text(encoding="utf-8").splitlines(keepends=True)
-updated = []
-for line in lines:
-    stripped = line.strip()
-    if stripped.startswith("path:") and ".exe" in stripped:
-        updated.append(replace_line(line, "path:", f" {exe_name}"))
-        continue
-    if stripped.startswith("url:") and ".exe" in stripped:
-        value = stripped.split(None, 1)[1] if len(stripped.split(None, 1)) == 2 else ""
-        if value.endswith(".exe.blockmap") and blockmap_name:
-            updated.append(replace_line(line, "url:", f" {quote(blockmap_name)}"))
-            continue
-        if value.endswith(".exe"):
-            updated.append(replace_line(line, "url:", f" {quote(exe_name)}"))
-            continue
-    updated.append(line)
-
-latest.write_text("".join(updated), encoding="utf-8")
-PY
-          fi
-
-      # Only upload the real deliverables, not unpacked app trees
+      # Upload only installer files and updater manifests (no unpacked trees)
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -253,28 +170,32 @@ PY
           set -euo pipefail
           shopt -s nullglob
 
-          mapfile -t files < <(printf '%s\0' \
+          # Collect files; keep it simple to avoid YAML parsing issues
+          FILES=()
+          for f in \
             release/*.exe \
             release/*.exe.blockmap \
             release/*.dmg \
             release/*.dmg.blockmap \
             release/*.AppImage \
             release/*.deb \
-            release/latest*.yml \
-            | xargs -0 -r ls 2>/dev/null | sed '/^ls:/d')
+            release/latest*.yml
+          do
+            [ -e "$f" ] && FILES+=("$f")
+          done
 
-          if [ ${#files[@]} -eq 0 ]; then
+          if [ ${#FILES[@]} -eq 0 ]; then
             echo "No release files found" >&2
             exit 1
           fi
 
-          for file in "${files[@]}"; do
+          for file in "${FILES[@]}"; do
             echo "Uploading $(basename "$file")"
             gh release upload "$TAG_NAME" "$file" --clobber
           done
 
       - name: Upload build logs on failure
-        if: failure()
+        if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.display_name }}-logs
