@@ -6,6 +6,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { createReadStream, createWriteStream } from 'fs';
 import { autoUpdater } from 'electron-updater';
+import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider';
 import { databaseService } from './database';
 import { pythonManager } from './pythonManager';
 import log from 'electron-log/main';
@@ -60,6 +61,38 @@ const broadcastPythonEvent = (channel: string, payload: any) => {
 
 pythonManager.events.on('run-log', (payload) => broadcastPythonEvent('python:run-log', payload));
 pythonManager.events.on('run-status', (payload) => broadcastPythonEvent('python:run-status', payload));
+
+// Work around GitHub returning HTTP 406 for JSON-only requests to the
+// `/releases/latest` endpoint by attempting to resolve the latest tag via the
+// REST API before falling back to the default behaviour implemented by
+// electron-updater. This avoids the auto-update check failing on startup.
+const originalGetLatestTagName = GitHubProvider.prototype.getLatestTagName;
+GitHubProvider.prototype.getLatestTagName = async function (this: GitHubProvider, cancellationToken) {
+    const { owner, repo } = this.options;
+    const apiUrl = new URL(`/repos/${owner}/${repo}/releases/latest`, 'https://api.github.com');
+
+    try {
+        const rawResponse = await this.httpRequest(
+            apiUrl,
+            {
+                Accept: 'application/vnd.github+json',
+                'User-Agent': 'docforge-auto-updater'
+            },
+            cancellationToken
+        );
+
+        if (rawResponse) {
+            const parsed = JSON.parse(rawResponse) as { tag_name?: string };
+            if (parsed.tag_name) {
+                return parsed.tag_name;
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to resolve latest release tag via GitHub API, falling back to default behaviour.', error);
+    }
+
+    return originalGetLatestTagName.call(this, cancellationToken);
+};
 
 // --- Auto Updater Setup ---
 // Note: For auto-updates to work, you need to configure `electron-builder` in package.json
