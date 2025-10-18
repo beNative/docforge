@@ -110,8 +110,25 @@ function isReleaseAsset(filename) {
   );
 }
 
+function isAutoUpdateSupportFile(filename) {
+  if (filename.endsWith('.blockmap')) {
+    return true;
+  }
+
+  if (!filename.endsWith('.yml')) {
+    return false;
+  }
+
+  // Electron Builder always publishes metadata files with a `.yml` extension
+  // alongside the installers (for example `latest.yml` on Windows). Without
+  // these files the auto-updater cannot determine the latest available
+  // version, which is the issue we are addressing.
+  return true;
+}
+
 async function collectAssets(artifactRoot) {
-  const entries = [];
+  const releaseAssets = [];
+  const updateSupportFiles = [];
   const rootEntries = await fs.readdir(artifactRoot, { withFileTypes: true });
   for (const rootEntry of rootEntries) {
     if (!rootEntry.isDirectory()) {
@@ -127,11 +144,16 @@ async function collectAssets(artifactRoot) {
     const arch = normaliseArch(parts.slice(1).join('-') || parts[0]);
     const files = await walkFiles(path.join(artifactRoot, dirName));
     for (const file of files) {
-      if (!isReleaseAsset(file)) {
+      const fileName = path.basename(file);
+      if (isAutoUpdateSupportFile(fileName)) {
+        updateSupportFiles.push(file);
         continue;
       }
-      const fileName = path.basename(file);
-      entries.push({
+
+      if (!isReleaseAsset(fileName)) {
+        continue;
+      }
+      releaseAssets.push({
         platform,
         arch,
         fileName,
@@ -140,10 +162,10 @@ async function collectAssets(artifactRoot) {
       });
     }
   }
-  if (entries.length === 0) {
+  if (releaseAssets.length === 0) {
     throw new Error(`No release-ready binaries were found in ${artifactRoot}`);
   }
-  entries.sort((a, b) => {
+  releaseAssets.sort((a, b) => {
     const platformCompare = a.platform.localeCompare(b.platform);
     if (platformCompare !== 0) {
       return platformCompare;
@@ -154,7 +176,8 @@ async function collectAssets(artifactRoot) {
     }
     return a.fileName.localeCompare(b.fileName);
   });
-  return entries;
+  updateSupportFiles.sort();
+  return { releaseAssets, updateSupportFiles };
 }
 
 function buildDownloadTable(entries, repo, tag) {
@@ -182,8 +205,8 @@ async function main() {
   const headingLine = entryLines.shift()?.replace(/^##\s*/, '').trim() ?? '';
   const body = entryLines.join('\n').trim();
 
-  const assets = await collectAssets(artifactRoot);
-  const table = buildDownloadTable(assets, repository, tag);
+  const { releaseAssets, updateSupportFiles } = await collectAssets(artifactRoot);
+  const table = buildDownloadTable(releaseAssets, repository, tag);
 
   const sections = [`# DocForge v${version}`];
   if (headingLine) {
@@ -198,7 +221,11 @@ async function main() {
   const releaseNotes = sections.join('\n').replace(/\n{3,}/g, '\n\n');
   await fs.writeFile(outputPath, `${releaseNotes}\n`, 'utf8');
 
-  const manifest = assets.map((asset) => path.relative(process.cwd(), asset.filePath)).join('\n');
+  const manifestEntries = [
+    ...releaseAssets.map((asset) => path.relative(process.cwd(), asset.filePath)),
+    ...updateSupportFiles.map((filePath) => path.relative(process.cwd(), filePath)),
+  ];
+  const manifest = manifestEntries.join('\n');
   await fs.writeFile(filesOutputPath, `${manifest}\n`, 'utf8');
 }
 
