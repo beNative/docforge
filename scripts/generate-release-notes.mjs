@@ -1,7 +1,10 @@
 #!/usr/bin/env node
+import { createReadStream } from 'fs';
 import { promises as fs } from 'fs';
 import path from 'path';
 import process from 'process';
+import crypto from 'crypto';
+import YAML from 'yaml';
 
 function parseArgs(argv) {
   const args = {};
@@ -115,6 +118,9 @@ function isReleaseAsset(filename) {
 }
 
 function isAutoUpdateSupportFile(filename) {
+  if (filename === 'builder-debug.yml') {
+    return false;
+  }
   if (filename.endsWith('.blockmap')) {
     return true;
   }
@@ -153,13 +159,28 @@ async function normaliseReleaseAsset(filePath) {
   const fileName = path.basename(filePath);
   const normalisedName = normaliseInstallerFileName(fileName);
   if (normalisedName === fileName) {
-    return { filePath, fileName };
+    return { filePath, fileName, originalFileName: fileName };
   }
 
   const targetPath = path.join(path.dirname(filePath), normalisedName);
   await fs.rename(filePath, targetPath);
   console.log(`Normalised release asset name: ${fileName} -> ${normalisedName}`);
-  return { filePath: targetPath, fileName: normalisedName };
+  return { filePath: targetPath, fileName: normalisedName, originalFileName: fileName };
+}
+
+async function computeFileSha512(filePath) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha512');
+    const stream = createReadStream(filePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(hash.digest('base64')));
+  });
+}
+
+async function getFileSize(filePath) {
+  const stats = await fs.stat(filePath);
+  return stats.size;
 }
 
 async function collectAssets(artifactRoot) {
@@ -180,7 +201,7 @@ async function collectAssets(artifactRoot) {
     const arch = normaliseArch(parts.slice(1).join('-') || parts[0]);
     const files = await walkFiles(path.join(artifactRoot, dirName));
     for (const file of files) {
-      const { filePath: normalisedPath, fileName: normalisedName } = await normaliseReleaseAsset(file);
+      const { filePath: normalisedPath, fileName: normalisedName, originalFileName } = await normaliseReleaseAsset(file);
       const fileName = normalisedName;
       const filePath = normalisedPath;
       if (isAutoUpdateSupportFile(fileName)) {
@@ -191,12 +212,21 @@ async function collectAssets(artifactRoot) {
       if (!isReleaseAsset(fileName)) {
         continue;
       }
+
+      const [sha512, size] = await Promise.all([
+        computeFileSha512(filePath),
+        getFileSize(filePath),
+      ]);
+
       releaseAssets.push({
         platform,
         arch,
         fileName,
         filePath,
+        originalFileName,
         format: detectFormat(fileName),
+        sha512,
+        size,
       });
     }
   }
@@ -216,6 +246,130 @@ async function collectAssets(artifactRoot) {
   });
   updateSupportFiles.sort();
   return { releaseAssets, updateSupportFiles };
+}
+
+async function updateMetadataFiles(metadataFiles, releaseAssets) {
+  if (metadataFiles.length === 0) {
+    return;
+  }
+
+  const assetByName = new Map();
+  for (const asset of releaseAssets) {
+    assetByName.set(asset.fileName, asset);
+    const originalName = asset.originalFileName;
+    if (originalName && originalName !== asset.fileName && !assetByName.has(originalName)) {
+      assetByName.set(originalName, asset);
+    }
+  }
+
+  const ensureEntryMatchesAsset = (entry) => {
+    if (!entry) {
+      return false;
+    }
+    const key = entry.url || entry.path;
+    if (!key) {
+      return false;
+    }
+    let asset = assetByName.get(key);
+    if (!asset) {
+      const normalisedKey = normaliseInstallerFileName(key);
+      if (normalisedKey !== key && assetByName.has(normalisedKey)) {
+        asset = assetByName.get(normalisedKey);
+      }
+    }
+    if (!asset) {
+      return false;
+    }
+    let changed = false;
+    if (entry.url && entry.url !== asset.fileName) {
+      entry.url = asset.fileName;
+      changed = true;
+    }
+    if (entry.path && entry.path !== asset.fileName) {
+      entry.path = asset.fileName;
+      changed = true;
+    }
+    if (typeof asset.size === 'number' && entry.size !== asset.size) {
+      entry.size = asset.size;
+      changed = true;
+    }
+    if (asset.sha512 && entry.sha512 !== asset.sha512) {
+      entry.sha512 = asset.sha512;
+      changed = true;
+    }
+    return changed;
+  };
+
+  for (const metadataPath of metadataFiles) {
+    let parsed;
+    try {
+      const source = await fs.readFile(metadataPath, 'utf8');
+      parsed = YAML.parse(source);
+    } catch (error) {
+      console.warn(`Failed to parse auto-update metadata at ${metadataPath}:`, error);
+      continue;
+    }
+
+    if (!parsed || typeof parsed !== 'object') {
+      continue;
+    }
+
+    let changed = false;
+
+    if (Array.isArray(parsed.files)) {
+      for (const entry of parsed.files) {
+        if (ensureEntryMatchesAsset(entry)) {
+          changed = true;
+        }
+      }
+    }
+
+    const primaryKey =
+      (typeof parsed.path === 'string' && parsed.path) ||
+      (Array.isArray(parsed.files) && parsed.files[0] && (parsed.files[0].path || parsed.files[0].url));
+
+    if (primaryKey) {
+      const asset = assetByName.get(primaryKey);
+      if (asset) {
+        if (parsed.path !== asset.fileName) {
+          parsed.path = asset.fileName;
+          changed = true;
+        }
+        if (asset.sha512 && parsed.sha512 !== asset.sha512) {
+          parsed.sha512 = asset.sha512;
+          changed = true;
+        }
+        if (typeof asset.size === 'number' && parsed.size !== undefined && parsed.size !== asset.size) {
+          parsed.size = asset.size;
+          changed = true;
+        }
+      }
+    }
+
+    if (!parsed.sha512 && parsed.path && assetByName.has(parsed.path)) {
+      parsed.sha512 = assetByName.get(parsed.path).sha512;
+      changed = true;
+    }
+
+    if (!Array.isArray(parsed.files) && parsed.path && assetByName.has(parsed.path)) {
+      parsed.files = [
+        {
+          url: parsed.path,
+          sha512: parsed.sha512,
+          size: assetByName.get(parsed.path).size,
+        },
+      ];
+      changed = true;
+    }
+
+    if (!changed) {
+      continue;
+    }
+
+    const serialised = YAML.stringify(parsed, { lineWidth: 0 }).trimEnd();
+    await fs.writeFile(metadataPath, `${serialised}\n`, 'utf8');
+    console.log(`Updated auto-update metadata checksums in ${metadataPath}`);
+  }
 }
 
 function buildDownloadTable(entries, repo, tag) {
@@ -244,6 +398,7 @@ async function main() {
   const body = entryLines.join('\n').trim();
 
   const { releaseAssets, updateSupportFiles } = await collectAssets(artifactRoot);
+  await updateMetadataFiles(updateSupportFiles, releaseAssets);
   const table = buildDownloadTable(releaseAssets, repository, tag);
 
   const sections = [`# DocForge v${version}`];
