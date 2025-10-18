@@ -1,5 +1,18 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
+type UpdateAvailableInfo = {
+  version: string | null;
+  releaseName: string | null;
+  releaseNotes?: string | null;
+};
+
+type UpdateDownloadProgress = {
+  percent: number;
+  transferred: number;
+  total: number;
+  bytesPerSecond: number;
+};
+
 contextBridge.exposeInMainWorld('electronAPI', {
   // --- Database ---
   dbQuery: (sql: string, params?: any[]) => ipcRenderer.invoke('db:query', sql, params),
@@ -31,10 +44,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLogPath: () => ipcRenderer.invoke('app:get-log-path'),
   renderPlantUML: (diagram: string, format: 'svg' = 'svg') => ipcRenderer.invoke('plantuml:render-svg', diagram, format),
   updaterSetAllowPrerelease: (allow: boolean) => ipcRenderer.send('updater:set-allow-prerelease', allow),
-  onUpdateDownloaded: (callback: (version: string) => void) => {
-    const handler = (_: IpcRendererEvent, version: string) => callback(version);
+  onUpdateAvailable: (callback: (info: UpdateAvailableInfo) => void) => {
+    const handler = (_: IpcRendererEvent, info: UpdateAvailableInfo) => callback(info);
+    ipcRenderer.on('update:available', handler);
+    return () => ipcRenderer.removeListener('update:available', handler);
+  },
+  onUpdateDownloadProgress: (callback: (progress: UpdateDownloadProgress) => void) => {
+    const handler = (_: IpcRendererEvent, progress: UpdateDownloadProgress) => callback(progress);
+    ipcRenderer.on('update:download-progress', handler);
+    return () => ipcRenderer.removeListener('update:download-progress', handler);
+  },
+  onUpdateDownloaded: (callback: (info: string | UpdateAvailableInfo) => void) => {
+    const handler = (_: IpcRendererEvent, info: string | UpdateAvailableInfo) => callback(info);
     ipcRenderer.on('update:downloaded', handler);
     return () => ipcRenderer.removeListener('update:downloaded', handler);
+  },
+  onUpdateError: (callback: (message: string) => void) => {
+    const handler = (_: IpcRendererEvent, message: string) => callback(message);
+    ipcRenderer.on('update:error', handler);
+    return () => ipcRenderer.removeListener('update:error', handler);
   },
   quitAndInstallUpdate: () => ipcRenderer.send('updater:quit-and-install'),
   

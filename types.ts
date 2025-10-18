@@ -40,7 +40,10 @@ declare global {
         format?: 'svg'
       ) => Promise<{ success: boolean; svg?: string; error?: string; details?: string }>;
       updaterSetAllowPrerelease: (allow: boolean) => void;
-      onUpdateDownloaded: (callback: (version: string) => void) => () => void;
+      onUpdateAvailable?: (callback: (info: UpdateAvailableInfo) => void) => () => void;
+      onUpdateDownloadProgress?: (callback: (progress: UpdateDownloadProgress) => void) => () => void;
+      onUpdateDownloaded: (callback: (info: string | UpdateAvailableInfo) => void) => () => void;
+      onUpdateError?: (callback: (message: string) => void) => () => void;
       quitAndInstallUpdate: () => void;
       minimizeWindow: () => void;
       maximizeWindow: () => void;
@@ -77,6 +80,19 @@ declare global {
 // =================================================================
 // Core Database-aligned Types
 // =================================================================
+
+export interface UpdateAvailableInfo {
+  version: string | null;
+  releaseName: string | null;
+  releaseNotes?: string | null;
+}
+
+export interface UpdateDownloadProgress {
+  percent: number;
+  transferred: number;
+  total: number;
+  bytesPerSecond: number;
+}
 
 export type NodeType = 'folder' | 'document';
 export type DocType = 'prompt' | 'source_code' | 'pdf' | 'image';

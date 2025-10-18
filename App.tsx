@@ -28,7 +28,7 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer } from './types';
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer, UpdateAvailableInfo } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
@@ -100,6 +100,20 @@ interface DatabaseStatusState {
     tone: DatabaseStatusTone;
 }
 
+type UpdateStatus = 'idle' | 'downloading' | 'downloaded' | 'error';
+
+interface UpdateToastState {
+    status: UpdateStatus;
+    version: string | null;
+    releaseName: string | null;
+    progress: number;
+    bytesTransferred: number | null;
+    bytesTotal: number | null;
+    visible: boolean;
+    snoozed: boolean;
+    errorMessage: string | null;
+}
+
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
     const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, isLoading: areDocumentsLoading } = useDocuments();
@@ -129,7 +143,17 @@ const MainApp: React.FC = () => {
     const [discoveredServices, setDiscoveredServices] = useState<DiscoveredLLMService[]>([]);
     const [isDetecting, setIsDetecting] = useState(false);
     const [appVersion, setAppVersion] = useState('');
-    const [updateInfo, setUpdateInfo] = useState<{ ready: boolean; version: string | null }>({ ready: false, version: null });
+    const [updateToast, setUpdateToast] = useState<UpdateToastState>({
+        status: 'idle',
+        version: null,
+        releaseName: null,
+        progress: 0,
+        bytesTransferred: null,
+        bytesTotal: null,
+        visible: false,
+        snoozed: false,
+        errorMessage: null,
+    });
     const [confirmAction, setConfirmAction] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; position: { x: number, y: number }, items: MenuItem[] }>({ isOpen: false, position: { x: 0, y: 0 }, items: [] });
@@ -911,13 +935,104 @@ const MainApp: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        if (window.electronAPI?.onUpdateDownloaded) {
-            const cleanup = window.electronAPI.onUpdateDownloaded((version) => {
-                addLog('INFO', `Update version ${version} is ready to be installed.`);
-                setUpdateInfo({ ready: true, version });
-            });
-            return cleanup;
+        if (!window.electronAPI) {
+            return;
         }
+
+        const cleanups: (() => void)[] = [];
+        const {
+            onUpdateAvailable,
+            onUpdateDownloadProgress,
+            onUpdateDownloaded,
+            onUpdateError,
+        } = window.electronAPI;
+
+        if (onUpdateAvailable) {
+            cleanups.push(onUpdateAvailable((info) => {
+                const versionLabel = info.version ?? info.releaseName ?? 'latest';
+                addLog('INFO', `Update ${versionLabel} detected. Downloading in the background.`);
+                setUpdateToast(prev => ({
+                    ...prev,
+                    status: 'downloading',
+                    version: info.version ?? prev.version ?? null,
+                    releaseName: info.releaseName ?? prev.releaseName ?? null,
+                    progress: 0,
+                    bytesTransferred: null,
+                    bytesTotal: null,
+                    visible: true,
+                    snoozed: false,
+                    errorMessage: null,
+                }));
+            }));
+        }
+
+        if (onUpdateDownloadProgress) {
+            cleanups.push(onUpdateDownloadProgress((progress) => {
+                setUpdateToast(prev => ({
+                    ...prev,
+                    status: 'downloading',
+                    progress: Number.isFinite(progress.percent) ? progress.percent : prev.progress,
+                    bytesTransferred: Number.isFinite(progress.transferred) ? progress.transferred : prev.bytesTransferred,
+                    bytesTotal: Number.isFinite(progress.total) ? progress.total : prev.bytesTotal,
+                    visible: prev.snoozed ? prev.visible : true,
+                    snoozed: prev.snoozed,
+                    errorMessage: null,
+                }));
+            }));
+        }
+
+        if (onUpdateDownloaded) {
+            cleanups.push(onUpdateDownloaded((payload: string | UpdateAvailableInfo) => {
+                const versionLabel = typeof payload === 'string'
+                    ? payload
+                    : payload.version ?? payload.releaseName ?? 'latest';
+                addLog('INFO', `Update version ${versionLabel} is ready to be installed.`);
+                setUpdateToast(prev => {
+                    const version = typeof payload === 'string'
+                        ? payload
+                        : payload.version ?? prev.version ?? payload.releaseName ?? prev.releaseName ?? null;
+                    const releaseName = typeof payload === 'string'
+                        ? prev.releaseName
+                        : payload.releaseName ?? prev.releaseName ?? null;
+
+                    return {
+                        ...prev,
+                        status: 'downloaded',
+                        version,
+                        releaseName,
+                        progress: 100,
+                        bytesTransferred: prev.bytesTotal ?? prev.bytesTransferred ?? null,
+                        bytesTotal: prev.bytesTotal ?? prev.bytesTransferred ?? null,
+                        visible: true,
+                        snoozed: false,
+                        errorMessage: null,
+                    };
+                });
+            }));
+        }
+
+        if (onUpdateError) {
+            cleanups.push(onUpdateError((message) => {
+                addLog('ERROR', `Auto-update error: ${message}`);
+                setUpdateToast(prev => ({
+                    ...prev,
+                    status: 'error',
+                    visible: true,
+                    snoozed: false,
+                    errorMessage: message,
+                }));
+            }));
+        }
+
+        return () => {
+            cleanups.forEach(dispose => {
+                try {
+                    dispose();
+                } catch (error) {
+                    console.error('Failed to cleanup update listener', error);
+                }
+            });
+        };
     }, [addLog]);
 
 
@@ -1762,6 +1877,30 @@ const MainApp: React.FC = () => {
         setIsAboutModalOpen(false);
     }, [addLog]);
 
+    const handleUpdateToastClose = useCallback(() => {
+        setUpdateToast(prev => {
+            if (prev.status === 'error') {
+                return {
+                    status: 'idle',
+                    version: prev.version,
+                    releaseName: prev.releaseName,
+                    progress: 0,
+                    bytesTransferred: null,
+                    bytesTotal: null,
+                    visible: false,
+                    snoozed: false,
+                    errorMessage: null,
+                };
+            }
+
+            return {
+                ...prev,
+                visible: false,
+                snoozed: true,
+            };
+        });
+    }, []);
+
     const handleFormatDocument = useCallback(() => {
         const activeDoc = items.find(p => p.id === activeNodeId);
         if (activeDoc && activeDoc.type === 'document' && view === 'editor') {
@@ -2280,6 +2419,12 @@ const MainApp: React.FC = () => {
         commands: enrichedCommands,
     };
 
+    const shouldShowUpdateToast = updateToast.visible && updateToast.status !== 'idle';
+    const updateVersionLabel = updateToast.version ?? updateToast.releaseName ?? 'latest';
+    const updateToastStatus: 'downloading' | 'downloaded' | 'error' = updateToast.status === 'idle'
+        ? 'downloading'
+        : updateToast.status;
+
     return (
         <IconProvider value={{ iconSet: getSupportedIconSet(settings.iconSet) }}>
             <div className="flex flex-col h-full font-sans bg-background text-text-main antialiased overflow-hidden">
@@ -2443,11 +2588,18 @@ const MainApp: React.FC = () => {
                 <AboutModal onClose={handleCloseAbout} />
             )}
 
-            {updateInfo.ready && window.electronAPI?.quitAndInstallUpdate && (
+            {shouldShowUpdateToast && (
                 <UpdateNotification
-                    version={updateInfo.version!}
-                    onInstall={() => window.electronAPI!.quitAndInstallUpdate!()}
-                    onClose={() => setUpdateInfo({ ready: false, version: null })}
+                    status={updateToastStatus}
+                    versionLabel={updateVersionLabel}
+                    progress={updateToast.progress}
+                    bytesTransferred={updateToast.bytesTransferred ?? undefined}
+                    bytesTotal={updateToast.bytesTotal ?? undefined}
+                    errorMessage={updateToast.errorMessage ?? undefined}
+                    onInstall={updateToast.status === 'downloaded' && window.electronAPI?.quitAndInstallUpdate
+                        ? () => window.electronAPI!.quitAndInstallUpdate!()
+                        : undefined}
+                    onClose={handleUpdateToastClose}
                 />
             )}
 

@@ -1,44 +1,186 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import Button from './Button';
-import { DownloadIcon, XIcon } from './Icons';
+import { DownloadIcon, XIcon, CheckIcon, InfoIcon } from './Icons';
 import IconButton from './IconButton';
 import { useLogger } from '../hooks/useLogger';
 
+type UpdateNotificationStatus = 'downloading' | 'downloaded' | 'error';
+
 interface UpdateNotificationProps {
-  version: string;
-  onInstall: () => void;
+  status: UpdateNotificationStatus;
+  versionLabel: string;
+  progress?: number;
+  bytesTransferred?: number | null;
+  bytesTotal?: number | null;
+  errorMessage?: string | null;
+  onInstall?: () => void;
   onClose: () => void;
 }
 
-const UpdateNotification: React.FC<UpdateNotificationProps> = ({ version, onInstall, onClose }) => {
+const formatBytes = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null;
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let displayValue = value;
+  let unitIndex = 0;
+
+  while (displayValue >= 1024 && unitIndex < units.length - 1) {
+    displayValue /= 1024;
+    unitIndex += 1;
+  }
+
+  const precision = displayValue < 10 && unitIndex > 0 ? 1 : 0;
+  return `${displayValue.toFixed(precision)} ${units[unitIndex]}`;
+};
+
+const UpdateNotification: React.FC<UpdateNotificationProps> = ({
+  status,
+  versionLabel,
+  progress = 0,
+  bytesTransferred = null,
+  bytesTotal = null,
+  errorMessage,
+  onInstall,
+  onClose,
+}) => {
   const { addLog } = useLogger();
   const overlayRoot = document.getElementById('overlay-root');
   if (!overlayRoot) return null;
 
-  const notificationContent = (
-    <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm animate-slide-in-up">
-      <div className="bg-secondary rounded-lg shadow-2xl border border-border-color p-5">
-        <div className="flex items-start gap-4">
-          <div className="flex-shrink-0 w-10 h-10 bg-primary/10 text-primary rounded-full flex items-center justify-center">
-            <DownloadIcon className="w-6 h-6" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-text-main">Update Ready to Install</h3>
-            <p className="text-sm text-text-secondary mt-1">
-              DocForge version <span className="font-bold">{version}</span> has been downloaded.
-            </p>
-            <div className="mt-4 flex gap-3">
-              <Button onClick={() => { addLog('INFO', 'User action: Clicked "Restart & Install" for update.'); onInstall(); }} variant="primary" className="flex-1">
+  const safeProgress = Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0));
+  const transferredLabel = formatBytes(bytesTransferred);
+  const totalLabel = formatBytes(bytesTotal);
+
+  const iconConfig = {
+    downloading: {
+      className: 'bg-primary/10 text-primary',
+      Icon: DownloadIcon,
+    },
+    downloaded: {
+      className: 'bg-success/10 text-success',
+      Icon: CheckIcon,
+    },
+    error: {
+      className: 'bg-error/10 text-error',
+      Icon: InfoIcon,
+    },
+  } satisfies Record<UpdateNotificationStatus, { className: string; Icon: React.FC<{ className?: string }> }>;
+
+  const { className: iconClassName, Icon } = iconConfig[status];
+
+  const logDismiss = () => {
+    if (status === 'downloaded') {
+      addLog('INFO', 'User action: Dismissed update notification ("Later").');
+    } else if (status === 'downloading') {
+      addLog('INFO', 'User action: Hid update download notification.');
+    } else {
+      addLog('INFO', 'User action: Dismissed update error notification.');
+    }
+  };
+
+  const handleDismiss = () => {
+    logDismiss();
+    onClose();
+  };
+
+  const handleInstall = () => {
+    if (onInstall) {
+      addLog('INFO', 'User action: Clicked "Restart & Install" for update.');
+      onInstall();
+    }
+  };
+
+  const renderContent = () => {
+    if (status === 'downloaded') {
+      return (
+        <>
+          <h3 className="font-semibold text-text-main">Update Ready to Install</h3>
+          <p className="text-sm text-text-secondary mt-1">
+            DocForge version <span className="font-semibold text-text-main">{versionLabel}</span> has been downloaded and is ready to go.
+          </p>
+          <div className="mt-4 flex gap-3">
+            {onInstall && (
+              <Button onClick={handleInstall} variant="primary" className="flex-1">
                 Restart & Install
               </Button>
-              <Button onClick={() => { addLog('INFO', 'User action: Dismissed update notification ("Later").'); onClose(); }} variant="secondary">
-                Later
-              </Button>
+            )}
+            <Button onClick={handleDismiss} variant="secondary">
+              Later
+            </Button>
+          </div>
+        </>
+      );
+    }
+
+    if (status === 'error') {
+      return (
+        <>
+          <h3 className="font-semibold text-text-main">Update Download Interrupted</h3>
+          <p className="text-sm text-text-secondary mt-1">
+            We couldn&apos;t finish downloading DocForge {versionLabel}. We&apos;ll keep trying in the background.
+          </p>
+          {errorMessage && (
+            <p className="mt-2 text-xs text-text-secondary">
+              Details: {errorMessage}
+            </p>
+          )}
+          <div className="mt-4 flex justify-end">
+            <Button onClick={handleDismiss} variant="secondary">
+              Dismiss
+            </Button>
+          </div>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <h3 className="font-semibold text-text-main">Downloading Update</h3>
+        <p className="text-sm text-text-secondary mt-1">
+          DocForge {versionLabel} is downloading quietly in the background. Feel free to keep working.
+        </p>
+        <div className="mt-4 space-y-3">
+          <div className="flex items-center justify-between text-xs text-text-secondary">
+            <span>Download progress</span>
+            <span className="font-medium text-text-main">{Math.round(safeProgress)}%</span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-border-color/50 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-primary-hover transition-[width] duration-300 ease-out"
+              style={{ width: `${safeProgress}%` }}
+            />
+          </div>
+          {transferredLabel && totalLabel && (
+            <div className="flex items-center justify-between text-[0.7rem] text-text-secondary">
+              <span>{transferredLabel}</span>
+              <span>{totalLabel}</span>
             </div>
+          )}
+          <div className="flex justify-end">
+            <Button onClick={handleDismiss} variant="secondary">
+              Hide
+            </Button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
+  const notificationContent = (
+    <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm animate-slide-in-up">
+      <div className="bg-secondary/95 backdrop-blur-xl rounded-xl shadow-2xl border border-border-color p-5">
+        <div className="flex items-start gap-4">
+          <div className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center ${iconClassName}`}>
+            <Icon className="w-6 h-6" />
+          </div>
+          <div className="flex-1 space-y-1">
+            {renderContent()}
           </div>
           <div className="-mt-2 -mr-2">
-            <IconButton onClick={() => { addLog('INFO', 'User action: Closed update notification.'); onClose(); }} tooltip="Close" size="sm" variant="ghost">
+            <IconButton onClick={handleDismiss} tooltip="Close" size="sm" variant="ghost">
               <XIcon className="w-5 h-5" />
             </IconButton>
           </div>
@@ -56,7 +198,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({ version, onInst
           }
         }
         .animate-slide-in-up {
-          animation: slide-in-up 0.3s ease-out forwards;
+          animation: slide-in-up 0.28s ease-out forwards;
         }
       `}</style>
     </div>
