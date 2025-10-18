@@ -14,6 +14,7 @@ interface UpdateNotificationProps {
   bytesTransferred?: number | null;
   bytesTotal?: number | null;
   errorMessage?: string | null;
+  errorDetails?: string | null;
   onInstall?: () => void;
   onClose: () => void;
 }
@@ -43,6 +44,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
   bytesTransferred = null,
   bytesTotal = null,
   errorMessage,
+  errorDetails,
   onInstall,
   onClose,
 }) => {
@@ -116,16 +118,23 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
     }
 
     if (status === 'error') {
+      const fallbackMessage = `We ran into a hiccup while downloading DocForge ${versionLabel}. We'll automatically retry in the background. Feel free to keep working in the meantime.`;
+      const friendlyMessage = errorMessage ?? fallbackMessage;
       return (
         <>
-          <h3 className="font-semibold text-text-main">Update Download Interrupted</h3>
+          <h3 className="font-semibold text-text-main">Automatic Update Paused</h3>
           <p className="text-sm text-text-secondary mt-1">
-            We couldn&apos;t finish downloading DocForge {versionLabel}. We&apos;ll keep trying in the background.
+            {friendlyMessage}
           </p>
-          {errorMessage && (
-            <p className="mt-2 text-xs text-text-secondary">
-              Details: {errorMessage}
-            </p>
+          {errorDetails && (
+            <details className="mt-3 rounded-md border border-border-color/60 bg-secondary/40 p-3 text-xs text-text-secondary">
+              <summary className="cursor-pointer text-xs font-semibold text-text-main">
+                Technical details
+              </summary>
+              <pre className="mt-2 whitespace-pre-wrap break-words text-[11px] leading-snug text-text-secondary/90">
+                {errorDetails}
+              </pre>
+            </details>
           )}
           <div className="mt-4 flex justify-end">
             <Button onClick={handleDismiss} variant="secondary">

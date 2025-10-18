@@ -112,6 +112,7 @@ interface UpdateToastState {
     visible: boolean;
     snoozed: boolean;
     errorMessage: string | null;
+    errorDetails: string | null;
 }
 
 const MainApp: React.FC = () => {
@@ -153,6 +154,7 @@ const MainApp: React.FC = () => {
         visible: false,
         snoozed: false,
         errorMessage: null,
+        errorDetails: null,
     });
     const [confirmAction, setConfirmAction] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -962,6 +964,7 @@ const MainApp: React.FC = () => {
                     visible: true,
                     snoozed: false,
                     errorMessage: null,
+                    errorDetails: null,
                 }));
             }));
         }
@@ -977,6 +980,7 @@ const MainApp: React.FC = () => {
                     visible: prev.snoozed ? prev.visible : true,
                     snoozed: prev.snoozed,
                     errorMessage: null,
+                    errorDetails: null,
                 }));
             }));
         }
@@ -1006,20 +1010,28 @@ const MainApp: React.FC = () => {
                         visible: true,
                         snoozed: false,
                         errorMessage: null,
+                        errorDetails: null,
                     };
                 });
             }));
         }
 
         if (onUpdateError) {
-            cleanups.push(onUpdateError((message) => {
-                addLog('ERROR', `Auto-update error: ${message}`);
+            cleanups.push(onUpdateError((payload) => {
+                const message = typeof payload === 'string'
+                    ? payload
+                    : payload?.message ?? 'Something went wrong while checking for updates.';
+                const details = typeof payload === 'string'
+                    ? payload
+                    : payload?.details ?? null;
+                addLog('ERROR', `Auto-update error: ${details ?? message}`);
                 setUpdateToast(prev => ({
                     ...prev,
                     status: 'error',
                     visible: true,
                     snoozed: false,
                     errorMessage: message,
+                    errorDetails: details,
                 }));
             }));
         }
@@ -1890,6 +1902,7 @@ const MainApp: React.FC = () => {
                     visible: false,
                     snoozed: false,
                     errorMessage: null,
+                    errorDetails: null,
                 };
             }
 
@@ -1897,6 +1910,8 @@ const MainApp: React.FC = () => {
                 ...prev,
                 visible: false,
                 snoozed: true,
+                errorMessage: null,
+                errorDetails: null,
             };
         });
     }, []);
@@ -2596,6 +2611,7 @@ const MainApp: React.FC = () => {
                     bytesTransferred={updateToast.bytesTransferred ?? undefined}
                     bytesTotal={updateToast.bytesTotal ?? undefined}
                     errorMessage={updateToast.errorMessage ?? undefined}
+                    errorDetails={updateToast.errorDetails ?? undefined}
                     onInstall={updateToast.status === 'downloaded' && window.electronAPI?.quitAndInstallUpdate
                         ? () => window.electronAPI!.quitAndInstallUpdate!()
                         : undefined}
