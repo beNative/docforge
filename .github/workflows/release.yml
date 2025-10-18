@@ -1,0 +1,272 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate tag & version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.package.outputs.version }}
+      tag: ${{ steps.metadata.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine package version
+        id: package
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Package version: ${VERSION}"
+
+      - name: Capture tag metadata
+        id: metadata
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            echo "::error::The release workflow must be triggered by a tag." >&2
+            exit 1
+          fi
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "Tag name: ${GITHUB_REF_NAME}"
+
+      - name: Validate tag matches package version
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.package.outputs.version }}"
+          if [[ "${TAG}" != "v${VERSION}" ]]; then
+            echo "::error::Tag ${TAG} does not match package version v${VERSION}." >&2
+            exit 1
+          fi
+          echo "Tag ${TAG} matches package version v${VERSION}."
+
+      - name: Validate changelog entries
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.package.outputs.version }}"
+          for file in VERSION_LOG.md docs/VERSION_LOG.md; do
+            if [[ ! -f "$file" ]]; then
+              echo "::error file=$file::Changelog file is missing." >&2
+              exit 1
+            fi
+            if ! grep -q "## v${VERSION}" "$file"; then
+              echo "::error file=$file::Missing changelog entry for v${VERSION}." >&2
+              exit 1
+            fi
+            echo "Found changelog entry for v${VERSION} in $file."
+          done
+
+  build:
+    name: Build ${{ matrix.display-name }}
+    needs: validate
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - display-name: macOS x64
+            os: macos-latest
+            script: package:mac:x64
+            arch: x64
+            npm-platform: darwin
+            cache-paths: |
+              ~/Library/Caches/electron
+              ~/Library/Caches/electron-builder
+            artifact-name: docforge-macos-x64
+          - display-name: Windows x64
+            os: windows-latest
+            script: package:win:x64
+            arch: x64
+            npm-platform: win32
+            cache-paths: |
+              ~/AppData/Local/electron/Cache
+              ~/AppData/Local/electron-builder/Cache
+            artifact-name: docforge-windows-x64
+          - display-name: Windows ia32
+            os: windows-latest
+            script: package:win:ia32
+            arch: ia32
+            npm-platform: win32
+            cache-paths: |
+              ~/AppData/Local/electron/Cache
+              ~/AppData/Local/electron-builder/Cache
+            artifact-name: docforge-windows-ia32
+          - display-name: Linux x64
+            os: ubuntu-latest
+            script: package:linux:x64
+            arch: x64
+            npm-platform: linux
+            cache-paths: |
+              ~/.cache/electron
+              ~/.cache/electron-builder
+            artifact-name: docforge-linux-x64
+          - display-name: Linux armv7l
+            os: ubuntu-latest
+            script: package:linux:armv7l
+            arch: armv7l
+            npm-platform: linux
+            cache-paths: |
+              ~/.cache/electron
+              ~/.cache/electron-builder
+            artifact-name: docforge-linux-armv7l
+          - display-name: Linux arm64
+            os: ubuntu-latest
+            script: package:linux:arm64
+            arch: arm64
+            npm-platform: linux
+            cache-paths: |
+              ~/.cache/electron
+              ~/.cache/electron-builder
+            artifact-name: docforge-linux-arm64
+    env:
+      NODE_OPTIONS: --max_old_space_size=4096
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Cache Electron downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.cache-paths }}
+          key: ${{ runner.os }}-electron-${{ matrix.arch }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-${{ matrix.arch }}-
+            ${{ runner.os }}-electron-
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y rpm libarchive-tools
+          if ! sudo apt-get install --no-install-recommends -y libfuse2; then
+            sudo apt-get install --no-install-recommends -y libfuse2t64
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+          npm_config_platform: ${{ matrix.npm-platform }}
+
+      - name: Prepare native modules
+        run: npm run postinstall --if-present
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+          npm_config_platform: ${{ matrix.npm-platform }}
+
+      - name: Package application
+        run: npm run ${{ matrix.script }}
+        env:
+          npm_config_arch: ${{ matrix.arch }}
+          npm_config_target_arch: ${{ matrix.arch }}
+          npm_config_platform: ${{ matrix.npm-platform }}
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            release/**
+            !**/*.blockmap
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}-logs
+          path: |
+            npm-debug.log
+            *.log
+            release/**/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    name: Publish GitHub release
+    needs:
+      - validate
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          set -euo pipefail
+          node scripts/generate-release-notes.mjs \
+            --tag "${{ needs.validate.outputs.tag }}" \
+            --version "${{ needs.validate.outputs.version }}" \
+            --artifact-root "release-artifacts" \
+            --changelog "docs/VERSION_LOG.md" \
+            --output "release-notes.md" \
+            --files-output "release-files.txt"
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          cat release-files.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Display release notes
+        run: |
+          echo "Generated release notes:" >&2
+          cat release-notes.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.validate.outputs.tag }}
+          name: DocForge v${{ needs.validate.outputs.version }}
+          body_path: release-notes.md
+          files: ${{ steps.notes.outputs.files }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
