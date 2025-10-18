@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { promises as fs } from 'node:fs';
 import YAML from 'yaml';
+import { analyseMetadataEntry, runRemoteCheck } from '../test-auto-update.mjs';
 
 const execFileAsync = promisify(execFile);
 
@@ -396,6 +397,80 @@ test('release generation fails when required latest metadata is missing', async 
       }),
     /Missing required auto-update metadata/,
   );
+});
+
+test('remote auto-update check fails when Windows release metadata is absent', async () => {
+  await assert.rejects(
+    () =>
+      runRemoteCheck({
+        owner: 'beNative',
+        repo: 'docforge',
+        tag: 'v0.6.6',
+        skipHttp: true,
+        skipDownload: true,
+        http: {
+          fetchJson: async () => ({
+            assets: [
+              {
+                name: 'DocForge-Setup-0.6.6.exe',
+                browser_download_url: 'https://example.invalid/DocForge-Setup-0.6.6.exe',
+              },
+            ],
+          }),
+        },
+      }),
+    (error) => {
+      assert(error instanceof Error, 'Expected runRemoteCheck to reject with an Error instance');
+      assert.match(
+        error.message,
+        /Missing required auto-update metadata asset[\s\S]*latest\.yml/,
+        'Error message should mention latest.yml as the missing manifest',
+      );
+      return true;
+    },
+  );
+});
+
+test('auto-update analysis reports unreachable assets when GitHub returns 404', async () => {
+  const metadataSource = YAML.stringify({
+    version: '0.6.6',
+    files: [
+      {
+        url: 'DocForge-Setup-0.6.6.exe',
+        sha512: 'placeholder',
+        size: 100,
+      },
+    ],
+    path: 'DocForge-Setup-0.6.6.exe',
+    sha512: 'placeholder',
+  });
+
+  const assets = new Map([
+    [
+      'DocForge-Setup-0.6.6.exe',
+      {
+        name: 'DocForge-Setup-0.6.6.exe',
+        browser_download_url: 'https://example.invalid/DocForge-Setup-0.6.6.exe',
+      },
+    ],
+  ]);
+
+  const result = await analyseMetadataEntry({
+    metadataName: 'latest.yml',
+    metadataSource,
+    owner: 'beNative',
+    repo: 'docforge',
+    tag: 'v0.6.6',
+    assets,
+    skipHttp: false,
+    skipDownload: true,
+    digestCache: new Map(),
+    http: {
+      headRequest: async () => ({ ok: false, status: 404, error: new Error('Not Found') }),
+    },
+  });
+
+  assert(result.unreachable.some((entry) => entry.includes('DocForge-Setup-0.6.6.exe') && entry.includes('404 (Not Found)')));
 });
 
 test('metadata updates compute digests for non-release assets referenced locally', async (t) => {

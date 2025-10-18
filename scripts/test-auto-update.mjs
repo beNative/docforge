@@ -6,12 +6,13 @@ import crypto from 'crypto';
 import path from 'path';
 import process from 'process';
 import { promisify } from 'util';
+import { fileURLToPath } from 'url';
 import YAML from 'yaml';
 
 const DEFAULT_OWNER = 'beNative';
 const DEFAULT_REPO = 'docforge';
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const args = {};
   for (let index = 0; index < argv.length; index += 1) {
     const key = argv[index];
@@ -37,7 +38,7 @@ function ensure(value, message) {
   return value;
 }
 
-function normaliseInstallerFileName(fileName) {
+export function normaliseInstallerFileName(fileName) {
   if (!fileName.toLowerCase().endsWith('.exe')) {
     return fileName;
   }
@@ -52,7 +53,7 @@ function normaliseInstallerFileName(fileName) {
   return `${normalisedBase}${extension}`;
 }
 
-function extractMetadataReferences(source) {
+export function extractMetadataReferences(source) {
   const references = new Set();
   const lines = source.split(/\r?\n/);
   for (const line of lines) {
@@ -73,7 +74,7 @@ function extractMetadataReferences(source) {
   return Array.from(references);
 }
 
-function extractMetadataTargets(metadata) {
+export function extractMetadataTargets(metadata) {
   if (!metadata || typeof metadata !== 'object') {
     return [];
   }
@@ -114,7 +115,7 @@ function extractMetadataTargets(metadata) {
 
 const execFileAsync = promisify(execFile);
 
-async function curlGet(url, headers) {
+export async function curlGet(url, headers) {
   const args = ['-sS', '-L', '--fail-with-body'];
   for (const [key, value] of Object.entries(headers)) {
     args.push('-H', `${key}: ${value}`);
@@ -124,7 +125,7 @@ async function curlGet(url, headers) {
   return stdout;
 }
 
-async function curlHead(url, headers) {
+export async function curlHead(url, headers) {
   const args = ['-sS', '-L', '-I', '-o', '/dev/null', '-w', '%{http_code}'];
   for (const [key, value] of Object.entries(headers)) {
     args.push('-H', `${key}: ${value}`);
@@ -140,16 +141,16 @@ async function curlHead(url, headers) {
   }
 }
 
-async function fetchJson(url, headers) {
+export async function fetchJson(url, headers) {
   const body = await curlGet(url, headers);
   return JSON.parse(body);
 }
 
-async function fetchText(url, headers) {
+export async function fetchText(url, headers) {
   return curlGet(url, headers);
 }
 
-async function headRequest(url, headers) {
+export async function headRequest(url, headers) {
   return curlHead(url, headers);
 }
 
@@ -212,7 +213,7 @@ function downloadAndComputeDigest(url, headers) {
   });
 }
 
-async function analyseMetadataEntry({
+export async function analyseMetadataEntry({
   metadataName,
   metadataSource,
   owner,
@@ -222,7 +223,9 @@ async function analyseMetadataEntry({
   skipHttp,
   skipDownload,
   digestCache,
+  http,
 }) {
+  const headRequestFn = http?.headRequest ?? headRequest;
   const references = extractMetadataReferences(metadataSource);
   const missing = [];
   const unreachable = [];
@@ -251,7 +254,7 @@ async function analyseMetadataEntry({
     }
     if (!skipHttp) {
       const downloadUrl = buildDownloadUrl(owner, repo, tag, reference);
-      const { ok, status, error } = await headRequest(downloadUrl, {
+      const { ok, status, error } = await headRequestFn(downloadUrl, {
         'User-Agent': 'docforge-auto-update-tester',
       });
       if (!ok) {
@@ -357,12 +360,42 @@ async function analyseMetadataEntry({
   return { missing, unreachable, mismatchedHashes, missingHashes, mismatchedSizes };
 }
 
-async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload }) {
+function describeMissingMetadataAssets(assetEntries, metadataAssets) {
+  const missing = [];
+  const windowsInstallers = assetEntries.filter((asset) => asset.name.endsWith('.exe'));
+  const hasLatest = metadataAssets.some((asset) => asset.name === 'latest.yml');
+
+  if (windowsInstallers.length > 0 && !hasLatest) {
+    const installers = windowsInstallers.map((asset) => asset.name).join(', ');
+    missing.push(
+      [
+        'latest.yml (required for Windows auto-update)',
+        installers ? `Windows installers detected: ${installers}` : null,
+      ]
+        .filter(Boolean)
+        .join(' - '),
+    );
+  }
+
+  return missing;
+}
+
+const defaultHttp = {
+  fetchJson,
+  fetchText,
+  headRequest,
+};
+
+export async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload, http = defaultHttp }) {
   const headers = {
     'User-Agent': 'docforge-auto-update-tester',
     Accept: 'application/vnd.github+json',
   };
-  const release = await fetchJson(`https://api.github.com/repos/${owner}/${repo}/releases/tags/${tag}`, headers);
+  const fetchJsonFn = http.fetchJson ?? fetchJson;
+  const fetchTextFn = http.fetchText ?? fetchText;
+  const headRequestFn = http.headRequest ?? headRequest;
+
+  const release = await fetchJsonFn(`https://api.github.com/repos/${owner}/${repo}/releases/tags/${tag}`, headers);
   const assetEntries = release.assets ?? [];
   if (assetEntries.length === 0) {
     throw new Error(`No assets found for ${owner}/${repo} ${tag}.`);
@@ -370,8 +403,29 @@ async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload }) {
 
   const assetMap = new Map(assetEntries.map((asset) => [asset.name, asset]));
   const metadataAssets = assetEntries.filter((asset) => asset.name.endsWith('.yml') && asset.name !== 'builder-debug.yml');
+  const missingRequired = describeMissingMetadataAssets(assetEntries, metadataAssets);
   if (metadataAssets.length === 0) {
-    throw new Error('No update metadata (.yml) files were found in the release.');
+    const details = missingRequired.length > 0 ? `\n${missingRequired.map((entry) => ` - ${entry}`).join('\n')}` : '';
+    throw new Error(
+      [
+        'No update metadata (.yml) files were found in the release.',
+        details && 'Missing required auto-update metadata asset(s):',
+        details,
+        'Ensure the release upload step includes the generated auto-update manifests.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
+  }
+
+  if (missingRequired.length > 0) {
+    throw new Error(
+      [
+        'Missing required auto-update metadata asset:',
+        ...missingRequired.map((entry) => ` - ${entry}`),
+        'Electron auto-update downloads latest.yml from the release. Upload the manifest alongside the installer.',
+      ].join('\n'),
+    );
   }
 
   console.log(`Auto-update asset verification for ${owner}/${repo} ${tag}`);
@@ -380,7 +434,7 @@ async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload }) {
   let failures = false;
   const digestCache = new Map();
   for (const asset of metadataAssets) {
-    const content = await fetchText(asset.browser_download_url, { 'User-Agent': 'docforge-auto-update-tester' });
+    const content = await fetchTextFn(asset.browser_download_url, { 'User-Agent': 'docforge-auto-update-tester' });
     const result = await analyseMetadataEntry({
       metadataName: asset.name,
       metadataSource: content,
@@ -391,6 +445,7 @@ async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload }) {
       skipHttp,
       skipDownload,
       digestCache,
+      http: { headRequest: headRequestFn },
     });
     if (
       result.missing.length > 0 ||
@@ -567,14 +622,21 @@ async function main() {
   await runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload });
 }
 
-main().catch((error) => {
-  if (error instanceof Error) {
-    console.error(error.message);
-    if (error.cause) {
-      console.error(error.cause);
+const isCliExecution =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isCliExecution) {
+  main().catch((error) => {
+    if (error instanceof Error) {
+      console.error(error.message);
+      if (error.cause) {
+        console.error(error.cause);
+      }
+    } else {
+      console.error(error);
     }
-  } else {
-    console.error(error);
-  }
-  process.exit(1);
-});
+    process.exit(1);
+  });
+}
+
+export { runLocalCheck };
