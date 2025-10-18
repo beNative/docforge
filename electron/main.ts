@@ -80,6 +80,49 @@ const scheduleAutoUpdateCheck = (delayMs = 3000) => {
   }, delayMs);
 };
 
+const buildUpdateErrorMessages = (error: unknown) => {
+  const fallback = 'DocForge hit an unexpected problem while downloading the latest update. We\'ll retry automatically in the background.';
+  let detailMessage: string;
+  if (error instanceof Error) {
+    const baseMessage = `${error.name}: ${error.message}`.trim();
+    const stack = (error.stack ?? '').trim();
+    detailMessage = stack && !stack.includes(baseMessage)
+      ? `${baseMessage}\n${stack}`
+      : (stack || baseMessage || 'Unknown error');
+  } else if (typeof error === 'string') {
+    detailMessage = error || 'Unknown error';
+  } else {
+    try {
+      detailMessage = JSON.stringify(error) || 'Unknown error';
+    } catch {
+      detailMessage = 'Unknown error';
+    }
+  }
+
+  const normalized = detailMessage.toLowerCase();
+
+  let friendlyMessage = fallback;
+  if (normalized.includes('latest.yml') || normalized.includes('app-update.yml')) {
+    friendlyMessage = 'DocForge couldn\'t download the update manifest from GitHub yet. The release files may still be publishing, so we\'ll try again shortly.';
+  } else if (normalized.includes('404')) {
+    friendlyMessage = 'DocForge reached GitHub but the update files were unavailable. We\'ll retry automatically once they finish uploading.';
+  } else if (normalized.includes('403') || normalized.includes('rate limit')) {
+    friendlyMessage = 'GitHub temporarily rejected the update request. DocForge will pause for a moment and then try again.';
+  } else if (
+    normalized.includes('econnrefused') ||
+    normalized.includes('getaddrinfo') ||
+    normalized.includes('eai_again') ||
+    normalized.includes('network') ||
+    normalized.includes('offline')
+  ) {
+    friendlyMessage = 'DocForge couldn\'t reach GitHub to download the update. Please check your internet connection; we\'ll retry in the background.';
+  } else if (normalized.includes('timeout') || normalized.includes('timed out')) {
+    friendlyMessage = 'The connection to GitHub timed out while downloading the update. DocForge will automatically retry in a few minutes.';
+  }
+
+  return { friendlyMessage, detailMessage };
+};
+
 const broadcastPythonEvent = (channel: string, payload: any) => {
   const targets = BrowserWindow.getAllWindows();
   for (const window of targets) {
@@ -222,8 +265,12 @@ autoUpdater.on('update-downloaded', (info) => {
 });
 autoUpdater.on('error', (error) => {
     console.error('Auto-update error:', error);
-    const message = error instanceof Error ? error.message : String(error);
-    mainWindow?.webContents.send('update:error', message);
+    const { friendlyMessage, detailMessage } = buildUpdateErrorMessages(error);
+    mainWindow?.webContents.send('update:error', { message: friendlyMessage, details: detailMessage });
+    if (autoCheckEnabled) {
+        console.log('Scheduling another automatic update check after a failure.');
+        scheduleAutoUpdateCheck(5 * 60 * 1000);
+    }
 });
 
 function createWindow() {
@@ -565,9 +612,9 @@ ipcMain.handle('updater:check-now', async () => {
             releaseName,
         };
     } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.error('Manual update check failed:', message);
-        return { success: false, error: message };
+        const { friendlyMessage, detailMessage } = buildUpdateErrorMessages(error);
+        console.error('Manual update check failed:', error);
+        return { success: false, error: friendlyMessage, details: detailMessage };
     }
 });
 

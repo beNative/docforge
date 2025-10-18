@@ -45,7 +45,7 @@ declare global {
       onUpdateAvailable?: (callback: (info: UpdateAvailableInfo) => void) => () => void;
       onUpdateDownloadProgress?: (callback: (progress: UpdateDownloadProgress) => void) => () => void;
       onUpdateDownloaded: (callback: (info: string | UpdateAvailableInfo) => void) => () => void;
-      onUpdateError?: (callback: (message: string) => void) => () => void;
+      onUpdateError?: (callback: (payload: UpdateErrorPayload | string) => void) => () => void;
       quitAndInstallUpdate: () => void;
       minimizeWindow: () => void;
       maximizeWindow: () => void;
@@ -102,6 +102,12 @@ export interface ManualUpdateCheckResult {
   version?: string | null;
   releaseName?: string | null;
   error?: string;
+  details?: string;
+}
+
+export interface UpdateErrorPayload {
+  message: string;
+  details?: string | null;
 }
 
 export type NodeType = 'folder' | 'document';

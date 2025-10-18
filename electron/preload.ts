@@ -19,6 +19,12 @@ type ManualUpdateCheckResult = {
   version?: string | null;
   releaseName?: string | null;
   error?: string;
+  details?: string;
+};
+
+type UpdateErrorPayload = {
+  message: string;
+  details?: string | null;
 };
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -69,8 +75,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update:downloaded', handler);
     return () => ipcRenderer.removeListener('update:downloaded', handler);
   },
-  onUpdateError: (callback: (message: string) => void) => {
-    const handler = (_: IpcRendererEvent, message: string) => callback(message);
+  onUpdateError: (callback: (payload: string | UpdateErrorPayload) => void) => {
+    const handler = (_: IpcRendererEvent, payload: string | UpdateErrorPayload) => callback(payload);
     ipcRenderer.on('update:error', handler);
     return () => ipcRenderer.removeListener('update:error', handler);
   },

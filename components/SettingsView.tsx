@@ -1506,11 +1506,15 @@ const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurre
             } else {
                 setManualCheckStatus('error');
                 setManualCheckMessage(result?.error ?? 'Failed to check for updates.');
+                if (result?.details) {
+                    addLog('DEBUG', `Manual update check details: ${result.details}`);
+                }
             }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to check for updates.';
             setManualCheckStatus('error');
             setManualCheckMessage(message);
+            addLog('ERROR', `Manual update check exception: ${message}`);
         } finally {
             setIsManualCheckRunning(false);
         }

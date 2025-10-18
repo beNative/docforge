@@ -130,6 +130,38 @@ function isAutoUpdateSupportFile(filename) {
   return true;
 }
 
+function normaliseInstallerFileName(fileName) {
+  if (!fileName.toLowerCase().endsWith('.exe')) {
+    return fileName;
+  }
+
+  const extension = path.extname(fileName);
+  const baseName = fileName.slice(0, -extension.length);
+
+  const normalisedBase = baseName
+    .replace(/^DocForge[\s._-]*Setup[\s._-]*/i, 'DocForge-Setup-')
+    .replace(/[\s_]+/g, '-')
+    .replace(/\.Setup\.?/i, '-Setup-')
+    .replace(/-+/g, '-')
+    .replace(/-$/g, '');
+
+  const normalisedName = `${normalisedBase}${extension}`;
+  return normalisedName;
+}
+
+async function normaliseReleaseAsset(filePath) {
+  const fileName = path.basename(filePath);
+  const normalisedName = normaliseInstallerFileName(fileName);
+  if (normalisedName === fileName) {
+    return { filePath, fileName };
+  }
+
+  const targetPath = path.join(path.dirname(filePath), normalisedName);
+  await fs.rename(filePath, targetPath);
+  console.log(`Normalised release asset name: ${fileName} -> ${normalisedName}`);
+  return { filePath: targetPath, fileName: normalisedName };
+}
+
 async function collectAssets(artifactRoot) {
   const releaseAssets = [];
   const updateSupportFiles = [];
@@ -148,9 +180,11 @@ async function collectAssets(artifactRoot) {
     const arch = normaliseArch(parts.slice(1).join('-') || parts[0]);
     const files = await walkFiles(path.join(artifactRoot, dirName));
     for (const file of files) {
-      const fileName = path.basename(file);
+      const { filePath: normalisedPath, fileName: normalisedName } = await normaliseReleaseAsset(file);
+      const fileName = normalisedName;
+      const filePath = normalisedPath;
       if (isAutoUpdateSupportFile(fileName)) {
-        updateSupportFiles.push(file);
+        updateSupportFiles.push(filePath);
         continue;
       }
 
@@ -161,7 +195,7 @@ async function collectAssets(artifactRoot) {
         platform,
         arch,
         fileName,
-        filePath: file,
+        filePath,
         format: detectFormat(fileName),
       });
     }
