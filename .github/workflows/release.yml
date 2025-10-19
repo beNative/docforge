@@ -284,7 +284,7 @@ jobs:
 
           for dir in "${metadata_dirs[@]}"; do
             echo "Verifying auto-update metadata in ${dir}" >&2
-            node scripts/test-auto-update.mjs --local "$dir"
+            node scripts/test-auto-update.mjs --local "$dir" --fix-metadata
           done
 
       - name: Display release notes

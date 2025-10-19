@@ -34,6 +34,7 @@ async function writeFixtureInstaller(directory, version, options = {}) {
     includeMetadata = true,
     additionalMetadata = [],
     assetSize = 1024,
+    includeBlockmap = false,
   } = options;
 
   const releaseDir = path.join(directory, 'release-artifacts', artifactDir, 'release');
@@ -42,6 +43,12 @@ async function writeFixtureInstaller(directory, version, options = {}) {
   const installerPath = path.join(releaseDir, assetName);
   const binary = crypto.randomBytes(assetSize);
   await fs.writeFile(installerPath, binary);
+
+  let blockmapPath = null;
+  if (includeBlockmap) {
+    blockmapPath = `${installerPath}.blockmap`;
+    await fs.writeFile(blockmapPath, crypto.randomBytes(Math.max(256, Math.floor(assetSize / 4))));
+  }
 
   let metadataPath = null;
   if (includeMetadata && metadataFileName) {
@@ -84,6 +91,7 @@ async function writeFixtureInstaller(directory, version, options = {}) {
     artifactDir,
     assetPath: installerPath,
     assetName,
+    blockmapPath,
   };
 }
 
@@ -148,10 +156,10 @@ async function runGenerateReleaseNotes({
   );
 }
 
-async function runLocalVerification(directory) {
+async function runLocalVerification(directory, extraArgs = []) {
   await execFileAsync(
     'node',
-    [repoPath('scripts', 'test-auto-update.mjs'), '--local', directory],
+    [repoPath('scripts', 'test-auto-update.mjs'), '--local', directory, ...extraArgs],
     {
       cwd: repoPath(),
     },
@@ -230,11 +238,89 @@ test('release tooling rewrites metadata and keeps latest.yml published', async (
   await runLocalVerification(releaseDir);
 });
 
+test('release tooling ignores unpacked directories when enforcing metadata', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  await writeFixtureInstaller(workspace, '0.0.2', {
+    artifactDir: 'docforge-windows-x64',
+  });
+
+  const unpackedDir = path.join(
+    workspace,
+    'release-artifacts',
+    'docforge-windows-x64',
+    'win-unpacked',
+  );
+  await fs.mkdir(unpackedDir, { recursive: true });
+  const unpackedExecutable = path.join(unpackedDir, 'DocForge.exe');
+  await fs.writeFile(unpackedExecutable, crypto.randomBytes(2048));
+
+  const changelogPath = path.join(workspace, 'CHANGELOG.md');
+  await fs.writeFile(
+    changelogPath,
+    ['## v0.0.2', '', '- Ignore unpacked executable fixtures.'].join('\n'),
+    'utf8',
+  );
+
+  const notesPath = path.join(workspace, 'release-notes.md');
+  const manifestPath = path.join(workspace, 'release-files.txt');
+
+  await runGenerateReleaseNotes({
+    workspace,
+    version: '0.0.2',
+    tag: 'v0.0.2',
+    changelogPath,
+    outputPath: notesPath,
+    filesOutputPath: manifestPath,
+  });
+
+  const manifest = await fs.readFile(manifestPath, 'utf8');
+  const entries = readManifestEntries(manifest);
+  assert(entries.every((line) => !line.includes('DocForge.exe')));
+});
+
+test('local verification can repair mismatched metadata when requested', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const version = '0.0.2';
+  const { releaseDir, metadataPath, assetPath } = await writeFixtureInstaller(workspace, version, {
+    assetSize: 2048,
+  });
+
+  const corrupted = YAML.parse(await fs.readFile(metadataPath, 'utf8'));
+  corrupted.sha512 = 'invalid-sha512';
+  corrupted.files[0].sha512 = 'invalid-sha512';
+  corrupted.files[0].size = 1;
+  await fs.writeFile(metadataPath, YAML.stringify(corrupted), 'utf8');
+
+  await assert.rejects(() => runLocalVerification(releaseDir), /Local auto-update verification failed/);
+
+  await runLocalVerification(releaseDir, ['--fix-metadata']);
+
+  const installerBuffer = await fs.readFile(assetPath);
+  const expectedSha = computeSha512Base64(installerBuffer);
+  const updated = YAML.parse(await fs.readFile(metadataPath, 'utf8'));
+
+  assert.equal(updated.path, path.basename(assetPath));
+  assert.equal(updated.sha512, expectedSha);
+  if (Object.prototype.hasOwnProperty.call(updated, 'size')) {
+    assert.equal(updated.size, installerBuffer.length);
+  }
+  assert(Array.isArray(updated.files) && updated.files.length === 1);
+  assert.equal(updated.files[0].url, path.basename(assetPath));
+  assert.equal(updated.files[0].sha512, expectedSha);
+  assert.equal(updated.files[0].size, installerBuffer.length);
+});
+
 test('metadata updates remain isolated across artifact directories with identical installer names', async (t) => {
   const workspace = await createTemporaryWorkspace(t);
   const version = '0.0.3';
-  const x64 = await writeFixtureInstaller(workspace, version, { artifactDir: 'docforge-windows-x64' });
-  const arm64 = await writeFixtureInstaller(workspace, version, { artifactDir: 'docforge-windows-arm64' });
+  const x64 = await writeFixtureInstaller(workspace, version, {
+    artifactDir: 'docforge-windows-x64',
+    includeBlockmap: true,
+  });
+  const arm64 = await writeFixtureInstaller(workspace, version, {
+    artifactDir: 'docforge-windows-arm64',
+    includeBlockmap: true,
+  });
 
   const changelogPath = path.join(workspace, 'CHANGELOG.md');
   await fs.writeFile(
@@ -255,13 +341,16 @@ test('metadata updates remain isolated across artifact directories with identica
     filesOutputPath: manifestPath,
   });
 
-  const renamedInstallerName = `DocForge-Setup-${version}.exe`;
-  const renamedX64 = path.join(x64.releaseDir, renamedInstallerName);
-  const renamedArm64 = path.join(arm64.releaseDir, renamedInstallerName);
+  const renamedX64Name = `DocForge-Setup-${version}.exe`;
+  const renamedArm64Name = `DocForge-Setup-${version}-arm64.exe`;
+  const renamedX64 = path.join(x64.releaseDir, renamedX64Name);
+  const renamedArm64 = path.join(arm64.releaseDir, renamedArm64Name);
 
   await Promise.all([
     assert.doesNotReject(() => fs.access(renamedX64)),
     assert.doesNotReject(() => fs.access(renamedArm64)),
+    assert.doesNotReject(() => fs.access(path.join(x64.releaseDir, `${renamedX64Name}.blockmap`))),
+    assert.doesNotReject(() => fs.access(path.join(arm64.releaseDir, `${renamedArm64Name}.blockmap`))),
   ]);
 
   const [x64Buffer, arm64Buffer] = await Promise.all([
@@ -286,20 +375,20 @@ test('metadata updates remain isolated across artifact directories with identica
   assert(entries.includes(expectedX64Entry), 'x64 installer should be listed in manifest');
   assert(entries.includes(expectedArm64Entry), 'arm64 installer should be listed in manifest');
 
-  const assertMetadataMatches = (metadata, expectedSha, bufferLength) => {
-    assert.equal(metadata.path, renamedInstallerName);
+  const assertMetadataMatches = (metadata, expectedName, expectedSha, bufferLength) => {
+    assert.equal(metadata.path, expectedName);
     assert.equal(metadata.sha512, expectedSha);
     if (Object.prototype.hasOwnProperty.call(metadata, 'size')) {
       assert.equal(metadata.size, bufferLength);
     }
     assert(Array.isArray(metadata.files) && metadata.files.length === 1);
-    assert.equal(metadata.files[0].url, renamedInstallerName);
+    assert.equal(metadata.files[0].url, expectedName);
     assert.equal(metadata.files[0].sha512, expectedSha);
     assert.equal(metadata.files[0].size, bufferLength);
   };
 
-  assertMetadataMatches(x64Metadata, x64Sha, x64Buffer.length);
-  assertMetadataMatches(arm64Metadata, arm64Sha, arm64Buffer.length);
+  assertMetadataMatches(x64Metadata, renamedX64Name, x64Sha, x64Buffer.length);
+  assertMetadataMatches(arm64Metadata, renamedArm64Name, arm64Sha, arm64Buffer.length);
 
   await Promise.all([
     runLocalVerification(x64.releaseDir),
@@ -313,6 +402,7 @@ test('release workflow verifies metadata directories across platforms and publis
 
   const ia32 = await writeFixtureInstaller(workspace, version, {
     artifactDir: 'docforge-windows-ia32',
+    includeBlockmap: true,
     additionalMetadata: [
       {
         relativePath: path.join('win-ia32-unpacked', 'resources', 'app-update.yml'),
@@ -326,6 +416,7 @@ test('release workflow verifies metadata directories across platforms and publis
 
   const x64 = await writeFixtureInstaller(workspace, version, {
     artifactDir: 'docforge-windows-x64',
+    includeBlockmap: true,
   });
 
   const linux = await writeFixtureInstaller(workspace, version, {
@@ -360,6 +451,43 @@ test('release workflow verifies metadata directories across platforms and publis
   });
 
   const manifestEntries = new Set(readManifestEntries(await fs.readFile(manifestPath, 'utf8')));
+  const publishedNames = new Map();
+  for (const entry of manifestEntries) {
+    const [relativePath, explicitName] = entry.split('#');
+    const candidateName = explicitName || path.basename(relativePath);
+    const previousEntry = publishedNames.get(candidateName);
+    assert(
+      !previousEntry,
+      `Duplicate release asset name detected: ${candidateName} (entries: ${previousEntry}, ${entry})`,
+    );
+    publishedNames.set(candidateName, entry);
+  }
+  const appUpdateRelative = path.relative(
+    repoPath(),
+    path.join(ia32.releaseDir, 'win-ia32-unpacked', 'resources', 'app-update.yml'),
+  );
+  assert(
+    !manifestEntries.has(appUpdateRelative),
+    'app-update.yml should not be uploaded to the release',
+  );
+  const ia32InstallerName = `DocForge-Setup-${version}-ia32.exe`;
+  const x64InstallerName = `DocForge-Setup-${version}.exe`;
+  const expectedWindowsBinaries = [
+    path.relative(repoPath(), path.join(ia32.releaseDir, ia32InstallerName)),
+    path.relative(repoPath(), path.join(x64.releaseDir, x64InstallerName)),
+  ];
+  for (const entry of expectedWindowsBinaries) {
+    assert(manifestEntries.has(entry), `${entry} must be included for Windows release assets`);
+  }
+
+  const expectedBlockmaps = [
+    path.relative(repoPath(), path.join(ia32.releaseDir, `${ia32InstallerName}.blockmap`)),
+    path.relative(repoPath(), path.join(x64.releaseDir, `${x64InstallerName}.blockmap`)),
+  ];
+  for (const blockmap of expectedBlockmaps) {
+    assert(manifestEntries.has(blockmap), `${blockmap} must be published after renaming installers`);
+  }
+
   const expectedMetadataUploads = [x64.metadataPath, linux.metadataPath, mac.metadataPath];
   for (const metadataPath of expectedMetadataUploads) {
     assert(metadataPath, 'metadataPath should be defined for uploaded manifests');
@@ -397,6 +525,93 @@ test('release workflow verifies metadata directories across platforms and publis
   }
 });
 
+test('local metadata repair realigns renamed Windows installers', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const releaseDir = path.join(workspace, 'release-artifacts', 'docforge-windows-ia32');
+  await fs.mkdir(releaseDir, { recursive: true });
+
+  const version = '0.0.9';
+  const renamedInstaller = `DocForge-Setup-${version}-ia32.exe`;
+  const legacyName = `DocForge-Setup-${version}.exe`;
+  const installerPath = path.join(releaseDir, renamedInstaller);
+  await fs.writeFile(installerPath, crypto.randomBytes(2048));
+
+  const metadataPath = path.join(releaseDir, 'latest.yml');
+  await fs.writeFile(
+    metadataPath,
+    YAML.stringify({
+      version,
+      files: [
+        {
+          url: legacyName,
+          sha512: 'placeholder',
+          size: 0,
+        },
+      ],
+      path: legacyName,
+      sha512: 'placeholder',
+      releaseDate: new Date().toISOString(),
+    }),
+    'utf8',
+  );
+
+  await assert.rejects(() => runLocalVerification(releaseDir), /Local auto-update verification failed/);
+
+  await runLocalVerification(releaseDir, ['--fix-metadata']);
+
+  const repaired = YAML.parse(await fs.readFile(metadataPath, 'utf8'));
+  assert.equal(repaired.path, renamedInstaller);
+  assert(Array.isArray(repaired.files) && repaired.files.length === 1);
+  assert.equal(repaired.files[0].url, renamedInstaller);
+  assert.notEqual(repaired.sha512, 'placeholder');
+  assert.notEqual(repaired.files[0].sha512, 'placeholder');
+
+  await runLocalVerification(releaseDir);
+});
+
+test('local metadata repair resolves dotted Windows installer variants', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const releaseDir = path.join(workspace, 'release-artifacts', 'docforge-windows-ia32');
+  await fs.mkdir(releaseDir, { recursive: true });
+
+  const version = '0.1.1';
+  const installerName = `DocForge.Setup.${version}-ia32.exe`;
+  const installerPath = path.join(releaseDir, installerName);
+  await fs.writeFile(installerPath, crypto.randomBytes(4096));
+
+  const blockmapPath = `${installerPath}.blockmap`;
+  await fs.writeFile(blockmapPath, crypto.randomBytes(512));
+
+  const legacyReference = `DocForge-Setup-${version}.exe`;
+  const metadataPath = path.join(releaseDir, 'latest.yml');
+  const metadataSource = {
+    version,
+    files: [
+      {
+        url: legacyReference,
+        sha512: 'placeholder',
+        size: 0,
+      },
+    ],
+    path: legacyReference,
+    sha512: 'placeholder',
+  };
+  await fs.writeFile(metadataPath, YAML.stringify(metadataSource), 'utf8');
+
+  await assert.rejects(() => runLocalVerification(releaseDir), /Local auto-update verification failed/);
+
+  await runLocalVerification(releaseDir, ['--fix-metadata']);
+
+  const repaired = YAML.parse(await fs.readFile(metadataPath, 'utf8'));
+  assert.equal(repaired.path, installerName);
+  assert(Array.isArray(repaired.files) && repaired.files.length === 1);
+  assert.equal(repaired.files[0].url, installerName);
+  assert.notEqual(repaired.sha512, 'placeholder');
+  assert.notEqual(repaired.files[0].sha512, 'placeholder');
+
+  await runLocalVerification(releaseDir);
+});
+
 test('release generation fails when required latest metadata is missing', async (t) => {
   const workspace = await createTemporaryWorkspace(t);
   const version = '0.0.7';
@@ -425,8 +640,78 @@ test('release generation fails when required latest metadata is missing', async 
         outputPath: notesPath,
         filesOutputPath: manifestPath,
       }),
-    /Missing required auto-update metadata/,
+    /Missing required auto-update metadata/, 
   );
+});
+
+test('release tooling normalises dotted installer names across architectures', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const version = '0.0.10';
+
+  const x64 = await writeFixtureInstaller(workspace, version, {
+    artifactDir: 'docforge-windows-x64',
+    assetName: `DocForge.Setup.${version}.exe`,
+    includeBlockmap: true,
+  });
+  const ia32 = await writeFixtureInstaller(workspace, version, {
+    artifactDir: 'docforge-windows-ia32',
+    assetName: `DocForge.Setup.${version}.exe`,
+    includeBlockmap: true,
+  });
+
+  const harmoniseMetadata = async (metadataPath) => {
+    const parsed = YAML.parse(await fs.readFile(metadataPath, 'utf8'));
+    const legacyName = `DocForge-Setup-${version}.exe`;
+    parsed.path = legacyName;
+    if (Array.isArray(parsed.files) && parsed.files[0]) {
+      parsed.files[0].url = legacyName;
+    }
+    await fs.writeFile(metadataPath, YAML.stringify(parsed), 'utf8');
+  };
+
+  await harmoniseMetadata(x64.metadataPath);
+  await harmoniseMetadata(ia32.metadataPath);
+
+  const changelogPath = path.join(workspace, 'CHANGELOG.md');
+  await fs.writeFile(
+    changelogPath,
+    [`## v${version}`, '', '- Dotted installer normalisation test.'].join('\n'),
+    'utf8',
+  );
+
+  const notesPath = path.join(workspace, 'release-notes.md');
+  const manifestPath = path.join(workspace, 'release-files.txt');
+
+  await runGenerateReleaseNotes({
+    workspace,
+    version,
+    tag: `v${version}`,
+    changelogPath,
+    outputPath: notesPath,
+    filesOutputPath: manifestPath,
+  });
+
+  const renamedX64 = path.join(x64.releaseDir, `DocForge-Setup-${version}.exe`);
+  const renamedIa32 = path.join(ia32.releaseDir, `DocForge-Setup-${version}-ia32.exe`);
+
+  await Promise.all([
+    assert.doesNotReject(() => fs.access(renamedX64)),
+    assert.doesNotReject(() => fs.access(renamedIa32)),
+  ]);
+
+  const x64Metadata = YAML.parse(await fs.readFile(x64.metadataPath, 'utf8'));
+  const ia32Metadata = YAML.parse(await fs.readFile(ia32.metadataPath, 'utf8'));
+
+  assert.equal(x64Metadata.path, `DocForge-Setup-${version}.exe`);
+  assert.equal(ia32Metadata.path, `DocForge-Setup-${version}-ia32.exe`);
+  assert(Array.isArray(ia32Metadata.files) && ia32Metadata.files[0].url === `DocForge-Setup-${version}-ia32.exe`);
+
+  const manifestEntries = new Set(readManifestEntries(await fs.readFile(manifestPath, 'utf8')));
+  const expectedIa32 = path.relative(repoPath(), renamedIa32);
+  assert(manifestEntries.has(expectedIa32), 'Renamed ia32 installer must be listed in manifest');
+
+  await runLocalVerification(x64.releaseDir);
+  await runLocalVerification(ia32.releaseDir);
 });
 
 test('remote auto-update check fails when Windows release metadata is absent', async () => {
