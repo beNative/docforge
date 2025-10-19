@@ -1,5 +1,26 @@
 # Version Log
 
+## v0.6.7 - The Release Readiness Confirmation
+
+This maintenance release double-checks the release process ahead of the next
+build by updating the version metadata, aligning the release tests, and
+resyncing the documentation bundle.
+
+### 🛠 Improvements
+
+-   Bumped the application version to `v0.6.7` and refreshed the release
+    tagging examples so the workflow documentation continues to reflect the
+    current command sequence.
+-   Reverified every Markdown guide (README, manuals, version log) and synced
+    the `docs/` copies to ensure the published documentation matches the
+    repository sources.
+
+### 🐛 Fixes
+
+-   Updated the release workflow tests to expect the new versioned installer
+    artifacts, preventing false failures when validating the publishing
+    pipeline.
+
 ## v0.6.6 - The Documentation Assurance Update
 
 This patch release keeps the publishing workflow aligned ahead of the next
