@@ -113,6 +113,193 @@ export function extractMetadataTargets(metadata) {
   return Array.from(targets.values());
 }
 
+async function resolveLocalAsset(metadataDir, key, digestCache) {
+  if (!key || typeof key !== 'string') {
+    return null;
+  }
+
+  const candidates = [];
+  const seen = new Set();
+
+  const addCandidate = (value) => {
+    if (!value || typeof value !== 'string') {
+      return;
+    }
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      return;
+    }
+    seen.add(trimmed);
+    candidates.push(trimmed);
+  };
+
+  addCandidate(key);
+  const normalised = normaliseInstallerFileName(key);
+  if (normalised && normalised !== key) {
+    addCandidate(normalised);
+  }
+
+  const lowerKey = key.toLowerCase();
+  const suffixPatterns = ['.exe.blockmap', '.exe'];
+  let directoryEntries = null;
+  for (const suffix of suffixPatterns) {
+    if (!lowerKey.endsWith(suffix)) {
+      continue;
+    }
+
+    if (!directoryEntries) {
+      try {
+        directoryEntries = await fs.readdir(metadataDir);
+      } catch {
+        directoryEntries = [];
+      }
+    }
+
+    const baseLower = lowerKey.slice(0, -suffix.length);
+    const prefixed = `${baseLower}-`;
+    for (const entry of directoryEntries) {
+      const entryLower = entry.toLowerCase();
+      if (!entryLower.endsWith(suffix)) {
+        continue;
+      }
+
+      const entryBaseLower = entryLower.slice(0, -suffix.length);
+      if (entryBaseLower === baseLower || entryBaseLower.startsWith(prefixed)) {
+        addCandidate(entry);
+      }
+    }
+  }
+
+  for (const candidate of candidates) {
+    const candidatePath = path.resolve(metadataDir, candidate);
+    const relative = path.relative(metadataDir, candidatePath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      continue;
+    }
+
+    try {
+      const stats = await fs.stat(candidatePath);
+      if (!stats.isFile()) {
+        continue;
+      }
+
+      let digest = digestCache.get(candidatePath);
+      if (!digest) {
+        digest = await computeLocalDigest(candidatePath);
+        digestCache.set(candidatePath, digest);
+      }
+
+      return {
+        name: candidate,
+        path: candidatePath,
+        sha512: digest.sha512,
+        size: digest.size,
+      };
+    } catch {
+      // Ignore missing assets at this stage; verification will surface the issue.
+    }
+  }
+
+  return null;
+}
+
+async function repairLocalMetadataFile(metadataPath, metadataDocument) {
+  if (!metadataDocument || typeof metadataDocument !== 'object') {
+    return false;
+  }
+
+  const metadataDir = path.dirname(metadataPath);
+  const digestCache = new Map();
+  let changed = false;
+
+  const ensureEntryMatchesAsset = async (entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return false;
+    }
+
+    const key = entry.url || entry.path;
+    const asset = await resolveLocalAsset(metadataDir, key, digestCache);
+    if (!asset) {
+      return false;
+    }
+
+    let localChange = false;
+    if (entry.url && entry.url !== asset.name) {
+      entry.url = asset.name;
+      localChange = true;
+    }
+    if (entry.path && entry.path !== asset.name) {
+      entry.path = asset.name;
+      localChange = true;
+    }
+    if (asset.sha512 && entry.sha512 !== asset.sha512) {
+      entry.sha512 = asset.sha512;
+      localChange = true;
+    }
+    if (typeof asset.size === 'number' && entry.size !== asset.size) {
+      entry.size = asset.size;
+      localChange = true;
+    }
+    return localChange;
+  };
+
+  if (Array.isArray(metadataDocument.files)) {
+    for (const entry of metadataDocument.files) {
+      if (await ensureEntryMatchesAsset(entry)) {
+        changed = true;
+      }
+    }
+  }
+
+  const primarySource =
+    (typeof metadataDocument.path === 'string' && metadataDocument.path.trim()) ||
+    (Array.isArray(metadataDocument.files) &&
+      metadataDocument.files[0] &&
+      (metadataDocument.files[0].path || metadataDocument.files[0].url));
+
+  const primaryAsset = await resolveLocalAsset(metadataDir, primarySource, digestCache);
+  if (primaryAsset) {
+    if (metadataDocument.path !== primaryAsset.name) {
+      metadataDocument.path = primaryAsset.name;
+      changed = true;
+    }
+    if (metadataDocument.sha512 !== primaryAsset.sha512) {
+      metadataDocument.sha512 = primaryAsset.sha512;
+      changed = true;
+    }
+    if (typeof primaryAsset.size === 'number' && metadataDocument.size !== primaryAsset.size) {
+      metadataDocument.size = primaryAsset.size;
+      changed = true;
+    }
+
+    if (!Array.isArray(metadataDocument.files) || metadataDocument.files.length === 0) {
+      metadataDocument.files = [
+        {
+          url: primaryAsset.name,
+          sha512: primaryAsset.sha512,
+          size: primaryAsset.size,
+        },
+      ];
+      changed = true;
+    }
+  }
+
+  if (Array.isArray(metadataDocument.files)) {
+    for (const entry of metadataDocument.files) {
+      if (await ensureEntryMatchesAsset(entry)) {
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) {
+    const serialised = YAML.stringify(metadataDocument, { lineWidth: 0 }).trimEnd();
+    await fs.writeFile(metadataPath, `${serialised}\n`, 'utf8');
+  }
+
+  return changed;
+}
+
 const execFileAsync = promisify(execFile);
 
 export async function curlGet(url, headers) {
@@ -484,7 +671,7 @@ export async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload,
   console.log('\nAll metadata files reference available, reachable assets with matching hashes.');
 }
 
-async function runLocalCheck({ directory, skipDownload }) {
+async function runLocalCheck({ directory, skipDownload, fixMetadata = false }) {
   const resolvedDirectory = path.resolve(directory);
   const entries = await fs.readdir(resolvedDirectory);
   const metadataFiles = entries.filter(
@@ -500,12 +687,7 @@ async function runLocalCheck({ directory, skipDownload }) {
   let failures = false;
   for (const metadataFile of metadataFiles) {
     const metadataPath = path.join(resolvedDirectory, metadataFile);
-    const source = await fs.readFile(metadataPath, 'utf8');
-    const references = extractMetadataReferences(source);
-    const missing = [];
-    const mismatchedHashes = [];
-    const missingHashes = [];
-    const mismatchedSizes = [];
+    let source = await fs.readFile(metadataPath, 'utf8');
     let metadataDocument = null;
     let parseError = null;
 
@@ -515,8 +697,26 @@ async function runLocalCheck({ directory, skipDownload }) {
       parseError = error instanceof Error ? error : new Error(String(error));
     }
 
+    let repaired = false;
+    if (fixMetadata && !parseError && metadataDocument && typeof metadataDocument === 'object') {
+      repaired = await repairLocalMetadataFile(metadataPath, metadataDocument);
+      if (repaired) {
+        source = await fs.readFile(metadataPath, 'utf8');
+        metadataDocument = YAML.parse(source);
+      }
+    }
+
+    const references = extractMetadataReferences(source);
+    const missing = [];
+    const mismatchedHashes = [];
+    const missingHashes = [];
+    const mismatchedSizes = [];
+
     console.log(`\nMetadata: ${metadataFile}`);
     console.log(`  Referenced files: ${references.length}`);
+    if (repaired) {
+      console.log('  • Updated metadata checksums to match local assets.');
+    }
 
     for (const reference of references) {
       const targetPath = path.join(resolvedDirectory, reference);
@@ -616,9 +816,10 @@ async function main() {
   const localDir = args.local ?? null;
   const skipHttp = Boolean(args['skip-http']);
   const skipDownload = Boolean(args['skip-download']);
+  const fixMetadata = Boolean(args['fix-metadata']);
 
   if (localDir) {
-    await runLocalCheck({ directory: localDir, skipDownload });
+    await runLocalCheck({ directory: localDir, skipDownload, fixMetadata });
     return;
   }
 
