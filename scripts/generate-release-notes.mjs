@@ -170,13 +170,23 @@ async function normaliseReleaseAsset(filePath) {
   const fileName = path.basename(filePath);
   const normalisedName = normaliseInstallerFileName(fileName);
   if (normalisedName === fileName) {
-    return { filePath, fileName, originalFileName: fileName };
+    return {
+      filePath,
+      fileName,
+      originalFileName: fileName,
+      previousFileNames: new Set(),
+    };
   }
 
   const targetPath = path.join(path.dirname(filePath), normalisedName);
   await fs.rename(filePath, targetPath);
   console.log(`Normalised release asset name: ${fileName} -> ${normalisedName}`);
-  return { filePath: targetPath, fileName: normalisedName, originalFileName: fileName };
+  return {
+    filePath: targetPath,
+    fileName: normalisedName,
+    originalFileName: fileName,
+    previousFileNames: new Set([fileName]),
+  };
 }
 
 async function computeFileSha512(filePath) {
@@ -258,7 +268,12 @@ async function collectAssets(artifactRoot) {
     const arch = normaliseArch(parts.slice(1).join('-') || parts[0]);
     const files = await walkFiles(path.join(artifactRoot, dirName));
     for (const file of files) {
-      const { filePath: normalisedPath, fileName: normalisedName, originalFileName } = await normaliseReleaseAsset(file);
+      const {
+        filePath: normalisedPath,
+        fileName: normalisedName,
+        originalFileName,
+        previousFileNames,
+      } = await normaliseReleaseAsset(file);
       const fileName = normalisedName;
       const filePath = normalisedPath;
       const artifactDir = path.relative(artifactRoot, path.dirname(filePath));
@@ -292,6 +307,7 @@ async function collectAssets(artifactRoot) {
         fileName,
         filePath,
         originalFileName,
+        previousFileNames: previousFileNames ?? new Set(),
         artifactDir,
         format: detectFormat(fileName),
         sha512,
@@ -300,6 +316,8 @@ async function collectAssets(artifactRoot) {
       });
     }
   }
+  await ensureUniqueInstallerNames(releaseAssets, updateSupportFiles);
+
   if (releaseAssets.length === 0) {
     throw new Error(`No release-ready binaries were found in ${artifactRoot}`);
   }
@@ -316,6 +334,179 @@ async function collectAssets(artifactRoot) {
   });
   updateSupportFiles.sort((a, b) => a.filePath.localeCompare(b.filePath));
   return { releaseAssets, updateSupportFiles };
+}
+
+function normaliseArchForSuffix(arch) {
+  if (!arch) {
+    return '';
+  }
+  return arch.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
+function rememberPreviousName(asset, previousName) {
+  if (!previousName || previousName === asset.fileName) {
+    return;
+  }
+  if (!asset.previousFileNames) {
+    asset.previousFileNames = new Set();
+  }
+  asset.previousFileNames.add(previousName);
+}
+
+async function renameReleaseAsset(asset, candidateName, logMessage) {
+  if (!candidateName || candidateName === asset.fileName) {
+    return;
+  }
+
+  const previousName = asset.fileName;
+  const targetPath = path.join(path.dirname(asset.filePath), candidateName);
+  await fs.rename(asset.filePath, targetPath);
+  console.log(logMessage ?? `Renamed release asset ${previousName} -> ${candidateName}`);
+  rememberPreviousName(asset, previousName);
+  asset.fileName = candidateName;
+  asset.assetName = candidateName;
+  asset.filePath = targetPath;
+}
+
+async function ensureUniqueInstallerNames(releaseAssets, updateSupportFiles) {
+  if (releaseAssets.length === 0) {
+    return;
+  }
+
+  const entriesByName = new Map();
+  for (const asset of releaseAssets) {
+    const key = asset.fileName.toLowerCase();
+    if (!entriesByName.has(key)) {
+      entriesByName.set(key, []);
+    }
+    entriesByName.get(key).push(asset);
+  }
+
+  const nameUsage = new Set(releaseAssets.map((asset) => asset.fileName.toLowerCase()));
+
+  const findBlockmapEntry = (asset, candidateNames) => {
+    return updateSupportFiles.find((file) => {
+      if (file.artifactDir !== asset.artifactDir) {
+        return false;
+      }
+      const currentName = path.basename(file.filePath).toLowerCase();
+      return candidateNames.some((name) => currentName === name.toLowerCase());
+    });
+  };
+
+  for (const group of entriesByName.values()) {
+    if (!group || group.length <= 1) {
+      continue;
+    }
+
+    const canonical =
+      group.find((asset) => asset.arch && asset.arch.toLowerCase() === 'x64') ?? group[0];
+
+    for (const asset of group) {
+      if (asset === canonical) {
+        continue;
+      }
+
+      const previousFileName = asset.fileName;
+      const extension = path.extname(previousFileName);
+      const baseName = previousFileName.slice(0, -extension.length);
+      const archSuffix = normaliseArchForSuffix(asset.arch) || 'variant';
+
+      let candidateBase = `${baseName}-${archSuffix}`;
+      let candidateName = `${candidateBase}${extension}`;
+      let counter = 1;
+      while (nameUsage.has(candidateName.toLowerCase())) {
+        candidateName = `${candidateBase}-${counter}${extension}`;
+        counter += 1;
+      }
+
+      await renameReleaseAsset(asset, candidateName, `Renamed conflicting installer ${previousFileName} -> ${candidateName}`);
+
+      nameUsage.delete(previousFileName.toLowerCase());
+      nameUsage.add(candidateName.toLowerCase());
+    }
+  }
+
+  const usedNames = new Set();
+  for (const asset of releaseAssets) {
+    const extension = path.extname(asset.fileName);
+    const baseName = extension ? asset.fileName.slice(0, -extension.length) : asset.fileName;
+    let candidateName = asset.fileName;
+    let counter = 1;
+    while (usedNames.has(candidateName.toLowerCase())) {
+      const suffix = counter;
+      candidateName = `${baseName}-${suffix}${extension}`;
+      counter += 1;
+    }
+    if (candidateName !== asset.fileName) {
+      await renameReleaseAsset(asset, candidateName);
+    }
+    usedNames.add(asset.fileName.toLowerCase());
+  }
+
+  const alignBlockmapWithInstaller = async (asset) => {
+    const desiredName = `${asset.fileName}.blockmap`;
+    const artifactDir = path.dirname(asset.filePath);
+    const desiredPath = path.join(artifactDir, desiredName);
+    const candidateNames = [
+      desiredName,
+      asset.originalFileName ? `${asset.originalFileName}.blockmap` : null,
+      ...(asset.previousFileNames
+        ? Array.from(asset.previousFileNames, (name) => `${name}.blockmap`)
+        : []),
+    ].filter(Boolean);
+
+    const blockmapEntry = findBlockmapEntry(asset, candidateNames);
+
+    const resolveExistingPath = async () => {
+      if (blockmapEntry) {
+        return blockmapEntry.filePath;
+      }
+
+      for (const name of candidateNames) {
+        const candidatePath = path.join(artifactDir, name);
+        try {
+          await fs.access(candidatePath);
+          return candidatePath;
+        } catch (error) {
+          if (!error || error.code === 'ENOENT') {
+            continue;
+          }
+          throw error;
+        }
+      }
+      return null;
+    };
+
+    const existingPath = await resolveExistingPath();
+    if (!existingPath) {
+      return;
+    }
+
+    let finalPath = existingPath;
+    if (path.basename(existingPath) !== desiredName) {
+      finalPath = desiredPath;
+      await fs.rename(existingPath, finalPath);
+      console.log(`Normalised blockmap name ${path.basename(existingPath)} -> ${desiredName}`);
+    }
+
+    const ensureEntry = blockmapEntry ?? {
+      filePath: finalPath,
+      artifactDir: asset.artifactDir,
+    };
+
+    ensureEntry.filePath = finalPath;
+    ensureEntry.assetName = desiredName;
+    ensureEntry.upload = shouldUploadMetadataFile(desiredName);
+
+    if (!blockmapEntry) {
+      updateSupportFiles.push(ensureEntry);
+    }
+  };
+
+  for (const asset of releaseAssets) {
+    await alignBlockmapWithInstaller(asset);
+  }
 }
 
 function normaliseWindowsChannelName(arch) {
@@ -400,10 +591,23 @@ async function updateMetadataFiles(metadataFiles, releaseAssets) {
     }
     const entry = assetsByDirectory.get(key);
     entry.assets.push(asset);
-    entry.byName.set(asset.fileName, asset);
-    const originalName = asset.originalFileName;
-    if (originalName && originalName !== asset.fileName && !entry.byName.has(originalName)) {
-      entry.byName.set(originalName, asset);
+    const registerName = (name) => {
+      if (!name) {
+        return;
+      }
+      const key = name.toString();
+      if (!key || entry.byName.has(key)) {
+        return;
+      }
+      entry.byName.set(key, asset);
+    };
+
+    registerName(asset.fileName);
+    registerName(asset.originalFileName);
+    if (asset.previousFileNames && asset.previousFileNames.size > 0) {
+      for (const previousName of asset.previousFileNames) {
+        registerName(previousName);
+      }
     }
   }
 
