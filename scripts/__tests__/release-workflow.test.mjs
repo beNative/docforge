@@ -310,6 +310,47 @@ test('local verification can repair mismatched metadata when requested', async (
   assert.equal(updated.files[0].size, installerBuffer.length);
 });
 
+test('local verification resolves renamed Windows installers when metadata lacks architecture suffix', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const version = '0.0.4';
+  const releaseDir = path.join(workspace, 'release-artifacts', 'docforge-windows-ia32');
+  await fs.mkdir(releaseDir, { recursive: true });
+
+  const installerName = `DocForge-Setup-${version}-ia32.exe`;
+  const installerPath = path.join(releaseDir, installerName);
+  const binary = crypto.randomBytes(4096);
+  await fs.writeFile(installerPath, binary);
+
+  const metadataPath = path.join(releaseDir, 'latest.yml');
+  const metadata = {
+    version,
+    path: `DocForge-Setup-${version}.exe`,
+    sha512: 'mismatched',
+    files: [
+      {
+        url: `DocForge-Setup-${version}.exe`,
+        sha512: 'mismatched',
+        size: 123,
+      },
+    ],
+  };
+  await fs.writeFile(metadataPath, YAML.stringify(metadata), 'utf8');
+
+  await runLocalVerification(releaseDir, ['--fix-metadata']);
+
+  const expectedSha = computeSha512Base64(binary);
+  const updated = YAML.parse(await fs.readFile(metadataPath, 'utf8'));
+  assert.equal(updated.path, installerName);
+  assert.equal(updated.sha512, expectedSha);
+  if (Object.prototype.hasOwnProperty.call(updated, 'size')) {
+    assert.equal(updated.size, binary.length);
+  }
+  assert(Array.isArray(updated.files) && updated.files.length === 1);
+  assert.equal(updated.files[0].url, installerName);
+  assert.equal(updated.files[0].sha512, expectedSha);
+  assert.equal(updated.files[0].size, binary.length);
+});
+
 test('metadata updates remain isolated across artifact directories with identical installer names', async (t) => {
   const workspace = await createTemporaryWorkspace(t);
   const version = '0.0.3';
