@@ -30,7 +30,7 @@ DocForge is a desktop application designed to streamline the process of creating
 
 ## Getting Started
 
-1.  **Download:** Grab the latest release for your operating system from the [Releases](https://github.com/TimSirmov/docforge/releases) page.
+1.  **Download:** Grab the latest release for your operating system from the [Releases](https://github.com/beNative/docforge/releases) page.
 2.  **Run a Local LLM:** Ensure you have a local AI provider like [Ollama](https://ollama.ai/) or [LM Studio](https://lmstudio.ai/) running.
 3.  **Configure:** Launch DocForge, open the Settings view, and select your detected LLM service and a model to use for refinement tasks.
 4.  **Create:** Start creating, organizing, and refining your documents!

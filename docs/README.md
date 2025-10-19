@@ -2,7 +2,7 @@
 
 DocForge is a desktop application designed to streamline the process of creating, managing, and refining documents for Large Language Models (LLMs). It connects to local AI providers like Ollama, allowing you to leverage the power of AI to improve your documents in a secure, offline-first environment.
 
-![DocForge Screenshot](https://raw.githubusercontent.com/TimSirmov/docforge/main/assets/screenshot.png)
+![DocForge Screenshot](https://raw.githubusercontent.com/beNative/docforge/main/assets/screenshot.png)
 
 ## Key Features
 
@@ -30,7 +30,7 @@ DocForge is a desktop application designed to streamline the process of creating
 
 ## Getting Started
 
-1.  **Download:** Grab the latest release for your operating system from the [Releases](https://github.com/TimSirmov/docforge/releases) page.
+1.  **Download:** Grab the latest release for your operating system from the [Releases](https://github.com/beNative/docforge/releases) page.
 2.  **Run a Local LLM:** Ensure you have a local AI provider like [Ollama](https://ollama.ai/) or [LM Studio](https://lmstudio.ai/) running.
 3.  **Configure:** Launch DocForge, open the Settings view, and select your detected LLM service and a model to use for refinement tasks.
 4.  **Create:** Start creating, organizing, and refining your documents!
