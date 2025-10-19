@@ -432,6 +432,14 @@ test('release workflow verifies metadata directories across platforms and publis
   });
 
   const manifestEntries = new Set(readManifestEntries(await fs.readFile(manifestPath, 'utf8')));
+  const appUpdateRelative = path.relative(
+    repoPath(),
+    path.join(ia32.releaseDir, 'win-ia32-unpacked', 'resources', 'app-update.yml'),
+  );
+  assert(
+    !manifestEntries.has(appUpdateRelative),
+    'app-update.yml should not be uploaded to the release',
+  );
   const expectedMetadataUploads = [x64.metadataPath, linux.metadataPath, mac.metadataPath];
   for (const metadataPath of expectedMetadataUploads) {
     assert(metadataPath, 'metadataPath should be defined for uploaded manifests');

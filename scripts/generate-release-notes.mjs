@@ -136,6 +136,17 @@ function isAutoUpdateSupportFile(filename) {
   return true;
 }
 
+function shouldUploadMetadataFile(filename) {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.blockmap')) {
+    return true;
+  }
+  if (lower.startsWith('latest') && lower.endsWith('.yml')) {
+    return true;
+  }
+  return false;
+}
+
 function normaliseInstallerFileName(fileName) {
   if (!fileName.toLowerCase().endsWith('.exe')) {
     return fileName;
@@ -256,7 +267,7 @@ async function collectAssets(artifactRoot) {
           filePath,
           artifactDir,
           assetName: path.basename(filePath),
-          upload: true,
+          upload: shouldUploadMetadataFile(fileName),
         });
         continue;
       }
