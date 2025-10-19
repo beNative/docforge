@@ -541,6 +541,78 @@ test('remote auto-update check fails when Windows release metadata is absent', a
   );
 });
 
+test('remote auto-update check falls back to latest release when requested tag is missing', async () => {
+  const metadataSource = YAML.stringify({
+    version: '0.6.6',
+    files: [
+      {
+        url: 'DocForge-Setup-0.6.6.exe',
+        sha512: 'placeholder',
+        size: 123,
+      },
+    ],
+    path: 'DocForge-Setup-0.6.6.exe',
+    sha512: 'placeholder',
+  });
+
+  const headUrls = [];
+  const http = {
+    fetchJson: async (url) => {
+      if (url.endsWith('/releases/tags/v0.6.7')) {
+        const error = new Error('Not Found');
+        error.status = 404;
+        throw error;
+      }
+      if (url.endsWith('/releases/latest')) {
+        return {
+          tag_name: 'v0.6.6',
+          assets: [
+            {
+              name: 'DocForge-Setup-0.6.6.exe',
+              browser_download_url: 'https://example.invalid/DocForge-Setup-0.6.6.exe',
+            },
+            {
+              name: 'latest.yml',
+              browser_download_url: 'https://example.invalid/latest.yml',
+            },
+            {
+              name: 'win32-x64.yml',
+              browser_download_url: 'https://example.invalid/win32-x64.yml',
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected fetchJson call for ${url}`);
+    },
+    fetchText: async (url) => {
+      if (url.endsWith('latest.yml') || url.endsWith('win32-x64.yml')) {
+        return metadataSource;
+      }
+      throw new Error(`Unexpected fetchText call for ${url}`);
+    },
+    headRequest: async (url) => {
+      headUrls.push(url);
+      return { ok: true, status: 200 };
+    },
+  };
+
+  await assert.doesNotReject(() =>
+    runRemoteCheck({
+      owner: 'beNative',
+      repo: 'docforge',
+      tag: 'v0.6.7',
+      skipHttp: false,
+      skipDownload: true,
+      http,
+    }),
+  );
+
+  assert.ok(
+    headUrls.length > 0 && headUrls.every((url) => url.includes('/v0.6.6/DocForge-Setup-0.6.6.exe')),
+    'Expected HEAD checks to target the fallback release tag',
+  );
+});
+
 test('auto-update analysis reports unreachable assets when GitHub returns 404', async () => {
   const metadataSource = YAML.stringify({
     version: '0.6.7',
