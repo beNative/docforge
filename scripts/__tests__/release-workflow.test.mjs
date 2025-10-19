@@ -230,6 +230,46 @@ test('release tooling rewrites metadata and keeps latest.yml published', async (
   await runLocalVerification(releaseDir);
 });
 
+test('release tooling ignores unpacked directories when enforcing metadata', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  await writeFixtureInstaller(workspace, '0.0.2', {
+    artifactDir: 'docforge-windows-x64',
+  });
+
+  const unpackedDir = path.join(
+    workspace,
+    'release-artifacts',
+    'docforge-windows-x64',
+    'win-unpacked',
+  );
+  await fs.mkdir(unpackedDir, { recursive: true });
+  const unpackedExecutable = path.join(unpackedDir, 'DocForge.exe');
+  await fs.writeFile(unpackedExecutable, crypto.randomBytes(2048));
+
+  const changelogPath = path.join(workspace, 'CHANGELOG.md');
+  await fs.writeFile(
+    changelogPath,
+    ['## v0.0.2', '', '- Ignore unpacked executable fixtures.'].join('\n'),
+    'utf8',
+  );
+
+  const notesPath = path.join(workspace, 'release-notes.md');
+  const manifestPath = path.join(workspace, 'release-files.txt');
+
+  await runGenerateReleaseNotes({
+    workspace,
+    version: '0.0.2',
+    tag: 'v0.0.2',
+    changelogPath,
+    outputPath: notesPath,
+    filesOutputPath: manifestPath,
+  });
+
+  const manifest = await fs.readFile(manifestPath, 'utf8');
+  const entries = readManifestEntries(manifest);
+  assert(entries.every((line) => !line.includes('DocForge.exe')));
+});
+
 test('local verification can repair mismatched metadata when requested', async (t) => {
   const workspace = await createTemporaryWorkspace(t);
   const version = '0.0.2';
