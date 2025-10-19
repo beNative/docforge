@@ -139,17 +139,17 @@ async function resolveLocalAsset(metadataDir, key, digestCache) {
     addCandidate(normalised);
   }
 
-  for (const candidate of candidates) {
+  const tryResolveCandidate = async (candidate) => {
     const candidatePath = path.resolve(metadataDir, candidate);
     const relative = path.relative(metadataDir, candidatePath);
     if (relative.startsWith('..') || path.isAbsolute(relative)) {
-      continue;
+      return null;
     }
 
     try {
       const stats = await fs.stat(candidatePath);
       if (!stats.isFile()) {
-        continue;
+        return null;
       }
 
       let digest = digestCache.get(candidatePath);
@@ -165,7 +165,52 @@ async function resolveLocalAsset(metadataDir, key, digestCache) {
         size: digest.size,
       };
     } catch {
-      // Ignore missing assets at this stage; verification will surface the issue.
+      return null;
+    }
+  };
+
+  let index = 0;
+  while (index < candidates.length) {
+    const candidate = candidates[index];
+    index += 1;
+    const asset = await tryResolveCandidate(candidate);
+    if (asset) {
+      return asset;
+    }
+  }
+
+  const extension = normalised ? path.extname(normalised) : path.extname(key ?? '');
+  const extensionLower = extension.toLowerCase();
+  const canonicalBase = extension ? (normalised || key).slice(0, -extension.length) : null;
+
+  if (canonicalBase && extensionLower === '.exe') {
+    let entries = [];
+    try {
+      entries = await fs.readdir(metadataDir);
+    } catch {
+      entries = [];
+    }
+
+    for (const entry of entries) {
+      if (seen.has(entry)) {
+        continue;
+      }
+      if (!entry.toLowerCase().endsWith(extensionLower)) {
+        continue;
+      }
+      const baseName = entry.slice(0, -extension.length);
+      if (baseName === canonicalBase || baseName.startsWith(`${canonicalBase}-`)) {
+        addCandidate(entry);
+      }
+    }
+
+    while (index < candidates.length) {
+      const candidate = candidates[index];
+      index += 1;
+      const asset = await tryResolveCandidate(candidate);
+      if (asset) {
+        return asset;
+      }
     }
   }
 
