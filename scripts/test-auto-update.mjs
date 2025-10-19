@@ -270,44 +270,93 @@ async function repairLocalMetadataFile(metadataPath, metadataDocument) {
 }
 
 const execFileAsync = promisify(execFile);
+const CURL_STATUS_MARKER = '__curl_status__:';
 
-export async function curlGet(url, headers) {
-  const args = ['-sS', '-L', '--fail-with-body'];
-  for (const [key, value] of Object.entries(headers)) {
-    args.push('-H', `${key}: ${value}`);
+function parseCurlResponse(stdout, { includeBody = true, defaultStatus = 0 } = {}) {
+  if (typeof stdout !== 'string') {
+    return { status: defaultStatus, ok: defaultStatus >= 200 && defaultStatus < 400, body: '' };
   }
-  args.push(url);
-  const { stdout } = await execFileAsync('curl', args);
-  return stdout;
+
+  const markerIndex = stdout.lastIndexOf(CURL_STATUS_MARKER);
+  if (markerIndex === -1) {
+    const body = includeBody ? stdout : '';
+    return { status: defaultStatus, ok: defaultStatus >= 200 && defaultStatus < 400, body };
+  }
+
+  const statusText = stdout.slice(markerIndex + CURL_STATUS_MARKER.length).trim();
+  const status = Number(statusText);
+  let body = '';
+  if (includeBody) {
+    body = stdout.slice(0, markerIndex);
+    body = body.replace(/\r?\n$/, '');
+  }
+
+  return { status, ok: status >= 200 && status < 400, body };
 }
 
-export async function curlHead(url, headers) {
-  const args = ['-sS', '-L', '-I', '-o', '/dev/null', '-w', '%{http_code}'];
+async function curlRequest(url, { headers = {}, method = 'GET', includeBody = true, failWithBody = true } = {}) {
+  const args = ['-sS', '-L', '-w', `\n${CURL_STATUS_MARKER}%{http_code}`];
+  if (failWithBody) {
+    args.push('--fail-with-body');
+  }
+  if (method === 'HEAD') {
+    args.push('-I');
+  } else if (method && method !== 'GET') {
+    args.push('-X', method);
+  }
+
   for (const [key, value] of Object.entries(headers)) {
     args.push('-H', `${key}: ${value}`);
   }
+
   args.push(url);
+
   try {
     const { stdout } = await execFileAsync('curl', args);
-    const status = Number(stdout.trim());
-    return { ok: status >= 200 && status < 400, status };
+    return parseCurlResponse(stdout, { includeBody });
   } catch (error) {
-    const statusOutput = typeof error.stdout === 'string' ? Number(error.stdout.trim()) : 0;
-    return { ok: false, status: statusOutput, error };
+    const stdout = typeof error.stdout === 'string' ? error.stdout : '';
+    const stderr = typeof error.stderr === 'string' ? error.stderr : '';
+    const parsed = parseCurlResponse(stdout, { includeBody, defaultStatus: 0 });
+    const requestError = new Error(
+      parsed.status
+        ? `curl request failed with status ${parsed.status}`
+        : `curl request failed${stderr ? ` (${stderr.trim()})` : ''}`,
+    );
+    requestError.status = Number.isFinite(parsed.status) ? parsed.status : null;
+    requestError.body = includeBody ? parsed.body : '';
+    requestError.stderr = stderr;
+    requestError.cause = error;
+    throw requestError;
   }
 }
 
 export async function fetchJson(url, headers) {
-  const body = await curlGet(url, headers);
-  return JSON.parse(body);
+  const { body } = await curlRequest(url, { headers });
+  try {
+    return JSON.parse(body);
+  } catch (error) {
+    const parseError = new Error(
+      `Failed to parse JSON response from ${url}: ${error instanceof Error ? error.message : error}`,
+    );
+    parseError.cause = error;
+    throw parseError;
+  }
 }
 
 export async function fetchText(url, headers) {
-  return curlGet(url, headers);
+  const { body } = await curlRequest(url, { headers });
+  return body;
 }
 
 export async function headRequest(url, headers) {
-  return curlHead(url, headers);
+  try {
+    const { status } = await curlRequest(url, { headers, includeBody: false, method: 'HEAD' });
+    return { ok: status >= 200 && status < 400, status };
+  } catch (error) {
+    const status = typeof error.status === 'number' ? error.status : 0;
+    return { ok: false, status, error };
+  }
 }
 
 function buildDownloadUrl(owner, repo, tag, fileName) {
@@ -336,7 +385,7 @@ async function computeLocalDigest(filePath) {
   });
 }
 
-function downloadAndComputeDigest(url, headers) {
+export function downloadAndComputeDigest(url, headers) {
   return new Promise((resolve, reject) => {
     const args = ['-sS', '-L', '--fail'];
     for (const [key, value] of Object.entries(headers)) {
@@ -566,14 +615,58 @@ export async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload,
     'User-Agent': 'docforge-auto-update-tester',
     Accept: 'application/vnd.github+json',
   };
+
+  const token = process.env.GITHUB_TOKEN?.trim();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   const fetchJsonFn = http.fetchJson ?? fetchJson;
   const fetchTextFn = http.fetchText ?? fetchText;
   const headRequestFn = http.headRequest ?? headRequest;
 
-  const release = await fetchJsonFn(`https://api.github.com/repos/${owner}/${repo}/releases/tags/${tag}`, headers);
+  let release;
+  let resolvedTag = tag;
+  let usedFallbackRelease = false;
+  try {
+    release = await fetchJsonFn(
+      `https://api.github.com/repos/${owner}/${repo}/releases/tags/${tag}`,
+      headers,
+    );
+  } catch (error) {
+    if (error && typeof error === 'object' && error.status === 404) {
+      const latestRelease = await fetchJsonFn(
+        `https://api.github.com/repos/${owner}/${repo}/releases/latest`,
+        headers,
+      );
+
+      if (!latestRelease || !latestRelease.assets || latestRelease.assets.length === 0) {
+        throw new Error(
+          [
+            `Release ${tag} was not found for ${owner}/${repo}.`,
+            'GitHub returned 404 for the requested tag and no published releases are available for fallback verification.',
+            'Publish the release or provide an explicit --tag to verify an alternate version.',
+          ].join('\n'),
+          { cause: error },
+        );
+      }
+
+      release = latestRelease;
+      resolvedTag = latestRelease.tag_name ?? tag;
+      if (resolvedTag !== tag) {
+        console.warn(
+          `Requested release ${tag} was not found; falling back to latest published release ${resolvedTag} for verification.`,
+        );
+        usedFallbackRelease = true;
+      }
+    } else {
+      throw error;
+    }
+  }
+
   const assetEntries = release.assets ?? [];
   if (assetEntries.length === 0) {
-    throw new Error(`No assets found for ${owner}/${repo} ${tag}.`);
+    throw new Error(`No assets found for ${owner}/${repo} ${resolvedTag}.`);
   }
 
   const assetMap = new Map(assetEntries.map((asset) => [asset.name, asset]));
@@ -603,11 +696,17 @@ export async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload,
     );
   }
 
-  console.log(`Auto-update asset verification for ${owner}/${repo} ${tag}`);
+  console.log(`Auto-update asset verification for ${owner}/${repo} ${resolvedTag}`);
   console.log(`Found ${assetEntries.length} total assets and ${metadataAssets.length} metadata files.`);
 
   let failures = false;
   const digestCache = new Map();
+  const effectiveSkipDownload = usedFallbackRelease ? true : skipDownload;
+  if (usedFallbackRelease && !skipDownload) {
+    console.warn(
+      'Checksum validation is skipped when verifying a fallback release. Use --tag to test a specific published version.',
+    );
+  }
   for (const asset of metadataAssets) {
     const content = await fetchTextFn(asset.browser_download_url, { 'User-Agent': 'docforge-auto-update-tester' });
     const result = await analyseMetadataEntry({
@@ -615,10 +714,10 @@ export async function runRemoteCheck({ owner, repo, tag, skipHttp, skipDownload,
       metadataSource: content,
       owner,
       repo,
-      tag,
+      tag: resolvedTag,
       assets: assetMap,
       skipHttp,
-      skipDownload,
+      skipDownload: effectiveSkipDownload,
       digestCache,
       http: { headRequest: headRequestFn },
     });

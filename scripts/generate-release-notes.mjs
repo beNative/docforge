@@ -827,6 +827,7 @@ async function main() {
   const body = entryLines.join('\n').trim();
 
   const { releaseAssets, updateSupportFiles } = await collectAssets(artifactRoot);
+  await prepareMetadataUploads({ releaseAssets, updateSupportFiles });
   await updateMetadataFiles(updateSupportFiles, releaseAssets);
   ensureLatestMetadataPresence({ artifactRoot, releaseAssets, updateSupportFiles });
   const table = buildDownloadTable(releaseAssets, repository, tag);
@@ -844,7 +845,6 @@ async function main() {
   const releaseNotes = sections.join('\n').replace(/\n{3,}/g, '\n\n');
   await fs.writeFile(outputPath, `${releaseNotes}\n`, 'utf8');
 
-  await prepareMetadataUploads({ releaseAssets, updateSupportFiles });
   updateSupportFiles.sort((a, b) => a.filePath.localeCompare(b.filePath));
 
   const manifestEntries = [
