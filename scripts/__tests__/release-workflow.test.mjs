@@ -148,10 +148,10 @@ async function runGenerateReleaseNotes({
   );
 }
 
-async function runLocalVerification(directory) {
+async function runLocalVerification(directory, extraArgs = []) {
   await execFileAsync(
     'node',
-    [repoPath('scripts', 'test-auto-update.mjs'), '--local', directory],
+    [repoPath('scripts', 'test-auto-update.mjs'), '--local', directory, ...extraArgs],
     {
       cwd: repoPath(),
     },
@@ -228,6 +228,78 @@ test('release tooling rewrites metadata and keeps latest.yml published', async (
   assert.equal(metadata.files[0].size, installerBuffer.length);
 
   await runLocalVerification(releaseDir);
+});
+
+test('release tooling ignores unpacked directories when enforcing metadata', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  await writeFixtureInstaller(workspace, '0.0.2', {
+    artifactDir: 'docforge-windows-x64',
+  });
+
+  const unpackedDir = path.join(
+    workspace,
+    'release-artifacts',
+    'docforge-windows-x64',
+    'win-unpacked',
+  );
+  await fs.mkdir(unpackedDir, { recursive: true });
+  const unpackedExecutable = path.join(unpackedDir, 'DocForge.exe');
+  await fs.writeFile(unpackedExecutable, crypto.randomBytes(2048));
+
+  const changelogPath = path.join(workspace, 'CHANGELOG.md');
+  await fs.writeFile(
+    changelogPath,
+    ['## v0.0.2', '', '- Ignore unpacked executable fixtures.'].join('\n'),
+    'utf8',
+  );
+
+  const notesPath = path.join(workspace, 'release-notes.md');
+  const manifestPath = path.join(workspace, 'release-files.txt');
+
+  await runGenerateReleaseNotes({
+    workspace,
+    version: '0.0.2',
+    tag: 'v0.0.2',
+    changelogPath,
+    outputPath: notesPath,
+    filesOutputPath: manifestPath,
+  });
+
+  const manifest = await fs.readFile(manifestPath, 'utf8');
+  const entries = readManifestEntries(manifest);
+  assert(entries.every((line) => !line.includes('DocForge.exe')));
+});
+
+test('local verification can repair mismatched metadata when requested', async (t) => {
+  const workspace = await createTemporaryWorkspace(t);
+  const version = '0.0.2';
+  const { releaseDir, metadataPath, assetPath } = await writeFixtureInstaller(workspace, version, {
+    assetSize: 2048,
+  });
+
+  const corrupted = YAML.parse(await fs.readFile(metadataPath, 'utf8'));
+  corrupted.sha512 = 'invalid-sha512';
+  corrupted.files[0].sha512 = 'invalid-sha512';
+  corrupted.files[0].size = 1;
+  await fs.writeFile(metadataPath, YAML.stringify(corrupted), 'utf8');
+
+  await assert.rejects(() => runLocalVerification(releaseDir), /Local auto-update verification failed/);
+
+  await runLocalVerification(releaseDir, ['--fix-metadata']);
+
+  const installerBuffer = await fs.readFile(assetPath);
+  const expectedSha = computeSha512Base64(installerBuffer);
+  const updated = YAML.parse(await fs.readFile(metadataPath, 'utf8'));
+
+  assert.equal(updated.path, path.basename(assetPath));
+  assert.equal(updated.sha512, expectedSha);
+  if (Object.prototype.hasOwnProperty.call(updated, 'size')) {
+    assert.equal(updated.size, installerBuffer.length);
+  }
+  assert(Array.isArray(updated.files) && updated.files.length === 1);
+  assert.equal(updated.files[0].url, path.basename(assetPath));
+  assert.equal(updated.files[0].sha512, expectedSha);
+  assert.equal(updated.files[0].size, installerBuffer.length);
 });
 
 test('metadata updates remain isolated across artifact directories with identical installer names', async (t) => {

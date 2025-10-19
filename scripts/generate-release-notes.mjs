@@ -261,6 +261,11 @@ async function collectAssets(artifactRoot) {
         continue;
       }
 
+      const artifactSegments = artifactDir.split(path.sep).filter(Boolean);
+      if (artifactSegments.some((segment) => segment.endsWith('-unpacked'))) {
+        continue;
+      }
+
       if (!isReleaseAsset(fileName)) {
         continue;
       }
