@@ -2496,6 +2496,7 @@ const MainApp: React.FC = () => {
                             folder={activeNode}
                             metrics={activeFolderMetrics ?? fallbackMetrics}
                             onNewDocument={(parentId) => handleNewDocument(parentId)}
+                            onNewFromClipboard={(parentId) => { void handleNewDocumentFromClipboard(parentId); }}
                             onNewSubfolder={(parentId) => handleNewFolder(parentId)}
                             onImportFiles={handleImportFilesIntoFolder}
                             onRenameFolderTitle={handleRenameNode}

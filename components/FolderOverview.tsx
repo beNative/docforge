@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { DocType, DocumentOrFolder } from '../types';
 import Button from './Button';
-import { FolderIcon, FileIcon, InfoIcon, PlusIcon, FolderPlusIcon, FolderDownIcon, PencilIcon, SearchIcon, XIcon } from './Icons';
+import { FolderIcon, FileIcon, InfoIcon, PlusIcon, FolderPlusIcon, FolderDownIcon, PencilIcon, SearchIcon, XIcon, CopyIcon } from './Icons';
 
 export interface DocTypeCount {
     type: DocType;
@@ -43,6 +43,7 @@ interface FolderOverviewProps {
     folder: DocumentOrFolder;
     metrics: FolderOverviewMetrics;
     onNewDocument: (parentId: string) => void;
+    onNewFromClipboard: (parentId: string) => void;
     onNewSubfolder: (parentId: string) => void;
     onImportFiles: (files: FileList, parentId: string) => void;
     onRenameFolderTitle: (folderId: string, title: string) => void;
@@ -98,6 +99,7 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
     folder,
     metrics,
     onNewDocument,
+    onNewFromClipboard,
     onNewSubfolder,
     onImportFiles,
     onRenameFolderTitle,
@@ -242,6 +244,15 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                             </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="gap-1 px-2.5"
+                                onClick={() => onNewFromClipboard(folder.id)}
+                            >
+                                <CopyIcon className="h-4 w-4" />
+                                New from clipboard
+                            </Button>
                             <Button
                                 type="button"
                                 className="gap-1 px-2.5"
