@@ -75,6 +75,10 @@ const looksLikeYaml = (content: string): boolean => {
       continue;
     }
     if (/^[\w"'][\w\-"']*:\s+/.test(line)) {
+      // Ignore CSS style declarations or other colon-delimited syntax that ends with semicolons or contains braces/tags.
+      if (/[;{}<>]/.test(line)) {
+        continue;
+      }
       score += 1;
     }
     if (/^-\s+/.test(line)) {
@@ -197,12 +201,12 @@ export const classifyDocumentContent = (options: ClassificationOptions): Classif
     return classifyWith('json', 'source_code', null, 0.9, 'JSON parse succeeded');
   }
 
-  if (looksLikeYaml(trimmed)) {
-    return classifyWith('yaml', 'source_code', null, 0.75, 'YAML mapping heuristics matched');
-  }
-
   if (looksLikeHtml(trimmed)) {
     return classifyWith('html', 'source_code', null, 0.75, 'HTML tag heuristics matched');
+  }
+
+  if (looksLikeYaml(trimmed)) {
+    return classifyWith('yaml', 'source_code', null, 0.75, 'YAML mapping heuristics matched');
   }
 
   const shebangLanguage = detectFromShebang(firstLine);

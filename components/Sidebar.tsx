@@ -4,7 +4,7 @@ import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
 import type { DocumentOrFolder, DocumentTemplate, Command, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon, XIcon, FolderDownIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon, XIcon, FolderDownIcon, CopyIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
@@ -34,6 +34,7 @@ interface SidebarProps {
   onNewRootFolder: () => void;
   onNewSubfolder: () => void;
   onNewCodeFile: () => void;
+  onNewFromClipboard: () => void;
   onDuplicateSelection: () => void;
   onCopyNodeContent: (id: string) => void;
   expandedFolderIds: Set<string>;
@@ -76,7 +77,7 @@ const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: Document
 };
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled } = props;
+  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, onNewFromClipboard } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
@@ -370,6 +371,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                         <CollapseAllIcon className="w-4 h-4" />
                     </IconButton>
                     <div className="h-5 w-px bg-border-color mx-1"></div>
+                    <IconButton onClick={onNewFromClipboard} tooltip={getTooltip('new-from-clipboard', 'New from Clipboard')} size="xs" tooltipPosition="bottom">
+                        <CopyIcon className="w-4 h-4" />
+                    </IconButton>
                      <IconButton onClick={props.onNewFromTemplate} tooltip={getTooltip('new-from-template', 'New from Template')} size="xs" tooltipPosition="bottom">
                         <DocumentDuplicateIcon className="w-4 h-4" />
                     </IconButton>

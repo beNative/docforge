@@ -1415,6 +1415,7 @@ const MainApp: React.FC = () => {
     }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog, activateDocumentTab]);
 
     const handleNewDocumentFromClipboard = useCallback(async (parentId?: string | null) => {
+        addLog('INFO', 'User action: Create New Document from Clipboard.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
         try {
             const { text, warnings: clipboardWarnings, mimeType } = await readClipboardText();
@@ -2573,6 +2574,7 @@ const MainApp: React.FC = () => {
                                         onNewRootFolder={handleNewRootFolder}
                                         onNewSubfolder={handleNewSubfolder}
                                         onNewCodeFile={handleOpenNewCodeFileModal}
+                                        onNewFromClipboard={() => { void handleNewDocumentFromClipboard(); }}
                                         onDuplicateSelection={handleDuplicateSelection}
                                         onCopyNodeContent={handleCopyNodeContent}
                                         expandedFolderIds={expandedFolderIds}
