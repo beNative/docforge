@@ -144,3 +144,15 @@ Electron Builder manages the packaging and publishing workflow for DocForge. The
 -   The canonical icon artwork lives at `assets/icon.svg`. During `npm run build` (and thus during `npm run package`/`npm run publish`), the `scripts/prepare-icons.mjs` script validates the SVG and, if valid, generates the required `icon.icns`, `icon.ico`, and `icon.png` files in the `assets/` directory using `icon-gen`.
 -   If the SVG is missing or invalid, the script logs a warning and leaves the existing binary icon assets untouched so packaging can proceed with the previous icons.
 -   To regenerate icons without running a full build, execute `npm run prepare:icons`.
+
+---
+
+## 6. Spec-Driven Development Assets
+
+DocForge integrates GitHub Spec Kit to manage feature planning artifacts alongside the codebase.
+
+-   **CLI tooling:** Install the Specify CLI with `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git` and run `specify check` to validate prerequisites.
+-   **Project scripts:** Helper scripts live under `.specify/scripts/` for creating feature folders, updating agent context, and enforcing executable permissions.
+-   **Spec storage:** Feature specifications, plans, and task lists reside in numbered folders under `specs/`. See [`specs/README.md`](../specs/README.md) for the canonical workflow.
+-   **Agent prompts:** Slash-command prompt files for AI assistants are stored in `.github/prompts/`, enabling `/speckit.*` commands inside supported tools.
+-   **Governance:** The living constitution at `.specify/memory/constitution.md` defines development principles, quality gates, and review expectations for the project.
