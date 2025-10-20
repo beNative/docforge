@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbSelectAndLoad: () => ipcRenderer.invoke('db:select-and-load'),
   dbImportFiles: (filesData: any[], targetParentId: string | null) => ipcRenderer.invoke('db:import-files', filesData, targetParentId),
 
+  // --- Clipboard ---
+  readClipboardText: () => ipcRenderer.invoke('clipboard:read-text'),
+
   // --- Migration-related FS access ---
   legacyFileExists: (filename: string) => ipcRenderer.invoke('fs:legacy-file-exists', filename),
   readLegacyFile: (filename: string) => ipcRenderer.invoke('fs:read-legacy-file', filename),

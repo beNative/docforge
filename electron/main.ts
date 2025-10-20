@@ -1,5 +1,5 @@
 // Fix: This file was previously a placeholder. This is the full implementation for the Electron main process.
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, clipboard } from 'electron';
 // Fix: Import 'platform' from 'process' for type-safe access to the current OS identifier.
 import { platform } from 'process';
 import path from 'path';
@@ -479,6 +479,20 @@ ipcMain.handle('db:import-files', async (_, filesData, targetParentId) => {
     } catch (error) {
         console.error('File import failed:', error);
         return { success: false, error: error instanceof Error ? error.message : 'Failed to import files.' };
+    }
+});
+
+ipcMain.handle('clipboard:read-text', async () => {
+    try {
+        const text = clipboard.readText();
+        const formats = clipboard.availableFormats();
+        const mimeType = formats.find(format => format.startsWith('text/')) ?? (text ? 'text/plain' : null);
+        return { success: true, text, mimeType };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const normalized = message.toLowerCase();
+        const errorCode = normalized.includes('denied') || normalized.includes('permission') ? 'permission-denied' : 'unexpected';
+        return { success: false, error: message, errorCode };
     }
 });
 
