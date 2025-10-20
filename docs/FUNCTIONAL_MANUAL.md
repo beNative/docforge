@@ -85,6 +85,7 @@ The bar at the bottom of the window provides at-a-glance information about the a
 
 - **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut. New documents default to Markdown.
 - **New Code File:** Click the code icon. A dialog will appear asking you to provide a filename with an extension (e.g., `script.js`) for automatic language detection.
+- **New from Clipboard:** Use the command palette entry or sidebar menu item to create a document from the current clipboard contents. DocForge will import the text verbatim, detect the document type automatically, and report the classification in the activity log. If clipboard access is denied, the app shows guidance for restoring permissions.
 - **New Root Folder:** Click the folder icon with a `+` to create a new folder at the root of your document list.
 - **New Subfolder:** Select an existing folder and click the "New Subfolder" icon to create a folder inside it.
 - **Duplicate Selection:** Select one or more items and click the "Duplicate" icon to create a deep copy.
