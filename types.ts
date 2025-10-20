@@ -112,6 +112,17 @@ export interface UpdateErrorPayload {
 
 export type NodeType = 'folder' | 'document';
 export type DocType = 'prompt' | 'source_code' | 'pdf' | 'image';
+export type ClassificationSource = 'auto' | 'user' | 'imported' | 'unknown';
+
+export interface ClassificationSummary {
+  languageHint: string | null;
+  docType: DocType;
+  defaultViewMode: ViewMode | null;
+  confidence: number;
+  primaryMatch: string;
+  fallbackUsed: boolean;
+  warnings: string[];
+}
 export type ViewMode = 'edit' | 'preview' | 'split-vertical' | 'split-horizontal';
 
 export interface ImportedNodeSummary {
@@ -234,6 +245,9 @@ export interface Document {
   doc_type: DocType;
   language_hint: string | null;
   default_view_mode: ViewMode | null;
+  language_source: ClassificationSource | null;
+  doc_type_source: ClassificationSource | null;
+  classification_updated_at: string | null;
   current_version_id: number | null;
   // Client-side property, holds content of current version
   content?: string;
@@ -272,6 +286,9 @@ export interface DocumentOrFolder {
   doc_type?: DocType;
   language_hint?: string | null;
   default_view_mode?: ViewMode | null;
+  language_source?: ClassificationSource | null;
+  doc_type_source?: ClassificationSource | null;
+  classification_updated_at?: string | null;
   searchSnippet?: string;
 }
 
@@ -282,6 +299,9 @@ export interface SerializedNodeForTransfer {
   doc_type?: DocType;
   language_hint?: string | null;
   default_view_mode?: ViewMode | null;
+  language_source?: ClassificationSource | null;
+  doc_type_source?: ClassificationSource | null;
+  classification_updated_at?: string | null;
   children?: SerializedNodeForTransfer[];
 }
 

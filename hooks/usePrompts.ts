@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import type { Node, DocumentOrFolder, DocType, ImportedNodeSummary } from '../types';
+import type { Node, DocumentOrFolder, DocType, ImportedNodeSummary, ClassificationSummary } from '../types';
 import { useNodes } from './useNodes';
 import { mapExtensionToLanguageId } from '../services/languageService';
 
@@ -18,6 +18,9 @@ const nodeToDocumentOrFolder = (node: Node): DocumentOrFolder => ({
   doc_type: node.document?.doc_type,
   language_hint: node.document?.language_hint,
   default_view_mode: node.document?.default_view_mode,
+  language_source: node.document?.language_source,
+  doc_type_source: node.document?.doc_type_source,
+  classification_updated_at: node.document?.classification_updated_at,
 });
 
 /**
@@ -52,7 +55,7 @@ const getDescendantIdsRecursive = (nodeId: string, allNodes: Node[]): Set<string
  * This allows the UI to function without a full refactor of all components.
  */
 export const useDocuments = () => {
-  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes, importFiles, importNodesFromTransfer, addLog, isLoading } = useNodes();
+  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, addLog, isLoading } = useNodes();
 
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
@@ -61,14 +64,37 @@ export const useDocuments = () => {
     const resolvedLanguage = mapExtensionToLanguageId(language_hint);
     const shouldPreviewByDefault = doc_type === 'pdf' || doc_type === 'image' || resolvedLanguage === 'pdf' || resolvedLanguage === 'image';
     const defaultViewMode = shouldPreviewByDefault ? 'preview' : undefined;
+    const now = new Date().toISOString();
     const newNode = await addNode({
       parent_id: parentId,
       node_type: 'document',
       title,
-      document: { content, doc_type, language_hint: resolvedLanguage, default_view_mode: defaultViewMode } as any,
+      document: {
+        content,
+        doc_type,
+        language_hint: resolvedLanguage,
+        language_source: 'user',
+        doc_type_source: 'user',
+        classification_updated_at: now,
+        default_view_mode: defaultViewMode,
+      } as any,
     });
     return nodeToDocumentOrFolder(newNode);
   }, [addNode]);
+
+  const createDocumentFromClipboardAdapter = useCallback(async (
+    payload: { parentId: string | null; content: string; title?: string | null }
+  ): Promise<{ item: DocumentOrFolder; summary: ClassificationSummary }> => {
+    const result = await createDocumentFromClipboard(payload);
+    const baseItem = nodeToDocumentOrFolder(result.node);
+    const enrichedItem: DocumentOrFolder = {
+      ...baseItem,
+      doc_type: baseItem.doc_type ?? result.summary.docType,
+      language_hint: baseItem.language_hint ?? result.summary.languageHint ?? null,
+      default_view_mode: baseItem.default_view_mode ?? result.summary.defaultViewMode ?? null,
+    };
+    return { item: enrichedItem, summary: result.summary };
+  }, [createDocumentFromClipboard]);
 
   const addFolder = useCallback(async (parentId: string | null, title: string = 'New Folder') => {
     const newNode = await addNode({
@@ -162,5 +188,5 @@ export const useDocuments = () => {
       return getDescendantIdsRecursive(nodeId, allNodesFlat);
   }, [allNodesFlat]);
 
-  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, isLoading };
+  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard: createDocumentFromClipboardAdapter, isLoading };
 };

@@ -14,10 +14,13 @@ import type {
   DatabaseLoadResult,
   SerializedNodeForTransfer,
   DraggedNodeTransfer,
+  ClassificationSummary,
+  ClassificationSource,
 } from '../types';
 import { cryptoService } from './cryptoService';
 import { DEFAULT_SETTINGS, EXAMPLE_TEMPLATES, LOCAL_STORAGE_KEYS } from '../constants';
 import { v4 as uuidv4 } from 'uuid';
+import { classifyDocumentContent } from './classificationService';
 
 const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
 
@@ -71,6 +74,9 @@ const createSampleBrowserState = (): BrowserState => {
         doc_type: 'prompt',
         language_hint: 'markdown',
         default_view_mode: 'split-vertical',
+        language_source: 'user',
+        doc_type_source: 'user',
+        classification_updated_at: now,
         current_version_id: versionId,
         content: sampleContent,
     };
@@ -482,7 +488,7 @@ export const repository = {
         const flatNodes = await window.electronAPI.dbQuery(`
             SELECT
                 n.*,
-                d.document_id, d.doc_type, d.language_hint, d.default_view_mode, d.current_version_id,
+                d.document_id, d.doc_type, d.language_hint, d.language_source, d.doc_type_source, d.classification_updated_at, d.default_view_mode, d.current_version_id,
                 cs.text_content as content,
                 ps.env_id as python_env_id,
                 ps.auto_detect_env as python_auto_detect_env,
@@ -513,6 +519,9 @@ export const repository = {
                     node_id: record.node_id,
                     doc_type: record.doc_type,
                     language_hint: record.language_hint,
+                    language_source: record.language_source ?? 'unknown',
+                    doc_type_source: record.doc_type_source ?? 'unknown',
+                    classification_updated_at: record.classification_updated_at ?? null,
                     default_view_mode: record.default_view_mode,
                     current_version_id: record.current_version_id,
                     content: record.content,
@@ -685,11 +694,19 @@ export const repository = {
                 if (content) {
                     versionId = state.nextVersionId++;
                 }
+                const docType = nodeData.document?.doc_type ?? 'prompt';
+                const languageHint = nodeData.document?.language_hint ?? null;
+                const languageSource = nodeData.document?.language_source ?? (languageHint ? 'user' : 'unknown');
+                const docTypeSource = nodeData.document?.doc_type_source ?? (docType ? 'user' : 'unknown');
+                const classificationUpdatedAt = nodeData.document?.classification_updated_at ?? (languageSource === 'auto' || docTypeSource === 'auto' ? now : null);
                 baseNode.document = {
                     document_id: documentId,
                     node_id: newNodeId,
-                    doc_type: nodeData.document?.doc_type ?? 'prompt',
-                    language_hint: nodeData.document?.language_hint ?? null,
+                    doc_type: docType,
+                    language_hint: languageHint,
+                    language_source: languageSource,
+                    doc_type_source: docTypeSource,
+                    classification_updated_at: classificationUpdatedAt,
                     default_view_mode: nodeData.document?.default_view_mode ?? null,
                     current_version_id: versionId,
                     content,
@@ -726,9 +743,16 @@ export const repository = {
         );
 
         if (nodeData.node_type === 'document' && nodeData.document) {
+            const docType = nodeData.document.doc_type ?? 'prompt';
+            const languageHint = nodeData.document.language_hint ?? null;
+            const languageSource = nodeData.document.language_source ?? (languageHint ? 'user' : 'unknown');
+            const docTypeSource = nodeData.document.doc_type_source ?? (docType ? 'user' : 'unknown');
+            const classificationUpdatedAt = nodeData.document.classification_updated_at ?? (languageSource === 'auto' || docTypeSource === 'auto' ? now : null);
+            const defaultViewMode = nodeData.document.default_view_mode ?? null;
+
             const docRes = await window.electronAPI!.dbRun(
-                `INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode) VALUES (?, ?, ?, ?)`,
-                [newNodeId, nodeData.document.doc_type, nodeData.document.language_hint, nodeData.document.default_view_mode ?? null]
+                `INSERT INTO documents (node_id, doc_type, language_hint, language_source, doc_type_source, classification_updated_at, default_view_mode) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [newNodeId, docType, languageHint, languageSource, docTypeSource, classificationUpdatedAt, defaultViewMode]
             );
             const documentId = docRes.lastInsertRowid;
 
@@ -739,6 +763,28 @@ export const repository = {
 
         const createdNode = await window.electronAPI!.dbGet(`SELECT * FROM nodes WHERE node_id = ?`, [newNodeId]);
         return createdNode as Node;
+    },
+    async createDocumentFromClipboard({ parentId, content, title }: { parentId: string | null; content: string; title?: string | null; }): Promise<{ node: Node; summary: ClassificationSummary }> {
+        const effectiveContent = content ?? '';
+        const classification = classifyDocumentContent({ content: effectiveContent, title });
+        const classificationTimestamp = new Date().toISOString();
+        const resolvedTitle = title?.trim()?.length ? title.trim() : 'Clipboard Document';
+        const newNode = await this.addNode({
+            parent_id: parentId,
+            node_type: 'document',
+            title: resolvedTitle,
+            document: {
+                content: effectiveContent,
+                doc_type: classification.docType,
+                language_hint: classification.languageHint,
+                language_source: classification.languageSource,
+                doc_type_source: classification.docTypeSource,
+                classification_updated_at: classificationTimestamp,
+                default_view_mode: classification.defaultViewMode ?? null,
+            } as any,
+        });
+
+        return { node: newNode, summary: classification.summary };
     },
     async updateNode(nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null; default_view_mode?: ViewMode | null }>) {
         if (!isElectron) {
@@ -770,6 +816,8 @@ export const repository = {
             if (node.document) {
                 if (updates.language_hint !== undefined) {
                     node.document.language_hint = updates.language_hint;
+                    node.document.language_source = 'user';
+                    node.document.classification_updated_at = now;
                 }
                 if (updates.default_view_mode !== undefined) {
                     node.document.default_view_mode = updates.default_view_mode;
@@ -798,8 +846,8 @@ export const repository = {
 
         if (updates.language_hint !== undefined) {
             await window.electronAPI!.dbRun(
-                `UPDATE documents SET language_hint = ? WHERE node_id = ?`,
-                [updates.language_hint, nodeId]
+                `UPDATE documents SET language_hint = ?, language_source = 'user', classification_updated_at = ? WHERE node_id = ?`,
+                [updates.language_hint, now, nodeId]
             );
             await window.electronAPI!.dbRun(`UPDATE nodes SET updated_at = ? WHERE node_id = ?`, [now, nodeId]);
         }
@@ -1088,41 +1136,71 @@ export const repository = {
                 }
 
                 if (nodeType === 'document') {
-                    const docType: DocType = allowedDocTypes.includes(node.doc_type as DocType)
+                    let docType: DocType | null = allowedDocTypes.includes(node.doc_type as DocType)
                         ? (node.doc_type as DocType)
-                        : 'prompt';
-                    const languageHint = typeof node.language_hint === 'string' ? node.language_hint : null;
-                    const defaultViewMode = allowedViewModes.includes(node.default_view_mode as ViewMode)
+                        : null;
+                    let languageHint = typeof node.language_hint === 'string' && node.language_hint.trim().length > 0 ? node.language_hint : null;
+                    let defaultViewMode = allowedViewModes.includes(node.default_view_mode as ViewMode)
                         ? (node.default_view_mode as ViewMode)
                         : null;
 
-                    const documentId = state.nextDocumentId++;
+                    const incomingLanguageSource = (node.language_source as ClassificationSource | undefined) ?? null;
+                    const incomingDocTypeSource = (node.doc_type_source as ClassificationSource | undefined) ?? null;
+                    let languageSource: ClassificationSource = incomingLanguageSource ?? (languageHint ? 'imported' : 'unknown');
+                    let docTypeSource: ClassificationSource = incomingDocTypeSource ?? (docType ? 'imported' : 'unknown');
+                    let classificationUpdatedAt: string | null = typeof node.classification_updated_at === 'string'
+                        ? node.classification_updated_at
+                        : null;
+
                     const content = typeof node.content === 'string' ? node.content : '';
+                    const shouldClassify = (!languageHint && incomingLanguageSource !== 'user') || (!docType && incomingDocTypeSource !== 'user');
+
+                    if (shouldClassify) {
+                        const classification = classifyDocumentContent({ content, title: node.title });
+                        if (!languageHint) {
+                            languageHint = classification.languageHint;
+                            languageSource = classification.languageSource;
+                        }
+                        if (!docType) {
+                            docType = classification.docType;
+                            docTypeSource = classification.docTypeSource;
+                        }
+                        if (!defaultViewMode && classification.defaultViewMode) {
+                            defaultViewMode = classification.defaultViewMode;
+                        }
+                        classificationUpdatedAt = new Date().toISOString();
+                    }
+
+                    const documentId = state.nextDocumentId++;
+                    const effectiveContent = content;
                     let versionId: number | null = null;
 
                     if (!state.docVersions[documentId]) {
                         state.docVersions[documentId] = [];
                     }
 
-                    if (content) {
+                    if (effectiveContent) {
                         versionId = state.nextVersionId++;
                         state.docVersions[documentId].push({
                             version_id: versionId,
                             document_id: documentId,
                             created_at: now,
                             content_id: versionId,
-                            content,
+                            content: effectiveContent,
                         });
                     }
 
                     baseNode.document = {
                         document_id: documentId,
                         node_id: newNodeId,
-                        doc_type: docType,
+                        doc_type: docType ?? 'prompt',
                         language_hint: languageHint,
+                        language_source: languageSource,
+                        doc_type_source: docTypeSource,
+                        classification_updated_at: classificationUpdatedAt,
                         default_view_mode: defaultViewMode,
                         current_version_id: versionId,
-                        content,
+                        content: effectiveContent,
                     } as Document;
                 }
 

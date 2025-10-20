@@ -117,7 +117,7 @@ interface UpdateToastState {
 
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, isLoading: areDocumentsLoading } = useDocuments();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
     
@@ -1394,6 +1394,35 @@ const MainApp: React.FC = () => {
         setView('editor');
     }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog, activateDocumentTab]);
 
+    const handlePasteClipboardAsDocument = useCallback(async (parentId?: string | null) => {
+        const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
+        try {
+            const clipboardText = await navigator.clipboard.readText();
+            if (!clipboardText || clipboardText.trim().length === 0) {
+                addLog('WARNING', 'Clipboard is empty or does not contain text content to import.');
+                return;
+            }
+            const result = await createDocumentFromClipboard({ parentId: effectiveParentId, content: clipboardText });
+            const { summary } = result;
+            const newDoc = result.item;
+            ensureNodeVisible(newDoc);
+            activateDocumentTab(newDoc.id);
+            setSelectedIds(new Set([newDoc.id]));
+            setLastClickedId(newDoc.id);
+            setActiveTemplateId(null);
+            setDocumentView('editor');
+            setView('editor');
+            const detectedLanguage = summary.languageHint ?? 'unknown';
+            addLog(
+                'INFO',
+                `Created document from clipboard classified as ${summary.docType}/${detectedLanguage} (${summary.primaryMatch}).`
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog('ERROR', `Failed to create document from clipboard: ${message}`);
+        }
+    }, [createDocumentFromClipboard, getParentIdForNewItem, ensureNodeVisible, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, addLog]);
+
     const handleNewCodeFile = useCallback(async (filename: string) => {
         addLog('INFO', `User action: Create New Code File with name "${filename}".`);
         const languageHint = filename.split('.').pop() || null;
@@ -2162,6 +2191,7 @@ const MainApp: React.FC = () => {
 
     const commands: Command[] = useMemo(() => [
         { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Control', 'N'], keywords: 'add create file' },
+        { id: 'paste-as-document', name: 'Paste Clipboard as Document', action: () => { addLog('INFO', 'Command: Paste clipboard as document.'); void handlePasteClipboardAsDocument(); }, category: 'File', icon: CopyIcon, keywords: 'clipboard import paste' },
         { id: 'new-code-file', name: 'Create New Code File', action: handleOpenNewCodeFileModal, category: 'File', icon: CodeIcon, shortcut: ['Control', 'Shift', 'N'], keywords: 'add create script' },
         { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
         { id: 'new-subfolder', name: 'Create New Subfolder', action: handleNewSubfolder, category: 'File', icon: FolderDownIcon, keywords: 'add create directory child' },
@@ -2176,7 +2206,7 @@ const MainApp: React.FC = () => {
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handlePasteClipboardAsDocument]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -2222,6 +2252,7 @@ const MainApp: React.FC = () => {
 
             menuItems.push(
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem), shortcut: getCommand('new-document')?.shortcutString },
+                { label: 'Paste Clipboard as Document', icon: CopyIcon, action: () => { void handlePasteClipboardAsDocument(parentIdForNewItem); }, shortcut: getCommand('paste-as-document')?.shortcutString },
                 { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem), shortcut: getCommand('new-folder')?.shortcutString },
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
@@ -2237,6 +2268,7 @@ const MainApp: React.FC = () => {
         } else { // Clicked on empty space
              menuItems.push(
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null), shortcut: getCommand('new-document')?.shortcutString },
+                { label: 'Paste Clipboard as Document', icon: CopyIcon, action: () => { void handlePasteClipboardAsDocument(null); }, shortcut: getCommand('paste-as-document')?.shortcutString },
                 { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null), shortcut: getCommand('new-folder')?.shortcutString },
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString }
@@ -2248,7 +2280,7 @@ const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handlePasteClipboardAsDocument]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
