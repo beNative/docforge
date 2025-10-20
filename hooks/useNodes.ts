@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Node, ViewMode, ImportedNodeSummary, DraggedNodeTransfer } from '../types';
+import type { Node, ViewMode, ImportedNodeSummary, DraggedNodeTransfer, ClassificationSummary } from '../types';
 import { repository } from '../services/repository';
 import { useLogger } from './useLogger';
 
@@ -88,5 +88,21 @@ export const useNodes = () => {
     [addLog, refreshNodes]
   );
 
-  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, importNodesFromTransfer, addLog };
+  const createDocumentFromClipboard = useCallback(async (
+    payload: { parentId: string | null; content: string; title?: string | null }
+  ): Promise<{ node: Node; summary: ClassificationSummary }> => {
+    const result = await repository.createDocumentFromClipboard(payload);
+    const summary = result.summary;
+    addLog(
+      'INFO',
+      `Clipboard import classified as ${summary.docType}/${summary.languageHint ?? 'unknown'} (${summary.primaryMatch})`
+    );
+    if (summary.warnings.length > 0) {
+      summary.warnings.forEach(warning => addLog('WARNING', warning));
+    }
+    await refreshNodes();
+    return result;
+  }, [addLog, refreshNodes]);
+
+  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, addLog };
 };

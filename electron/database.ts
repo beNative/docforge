@@ -17,7 +17,9 @@ import type {
   DatabaseLoadResult,
   SerializedNodeForTransfer,
   DraggedNodeTransfer,
+  ClassificationSource,
 } from '../types';
+import { classifyDocumentContent } from '../services/classificationService';
 
 let db: Database.Database;
 let hasInitializedDb = false;
@@ -235,7 +237,7 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
     console.log('Database does not exist, creating new one...');
     connection.exec(INITIAL_SCHEMA);
     // Set PRAGMAs for a new database
-    connection.pragma('user_version = 3');
+    connection.pragma('user_version = 4');
     connection.exec('PRAGMA journal_mode = WAL;');
     connection.exec('PRAGMA foreign_keys = ON;');
     console.log('Database created and schema applied.');
@@ -345,6 +347,33 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
       console.log('Migration to version 3 complete.');
     } catch (e) {
       console.error('Fatal: Failed to migrate database to version 3:', e);
+    }
+  }
+
+  if (currentVersion < 4) {
+    console.log(`Migrating schema from version ${currentVersion} to 4...`);
+    try {
+      const transaction = connection.transaction(() => {
+        const columns = connection.prepare('PRAGMA table_info(documents)').all() as { name: string }[];
+        const ensureColumn = (name: string, ddl: string) => {
+          if (!columns.some(column => column.name === name)) {
+            connection.exec(ddl);
+          }
+        };
+
+        ensureColumn('language_source', "ALTER TABLE documents ADD COLUMN language_source TEXT");
+        ensureColumn('doc_type_source', "ALTER TABLE documents ADD COLUMN doc_type_source TEXT");
+        ensureColumn('classification_updated_at', "ALTER TABLE documents ADD COLUMN classification_updated_at TEXT");
+
+        connection.exec("UPDATE documents SET language_source = COALESCE(language_source, 'unknown')");
+        connection.exec("UPDATE documents SET doc_type_source = COALESCE(doc_type_source, 'unknown')");
+
+        connection.pragma('user_version = 4');
+      });
+      transaction();
+      console.log('Migration to version 4 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 4:', e);
     }
   }
 };
@@ -524,7 +553,7 @@ export const databaseService = {
         }
 
         // Insert Documents and Versions
-        const docStmt = db.prepare('INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode) VALUES (?, ?, ?, ?)');
+        const docStmt = db.prepare('INSERT INTO documents (node_id, doc_type, language_hint, language_source, doc_type_source, classification_updated_at, default_view_mode) VALUES (?, ?, ?, ?, ?, ?, ?)');
         const versionStmt = db.prepare('INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)');
         const updateDocStmt = db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?');
 
@@ -535,7 +564,15 @@ export const databaseService = {
         }
 
         for (const doc of data.documents) {
-            const docResult = docStmt.run(doc.node_id, doc.doc_type, doc.language_hint, doc.default_view_mode ?? null);
+            const docResult = docStmt.run(
+              doc.node_id,
+              doc.doc_type,
+              doc.language_hint,
+              doc.language_source ?? 'unknown',
+              doc.doc_type_source ?? 'unknown',
+              doc.classification_updated_at ?? null,
+              doc.default_view_mode ?? null
+            );
             const docId = Number(docResult.lastInsertRowid);
             
             const versions = docVersionsByNode.get(doc.node_id) || [];
@@ -614,9 +651,17 @@ export const databaseService = {
           const originalDoc = db.prepare('SELECT * FROM documents WHERE node_id = ?').get(nodeId) as Document;
           if (originalDoc) {
             const newDocResult = db.prepare(`
-              INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode, current_version_id)
-              VALUES (?, ?, ?, ?, NULL)
-            `).run(newNodeId, originalDoc.doc_type, originalDoc.language_hint, originalDoc.default_view_mode);
+              INSERT INTO documents (node_id, doc_type, language_hint, language_source, doc_type_source, classification_updated_at, default_view_mode, current_version_id)
+              VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+            `).run(
+              newNodeId,
+              originalDoc.doc_type,
+              originalDoc.language_hint,
+              originalDoc.language_source ?? 'unknown',
+              originalDoc.doc_type_source ?? 'unknown',
+              originalDoc.classification_updated_at ?? null,
+              originalDoc.default_view_mode
+            );
             const newDocId = newDocResult.lastInsertRowid;
   
             // Fix: Cast the result to DocVersion array.
@@ -764,24 +809,63 @@ export const databaseService = {
         if (nodeType === 'document') {
           const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image'];
           const allowedViewModes: ViewMode[] = ['edit', 'preview', 'split-vertical', 'split-horizontal'];
-          const docType: DocType = allowedDocTypes.includes(node.doc_type as DocType)
+
+          let docType = allowedDocTypes.includes(node.doc_type as DocType)
             ? (node.doc_type as DocType)
-            : 'prompt';
-          const languageHint = typeof node.language_hint === 'string' ? node.language_hint : null;
-          const defaultViewMode = allowedViewModes.includes(node.default_view_mode as ViewMode)
+            : null;
+          let languageHint = typeof node.language_hint === 'string' && node.language_hint.trim().length > 0
+            ? node.language_hint
+            : null;
+          let defaultViewMode = allowedViewModes.includes(node.default_view_mode as ViewMode)
             ? (node.default_view_mode as ViewMode)
             : null;
 
+          const incomingLanguageSource = (node.language_source as ClassificationSource | undefined) ?? null;
+          const incomingDocTypeSource = (node.doc_type_source as ClassificationSource | undefined) ?? null;
+          let languageSource: ClassificationSource = incomingLanguageSource ?? (languageHint ? 'imported' : 'unknown');
+          let docTypeSource: ClassificationSource = incomingDocTypeSource ?? (docType ? 'imported' : 'unknown');
+          let classificationUpdatedAt: string | null = typeof node.classification_updated_at === 'string'
+            ? node.classification_updated_at
+            : null;
+
+          const content = typeof node.content === 'string' ? node.content : '';
+          const shouldClassify = (!languageHint && incomingLanguageSource !== 'user') || (!docType && incomingDocTypeSource !== 'user');
+
+          if (shouldClassify) {
+            const classification = classifyDocumentContent({ content, title });
+            if (!languageHint) {
+              languageHint = classification.languageHint;
+              languageSource = classification.languageSource;
+            }
+            if (!docType) {
+              docType = classification.docType;
+              docTypeSource = classification.docTypeSource;
+            }
+            if (!defaultViewMode && classification.defaultViewMode) {
+              defaultViewMode = classification.defaultViewMode;
+            }
+            classificationUpdatedAt = new Date().toISOString();
+          }
+
+          const resolvedDocType: DocType = docType ?? 'prompt';
           const docResult = db.prepare(
-            `INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode, current_version_id)
-             VALUES (?, ?, ?, ?, NULL)`
-          ).run(newNodeId, docType, languageHint, defaultViewMode);
+            `INSERT INTO documents (node_id, doc_type, language_hint, language_source, doc_type_source, classification_updated_at, default_view_mode, current_version_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`
+          ).run(
+            newNodeId,
+            resolvedDocType,
+            languageHint,
+            languageSource,
+            docTypeSource,
+            classificationUpdatedAt,
+            defaultViewMode
+          );
 
           const newDocumentId = Number(docResult.lastInsertRowid);
-          const content = typeof node.content === 'string' ? node.content : '';
+          const effectiveContent = content;
 
-          if (content && content.length > 0) {
-            const sha = crypto.createHash('sha256').update(content).digest('hex');
+          if (effectiveContent && effectiveContent.length > 0) {
+            const sha = crypto.createHash('sha256').update(effectiveContent).digest('hex');
             const existingContent = db
               .prepare('SELECT content_id FROM content_store WHERE sha256_hex = ?')
               .get(sha) as { content_id: number } | undefined;
@@ -791,7 +875,7 @@ export const databaseService = {
               : Number(
                   db
                     .prepare('INSERT INTO content_store (sha256_hex, text_content) VALUES (?, ?)')
-                    .run(sha, content).lastInsertRowid
+                    .run(sha, effectiveContent).lastInsertRowid
                 );
 
             const versionResult = db
@@ -914,29 +998,18 @@ export const databaseService = {
             const now = new Date().toISOString();
             const maxSortOrderResult = db.prepare(`SELECT MAX(sort_order) as max_order FROM nodes WHERE parent_id ${currentParentId ? '= ?' : 'IS NULL'}`).get(currentParentId) as { max_order: number | null };
             const sortOrder = (maxSortOrderResult?.max_order ?? -1) + 1;
-            const extension = file.name.split('.').pop() || null;
-            let languageHint = mapExtensionToLanguageId_local(extension);
-
-            const trimmedContent = file.content.trim();
-            const sample = trimmedContent.slice(0, 64).toLowerCase();
-            const isPdf = languageHint === 'pdf' || sample.startsWith('data:application/pdf');
-            const isSvgContent = sample.startsWith('<svg');
-            const isImageDataUrl = sample.startsWith('data:image/');
-            const isImage = languageHint === 'image' || isImageDataUrl || isSvgContent;
-
-            if (isPdf) {
-                languageHint = 'pdf';
-            } else if (isImage) {
-                languageHint = 'image';
-            }
-
-            const docType: DocType = isPdf ? 'pdf' : isImage ? 'image' : 'source_code';
-            const defaultViewMode: ViewMode | null = docType === 'pdf' || docType === 'image' ? 'preview' : null;
+            const classification = classifyDocumentContent({ content: file.content, title: file.name });
+            const docType: DocType = classification.docType;
+            const languageHint = classification.languageHint;
+            const languageSource = classification.languageSource;
+            const docTypeSource = classification.docTypeSource;
+            const defaultViewMode: ViewMode | null = classification.defaultViewMode ?? (docType === 'pdf' || docType === 'image' ? 'preview' : null);
+            const classificationTimestamp = new Date().toISOString();
 
             db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, 'document', ?, ?, ?, ?)`).run(newNodeId, currentParentId, file.name, sortOrder, now, now);
 
-            const docResult = db.prepare(`INSERT INTO documents (node_id, doc_type, language_hint, default_view_mode) VALUES (?, ?, ?, ?)`)
-              .run(newNodeId, docType, languageHint, defaultViewMode);
+            const docResult = db.prepare(`INSERT INTO documents (node_id, doc_type, language_hint, language_source, doc_type_source, classification_updated_at, default_view_mode) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+              .run(newNodeId, docType, languageHint, languageSource, docTypeSource, classificationTimestamp, defaultViewMode);
             const documentId = Number(docResult.lastInsertRowid);
 
             const contentId = getContentId(file.content);

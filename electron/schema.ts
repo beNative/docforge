@@ -27,6 +27,9 @@ CREATE TABLE documents (
   node_id             TEXT NOT NULL UNIQUE REFERENCES nodes(node_id) ON DELETE CASCADE,
   doc_type            TEXT NOT NULL,
   language_hint       TEXT,
+  language_source     TEXT DEFAULT 'unknown',
+  doc_type_source     TEXT DEFAULT 'unknown',
+  classification_updated_at TEXT,
   default_view_mode   TEXT,
   current_version_id  INTEGER REFERENCES doc_versions(version_id) DEFERRABLE INITIALLY DEFERRED
 );
