@@ -38,6 +38,34 @@ DocForge is a desktop application designed to streamline the process of creating
 For detailed instructions on usage and features, please refer to the [Functional Manual](./FUNCTIONAL_MANUAL.md).
 To review the history of changes, see the [Version Log](./VERSION_LOG.md).
 
+## Spec-Driven Development Workflow
+
+DocForge adopts [GitHub Spec Kit](https://github.com/github/spec-kit) to keep feature planning, implementation, and review aligned. The toolkit installs slash commands for AI coding assistants and project scripts that generate numbered spec packages under [`specs/`](../specs/README.md).
+
+### Install the Specify CLI
+
+Use the [`uv`](https://github.com/astral-sh/uv) tool to install or upgrade the Spec Kit CLI globally:
+
+```bash
+uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
+# Upgrade later with:
+uv tool install specify-cli --force --from git+https://github.com/github/spec-kit.git
+```
+
+Run `specify check` inside the repository to confirm prerequisites.
+
+### Create a Feature Specification
+
+1. Generate a scaffolded spec folder and branch slug:
+   ```bash
+   .specify/scripts/bash/create-new-feature.sh "<feature summary>"
+   ```
+2. Use your preferred AI assistant with the `/speckit.*` commands to fill out the artifacts:
+   - `/speckit.constitution` updates the governance document.
+   - `/speckit.specify`, `/speckit.plan`, and `/speckit.tasks` populate the feature spec, technical plan, and task list.
+   - `/speckit.implement` can translate an approved plan into code.
+3. Commit the spec folder before beginning implementation so reviewers can trace scope and acceptance criteria.
+
 ## Release Preparation
 
 To create a new public build of DocForge:
