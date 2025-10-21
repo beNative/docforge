@@ -42,6 +42,24 @@ const referenceGithubHtml = fs.readFileSync(
   'utf8',
 );
 
+const showcaseMarkdown = fs.readFileSync(
+  path.join(fixturesDir, 'github-feature-showcase.md'),
+  'utf8',
+);
+const showcaseGithubHtml = fs.readFileSync(
+  path.join(fixturesDir, 'github-feature-showcase.github.html'),
+  'utf8',
+);
+
+interface ParityFixture {
+  id: string;
+  markdown: string;
+  githubHtml: string;
+  artifactPrefix: string;
+  removeDocforgeSelectors?: string[];
+  removeGithubSelectors?: string[];
+}
+
 const renderMarkdown = async (markdown: string) => {
   const renderer = new MarkdownRenderer();
   const { output } = await renderer.render(markdown, undefined, 'markdown', DEFAULT_SETTINGS);
@@ -279,73 +297,178 @@ describe('MarkdownRenderer', () => {
     expect(normalizeText(paragraphAfterMath?.textContent)).toContain('Text after math');
   });
 
-  it('produces markup structurally consistent with GitHub for the reference fixture', async () => {
-    const { container } = await renderMarkdown(referenceMarkdown);
+  it('renders the GitHub feature showcase fixture with advanced markdown constructs', async () => {
+    const { container } = await renderMarkdown(showcaseMarkdown);
     const markdownRoot = container.querySelector('.df-markdown');
     expect(markdownRoot).not.toBeNull();
-
-    const githubDoc = new DOMParser().parseFromString(referenceGithubHtml, 'text/html');
-    const githubRoot = githubDoc.body;
-
-    const docforgeHtml = `<!doctype html><html><head><meta charset="utf-8"><title>DocForge Markdown</title></head><body style="margin:0;background:#f6f8fa;padding:32px;">${container.innerHTML}</body></html>`;
-    const githubHtmlDocument = `<!doctype html><html><head><meta charset="utf-8"><title>GitHub Reference</title></head><body style="margin:0;background:#f6f8fa;padding:32px;">${referenceGithubHtml}</body></html>`;
-
-    maybeWriteArtifact('github-reference-render.html', docforgeHtml);
-    maybeWriteArtifact('github-reference-github.html', githubHtmlDocument);
-
-    const expectedCounts = getTagCounts(githubRoot);
-    const actualCounts = getTagCounts(markdownRoot!);
-
-    const tagsToCompare = [
-      'h1',
-      'h2',
-      'h3',
-      'ul',
-      'ol',
-      'li',
-      'table',
-      'thead',
-      'tbody',
-      'tr',
-      'th',
-      'td',
-      'blockquote',
-      'hr',
-    ];
-
-    for (const tag of tagsToCompare) {
-      const expected = expectedCounts.get(tag) ?? 0;
-      const actual = actualCounts.get(tag) ?? 0;
-      expect(actual, `Mismatch for <${tag}>`).toBe(expected);
+    if (!markdownRoot) {
+      return;
     }
 
-    const expectedParagraphs = expectedCounts.get('p') ?? 0;
-    const actualParagraphs = actualCounts.get('p') ?? 0;
-    const displayMathBlocks = markdownRoot!.querySelectorAll('.katex-display').length;
-    expect(actualParagraphs + displayMathBlocks, 'Paragraphs including display math').toBe(
-      expectedParagraphs,
-    );
+    const sections = Array.from(markdownRoot.querySelectorAll('h1, h2'));
+    expect(sections.map((element) => normalizeText(element.textContent))).toEqual([
+      'GitHub Feature Showcase',
+      'Mixed Content',
+      'Tables',
+      'Code Blocks',
+      'Definition Lists',
+      'Table Alignment Verification',
+      'Final Notes',
+    ]);
 
-    const expectedPreformatted = expectedCounts.get('pre') ?? 0;
-    const actualPreformatted = actualCounts.get('pre') ?? 0;
-    const diagramBlocks = markdownRoot!.querySelectorAll('.df-mermaid, .df-plantuml').length;
-    expect(actualPreformatted + diagramBlocks, 'Pre/code blocks including rendered diagrams').toBe(
-      expectedPreformatted,
-    );
-
-    const expectedCodeElements = expectedCounts.get('code') ?? 0;
-    const actualCodeElements = actualCounts.get('code') ?? 0;
-    const highlightedBlocks = markdownRoot!.querySelectorAll('.df-code-block-shiki').length;
-    expect(actualCodeElements - highlightedBlocks, 'Code elements excluding highlighted blocks').toBe(
-      expectedCodeElements,
-    );
-
-    const docforgeText = extractComparableText(markdownRoot!, {
-      removeSelectors: ['.df-mermaid', '.df-plantuml'],
+    const dividers = markdownRoot.querySelectorAll('hr.df-divider');
+    expect(dividers.length).toBeGreaterThanOrEqual(6);
+    dividers.forEach((divider) => {
+      expect(divider).toHaveClass('df-divider');
     });
-    const githubText = extractComparableText(githubRoot, {
-      removeSelectors: ['.highlight-source-mermaid'],
+
+    const taskCheckboxes = markdownRoot.querySelectorAll('input[type="checkbox"]');
+    expect(taskCheckboxes.length).toBe(2);
+    taskCheckboxes.forEach((checkbox) => {
+      expect(checkbox).toHaveAttribute('disabled');
     });
-    expect(docforgeText).toBe(githubText);
+
+    const taskListItems = markdownRoot.querySelectorAll('li.df-list-item');
+    expect(taskListItems.length).toBeGreaterThanOrEqual(5);
+
+    const blockquote = markdownRoot.querySelector('blockquote.df-blockquote');
+    expect(blockquote).not.toBeNull();
+    expect(normalizeText(blockquote?.textContent)).toContain('Blockquote with formatting');
+
+    const tableWrappers = markdownRoot.querySelectorAll('.df-table-wrapper');
+    expect(tableWrappers.length).toBe(3);
+
+    const firstTable = tableWrappers[0]?.querySelector('table.df-table');
+    expect(firstTable).not.toBeNull();
+    const alignedHeader = firstTable?.querySelectorAll('thead .df-table-header') ?? [];
+    expect(alignedHeader.length).toBe(3);
+    const alignmentAttributes = Array.from(firstTable?.querySelectorAll('tbody td.df-table-cell') ?? []).map((cell) => {
+      const alignAttr = cell.getAttribute('align');
+      if (alignAttr) {
+        return alignAttr.toLowerCase();
+      }
+      const styleAlign = (cell as HTMLElement).style.textAlign;
+      if (styleAlign) {
+        return styleAlign.toLowerCase();
+      }
+      return 'left';
+    });
+    expect(alignmentAttributes).toEqual(['left', 'center', 'right', 'left', 'center', 'right', 'left', 'center', 'right']);
+
+    const inlineCodeInTable = markdownRoot.querySelectorAll('td.df-table-cell code');
+    expect(inlineCodeInTable.length).toBeGreaterThan(0);
+
+    const highlightedTsBlock = markdownRoot.querySelector('.df-code-block-shiki[data-language="TS"]');
+    expect(highlightedTsBlock).not.toBeNull();
+    expect(highlightedTsBlock?.querySelector('.line:nth-child(3)')?.textContent).toContain('name: string');
+
+    const highlightedPythonBlock = markdownRoot.querySelector('.df-code-block-shiki[data-language="PYTHON"]');
+    expect(highlightedPythonBlock).not.toBeNull();
+    expect(highlightedPythonBlock?.textContent).toContain('def greet');
+
+    const plainBlock = markdownRoot.querySelector('pre.df-code-block:not([data-language])');
+    expect(plainBlock?.querySelector('code.df-code-block__code')?.textContent).toContain('Plain fenced block');
+
+    const definitionHeading = Array.from(markdownRoot.querySelectorAll('h2')).find(
+      (heading) => normalizeText(heading.textContent) === 'Definition Lists',
+    );
+    expect(definitionHeading).toBeDefined();
+    const definitionTexts: string[] = [];
+    for (
+      let element = definitionHeading?.nextElementSibling;
+      element && element.tagName !== 'HR';
+      element = element.nextElementSibling
+    ) {
+      definitionTexts.push(normalizeText(element.textContent));
+    }
+    expect(definitionTexts).toEqual([
+      'Term 1 : Definition with inline code',
+      'Term 2 : Additional definition with bold text',
+    ]);
   });
+
+  const parityFixtures: ParityFixture[] = [
+    {
+      id: 'github-reference',
+      markdown: referenceMarkdown,
+      githubHtml: referenceGithubHtml,
+      artifactPrefix: 'github-reference',
+      removeDocforgeSelectors: ['.df-mermaid', '.df-plantuml'],
+      removeGithubSelectors: ['.highlight-source-mermaid'],
+    },
+    {
+      id: 'github-feature-showcase',
+      markdown: showcaseMarkdown,
+      githubHtml: showcaseGithubHtml,
+      artifactPrefix: 'github-feature-showcase',
+    },
+  ];
+
+  it.each(parityFixtures.map((fixture) => [fixture.id, fixture]))(
+    'produces markup structurally consistent with GitHub for %s',
+    async (_id, fixture) => {
+      const { container } = await renderMarkdown(fixture.markdown);
+      const markdownRoot = container.querySelector('.df-markdown');
+      expect(markdownRoot).not.toBeNull();
+
+      const githubDoc = new DOMParser().parseFromString(fixture.githubHtml, 'text/html');
+      const githubRoot = githubDoc.body;
+
+      const docforgeHtml = `<!doctype html><html><head><meta charset="utf-8"><title>DocForge Markdown</title></head><body style="margin:0;background:#f6f8fa;padding:32px;">${container.innerHTML}</body></html>`;
+      const githubHtmlDocument = `<!doctype html><html><head><meta charset="utf-8"><title>GitHub Reference</title></head><body style="margin:0;background:#f6f8fa;padding:32px;">${fixture.githubHtml}</body></html>`;
+
+      maybeWriteArtifact(`${fixture.artifactPrefix}-render.html`, docforgeHtml);
+      maybeWriteArtifact(`${fixture.artifactPrefix}-github.html`, githubHtmlDocument);
+
+      const expectedCounts = getTagCounts(githubRoot);
+      const actualCounts = getTagCounts(markdownRoot!);
+
+      const tagsToCompare = [
+        'h1',
+        'h2',
+        'h3',
+        'ul',
+        'ol',
+        'li',
+        'table',
+        'thead',
+        'tbody',
+        'tr',
+        'th',
+        'td',
+        'blockquote',
+        'hr',
+        'code',
+        'pre',
+        'input',
+      ];
+
+      for (const tag of tagsToCompare) {
+        const expected = expectedCounts.get(tag) ?? 0;
+        const actual = actualCounts.get(tag) ?? 0;
+        if (tag === 'code') {
+          const highlightedBlocks = markdownRoot!.querySelectorAll('.df-code-block-shiki').length;
+          expect(actual - highlightedBlocks, `Mismatch for <${tag}>`).toBe(expected);
+        } else if (tag === 'pre') {
+          const diagramBlocks = markdownRoot!.querySelectorAll('.df-mermaid, .df-plantuml').length;
+          expect(actual + diagramBlocks, `Mismatch for <${tag}>`).toBe(expected);
+        } else {
+          expect(actual, `Mismatch for <${tag}>`).toBe(expected);
+        }
+      }
+
+      const expectedParagraphs = expectedCounts.get('p') ?? 0;
+      const actualParagraphs = actualCounts.get('p') ?? 0;
+      const displayMathBlocks = markdownRoot!.querySelectorAll('.katex-display').length;
+      expect(actualParagraphs + displayMathBlocks, 'Paragraphs including display math').toBe(expectedParagraphs);
+
+      const docforgeText = extractComparableText(markdownRoot!, {
+        removeSelectors: fixture.removeDocforgeSelectors ?? [],
+      });
+      const githubText = extractComparableText(githubRoot, {
+        removeSelectors: fixture.removeGithubSelectors ?? [],
+      });
+      expect(docforgeText).toBe(githubText);
+    },
+  );
 });
