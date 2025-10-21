@@ -201,6 +201,30 @@ describe('MarkdownRenderer', () => {
     expect(styles).toMatch(/--df-divider-color:\s*#d0d7de/);
   });
 
+  it('avoids introducing excessive top spacing when a divider is the first element', async () => {
+    const markdown = ['---', '', 'description: "Task list template"', '', '# Heading'].join('\n');
+    const { container } = await renderMarkdown(markdown);
+
+    const markdownRoot = container.querySelector('.df-markdown');
+    expect(markdownRoot).not.toBeNull();
+
+    const firstElement = markdownRoot?.firstElementChild as HTMLElement | null;
+    expect(firstElement).not.toBeNull();
+    expect(firstElement?.tagName.toLowerCase()).toBe('hr');
+    expect(firstElement).toHaveClass('df-divider');
+
+    const styles = container.querySelector('style')?.textContent ?? '';
+    expect(styles).toContain('.df-markdown > .df-divider:first-child {');
+    const ruleStart = styles.indexOf('.df-markdown > .df-divider:first-child {');
+    expect(ruleStart).toBeGreaterThan(-1);
+    const ruleEnd = styles.indexOf('}', ruleStart);
+    const ruleBody = styles.slice(ruleStart, ruleEnd + 1);
+    expect(ruleBody).toContain('margin-top: 0;');
+
+    const artifactHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Front Matter Divider</title></head><body style="margin:0;background:#f6f8fa;padding:32px;">${container.innerHTML}</body></html>`;
+    maybeWriteArtifact('front-matter-divider.html', artifactHtml);
+  });
+
   it('injects GitHub-style table, divider, and code block styles', async () => {
     const markdown = ['| A | B |', '| - | - |', '| 1 | 2 |', '', '---', '', '```js', 'console.log(1);', '```'].join('\n');
     const { container } = await renderMarkdown(markdown);

@@ -600,6 +600,10 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           background-color: var(--df-divider-color);
         }
 
+        .df-markdown > .df-divider:first-child {
+          margin-top: 0;
+        }
+
         .df-markdown-container.light .df-markdown {
           --df-inline-code-bg: #f6f8fa;
           --df-inline-code-border-color: #d0d7de;
