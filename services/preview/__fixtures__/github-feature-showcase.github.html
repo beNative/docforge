@@ -1,0 +1,113 @@
+<h1>GitHub Feature Showcase</h1>
+<p>This document stress tests key GitHub Flavored Markdown rendering features.</p>
+<hr>
+<h2>Mixed Content</h2>
+<p>Paragraph with <code class="notranslate">inline code</code>, <strong>bold text</strong>, <em>italic text</em>, <del>strikethrough</del>, and a <a href="https://example.com" rel="nofollow">link</a>.</p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox" id="" disabled="" class="task-list-item-checkbox" aria-label="Completed task" checked=""> Completed task item</li>
+<li class="task-list-item"><input type="checkbox" id="" disabled="" class="task-list-item-checkbox" aria-label="Incomplete task"> Pending task item</li>
+<li>Regular list item
+<ul>
+<li>Nested bullet with <code class="notranslate">code</code> and <strong>bold</strong></li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>Blockquote with <strong>formatting</strong> and <code class="notranslate">inline code</code>.</p>
+<p>Second quote line with <a href="https://github.com">link</a>.</p>
+</blockquote>
+<ol>
+<li>Ordered first</li>
+<li>Ordered second</li>
+<li>Ordered third with <code class="notranslate">code</code></li>
+</ol>
+<hr>
+<h2>Tables</h2>
+<markdown-accessiblity-table><table role="table">
+<thead>
+<tr>
+<th align="left">Column</th>
+<th align="center">Alignment</th>
+<th align="right">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">Left</td>
+<td align="center">Center</td>
+<td align="right">1</td>
+</tr>
+<tr>
+<td align="left">Middle</td>
+<td align="center">Center</td>
+<td align="right">22</td>
+</tr>
+<tr>
+<td align="left">Right</td>
+<td align="center">Center</td>
+<td align="right">333</td>
+</tr>
+</tbody>
+</table></markdown-accessiblity-table>
+<markdown-accessiblity-table><table role="table">
+<thead>
+<tr>
+<th>Feature</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Inline <code class="notranslate">code</code></td>
+<td>Works</td>
+</tr>
+<tr>
+<td>Bold <strong>text</strong></td>
+<td>Styled</td>
+</tr>
+</tbody>
+</table></markdown-accessiblity-table>
+<hr>
+<h2>Code Blocks</h2>
+<div class="highlight highlight-source-ts"><pre class="notranslate"><span class="pl-k">export</span> <span class="pl-k">interface</span> <span class="pl-smi">User</span> <span class="pl-kos">{</span>
+  <span class="pl-c1">id</span>: <span class="pl-smi">number</span><span class="pl-kos">;</span>
+  <span class="pl-c1">name</span>: <span class="pl-smi">string</span><span class="pl-kos">;</span>
+<span class="pl-kos">}</span>
+
+<span class="pl-k">export</span> <span class="pl-k">const</span> <span class="pl-en">demo</span> <span class="pl-c1">=</span> <span class="pl-kos">(</span><span class="pl-s1">user</span>: <span class="pl-smi">User</span><span class="pl-kos">)</span> <span class="pl-c1">=&gt;</span> <span class="pl-kos">{</span>
+  <span class="pl-smi">console</span><span class="pl-kos">.</span><span class="pl-en">log</span><span class="pl-kos">(</span><span class="pl-s">`Hello <span class="pl-s1"><span class="pl-kos">${</span><span class="pl-s1">user</span><span class="pl-kos">.</span><span class="pl-c1">name</span><span class="pl-kos">}</span></span>`</span><span class="pl-kos">)</span><span class="pl-kos">;</span>
+<span class="pl-kos">}</span><span class="pl-kos">;</span></pre></div>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">greet</span>(<span class="pl-s1">name</span>):
+    <span class="pl-en">print</span>(<span class="pl-s">f"Hello, <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-s1">name</span><span class="pl-kos">}</span></span>!"</span>)</pre></div>
+<pre class="notranslate"><code class="notranslate">Plain fenced block without language.
+Multiple lines preserved.
+</code></pre>
+<hr>
+<h2>Definition Lists</h2>
+<p>Term 1<br>
+: Definition with <code class="notranslate">inline</code> code</p>
+<p>Term 2<br>
+: Additional definition with <strong>bold</strong> text</p>
+<hr>
+<h2>Table Alignment Verification</h2>
+<markdown-accessiblity-table><table role="table">
+<thead>
+<tr>
+<th>Syntax</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Header</td>
+<td>Title</td>
+</tr>
+<tr>
+<td>Paragraph</td>
+<td>Text</td>
+</tr>
+</tbody>
+</table></markdown-accessiblity-table>
+<hr>
+<h2>Final Notes</h2>
+<p>Text after multiple sections to confirm consistent spacing and divider handling.</p>

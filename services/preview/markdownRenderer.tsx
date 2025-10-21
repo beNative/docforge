@@ -128,154 +128,183 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
   const remarkPlugins = useMemo(() => [remarkGfm, remarkMath], []);
   const rehypePlugins = useMemo(() => [rehypeSlug, rehypeKatex, rehypeRaw], []);
 
-  const components = useMemo<Components>(() => ({
-    code({ inline, className, children, ...props }) {
-      if (inline) {
-        return (
-          <code className="df-inline-code" {...props}>
-            {children}
-          </code>
-        );
-      }
+  const components = useMemo<Components>(() => {
+    const stringifyChildren = (value: React.ReactNode): string => {
+      return React.Children.toArray(value)
+        .map((child) => {
+          if (typeof child === 'string') {
+            return child;
+          }
+          if (React.isValidElement(child)) {
+            return stringifyChildren(child.props.children);
+          }
+          return '';
+        })
+        .join('');
+    };
 
-      return (
-        <code className={className} {...props}>
-          {children}
-        </code>
-      );
-    },
-    pre({ children, className, ...props }) {
-      const childArray = React.Children.toArray(children);
-      const codeChild = childArray.find(
-        (child) => React.isValidElement(child) && typeof child.props.className === 'string'
-      ) as React.ReactElement | undefined;
-      const language = codeChild?.props.className
-        ? /language-([\w-]+)/.exec(codeChild.props.className)?.[1]
-        : undefined;
-      const normalizedLanguage = language?.toLowerCase();
+    const mergeClassNames = (
+      ...classNames: Array<string | undefined | null | false>
+    ): string => classNames.filter(Boolean).join(' ');
 
-      if (normalizedLanguage === 'mermaid' && codeChild) {
-        const raw = React.Children.toArray(codeChild.props.children)
-          .map((child) => (typeof child === 'string' ? child : ''))
-          .join('');
-        return <MermaidDiagram code={raw} theme={viewTheme} />;
-      }
+    return {
+      pre({ children, className, node: _node, ...props }) {
+        const childArray = React.Children.toArray(children);
+        const codeChild = childArray.find(
+          (child) => React.isValidElement(child) && child.type === 'code'
+        ) as React.ReactElement | undefined;
 
-      if (normalizedLanguage && PLANTUML_LANGS.includes(normalizedLanguage) && codeChild) {
-        const raw = React.Children.toArray(codeChild.props.children)
-          .map((child) => (typeof child === 'string' ? child : ''))
-          .join('');
-        return <PlantUMLDiagram code={raw} mode={settings.plantumlRendererMode} />;
-      }
+        const codeProps = (codeChild?.props ?? {}) as Record<string, unknown>;
+        const languageMatch =
+          typeof codeProps.className === 'string'
+            ? /language-([\w-]+)/.exec(codeProps.className)
+            : null;
+        const language = languageMatch?.[1];
+        const normalizedLanguage = language?.toLowerCase();
+        const raw = stringifyChildren(codeChild?.props?.children ?? []);
+        const normalizedContent = raw.replace(/\r\n?/g, '\n');
 
-      const baseClassName = ['df-code-block', className].filter(Boolean).join(' ');
-
-      if (normalizedLanguage && codeChild && highlighter) {
-        const raw = React.Children.toArray(codeChild.props.children)
-          .map((child) => (typeof child === 'string' ? child : ''))
-          .join('');
-
-        try {
-          const html = highlighter.codeToHtml(raw, {
-            lang: normalizedLanguage as any,
-            theme: viewTheme === 'dark' ? 'one-dark-pro' : 'github-light',
-          });
-
-          // Shiki injects newline characters between the span.line elements which the
-          // <pre> block preserves, resulting in visual blank lines between each code
-          // line. Collapse those inter-tag newlines while keeping intentional empty
-          // lines that are represented by dedicated <span class="line"></span> nodes.
-          const compactHtml = html
-            .replace(/>\s*\n\s*</g, '><')
-            .replace(/\n(<\/code>)/g, '$1')
-            .replace(/\n(<\/pre>)/g, '$1');
-
-          return (
-            <div
-              className={[baseClassName, 'df-code-block-shiki'].filter(Boolean).join(' ')}
-              data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
-              dangerouslySetInnerHTML={{ __html: compactHtml }}
-              {...props}
-            />
-          );
-        } catch (error) {
-          console.warn('[MarkdownRenderer] Failed to highlight code block for language ' + language + ':', error);
+        if (normalizedLanguage === 'mermaid') {
+          return <MermaidDiagram code={normalizedContent} theme={viewTheme} />;
         }
-      }
 
-      return (
-        <pre
-          className={baseClassName}
-          data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
-          {...props}
-        >
-          {children}
-        </pre>
-      );
-    },
-    table({ children, ...props }) {
-      return (
-        <div className="df-table-wrapper">
-          <table {...props}>{children}</table>
-        </div>
-      );
-    },
-    th({ children, ...props }) {
-      return (
-        <th className="df-table-header" {...props}>
-          {children}
-        </th>
-      );
-    },
-    td({ children, ...props }) {
-      return (
-        <td className="df-table-cell" {...props}>
-          {children}
-        </td>
-      );
-    },
-    blockquote({ children, ...props }) {
-      return (
-        <blockquote className="df-blockquote" {...props}>
-          {children}
-        </blockquote>
-      );
-    },
-    a({ children, ...props }) {
-      return (
-        <a className="df-link" {...props}>
-          {children}
-        </a>
-      );
-    },
-    img(props) {
-      return <img className="df-image" loading="lazy" {...props} />;
-    },
-    ul({ children, ...props }) {
-      return (
-        <ul className="df-list df-list-disc" {...props}>
-          {children}
-        </ul>
-      );
-    },
-    ol({ children, ...props }) {
-      return (
-        <ol className="df-list df-list-decimal" {...props}>
-          {children}
-        </ol>
-      );
-    },
-    li({ children, ...props }) {
-      return (
-        <li className="df-list-item" {...props}>
-          {children}
-        </li>
-      );
-    },
-    hr(props) {
-      return <hr className="df-divider" {...props} />;
-    },
-  }), [highlighter, viewTheme, settings.plantumlRendererMode]);
+        if (normalizedLanguage && PLANTUML_LANGS.includes(normalizedLanguage)) {
+          return <PlantUMLDiagram code={normalizedContent} mode={settings.plantumlRendererMode} />;
+        }
+
+        const baseClassName = ['df-code-block', className, codeChild?.props?.className]
+          .filter(Boolean)
+          .join(' ');
+
+        if (normalizedLanguage && highlighter) {
+          try {
+            const html = highlighter.codeToHtml(normalizedContent, {
+              lang: normalizedLanguage as any,
+              theme: viewTheme === 'dark' ? 'one-dark-pro' : 'github-light',
+            });
+
+            const compactHtml = html
+              .replace(/>\s*\n\s*</g, '><')
+              .replace(/\n(<\/code>)/g, '$1')
+              .replace(/\n(<\/pre>)/g, '$1');
+
+            return (
+              <div
+                className={[baseClassName, 'df-code-block-shiki'].filter(Boolean).join(' ')}
+                data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
+                dangerouslySetInnerHTML={{ __html: compactHtml }}
+                role="group"
+              />
+            );
+          } catch (error) {
+            console.warn('[MarkdownRenderer] Failed to highlight code block for language ' + language + ':', error);
+          }
+        }
+
+        const { children: _codeChildren, inline: _inline, node: _codeNode, ...restCodeProps } = codeProps;
+
+        return (
+          <pre
+            className={baseClassName}
+            data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
+            {...props}
+          >
+            <code
+              className={['df-code-block__code', codeChild?.props?.className].filter(Boolean).join(' ')}
+              {...(restCodeProps as React.HTMLAttributes<HTMLElement>)}
+            >
+              {normalizedContent}
+            </code>
+          </pre>
+        );
+      },
+      table({ children, className, ...props }) {
+        return (
+          <div className="df-table-wrapper">
+            <table className={mergeClassNames('df-table', className)} {...props}>
+              {children}
+            </table>
+          </div>
+        );
+      },
+      thead({ children, className, ...props }) {
+        return (
+          <thead className={mergeClassNames('df-table-head', className)} {...props}>
+            {children}
+          </thead>
+        );
+      },
+      tbody({ children, className, ...props }) {
+        return (
+          <tbody className={mergeClassNames('df-table-body', className)} {...props}>
+            {children}
+          </tbody>
+        );
+      },
+      tr({ children, className, ...props }) {
+        return (
+          <tr className={mergeClassNames('df-table-row', className)} {...props}>
+            {children}
+          </tr>
+        );
+      },
+      th({ children, className, ...props }) {
+        return (
+          <th className={mergeClassNames('df-table-header', className)} {...props}>
+            {children}
+          </th>
+        );
+      },
+      td({ children, className, ...props }) {
+        return (
+          <td className={mergeClassNames('df-table-cell', className)} {...props}>
+            {children}
+          </td>
+        );
+      },
+      blockquote({ children, className, ...props }) {
+        return (
+          <blockquote className={mergeClassNames('df-blockquote', className)} {...props}>
+            {children}
+          </blockquote>
+        );
+      },
+      a({ children, className, ...props }) {
+        return (
+          <a className={mergeClassNames('df-link', className)} {...props}>
+            {children}
+          </a>
+        );
+      },
+      img(props) {
+        return <img className="df-image" loading="lazy" {...props} />;
+      },
+      ul({ children, className, ...props }) {
+        return (
+          <ul className={mergeClassNames('df-list', 'df-list-disc', className)} {...props}>
+            {children}
+          </ul>
+        );
+      },
+      ol({ children, className, ...props }) {
+        return (
+          <ol className={mergeClassNames('df-list', 'df-list-decimal', className)} {...props}>
+            {children}
+          </ol>
+        );
+      },
+      li({ children, className, ...props }) {
+        return (
+          <li className={mergeClassNames('df-list-item', className)} {...props}>
+            {children}
+          </li>
+        );
+      },
+      hr({ className, ...props }) {
+        return <hr className={mergeClassNames('df-divider', className)} {...props} />;
+      },
+    } as Components;
+  }, [highlighter, viewTheme, settings.plantumlRendererMode]);
 
   return (
     <div ref={ref} onScroll={onScroll} className={`w-full h-full overflow-auto bg-secondary df-markdown-container ${theme}`}>
@@ -324,6 +353,14 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           line-height: var(--markdown-line-height, 1.7);
           color: rgb(var(--color-text-main));
           font-family: var(--markdown-body-font-family, 'Inter, sans-serif');
+          --df-inline-code-bg: rgba(var(--color-border), 0.35);
+          --df-inline-code-border-color: rgba(var(--color-border), 0.55);
+          --df-code-block-bg: rgba(var(--color-border), 0.25);
+          --df-code-block-border-color: rgba(var(--color-border), 0.6);
+          --df-table-border-color: rgba(var(--color-border), 0.65);
+          --df-table-header-bg: rgba(var(--color-border), 0.35);
+          --df-table-row-alt-bg: rgba(var(--color-border), 0.18);
+          --df-divider-color: rgba(var(--color-border), 0.9);
         }
 
         .df-markdown > * {
@@ -396,26 +433,36 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           font-weight: 600;
         }
 
-        .df-inline-code {
-          background: rgba(var(--color-text-secondary), 0.12);
-          color: rgb(var(--color-accent));
-          padding: 0.15rem 0.45rem;
-          border-radius: 0.4rem;
-          border: 1px solid rgba(var(--color-border), 0.7);
+        .df-markdown :not(pre) > code {
+          display: inline-block;
+          background-color: var(--df-inline-code-bg);
+          color: rgb(var(--color-text-main));
+          padding: 0.2rem 0.45rem;
+          border-radius: 0.35rem;
+          border: 1px solid var(--df-inline-code-border-color);
           font-family: var(--markdown-code-font-family, 'JetBrains Mono', monospace);
-          font-size: calc(var(--markdown-code-font-size, 14px) * 0.9);
+          font-size: var(--markdown-font-size, 16px);
+          line-height: inherit;
+          white-space: pre-wrap;
         }
 
         .df-code-block {
-          background: var(--markdown-code-block-background, rgba(var(--color-text-secondary), 0.08));
-          border: 1px solid rgba(var(--color-border), 0.95);
+          background: var(--markdown-code-block-background, var(--df-code-block-bg));
+          border: 1px solid var(--df-code-block-border-color);
           border-radius: 0.9rem;
           padding: 1.25rem 1.5rem;
           font-family: var(--markdown-code-font-family, 'JetBrains Mono', monospace);
           font-size: var(--markdown-code-font-size, 14px);
-          line-height: 1.4;
+          line-height: 1.6;
           overflow: auto;
           position: relative;
+          box-sizing: border-box;
+        }
+
+        .df-code-block__code {
+          display: block;
+          white-space: pre;
+          color: rgb(var(--color-text-main));
         }
 
         .df-code-block::-webkit-scrollbar {
@@ -438,22 +485,13 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           color: rgba(var(--color-text-secondary), 0.85);
         }
 
-        .df-code-block pre {
-          margin: 0;
-          padding: 0;
-          background: transparent !important;
-          font-family: var(--markdown-code-font-family, 'JetBrains Mono', monospace);
-          font-size: var(--markdown-code-font-size, 14px);
-        }
-
-        .df-code-block pre code {
-          background: transparent;
-          padding: 0;
-        }
-
         .df-code-block .line {
           display: block;
           line-height: 1.4;
+        }
+
+        .df-code-block .line:empty:not(:last-child)::before {
+          content: '\\00a0';
         }
 
         .df-code-block-shiki .shiki {
@@ -504,34 +542,38 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
 
         .df-table-wrapper {
           overflow-x: auto;
-          border-radius: 0.9rem;
-          border: 1px solid rgba(var(--color-border), 0.9);
-          background: rgba(var(--color-secondary), 0.92);
+          border-radius: 0.75rem;
+          border: 1px solid var(--df-table-border-color);
+          background: rgba(var(--color-background), 0.96);
           margin: calc(var(--markdown-font-size, 16px) * 1.25) 0;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
-        .df-table-wrapper table {
+        .df-table {
           width: 100%;
           border-collapse: collapse;
+          min-width: max(100%, 640px);
         }
 
-        .df-table-wrapper tbody tr:nth-child(even) {
-          background: rgba(var(--color-background), 0.65);
+        .df-table-head .df-table-header {
+          background: var(--df-table-header-bg);
+        }
+
+        .df-table-body .df-table-row:nth-child(even) .df-table-cell {
+          background: var(--df-table-row-alt-bg);
+        }
+
+        .df-table-header,
+        .df-table-cell {
+          border: 1px solid var(--df-table-border-color);
+          padding: 0.75rem 1rem;
+          text-align: left;
+          vertical-align: top;
         }
 
         .df-table-header {
           font-weight: 600;
-          text-align: left;
-          padding: 0.9rem 1.1rem;
           color: rgb(var(--color-text-secondary));
-        }
-
-        .df-table-cell {
-          padding: 0.85rem 1.1rem;
-        }
-
-        .df-table-wrapper tbody tr:last-child .df-table-cell {
-          border-bottom: none;
         }
 
         .df-list {
@@ -552,10 +594,37 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-divider {
-          height: 2px;
           border: none;
-          background: rgba(var(--color-border), 1);
+          height: 1px;
           margin: calc(var(--markdown-font-size, 16px) * 2.5) 0;
+          background-color: var(--df-divider-color);
+        }
+
+        .df-markdown > .df-divider:first-child {
+          margin-top: 0;
+        }
+
+        .df-markdown-container.light .df-markdown {
+          --df-inline-code-bg: #f6f8fa;
+          --df-inline-code-border-color: #d0d7de;
+          --df-code-block-bg: #f6f8fa;
+          --df-code-block-border-color: #d0d7de;
+          --df-table-border-color: #d0d7de;
+          --df-table-header-bg: #f6f8fa;
+          --df-table-row-alt-bg: #f0f3f6;
+          --df-divider-color: #d0d7de;
+          color: #1f2328;
+        }
+
+        .df-markdown-container.dark .df-markdown {
+          --df-inline-code-bg: rgba(240, 246, 252, 0.18);
+          --df-inline-code-border-color: rgba(240, 246, 252, 0.25);
+          --df-code-block-bg: rgba(240, 246, 252, 0.07);
+          --df-code-block-border-color: rgba(240, 246, 252, 0.2);
+          --df-table-border-color: rgba(240, 246, 252, 0.18);
+          --df-table-header-bg: rgba(240, 246, 252, 0.07);
+          --df-table-row-alt-bg: rgba(240, 246, 252, 0.05);
+          --df-divider-color: rgba(240, 246, 252, 0.18);
         }
 
         .df-image {
