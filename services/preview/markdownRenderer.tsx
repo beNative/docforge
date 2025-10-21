@@ -490,7 +490,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           line-height: 1.4;
         }
 
-        .df-code-block .line:empty::before {
+        .df-code-block .line:empty:not(:last-child)::before {
           content: '\\00a0';
         }
 

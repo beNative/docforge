@@ -260,8 +260,124 @@ describe('MarkdownRenderer', () => {
     expect(blankLine?.textContent).toBe('');
 
     const styles = container.querySelector('style')?.textContent ?? '';
-    expect(styles).toContain('.df-code-block .line:empty::before {');
+    expect(styles).toContain('.df-code-block .line:empty:not(:last-child)::before {');
     expect(styles).toContain("content: '\\00a0'");
+  });
+
+  it('avoids decorating trailing blank lines that originate from fenced block termination', async () => {
+    const markdown = [
+      '```bash',
+      'echo "hello"',
+      '',
+      '# Final line',
+      '```',
+    ].join('\n');
+    const { container } = await renderMarkdown(markdown);
+
+    const shikiBlock = container.querySelector('.df-code-block-shiki');
+    expect(shikiBlock).not.toBeNull();
+
+    const lines = Array.from(shikiBlock?.querySelectorAll('.line') ?? []);
+    expect(lines.length).toBe(4);
+    expect(lines[1]?.textContent).toBe('');
+    expect(lines[2]?.textContent).toContain('# Final line');
+    expect(lines[3]?.textContent).toBe('');
+
+    const styles = container.querySelector('style')?.textContent ?? '';
+    expect(styles).toContain('.df-code-block .line:empty:not(:last-child)::before {');
+    const placeholderRuleIndex = styles.indexOf('.df-code-block .line:empty:not(:last-child)::before');
+    const trailingRuleIndex = styles.indexOf('.df-code-block .line:empty::before', placeholderRuleIndex + 1);
+    expect(trailingRuleIndex).toBe(-1);
+  });
+
+  it('renders plain fenced code blocks without syntax highlighting while preserving whitespace', async () => {
+    const markdown = ['```', 'line 1', '  indented line', '', 'line 3', '```'].join('\n');
+    const { container } = await renderMarkdown(markdown);
+
+    const fallbackBlock = container.querySelector('pre.df-code-block:not(.df-code-block-shiki)');
+    expect(fallbackBlock).not.toBeNull();
+    expect(fallbackBlock?.getAttribute('data-language')).toBeNull();
+
+    const codeElement = fallbackBlock?.querySelector('code.df-code-block__code');
+    expect(codeElement?.textContent).toBe('line 1\n  indented line\n\nline 3\n');
+  });
+
+  it('renders indented code blocks with monospace styling and no language badge', async () => {
+    const markdown = ['    alpha()', '    beta()', '', 'Paragraph text'].join('\n');
+    const { container } = await renderMarkdown(markdown);
+
+    const pre = container.querySelector('pre.df-code-block');
+    expect(pre).not.toBeNull();
+    expect(pre?.classList.contains('df-code-block-shiki')).toBe(false);
+    expect(pre?.getAttribute('data-language')).toBeNull();
+
+    const code = pre?.querySelector('code.df-code-block__code');
+    expect(code?.textContent).toBe('alpha()\nbeta()\n');
+
+    const styles = container.querySelector('style')?.textContent ?? '';
+    expect(styles).toMatch(/\.df-code-block \{/);
+    expect(styles).toMatch(/font-family: var\(--markdown-code-font-family, 'JetBrains Mono', monospace\)/);
+  });
+
+  it('renders multiple highlighted code blocks with accurate language badges and structure', async () => {
+    const markdown = [
+      '```ts',
+      'const value: number = 42;',
+      '```',
+      '',
+      '```python',
+      'def greet(name):',
+      '    return f"Hello, {name}"',
+      '```',
+      '',
+      '```json',
+      '{',
+      '  "key": "value"',
+      '}',
+      '```',
+    ].join('\n');
+    const { container } = await renderMarkdown(markdown);
+
+    const shikiBlocks = Array.from(container.querySelectorAll('.df-code-block-shiki'));
+    expect(shikiBlocks.length).toBe(3);
+    const languages = shikiBlocks.map((block) => block.getAttribute('data-language'));
+    expect(languages).toEqual(['TS', 'PYTHON', 'JSON']);
+    shikiBlocks.forEach((block) => {
+      expect(block.querySelectorAll('.line').length).toBeGreaterThan(0);
+      expect(block.querySelector('.shiki code')).not.toBeNull();
+    });
+  });
+
+  it('renders user story bash instructions with the expected blank line spacing', async () => {
+    const markdown = [
+      '```bash',
+      '# Launch all tests for User Story 1 together (if tests requested):',
+      'Task: "Contract test for [endpoint] in tests/contract/test_[name].py"',
+      'Task: "Integration test for [user journey] in tests/integration/test_[name].py"',
+      '',
+      '# Launch all models for User Story 1 together:',
+      'Task: "Create [Entity1] model in src/models/[entity1].py"',
+      'Task: "Create [Entity2] model in src/models/[entity2].py"',
+      '```',
+    ].join('\n');
+    const { container } = await renderMarkdown(markdown);
+
+    const shikiBlock = container.querySelector('.df-code-block-shiki');
+    expect(shikiBlock).not.toBeNull();
+    expect(shikiBlock).toHaveAttribute('data-language', 'BASH');
+
+    const lines = Array.from(shikiBlock?.querySelectorAll('.line') ?? []);
+    expect(lines.length).toBe(8);
+    const blankIndices = lines
+      .map((line, index) => (line.textContent === '' ? index : -1))
+      .filter((index) => index >= 0);
+    expect(blankIndices).toEqual([3, 7]);
+
+    const styles = container.querySelector('style')?.textContent ?? '';
+    expect(styles).toContain('.df-code-block .line:empty:not(:last-child)::before {');
+
+    const docforgeHtml = `<!doctype html><html><head><meta charset="utf-8"><title>User Story Code Block</title></head><body style="margin:0;background:#f6f8fa;padding:32px;">${container.innerHTML}</body></html>`;
+    maybeWriteArtifact('user-story-code-render.html', docforgeHtml);
   });
 
   it('renders accessible GitHub-style tables with semantic sections', async () => {
