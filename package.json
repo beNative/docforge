@@ -12,6 +12,7 @@
     "prepare:icons": "node scripts/prepare-icons.mjs",
     "test": "node scripts/validate-gui-test-plan.mjs",
     "test:markdown": "vitest run",
+    "typecheck": "tsc --noEmit --project tsconfig.typecheck.json",
     "test:release": "node --test scripts/__tests__/release-workflow.test.mjs",
     "test:auto-update": "node scripts/test-auto-update.mjs",
     "postinstall": "electron-builder install-app-deps",

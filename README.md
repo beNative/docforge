@@ -66,6 +66,16 @@ Run `specify check` inside the repository to confirm prerequisites.
    - `/speckit.implement` can translate an approved plan into code.
 3. Commit the spec folder before beginning implementation so reviewers can trace scope and acceptance criteria.
 
+## Development Checks
+
+Run the strict TypeScript baseline before committing changes:
+
+```bash
+npm run typecheck
+```
+
+The `typecheck` script invokes `tsc --noEmit` via `tsconfig.typecheck.json`, which mirrors the strict compiler flags used in CI while excluding the browser-only preview fixtures that rely on Vitest for validation.
+
 ## Release Preparation
 
 To create a new public build of DocForge:
