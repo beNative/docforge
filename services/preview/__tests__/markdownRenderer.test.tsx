@@ -316,6 +316,16 @@ describe('MarkdownRenderer', () => {
       'Final Notes',
     ]);
 
+    const mixedParagraph = markdownRoot.querySelector('#mixed-content + p');
+    expect(mixedParagraph).not.toBeNull();
+    expect(normalizeText(mixedParagraph?.textContent)).toContain('strikethrough');
+    expect(mixedParagraph?.querySelector('code')?.textContent).toBe('inline code');
+    expect(mixedParagraph?.querySelector('strong')?.textContent).toBe('bold text');
+    expect(mixedParagraph?.querySelector('em')?.textContent).toBe('italic text');
+    expect(mixedParagraph?.querySelector('del')?.textContent).toBe('strikethrough');
+    const inlineLink = mixedParagraph?.querySelector('a.df-link[href="https://example.com"]');
+    expect(inlineLink).not.toBeNull();
+
     const dividers = markdownRoot.querySelectorAll('hr.df-divider');
     expect(dividers.length).toBeGreaterThanOrEqual(6);
     dividers.forEach((divider) => {
@@ -330,10 +340,15 @@ describe('MarkdownRenderer', () => {
 
     const taskListItems = markdownRoot.querySelectorAll('li.df-list-item');
     expect(taskListItems.length).toBeGreaterThanOrEqual(5);
+    const nestedList = markdownRoot.querySelector('ul.df-list ul.df-list');
+    expect(nestedList?.querySelectorAll('li.df-list-item').length).toBe(1);
+    expect(nestedList?.querySelector('code')?.textContent).toBe('code');
 
     const blockquote = markdownRoot.querySelector('blockquote.df-blockquote');
     expect(blockquote).not.toBeNull();
     expect(normalizeText(blockquote?.textContent)).toContain('Blockquote with formatting');
+    const blockquoteLink = blockquote?.querySelector('a.df-link[href="https://github.com"]');
+    expect(blockquoteLink).not.toBeNull();
 
     const tableWrappers = markdownRoot.querySelectorAll('.df-table-wrapper');
     expect(tableWrappers.length).toBe(3);
@@ -441,6 +456,10 @@ describe('MarkdownRenderer', () => {
         'code',
         'pre',
         'input',
+        'strong',
+        'em',
+        'a',
+        'del',
       ];
 
       for (const tag of tagsToCompare) {

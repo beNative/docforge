@@ -6,7 +6,7 @@ This document stress tests key GitHub Flavored Markdown rendering features.
 
 ## Mixed Content
 
-Paragraph with `inline code`, **bold text**, _italic text_, and a [link](https://example.com).
+Paragraph with `inline code`, **bold text**, _italic text_, ~~strikethrough~~, and a [link](https://example.com).
 
 - [x] Completed task item
 - [ ] Pending task item
