@@ -113,11 +113,16 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   }, [compareAIndex, compareBIndex, versionsWithCurrent]);
 
   const focusedVersion = useMemo(() => versionsWithCurrent[focusedIndex], [focusedIndex, versionsWithCurrent]);
+  const focusedContent = focusedVersion?.content ?? '';
+  const newerContent = newerVersion?.content ?? '';
+  const olderContent = olderVersion?.content ?? '';
+  const newerCreatedAt = newerVersion ? formatDate(newerVersion.createdAt) : 'Unknown';
+  const olderCreatedAt = olderVersion ? formatDate(olderVersion.createdAt) : 'None';
 
   const handleCopy = async () => {
     if (!focusedVersion) return;
     try {
-        await navigator.clipboard.writeText(focusedVersion.content);
+        await navigator.clipboard.writeText(focusedContent);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
@@ -125,13 +130,13 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
     }
   };
 
-  const formatDate = (dateString: string) => {
+  function formatDate(dateString: string) {
     const date = new Date(dateString);
     return date.toLocaleString(undefined, {
       year: 'numeric', month: 'short', day: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
-  };
+  }
 
   const handleToggleVersionSelection = (versionId: number) => {
     if (versionId === -1) return;
@@ -303,7 +308,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                 <div className="flex justify-between items-center flex-shrink-0 h-7 px-4 border-b border-border-color">
                     <div className="flex items-baseline gap-2 text-[11px] text-text-secondary flex-wrap">
                         <h3 className="text-xs font-semibold text-text-main m-0">Comparison</h3>
-                        <span>Comparing A (<span className="font-semibold text-text-main">{formatDate(newerVersion.createdAt)}</span>) with B (<span className="font-semibold text-text-main">{olderVersion ? formatDate(olderVersion.createdAt) : 'None'}</span>)</span>
+                        <span>Comparing A (<span className="font-semibold text-text-main">{newerCreatedAt}</span>) with B (<span className="font-semibold text-text-main">{olderCreatedAt}</span>)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="flex items-center gap-0.5 bg-background border border-border-color rounded-md px-1 py-0.5">
@@ -328,7 +333,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         <IconButton
                             onClick={() => {
                                 addLog('INFO', `User action: Restore version for document "${document.title}".`);
-                                onRestore(focusedVersion.content);
+                                onRestore(focusedContent);
                             }}
                             disabled={focusedIndex === 0}
                             tooltip="Restore Selected Version"
@@ -342,8 +347,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                 
                 <div className="flex-1 min-h-0">
                     <MonacoDiffEditor
-                        oldText={olderVersion ? olderVersion.content : ''}
-                        newText={newerVersion ? newerVersion.content : ''}
+                        oldText={olderContent}
+                        newText={newerContent}
                         language={document.language_hint || 'plaintext'}
                         renderMode={diffRenderMode}
                         readOnly

@@ -99,6 +99,9 @@ const PythonConsoleApp: React.FC<PythonConsoleAppProps> = ({ runId, theme }) => 
       : 'bg-white text-gray-900 border-gray-200';
   }, [theme]);
 
+  const exitCode = run?.exitCode ?? null;
+  const durationMs = run?.durationMs ?? null;
+
   if (isLoading) {
     return (
       <div className={`w-screen h-screen flex items-center justify-center ${themeClasses}`}>
@@ -131,8 +134,10 @@ const PythonConsoleApp: React.FC<PythonConsoleAppProps> = ({ runId, theme }) => 
         </div>
         <div className="mt-3 flex items-center gap-3">
           <span className={`text-sm font-semibold ${statusColors[status]}`}>{statusLabels[status]}</span>
-          {run?.exitCode !== null && <span className="text-xs text-text-secondary">Exit code: {run.exitCode}</span>}
-          {run?.durationMs !== null && <span className="text-xs text-text-secondary">Duration: {(run.durationMs / 1000).toFixed(2)}s</span>}
+          {exitCode !== null && <span className="text-xs text-text-secondary">Exit code: {exitCode}</span>}
+          {durationMs !== null && (
+            <span className="text-xs text-text-secondary">Duration: {(durationMs / 1000).toFixed(2)}s</span>
+          )}
         </div>
         {run?.errorMessage && <p className="mt-2 text-xs text-red-400">{run.errorMessage}</p>}
       </header>

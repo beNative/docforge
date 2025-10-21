@@ -162,7 +162,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
   };
 
   const overlayRoot = document.getElementById('overlay-root');
-  if (!isOpen || !targetRef.current) {
+  if (!isOpen || !targetRef.current || !overlayRoot) {
     return null;
   }
 

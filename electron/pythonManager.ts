@@ -633,7 +633,7 @@ export const pythonManager = {
       }
       updateRunStatus(runId, status, {
         finishedAt,
-        exitCode: exitCode ?? undefined,
+        exitCode,
         errorMessage: errorMessage ?? null,
         durationMs: Date.now() - startTime,
       });

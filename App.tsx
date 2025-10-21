@@ -21,7 +21,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -47,9 +47,9 @@ const MIN_LOGGER_HEIGHT = 100;
 
 const isElectron = !!window.electronAPI;
 
-const resolveClipboardHelpUrl = (): string | null => {
+const resolveClipboardHelpUrl = (): string | undefined => {
     if (typeof navigator === 'undefined') {
-        return null;
+        return undefined;
     }
     const userAgent = navigator.userAgent.toLowerCase();
     if (userAgent.includes('mac os x') || userAgent.includes('macintosh')) {
@@ -61,7 +61,7 @@ const resolveClipboardHelpUrl = (): string | null => {
     if (userAgent.includes('linux')) {
         return 'https://help.ubuntu.com/stable/ubuntu-help/privacy-applications.html';
     }
-    return null;
+    return undefined;
 };
 
 type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
@@ -930,7 +930,7 @@ const MainApp: React.FC = () => {
                 title: document.title,
                 updatedAt: document.updatedAt,
                 parentPath: document.parentPath,
-                searchSnippet: snippet,
+                searchSnippet: snippet ?? null,
                 matchedFields,
                 matchScore: computeMatchScore(matchedFields),
                 sortTimestamp: parseToTimestamp(document.updatedAt),
@@ -1458,7 +1458,7 @@ const MainApp: React.FC = () => {
                             <p className="text-xs text-text-secondary">Grant clipboard access in your operating system settings, then try again.</p>
                         </div>
                     ),
-                    helpUrl,
+                    ...(helpUrl ? { helpUrl } : {}),
                 });
                 return;
             }
@@ -1767,6 +1767,10 @@ const MainApp: React.FC = () => {
             addLog('WARNING', 'Cannot copy content of an empty document.');
         }
     }, [items, addLog]);
+
+    const handlePasteIntoRoot = useCallback(() => {
+        addLog('WARNING', 'Paste into root is not yet implemented.');
+    }, [addLog]);
 
     const handleModelChange = (modelId: string) => {
         addLog('INFO', `User action: Set LLM model to "${modelId}".`);
@@ -2267,13 +2271,15 @@ const MainApp: React.FC = () => {
     ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard]);
 
     const enrichedCommands = useMemo(() => {
-      return commands.map(command => {
+      return commands.map((command) => {
           const custom = settings.customShortcuts[command.id];
           const effectiveShortcut = custom !== undefined ? custom : command.shortcut;
-          return {
-              ...command,
-              shortcutString: effectiveShortcut ? formatShortcutForDisplay(effectiveShortcut) : undefined,
-          };
+          const shortcutString = effectiveShortcut ? formatShortcutForDisplay(effectiveShortcut) : null;
+          const enriched: Command = { ...command };
+          if (shortcutString) {
+              enriched.shortcutString = shortcutString;
+          }
+          return enriched;
       });
     }, [commands, settings.customShortcuts]);
 
@@ -2303,34 +2309,44 @@ const MainApp: React.FC = () => {
             setCreateFromTemplateOpen(true);
         };
 
+        const appendMenuItem = (item: { label: string; action: () => void; icon?: React.FC<{ className?: string }>; disabled?: boolean; shortcut?: string | null; }) => {
+            const { shortcut, ...rest } = item;
+            if (shortcut) {
+                menuItems.push({ ...rest, shortcut });
+            } else {
+                menuItems.push(rest);
+            }
+        };
+
         if (nodeId) { // Clicked on an item
             const isDocument = firstSelectedNode?.type === 'document';
             const language = isDocument ? firstSelectedNode.language_hint || 'plaintext' : '';
             const isFormattable = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(language);
 
-            menuItems.push(
-                { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem), shortcut: getCommand('new-document')?.shortcutString },
-                { label: 'New from Clipboard', icon: CopyIcon, action: () => { void handleNewDocumentFromClipboard(parentIdForNewItem); }, shortcut: getCommand('new-from-clipboard')?.shortcutString },
-                { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
-                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem), shortcut: getCommand('new-folder')?.shortcutString },
-                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
-                { type: 'separator' },
-                { label: 'Format', icon: FormatIcon, action: handleFormatDocument, disabled: !isFormattable || currentSelection.size !== 1, shortcut: getCommand('format-document')?.shortcutString },
-                { label: 'Rename', icon: PencilIcon, action: () => handleStartRenamingNode(nodeId), disabled: currentSelection.size !== 1 },
-                { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0, shortcut: getCommand('duplicate-item')?.shortcutString },
-                { type: 'separator' },
-                { label: 'Copy Content', icon: CopyIcon, action: () => hasDocuments && handleCopyNodeContent(selectedNodes.find(n => n.type === 'document')!.id), disabled: !hasDocuments},
-                { type: 'separator' },
-                { label: 'Delete', icon: TrashIcon, action: () => handleDeleteSelection(currentSelection), disabled: currentSelection.size === 0, shortcut: getCommand('delete-item')?.shortcutString }
-            );
+            appendMenuItem({ label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem), shortcut: getCommand('new-document')?.shortcutString ?? null });
+            appendMenuItem({ label: 'New from Clipboard', icon: CopyIcon, action: () => { void handleNewDocumentFromClipboard(parentIdForNewItem); }, shortcut: getCommand('new-from-clipboard')?.shortcutString ?? null });
+            appendMenuItem({ label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString ?? null });
+            appendMenuItem({ label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem), shortcut: getCommand('new-folder')?.shortcutString ?? null });
+            appendMenuItem({ label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString ?? null });
+            menuItems.push({ type: 'separator' });
+            appendMenuItem({ label: 'Format', icon: FormatIcon, action: handleFormatDocument, disabled: !isFormattable || currentSelection.size !== 1, shortcut: getCommand('format-document')?.shortcutString ?? null });
+            appendMenuItem({ label: 'Rename', icon: PencilIcon, action: () => handleStartRenamingNode(nodeId), disabled: currentSelection.size !== 1 });
+            appendMenuItem({ label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0, shortcut: getCommand('duplicate-item')?.shortcutString ?? null });
+            menuItems.push({ type: 'separator' });
+            appendMenuItem({ label: 'Copy Content', icon: CopyIcon, action: () => hasDocuments && handleCopyNodeContent(selectedNodes.find(n => n.type === 'document')!.id), disabled: !hasDocuments });
+            menuItems.push({ type: 'separator' });
+            appendMenuItem({ label: 'Delete', icon: TrashIcon, action: () => handleDeleteSelection(currentSelection), disabled: currentSelection.size === 0, shortcut: getCommand('delete-item')?.shortcutString ?? null });
         } else { // Clicked on empty space
-             menuItems.push(
-                { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null), shortcut: getCommand('new-document')?.shortcutString },
-                { label: 'New from Clipboard', icon: CopyIcon, action: () => { void handleNewDocumentFromClipboard(null); }, shortcut: getCommand('new-from-clipboard')?.shortcutString },
-                { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
-                { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null), shortcut: getCommand('new-folder')?.shortcutString },
-                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString }
-            );
+             appendMenuItem({ label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null), shortcut: getCommand('new-document')?.shortcutString ?? null });
+             appendMenuItem({ label: 'New from Clipboard', icon: CopyIcon, action: () => { void handleNewDocumentFromClipboard(null); }, shortcut: getCommand('new-from-clipboard')?.shortcutString ?? null });
+             appendMenuItem({ label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString ?? null });
+             appendMenuItem({ label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null), shortcut: getCommand('new-folder')?.shortcutString ?? null });
+             appendMenuItem({ label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString ?? null });
+             menuItems.push({ type: 'separator' });
+             appendMenuItem({ label: 'Paste', icon: CopyIcon, action: () => { void handlePasteIntoRoot(); }, shortcut: getCommand('paste-nodes')?.shortcutString ?? null });
+             menuItems.push({ type: 'separator' });
+             appendMenuItem({ label: 'Expand All', icon: ExpandAllIcon, action: handleExpandAll });
+             appendMenuItem({ label: 'Collapse All', icon: CollapseAllIcon, action: handleCollapseAll });
         }
 
         setContextMenu({
@@ -2644,7 +2660,6 @@ const MainApp: React.FC = () => {
                     llmProviderName={settings.llmProviderName}
                     llmProviderUrl={settings.llmProviderUrl}
                     documentCount={items.filter(i => i.type === 'document').length}
-                    lastSaved={activeDocument?.updatedAt}
                     availableModels={availableModels}
                     onModelChange={handleModelChange}
                     discoveredServices={discoveredServices}
@@ -2653,6 +2668,7 @@ const MainApp: React.FC = () => {
                     databasePath={databasePath}
                     databaseStatus={databaseStatus}
                     onDatabaseMenu={handleDatabaseMenu}
+                    {...(activeDocument?.updatedAt ? { lastSaved: activeDocument.updatedAt } : {})}
                 />
             </div>
             
@@ -2699,14 +2715,14 @@ const MainApp: React.FC = () => {
                 <UpdateNotification
                     status={updateToastStatus}
                     versionLabel={updateVersionLabel}
-                    progress={updateToast.progress}
-                    bytesTransferred={updateToast.bytesTransferred ?? undefined}
-                    bytesTotal={updateToast.bytesTotal ?? undefined}
-                    errorMessage={updateToast.errorMessage ?? undefined}
-                    errorDetails={updateToast.errorDetails ?? undefined}
-                    onInstall={updateToast.status === 'downloaded' && window.electronAPI?.quitAndInstallUpdate
-                        ? () => window.electronAPI!.quitAndInstallUpdate!()
-                        : undefined}
+                    {...(updateToast.progress !== undefined ? { progress: updateToast.progress } : {})}
+                    bytesTransferred={updateToast.bytesTransferred ?? null}
+                    bytesTotal={updateToast.bytesTotal ?? null}
+                    errorMessage={updateToast.errorMessage ?? null}
+                    errorDetails={updateToast.errorDetails ?? null}
+                    {...(updateToast.status === 'downloaded' && window.electronAPI?.quitAndInstallUpdate
+                        ? { onInstall: () => { window.electronAPI?.quitAndInstallUpdate?.(); } }
+                        : {})}
                     onClose={handleUpdateToastClose}
                 />
             )}
@@ -2716,17 +2732,19 @@ const MainApp: React.FC = () => {
                     title={clipboardNotice.title}
                     message={clipboardNotice.message}
                     onClose={() => setClipboardNotice(null)}
-                    primaryAction={clipboardNotice.helpUrl
+                    {...(clipboardNotice.helpUrl
                         ? {
-                            label: 'View instructions',
-                            onClick: () => {
-                                if (clipboardNotice.helpUrl) {
-                                    window.open(clipboardNotice.helpUrl, '_blank', 'noopener');
-                                }
-                                setClipboardNotice(null);
+                            primaryAction: {
+                                label: 'View instructions',
+                                onClick: () => {
+                                    if (clipboardNotice.helpUrl) {
+                                        window.open(clipboardNotice.helpUrl, '_blank', 'noopener');
+                                    }
+                                    setClipboardNotice(null);
+                                },
                             },
                         }
-                        : undefined}
+                        : {})}
                 />
             )}
 

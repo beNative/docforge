@@ -75,7 +75,7 @@ declare global {
   // This is for the Electron main process, to add properties attached by Electron.
   namespace NodeJS {
     interface Process {
-      resourcesPath: string;
+      readonly resourcesPath: string;
     }
   }
 }
