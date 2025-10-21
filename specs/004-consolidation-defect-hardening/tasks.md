@@ -14,6 +14,8 @@
 - Sweep application, Electron, and Spec Kit TypeScript sources to remediate new diagnostics.
 - Add or update `npm run typecheck` and wire `tsc --noEmit` into CI jobs.
 - Remove obsolete types and annotate intentional gaps with `@ts-expect-error` plus tracked follow-ups.
+- Reintroduce `services/preview` fixtures and Vitest configs into the strict typecheck once outstanding errors are resolved or
+  isolated behind dedicated configs.
 
 ### 2. Lint & Format Zero-Warning Policy
 - Standardize ESLint + Prettier configuration (plugins, ignore lists, parser options).
