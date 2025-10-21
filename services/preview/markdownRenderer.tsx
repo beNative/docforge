@@ -490,6 +490,10 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           line-height: 1.4;
         }
 
+        .df-code-block .line:empty::before {
+          content: '\\00a0';
+        }
+
         .df-code-block-shiki .shiki {
           background-color: transparent !important;
           padding: 0;

@@ -239,6 +239,31 @@ describe('MarkdownRenderer', () => {
     expect(shikiBlock?.querySelector('[style*="color"]')).not.toBeNull();
   });
 
+  it('preserves blank lines in highlighted code blocks with visible placeholders', async () => {
+    const markdown = [
+      '```bash',
+      '# First section',
+      'echo "hello"',
+      '',
+      '# Second section',
+      'echo "world"',
+      '```',
+    ].join('\n');
+    const { container } = await renderMarkdown(markdown);
+
+    const shikiBlock = container.querySelector('.df-code-block-shiki');
+    expect(shikiBlock).not.toBeNull();
+
+    const lines = Array.from(shikiBlock?.querySelectorAll('.line') ?? []);
+    expect(lines.length).toBeGreaterThanOrEqual(5);
+    const blankLine = lines[2];
+    expect(blankLine?.textContent).toBe('');
+
+    const styles = container.querySelector('style')?.textContent ?? '';
+    expect(styles).toContain('.df-code-block .line:empty::before {');
+    expect(styles).toContain("content: '\\00a0'");
+  });
+
   it('renders accessible GitHub-style tables with semantic sections', async () => {
     const tableMarkdown = [`| Name | Value |`, `| ---- | -----:|`, `| Foo  |   100 |`].join('\n');
     const { container } = await renderMarkdown(tableMarkdown);
