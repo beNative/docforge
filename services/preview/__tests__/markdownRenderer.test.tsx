@@ -146,6 +146,7 @@ describe('MarkdownRenderer', () => {
     expect(styles).toMatch(/font-size:\s*var\(--markdown-font-size, 16px\)/);
     expect(styles).toMatch(/background:\s*rgba\(/);
     expect(styles).toMatch(/border:\s*1px solid/);
+    expect(styles).toMatch(/font-family:\s*var\(--markdown-code-font-family, 'JetBrains Mono', monospace\)/);
   });
 
   it('renders horizontal rules with visible divider styling', async () => {
@@ -157,6 +158,18 @@ describe('MarkdownRenderer', () => {
     const styles = container.querySelector('style')?.textContent ?? '';
     expect(styles).toMatch(/\.df-divider \{/);
     expect(styles).toMatch(/border-top: 1px solid/);
+  });
+
+  it('injects GitHub-style table, divider, and code block styles', async () => {
+    const markdown = ['| A | B |', '| - | - |', '| 1 | 2 |', '', '---', '', '```js', 'console.log(1);', '```'].join('\n');
+    const { container } = await renderMarkdown(markdown);
+
+    const styles = container.querySelector('style')?.textContent ?? '';
+    expect(styles).toMatch(/\.df-table-wrapper \{/);
+    expect(styles).toMatch(/\.df-table \{/);
+    expect(styles).toMatch(/\.df-table-header,/);
+    expect(styles).toMatch(/\.df-divider \{/);
+    expect(styles).toMatch(/\.df-code-block \{/);
   });
 
   it('renders accessible GitHub-style tables with semantic sections', async () => {
@@ -180,6 +193,90 @@ describe('MarkdownRenderer', () => {
 
     const numericCell = within(table).getByRole('cell', { name: /100/ });
     expect(numericCell).toHaveClass('df-table-cell');
+  });
+
+  it('renders the GitHub reference fixture with all key markdown affordances', async () => {
+    const { container } = await renderMarkdown(referenceMarkdown);
+    const markdownRoot = container.querySelector('.df-markdown') as HTMLElement | null;
+    expect(markdownRoot).not.toBeNull();
+    if (!markdownRoot) {
+      return;
+    }
+
+    const headings = Array.from(markdownRoot.querySelectorAll('h1, h2, h3'));
+    expect(headings.map((element) => normalizeText(element.textContent))).toEqual([
+      'GitHub Rendering Reference',
+      'Lists and Quotes',
+      'Tables',
+      'Code Samples',
+      'Mathematics',
+      'Final Notes',
+    ]);
+
+    const horizontalRules = markdownRoot.querySelectorAll('hr.df-divider');
+    expect(horizontalRules.length).toBe(2);
+    horizontalRules.forEach((rule) => {
+      expect(rule.classList.contains('df-divider')).toBe(true);
+    });
+
+    const blockquote = markdownRoot.querySelector('.df-blockquote');
+    expect(blockquote).not.toBeNull();
+    expect(normalizeText(blockquote?.textContent)).toContain('Blockquote section including');
+
+    const unorderedList = markdownRoot.querySelector('ul.df-list.df-list-disc');
+    const orderedList = markdownRoot.querySelector('ol.df-list.df-list-decimal');
+    expect(unorderedList).not.toBeNull();
+    expect(orderedList).not.toBeNull();
+    expect(unorderedList?.querySelectorAll('li.df-list-item').length).toBeGreaterThanOrEqual(3);
+    expect(orderedList?.querySelectorAll('li.df-list-item').length).toBe(3);
+
+    const inlineCodeFragments = Array.from(markdownRoot.querySelectorAll('p > code'));
+    expect(inlineCodeFragments.length).toBeGreaterThan(0);
+    inlineCodeFragments.forEach((node) => {
+      expect(node.parentElement?.tagName.toLowerCase()).toBe('p');
+      expect(node.className).toBe('');
+    });
+
+    const tableWrapper = markdownRoot.querySelector('.df-table-wrapper');
+    expect(tableWrapper).not.toBeNull();
+    const table = tableWrapper?.querySelector('table.df-table') as HTMLTableElement | undefined;
+    expect(table).toBeTruthy();
+    const headerCells = Array.from(table?.querySelectorAll('thead .df-table-header') ?? []);
+    expect(headerCells.map((cell) => normalizeText(cell.textContent))).toEqual([
+      'Name',
+      'Alignment',
+      'Notes',
+    ]);
+    const bodyRows = table?.querySelectorAll('tbody .df-table-row') ?? [];
+    expect(bodyRows.length).toBe(3);
+    const inlineValueCell = Array.from(table?.querySelectorAll('tbody .df-table-cell') ?? []).find((cell) =>
+      normalizeText(cell.textContent).includes('Inline value'),
+    );
+    expect(inlineValueCell).toBeDefined();
+
+    const highlightedBlock = markdownRoot.querySelector(
+      '.df-code-block-shiki[data-language="TS"] .line:nth-child(2)',
+    );
+    expect(highlightedBlock).not.toBeNull();
+    expect(highlightedBlock?.textContent).toContain('console.log');
+
+    const fallbackCodeBlock = markdownRoot.querySelector('pre.df-code-block:not([data-language])');
+    expect(fallbackCodeBlock).not.toBeNull();
+    expect(fallbackCodeBlock?.querySelector('code.df-code-block__code')?.textContent).toContain(
+      'No language code block',
+    );
+
+    const mermaidDiagram = markdownRoot.querySelector('.df-mermaid');
+    expect(mermaidDiagram).not.toBeNull();
+    expect(mermaidDiagram?.querySelector('[role="img"]')).not.toBeNull();
+
+    const katexBlocks = markdownRoot.querySelectorAll('.katex');
+    expect(katexBlocks.length).toBeGreaterThanOrEqual(2);
+    const displayMath = markdownRoot.querySelector('.katex-display');
+    expect(displayMath).not.toBeNull();
+
+    const paragraphAfterMath = markdownRoot.querySelector('h3 + p');
+    expect(normalizeText(paragraphAfterMath?.textContent)).toContain('Text after math');
   });
 
   it('produces markup structurally consistent with GitHub for the reference fixture', async () => {
