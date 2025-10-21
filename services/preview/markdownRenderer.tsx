@@ -143,6 +143,10 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         .join('');
     };
 
+    const mergeClassNames = (
+      ...classNames: Array<string | undefined | null | false>
+    ): string => classNames.filter(Boolean).join(' ');
+
     return {
       pre({ children, className, node: _node, ...props }) {
         const childArray = React.Children.toArray(children);
@@ -214,58 +218,60 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           </pre>
         );
       },
-      table({ children, ...props }) {
+      table({ children, className, ...props }) {
         return (
           <div className="df-table-wrapper">
-            <table {...props}>{children}</table>
+            <table className={mergeClassNames('df-table', className)} {...props}>
+              {children}
+            </table>
           </div>
         );
       },
-      thead({ children, ...props }) {
+      thead({ children, className, ...props }) {
         return (
-          <thead className="df-table-head" {...props}>
+          <thead className={mergeClassNames('df-table-head', className)} {...props}>
             {children}
           </thead>
         );
       },
-      tbody({ children, ...props }) {
+      tbody({ children, className, ...props }) {
         return (
-          <tbody className="df-table-body" {...props}>
+          <tbody className={mergeClassNames('df-table-body', className)} {...props}>
             {children}
           </tbody>
         );
       },
-      tr({ children, ...props }) {
+      tr({ children, className, ...props }) {
         return (
-          <tr className="df-table-row" {...props}>
+          <tr className={mergeClassNames('df-table-row', className)} {...props}>
             {children}
           </tr>
         );
       },
-      th({ children, ...props }) {
+      th({ children, className, ...props }) {
         return (
-          <th className="df-table-header" {...props}>
+          <th className={mergeClassNames('df-table-header', className)} {...props}>
             {children}
           </th>
         );
       },
-      td({ children, ...props }) {
+      td({ children, className, ...props }) {
         return (
-          <td className="df-table-cell" {...props}>
+          <td className={mergeClassNames('df-table-cell', className)} {...props}>
             {children}
           </td>
         );
       },
-      blockquote({ children, ...props }) {
+      blockquote({ children, className, ...props }) {
         return (
-          <blockquote className="df-blockquote" {...props}>
+          <blockquote className={mergeClassNames('df-blockquote', className)} {...props}>
             {children}
           </blockquote>
         );
       },
-      a({ children, ...props }) {
+      a({ children, className, ...props }) {
         return (
-          <a className="df-link" {...props}>
+          <a className={mergeClassNames('df-link', className)} {...props}>
             {children}
           </a>
         );
@@ -273,29 +279,29 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
       img(props) {
         return <img className="df-image" loading="lazy" {...props} />;
       },
-      ul({ children, ...props }) {
+      ul({ children, className, ...props }) {
         return (
-          <ul className="df-list df-list-disc" {...props}>
+          <ul className={mergeClassNames('df-list', 'df-list-disc', className)} {...props}>
             {children}
           </ul>
         );
       },
-      ol({ children, ...props }) {
+      ol({ children, className, ...props }) {
         return (
-          <ol className="df-list df-list-decimal" {...props}>
+          <ol className={mergeClassNames('df-list', 'df-list-decimal', className)} {...props}>
             {children}
           </ol>
         );
       },
-      li({ children, ...props }) {
+      li({ children, className, ...props }) {
         return (
-          <li className="df-list-item" {...props}>
+          <li className={mergeClassNames('df-list-item', className)} {...props}>
             {children}
           </li>
         );
       },
-      hr(props) {
-        return <hr className="df-divider" {...props} />;
+      hr({ className, ...props }) {
+        return <hr className={mergeClassNames('df-divider', className)} {...props} />;
       },
     } as Components;
   }, [highlighter, viewTheme, settings.plantumlRendererMode]);
@@ -420,13 +426,14 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-markdown :not(pre) > code {
-          background: rgba(var(--color-text-secondary), 0.18);
+          background: rgba(var(--color-border), 0.25);
           color: rgb(var(--color-text-main));
-          padding: 0.15rem 0.45rem;
+          padding: 0.2rem 0.45rem;
           border-radius: 0.35rem;
-          border: 1px solid rgba(var(--color-border), 0.65);
+          border: 1px solid rgba(var(--color-border), 0.5);
           font-family: var(--markdown-code-font-family, 'JetBrains Mono', monospace);
-          font-size: calc(var(--markdown-code-font-size, 14px) * 0.9);
+          font-size: var(--markdown-font-size, 16px);
+          line-height: inherit;
           white-space: pre-wrap;
         }
 
@@ -522,29 +529,30 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
 
         .df-table-wrapper {
           overflow-x: auto;
-          border-radius: 0.9rem;
-          border: 1px solid rgba(var(--color-border), 0.9);
-          background: rgba(var(--color-secondary), 0.92);
+          border-radius: 0.75rem;
+          border: 1px solid rgba(var(--color-border), 0.55);
+          background: rgba(var(--color-background), 0.96);
           margin: calc(var(--markdown-font-size, 16px) * 1.25) 0;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }
 
-        .df-table-wrapper table {
+        .df-table {
           width: 100%;
           border-collapse: collapse;
-          min-width: 100%;
+          min-width: max(100%, 640px);
         }
 
-        .df-table-head {
-          background: rgba(var(--color-background), 0.35);
+        .df-table-head .df-table-header {
+          background: rgba(var(--color-border), 0.15);
         }
 
-        .df-table-row:nth-child(even) .df-table-cell {
-          background: rgba(var(--color-background), 0.65);
+        .df-table-body .df-table-row:nth-child(even) .df-table-cell {
+          background: rgba(var(--color-border), 0.08);
         }
 
         .df-table-header,
         .df-table-cell {
-          border: 1px solid rgba(var(--color-border), 0.6);
+          border: 1px solid rgba(var(--color-border), 0.5);
           padding: 0.75rem 1rem;
           text-align: left;
           vertical-align: top;
@@ -573,8 +581,10 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-divider {
-          border: 0;
-          border-top: 1px solid rgba(var(--color-border), 0.8);
+          border: none;
+          border-top: 1px solid rgba(var(--color-border), 0.75);
+          background: rgba(var(--color-border), 0.75);
+          height: 1px;
           margin: calc(var(--markdown-font-size, 16px) * 2.5) 0;
         }
 
