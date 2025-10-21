@@ -1,4 +1,5 @@
 import React, { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import type { ComponentPropsWithoutRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -129,7 +130,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
   const rehypePlugins = useMemo(() => [rehypeSlug, rehypeKatex, rehypeRaw], []);
 
   const components = useMemo<Components>(() => ({
-    code({ inline, className, children, ...props }) {
+    code({ inline, className, children, ...props }: ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
       if (inline) {
         return (
           <code className="df-inline-code" {...props}>
@@ -144,7 +145,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         </code>
       );
     },
-    pre({ children, className, ...props }) {
+    pre({ children, className, ...props }: ComponentPropsWithoutRef<'pre'>) {
       const childArray = React.Children.toArray(children);
       const codeChild = childArray.find(
         (child) => React.isValidElement(child) && typeof child.props.className === 'string'
@@ -161,7 +162,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         return <MermaidDiagram code={raw} theme={viewTheme} />;
       }
 
-      if (normalizedLanguage && PLANTUML_LANGS.includes(normalizedLanguage) && codeChild) {
+      if (normalizedLanguage && PLANTUML_LANGS.includes(normalizedLanguage as typeof PLANTUML_LANGS[number]) && codeChild) {
         const raw = React.Children.toArray(codeChild.props.children)
           .map((child) => (typeof child === 'string' ? child : ''))
           .join('');
@@ -190,12 +191,19 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
             .replace(/\n(<\/code>)/g, '$1')
             .replace(/\n(<\/pre>)/g, '$1');
 
+          const { onScroll, ...restPreProps } = props;
+          const forwardedDivProps = restPreProps as unknown as React.HTMLAttributes<HTMLDivElement>;
           return (
             <div
+              {...forwardedDivProps}
               className={[baseClassName, 'df-code-block-shiki'].filter(Boolean).join(' ')}
               data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
               dangerouslySetInnerHTML={{ __html: compactHtml }}
-              {...props}
+              onScroll={
+                onScroll
+                  ? (event) => onScroll(event as unknown as React.UIEvent<HTMLPreElement>)
+                  : undefined
+              }
             />
           );
         } catch (error) {

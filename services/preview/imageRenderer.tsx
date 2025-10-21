@@ -102,7 +102,9 @@ const detectMimeFromBytes = (bytes: Uint8Array): SupportedImageType | null => {
 const createBlobUrlFromBytes = (bytes: Uint8Array, hintedType: SupportedImageType | null) => {
   const mimeType = detectMimeFromBytes(bytes) ?? hintedType ?? FALLBACK_IMAGE_TYPE;
   try {
-    return { url: URL.createObjectURL(new Blob([bytes], { type: mimeType })), isBlobUrl: true, mimeType };
+    const buffer = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(buffer).set(bytes);
+    return { url: URL.createObjectURL(new Blob([buffer], { type: mimeType })), isBlobUrl: true, mimeType };
   } catch {
     return { url: null as string | null, isBlobUrl: false, mimeType };
   }
@@ -312,6 +314,6 @@ export class ImageRenderer implements IRenderer {
     languageId?: string | null,
     _settings?: Settings,
   ) {
-    return { output: <ImagePreview content={content} languageId={languageId} /> };
+    return { output: <ImagePreview content={content} languageId={languageId ?? null} /> };
   }
 }

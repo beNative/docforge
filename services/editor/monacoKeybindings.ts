@@ -158,15 +158,20 @@ export const getMonacoDefinition = (id: string): MonacoKeybindingDefinition | un
 };
 
 export const createMonacoCommands = (): Command[] => {
-  return MONACO_KEYBINDING_DEFINITIONS.map(definition => ({
-    id: definition.id,
-    name: definition.name,
-    keywords: definition.keywords,
-    action: () => {},
-    category: definition.category,
-    icon: () => null,
-    shortcut: definition.defaultShortcut,
-    monacoCommandId: definition.monacoCommandId,
-  }));
+  return MONACO_KEYBINDING_DEFINITIONS.map((definition) => {
+    const command: Command = {
+      id: definition.id,
+      name: definition.name,
+      action: () => {},
+      category: definition.category,
+      icon: () => null,
+      shortcut: definition.defaultShortcut,
+      monacoCommandId: definition.monacoCommandId,
+    };
+    if (definition.keywords) {
+      command.keywords = definition.keywords;
+    }
+    return command;
+  });
 };
 

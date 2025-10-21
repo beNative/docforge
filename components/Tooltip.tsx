@@ -15,13 +15,13 @@ const Tooltip: React.FC<TooltipProps> = ({ targetRef, content, position = 'top',
   const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0 });
 
   const calculatePosition = useCallback(() => {
-    if (!targetRef.current || !tooltipRef.current || targetRef.current.offsetWidth <= 0) {
+    const targetEl = targetRef.current;
+    const tooltipEl = tooltipRef.current;
+    if (!(targetEl instanceof HTMLElement) || !(tooltipEl instanceof HTMLElement) || targetEl.offsetWidth <= 0) {
       return;
     }
 
     const zoomFactor = parseFloat((getComputedStyle(document.documentElement) as any).zoom || '1');
-    const targetEl = targetRef.current;
-    const tooltipEl = tooltipRef.current;
 
     const scaledTargetRect = targetEl.getBoundingClientRect();
 

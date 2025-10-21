@@ -2,6 +2,7 @@ import { app } from 'electron';
 import path from 'path';
 import fs, { statSync } from 'fs';
 import Database from 'better-sqlite3';
+import type { RunResult } from 'better-sqlite3';
 import { INITIAL_SCHEMA } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
@@ -21,7 +22,7 @@ import type {
 } from '../types';
 import { classifyDocumentContent } from '../services/classificationService';
 
-let db: Database.Database;
+let db: Database;
 let hasInitializedDb = false;
 const DB_FILE_NAME = 'docforge.db';
 const DB_CONFIG_FILE = 'database-config.json';
@@ -164,7 +165,7 @@ const DOCUMENT_SEARCH_OBJECTS_SQL = `
   END;
 `;
 
-const populateDocumentSearch = (targetDb: Database.Database = db) => {
+const populateDocumentSearch = (targetDb: Database = db) => {
   targetDb.exec('DELETE FROM document_search;');
   targetDb.exec(`
     INSERT INTO document_search(rowid, document_id, node_id, title, body)
@@ -232,7 +233,7 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
     }
 };
 
-const configureConnection = (connection: Database.Database, dbExists: boolean) => {
+const configureConnection = (connection: Database, dbExists: boolean) => {
   if (!dbExists) {
     console.log('Database does not exist, creating new one...');
     connection.exec(INITIAL_SCHEMA);
@@ -419,7 +420,7 @@ export const databaseService = {
       };
     }
 
-    let connection: Database.Database;
+    let connection: Database;
     try {
       connection = new Database(resolvedPath);
     } catch (error) {
@@ -470,7 +471,7 @@ export const databaseService = {
       path: resolvedPath,
       created: !existedBefore,
       message,
-      previousPath,
+      ...(previousPath ? { previousPath } : {}),
     };
   },
 
@@ -519,7 +520,7 @@ export const databaseService = {
     }
   },
 
-  run(sql: string, params: any[] = []): Database.RunResult {
+  run(sql: string, params: any[] = []): RunResult {
     try {
       return db.prepare(sql).run(...(params || []));
     } catch(e) {

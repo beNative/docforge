@@ -7,6 +7,8 @@
     "moduleResolution": "node",
     "jsx": "react-jsx",
     "strict": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,

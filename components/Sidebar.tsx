@@ -47,6 +47,8 @@ interface SidebarProps {
   renamingNodeId: string | null;
   onRenameComplete: () => void;
   commands: Command[];
+  pendingRevealId: string | null;
+  onRevealHandled: () => void;
 
   templates: DocumentTemplate[];
   activeTemplateId: string | null;
@@ -90,7 +92,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       return false;
     }
     const activeItem = props.documents.find(item => item.id === props.activeNodeId);
-    return activeItem?.type === 'folder' ?? false;
+    return activeItem?.type === 'folder';
   }, [props.documents, props.activeNodeId]);
 
 

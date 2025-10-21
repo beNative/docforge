@@ -102,6 +102,8 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
       const command = commands.find(c => c.id === commandId);
       return command?.shortcutString ? `${baseText} (${command.shortcutString})` : baseText;
     };
+
+    const commandPaletteShortcut = commands.find(c => c.id === 'toggle-command-palette')?.shortcutString ?? null;
     
     return (
         <header className="draggable flex items-center justify-between h-7 flex-shrink-0 bg-secondary border-b border-border-color z-30 text-text-main">
@@ -111,13 +113,13 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
             </div>
 
             <div className="flex-1 flex justify-center">
-                <CommandPaletteSearch 
+                <CommandPaletteSearch
                     commandPaletteTargetRef={commandPaletteTargetRef}
                     inputRef={commandPaletteInputRef}
                     searchTerm={searchTerm}
                     onSearchTermChange={onSearchTermChange}
                     onOpenCommandPalette={onOpenCommandPalette}
-                    shortcutString={commands.find(c => c.id === 'toggle-command-palette')?.shortcutString}
+                    {...(commandPaletteShortcut ? { shortcutString: commandPaletteShortcut } : {})}
                 />
             </div>
 

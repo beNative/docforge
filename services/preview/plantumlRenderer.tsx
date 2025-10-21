@@ -100,7 +100,7 @@ export class PlantUMLRenderer implements IRenderer {
     const effectiveSettings = settings ?? DEFAULT_SETTINGS;
 
     if (!content.trim()) {
-      addLog?.('WARN', 'PlantUML document has no content to render.');
+      addLog?.('WARNING', 'PlantUML document has no content to render.');
     }
 
     return {

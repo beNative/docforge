@@ -40,7 +40,10 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
           // Clone the returned element to inject the ref and onScroll handler
           // This allows renderers to provide components that can be scroll-synced.
           if (React.isValidElement(result.output)) {
-            const elementWithProps = React.cloneElement(result.output, { ref, onScroll });
+            const elementWithProps = React.cloneElement(
+              result.output,
+              { ref: ref as React.Ref<unknown>, onScroll } as Record<string, unknown>
+            );
             setRenderedOutput(elementWithProps);
           } else {
             // Fallback for non-element outputs, though our current renderers all return elements.

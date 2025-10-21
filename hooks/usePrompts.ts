@@ -7,21 +7,30 @@ import { mapExtensionToLanguageId } from '../services/languageService';
  * Adapter function to convert the new `Node` data structure
  * to the legacy `DocumentOrFolder` structure that UI components still use.
  */
-const nodeToDocumentOrFolder = (node: Node): DocumentOrFolder => ({
-  id: node.node_id,
-  type: node.node_type,
-  title: node.title,
-  content: node.document?.content,
-  createdAt: node.created_at,
-  updatedAt: node.updated_at,
-  parentId: node.parent_id,
-  doc_type: node.document?.doc_type,
-  language_hint: node.document?.language_hint,
-  default_view_mode: node.document?.default_view_mode,
-  language_source: node.document?.language_source,
-  doc_type_source: node.document?.doc_type_source,
-  classification_updated_at: node.document?.classification_updated_at,
-});
+const nodeToDocumentOrFolder = (node: Node): DocumentOrFolder => {
+  const base: DocumentOrFolder = {
+    id: node.node_id,
+    type: node.node_type,
+    title: node.title,
+    createdAt: node.created_at,
+    updatedAt: node.updated_at,
+    parentId: node.parent_id,
+  };
+
+  if (node.document) {
+    if (typeof node.document.content === 'string') {
+      base.content = node.document.content;
+    }
+    base.doc_type = node.document.doc_type;
+    base.language_hint = node.document.language_hint ?? null;
+    base.default_view_mode = node.document.default_view_mode ?? null;
+    base.language_source = node.document.language_source ?? null;
+    base.doc_type_source = node.document.doc_type_source ?? null;
+    base.classification_updated_at = node.document.classification_updated_at ?? null;
+  }
+
+  return base;
+};
 
 /**
  * Recursively flattens the node tree into a simple array.
@@ -60,24 +69,27 @@ export const useDocuments = () => {
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
 
-  const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '', doc_type = 'prompt', language_hint = 'markdown' }: { parentId: string | null, title?: string, content?: string, doc_type?: DocType, language_hint?: string | null }) => {
+  const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '', doc_type = 'prompt', language_hint = 'markdown' }: { parentId: string | null; title?: string; content?: string; doc_type?: DocType; language_hint?: string | null }) => {
     const resolvedLanguage = mapExtensionToLanguageId(language_hint);
     const shouldPreviewByDefault = doc_type === 'pdf' || doc_type === 'image' || resolvedLanguage === 'pdf' || resolvedLanguage === 'image';
-    const defaultViewMode = shouldPreviewByDefault ? 'preview' : undefined;
+    const defaultViewMode = shouldPreviewByDefault ? 'preview' : null;
     const now = new Date().toISOString();
     const newNode = await addNode({
       parent_id: parentId,
       node_type: 'document',
       title,
       document: {
-        content,
+        document_id: 0,
+        node_id: '',
         doc_type,
         language_hint: resolvedLanguage,
         language_source: 'user',
         doc_type_source: 'user',
         classification_updated_at: now,
         default_view_mode: defaultViewMode,
-      } as any,
+        current_version_id: null,
+        content,
+      },
     });
     return nodeToDocumentOrFolder(newNode);
   }, [addNode]);

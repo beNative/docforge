@@ -36,12 +36,20 @@ type BrowserState = {
 const BROWSER_STATE_STORAGE_KEY = 'docforge:browser-state:v1';
 
 const cloneNodeTree = (nodes: Node[]): Node[] =>
-    nodes.map(node => ({
-        ...node,
-        document: node.document ? { ...node.document } : undefined,
-        pythonSettings: node.pythonSettings ? { ...node.pythonSettings } : undefined,
-        children: node.children ? cloneNodeTree(node.children) : undefined,
-    }));
+    nodes.map((node) => {
+        const { children, document, pythonSettings, ...rest } = node;
+        const cloned: Node = { ...rest };
+        if (document) {
+            cloned.document = { ...document };
+        }
+        if (pythonSettings) {
+            cloned.pythonSettings = { ...pythonSettings };
+        }
+        if (children) {
+            cloned.children = cloneNodeTree(children);
+        }
+        return cloned;
+    });
 
 const cloneDocVersions = (versions: DocVersion[] = []): DocVersion[] =>
     versions.map(version => ({ ...version }));
@@ -257,22 +265,22 @@ const createSnippetFromContent = (content: string, term: string, snippetLength: 
 
 const duplicateNodeRecursive = (state: BrowserState, node: Node, newParentId: string | null, sortOrder: number): Node => {
     const now = new Date().toISOString();
+    const { children, document, ...rest } = node;
     const clonedNode: Node = {
-        ...node,
+        ...rest,
         node_id: uuidv4(),
         parent_id: newParentId,
         sort_order: sortOrder,
         created_at: now,
         updated_at: now,
-        document: node.document ? { ...node.document } : undefined,
-        children: undefined,
     };
 
-    if (clonedNode.document) {
+    if (document) {
+        clonedNode.document = { ...document };
         const newDocumentId = state.nextDocumentId++;
-        const originalDocumentId = clonedNode.document.document_id;
+        const originalDocumentId = document.document_id;
         clonedNode.document = {
-            ...clonedNode.document,
+            ...document,
             document_id: newDocumentId,
             node_id: clonedNode.node_id,
             current_version_id: null,
@@ -289,22 +297,22 @@ const duplicateNodeRecursive = (state: BrowserState, node: Node, newParentId: st
         });
         if (clonedVersions.length > 0) {
             clonedNode.document.current_version_id = clonedVersions[clonedVersions.length - 1].version_id;
-        } else if (clonedNode.document.content) {
+        } else if (document.content) {
             const versionId = state.nextVersionId++;
             clonedVersions.push({
                 version_id: versionId,
                 document_id: newDocumentId,
                 created_at: now,
                 content_id: versionId,
-                content: clonedNode.document.content,
+                content: document.content,
             });
             clonedNode.document.current_version_id = versionId;
         }
         state.docVersions[newDocumentId] = clonedVersions;
     }
 
-    if (node.children) {
-        clonedNode.children = node.children.map((child, index) =>
+    if (children) {
+        clonedNode.children = children.map((child, index) =>
             duplicateNodeRecursive(state, child, clonedNode.node_id, index)
         );
     }
@@ -358,6 +366,9 @@ const transformLegacyData = async (
                 doc_type: 'prompt',
                 language_hint: null,
                 default_view_mode: null,
+                language_source: null,
+                doc_type_source: null,
+                classification_updated_at: null,
                 current_version_id: null, // placeholder
             });
 
@@ -514,7 +525,10 @@ export const repository = {
                 created_at: record.created_at,
                 updated_at: record.updated_at,
                 children: [],
-                document: record.document_id ? {
+            };
+
+            if (record.document_id) {
+                node.document = {
                     document_id: record.document_id,
                     node_id: record.node_id,
                     doc_type: record.doc_type,
@@ -524,15 +538,20 @@ export const repository = {
                     classification_updated_at: record.classification_updated_at ?? null,
                     default_view_mode: record.default_view_mode,
                     current_version_id: record.current_version_id,
-                    content: record.content,
-                } : undefined,
-                pythonSettings: record.python_env_id !== null || record.python_auto_detect_env !== null || record.python_last_run_id !== null ? {
+                };
+                if (typeof record.content === 'string') {
+                    node.document.content = record.content;
+                }
+            }
+
+            if (record.python_env_id !== null || record.python_auto_detect_env !== null || record.python_last_run_id !== null) {
+                node.pythonSettings = {
                     nodeId: record.node_id,
                     envId: record.python_env_id,
                     autoDetectEnvironment: record.python_auto_detect_env === null ? true : Boolean(record.python_auto_detect_env),
                     lastUsedRunId: record.python_last_run_id,
-                } : undefined,
-            };
+                };
+            }
             nodesById.set(node.node_id, node);
         }
 
@@ -766,7 +785,7 @@ export const repository = {
     },
     async createDocumentFromClipboard({ parentId, content, title }: { parentId: string | null; content: string; title?: string | null; }): Promise<{ node: Node; summary: ClassificationSummary }> {
         const effectiveContent = content ?? '';
-        const classification = classifyDocumentContent({ content: effectiveContent, title });
+        const classification = classifyDocumentContent({ content: effectiveContent, title: title ?? null });
         const classificationTimestamp = new Date().toISOString();
         const resolvedTitle = title?.trim()?.length ? title.trim() : 'Clipboard Document';
         const newNode = await this.addNode({
@@ -1211,10 +1230,8 @@ export const repository = {
                         const childNode = insertRecursive(child, newNodeId, index, false);
                         baseNode.children!.push(childNode);
                     });
-                } else {
-                    if (baseNode.children && baseNode.children.length === 0) {
-                        baseNode.children = undefined;
-                    }
+                } else if (baseNode.children && baseNode.children.length === 0) {
+                    delete baseNode.children;
                 }
 
                 return baseNode;
@@ -1271,7 +1288,11 @@ export const repository = {
                 if (node.document?.document_id === documentId) {
                     const latest = remaining[remaining.length - 1] ?? null;
                     node.document.current_version_id = latest ? latest.version_id : null;
-                    node.document.content = latest?.content;
+                    if (latest && typeof latest.content === 'string') {
+                        node.document.content = latest.content;
+                    } else {
+                        delete node.document.content;
+                    }
                 }
             });
             persistBrowserState(state);

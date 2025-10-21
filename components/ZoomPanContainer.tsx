@@ -52,7 +52,12 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  useImperativeHandle(ref, () => containerRef.current);
+  useImperativeHandle(ref, () => {
+    if (!containerRef.current) {
+      throw new Error('ZoomPanContainer ref accessed before mount');
+    }
+    return containerRef.current;
+  }, []);
 
   const [scale, setScaleState] = useState(initialScale);
   const [offset, setOffsetState] = useState({ x: 0, y: 0 });

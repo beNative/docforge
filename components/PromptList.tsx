@@ -87,15 +87,35 @@ const DocumentList: React.FC<DocumentListProps> = ({
 
   const serializeNode = useCallback(function serialize(node: DocumentNode): SerializedNodeForTransfer {
     const children = node.children.length > 0 ? node.children.map(serialize) : undefined;
-    return {
+    const serialized: SerializedNodeForTransfer = {
       type: node.type,
       title: node.title,
-      content: node.content,
-      doc_type: node.doc_type,
-      language_hint: node.language_hint ?? null,
-      default_view_mode: node.default_view_mode ?? null,
-      children,
     };
+    if (node.doc_type !== undefined) {
+      serialized.doc_type = node.doc_type;
+    }
+    if (node.language_hint !== undefined) {
+      serialized.language_hint = node.language_hint;
+    }
+    if (node.default_view_mode !== undefined) {
+      serialized.default_view_mode = node.default_view_mode;
+    }
+    if (node.language_source !== undefined) {
+      serialized.language_source = node.language_source;
+    }
+    if (node.doc_type_source !== undefined) {
+      serialized.doc_type_source = node.doc_type_source;
+    }
+    if (node.classification_updated_at !== undefined) {
+      serialized.classification_updated_at = node.classification_updated_at;
+    }
+    if (typeof node.content === 'string') {
+      serialized.content = node.content;
+    }
+    if (children && children.length > 0) {
+      serialized.children = children;
+    }
+    return serialized;
   }, []);
 
   const buildTransferPayload = useCallback((ids: string[]): DraggedNodeTransfer | null => {

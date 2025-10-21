@@ -194,7 +194,7 @@ const PlantUMLOfflineDiagram: React.FC<{ code: string }> = ({ code }) => {
   }
 
   if (state.status === 'error') {
-    return <PlantUMLError message={state.error ?? 'Unable to render PlantUML diagram locally.'} details={state.details} />;
+    return <PlantUMLError message={state.error ?? 'Unable to render PlantUML diagram locally.'} details={state.details ?? null} />;
   }
 
   if (state.status === 'success' && state.svg) {
@@ -213,7 +213,7 @@ const PlantUMLOfflineDiagram: React.FC<{ code: string }> = ({ code }) => {
   return (
     <PlantUMLError
       message="Local PlantUML renderer did not return any SVG output."
-      details={state.details}
+      details={state.details ?? null}
     />
   );
 };
