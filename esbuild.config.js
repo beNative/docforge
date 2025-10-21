@@ -1,6 +1,4 @@
 const esbuild = require('esbuild');
-const fs = require('fs/promises');
-const path = require('path');
 const isWatch = process.argv.includes('--watch');
 
 const sharedConfig = {

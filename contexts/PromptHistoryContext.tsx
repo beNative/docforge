@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import { createContext, useContext } from 'react';
 import type { DocVersion } from '../types';
 
 // Fix: This file was empty, causing module resolution errors.

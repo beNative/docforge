@@ -103,8 +103,8 @@ export class PdfRenderer implements IRenderer {
 
   async render(
     content: string,
-    addLog?: (level: LogLevel, message: string) => void,
-    languageId?: string | null,
+    _addLog?: (level: LogLevel, message: string) => void,
+    _languageId?: string | null,
     _settings?: Settings,
   ) {
     return { output: <PdfPreview content={content} /> };

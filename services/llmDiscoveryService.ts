@@ -57,7 +57,7 @@ export const llmDiscoveryService = {
         if (response.ok) {
           return { ...service, id: `${service.apiType}-${new URL(service.modelsUrl).port}` };
         }
-      } catch (error) {
+      } catch {
         // This is expected if the service isn't running, so we can ignore the error.
       }
       return null;

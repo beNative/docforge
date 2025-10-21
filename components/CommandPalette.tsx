@@ -98,7 +98,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
             e.preventDefault();
             setSelectedIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
             break;
-        case 'Enter':
+        case 'Enter': {
             e.preventDefault();
             const command = filteredCommands[selectedIndex];
             if (command) {
@@ -106,6 +106,7 @@ const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose, comman
                 onExecute();
             }
             break;
+        }
         case 'Escape':
             e.preventDefault();
             onClose();

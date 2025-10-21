@@ -5,9 +5,6 @@ import { DEFAULT_SETTINGS } from '../constants';
 import { ensureMonaco } from '../services/editor/monacoLoader';
 import { applyDocforgeTheme } from '../services/editor/monacoTheme';
 
-// Let TypeScript know monaco is available on the window
-declare const monaco: any;
-
 interface CodeEditorProps {
   content: string;
   language: string | null;
@@ -306,7 +303,6 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 monacoInstanceRef.current = editorInstance;
                 applyEditorShortcuts();
             } catch (error) {
-                // eslint-disable-next-line no-console
                 console.error('Failed to initialize Monaco editor', error);
             }
         };

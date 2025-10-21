@@ -182,57 +182,6 @@ const populateDocumentSearch = (targetDb: Database = db) => {
   `);
 };
 
-// Helper function from languageService.ts, now inside database.ts to avoid cross-context dependencies
-const mapExtensionToLanguageId_local = (extension: string | null): string => {
-    if (!extension) return 'plaintext';
-    switch (extension.toLowerCase()) {
-        case 'js': case 'jsx': return 'javascript';
-        case 'ts': case 'tsx': return 'typescript';
-        case 'py': return 'python';
-        case 'html': case 'htm': return 'html';
-        case 'css': return 'css';
-        case 'json': return 'json';
-        case 'md': case 'markdown': return 'markdown';
-        case 'java': return 'java';
-        case 'cs': return 'csharp';
-        case 'cpp': case 'cxx': case 'h': case 'hpp': return 'cpp';
-        case 'go': return 'go';
-        case 'rs': return 'rust';
-        case 'rb': return 'ruby';
-        case 'php': return 'php';
-        case 'sql': return 'sql';
-        case 'xml': return 'xml';
-        case 'yml': case 'yaml': return 'yaml';
-        case 'pas': return 'pascal';
-        case 'dfm':
-        case 'lfm':
-        case 'fmx':
-        case 'ini':
-            return 'ini';
-        case 'application/pdf':
-        case 'pdf':
-            return 'pdf';
-        case 'png':
-        case 'jpg':
-        case 'jpeg':
-        case 'gif':
-        case 'bmp':
-        case 'webp':
-        case 'svg':
-        case 'svgz':
-        case 'image/png':
-        case 'image/jpg':
-        case 'image/jpeg':
-        case 'image/gif':
-        case 'image/bmp':
-        case 'image/webp':
-        case 'image/svg':
-        case 'image/svg+xml':
-            return 'image';
-        default: return 'plaintext';
-    }
-};
-
 const configureConnection = (connection: Database, dbExists: boolean) => {
   if (!dbExists) {
     console.log('Database does not exist, creating new one...');
@@ -606,17 +555,16 @@ export const databaseService = {
         // Insert Settings
         const settingsStmt = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)');
         for (const setting of data.settings) {
-             // The `transformLegacyData` in renderer has a bug where it uses String(value)
+            // The `transformLegacyData` in renderer has a bug where it uses String(value)
             // instead of JSON.stringify(value). This is problematic for empty strings,
-            // which are not valid JSON. We store it as a stringified empty string
-            // to be compatible with `JSON.parse` on the renderer side.
-            const valueToStore = setting.value === '' ? '""' : JSON.stringify(setting.value);
-            // Re-parsing what is essentially a stringified primitive to store a valid JSON string.
+            // which are not valid JSON. Normalize the value before parsing so that
+            // the stored JSON remains valid.
+            const normalizedValue = setting.value === '' ? '""' : setting.value;
             try {
-                const parsed = JSON.parse(setting.value);
+                const parsed = JSON.parse(normalizedValue);
                 settingsStmt.run(setting.key, JSON.stringify(parsed));
             } catch {
-                 settingsStmt.run(setting.key, JSON.stringify(setting.value));
+                settingsStmt.run(setting.key, JSON.stringify(normalizedValue));
             }
         }
 
@@ -957,7 +905,7 @@ export const databaseService = {
 
         const getContentId = (content: string): number => {
             const sha = crypto.createHash('sha256').update(content).digest('hex');
-            let contentRow = db.prepare('SELECT content_id FROM content_store WHERE sha256_hex = ?').get(sha) as { content_id: number } | undefined;
+            const contentRow = db.prepare('SELECT content_id FROM content_store WHERE sha256_hex = ?').get(sha) as { content_id: number } | undefined;
             if (contentRow) {
                 return contentRow.content_id;
             }

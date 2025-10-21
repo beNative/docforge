@@ -12,7 +12,7 @@ export const useLLMStatus = (providerUrl: string): LLMStatus => {
       // Use the origin of the provided URL for a general health check
       // e.g., http://localhost:11434/api/generate -> http://localhost:11434
       checkUrl = new URL(providerUrl).origin;
-    } catch (e) {
+    } catch {
       // If the URL is invalid, we can't check it.
       setStatus('error');
       return;
@@ -31,7 +31,7 @@ export const useLLMStatus = (providerUrl: string): LLMStatus => {
         if (isMounted) {
           setStatus(response.ok ? 'connected' : 'error');
         }
-      } catch (error) {
+      } catch {
         if (isMounted) {
           setStatus('error');
         }

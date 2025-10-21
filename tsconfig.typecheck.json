@@ -1,11 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "release",
-    "services/preview/__tests__",
-    "vitest.config.ts"
-  ]
+  "exclude": ["node_modules", "dist", "release"]
 }

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import IconButton from './IconButton';
-import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, SearchIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, PencilIcon, SparklesIcon } from './Icons';
+import { GearIcon, InfoIcon, TerminalIcon, SearchIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, PencilIcon, SparklesIcon } from './Icons';
 import ThemeToggleButton from './ThemeToggleButton';
 import { useLogger } from '../hooks/useLogger';
 import type { Command } from '../types';
@@ -54,7 +54,7 @@ const CommandPaletteSearch: React.FC<CommandPaletteSearchProps> = ({
     </div>
 );
 
-const WindowControls: React.FC<{ platform: string, isMaximized: boolean }> = ({ platform, isMaximized }) => {
+const WindowControls: React.FC<{ isMaximized: boolean }> = ({ isMaximized }) => {
   const { addLog } = useLogger();
   // Fix: Use optional chaining, which is now type-safe.
   const handleMinimize = () => { addLog('INFO', 'User action: Minimize window.'); window.electronAPI?.minimizeWindow(); };
@@ -142,7 +142,7 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
                 </IconButton>
             </div>
             
-            <WindowControls platform={platform} isMaximized={isMaximized} />
+            <WindowControls isMaximized={isMaximized} />
         </header>
     );
 };

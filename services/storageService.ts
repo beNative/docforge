@@ -63,7 +63,7 @@ export const storageService = {
    * A more robust implementation would require main process changes. This is a placeholder.
    * @param content The string content to append.
    */
-  appendLogToFile: async (content: string): Promise<void> => {
+  appendLogToFile: async (_content: string): Promise<void> => {
     // This feature is not fully implemented in the electron backend.
     // Logging a warning to avoid silent failures.
     if (window.electronAPI) {

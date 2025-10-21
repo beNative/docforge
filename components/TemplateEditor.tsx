@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { DocumentTemplate } from '../types';
 import { TrashIcon } from './Icons';
 import { useHistoryState } from '../hooks/useHistoryState';
-import IconButton from './IconButton';
 import Button from './Button';
 
 declare const Prism: any;

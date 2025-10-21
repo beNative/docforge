@@ -57,16 +57,23 @@ Run `specify check` inside the repository to confirm prerequisites.
 ### Create a Feature Specification
 
 1. Generate a scaffolded spec folder and branch slug:
-   ```bash
-   .specify/scripts/bash/create-new-feature.sh "<feature summary>"
-   ```
+    ```bash
+    .specify/scripts/bash/create-new-feature.sh "<feature summary>"
+    ```
 2. Use your preferred AI assistant with the `/speckit.*` commands to fill out the artifacts:
-   - `/speckit.constitution` updates the governance document.
-   - `/speckit.specify`, `/speckit.plan`, and `/speckit.tasks` populate the feature spec, technical plan, and task list.
-   - `/speckit.implement` can translate an approved plan into code.
+    - `/speckit.constitution` updates the governance document.
+    - `/speckit.specify`, `/speckit.plan`, and `/speckit.tasks` populate the feature spec, technical plan, and task list.
+    - `/speckit.implement` can translate an approved plan into code.
 3. Commit the spec folder before beginning implementation so reviewers can trace scope and acceptance criteria.
 
 ## Development Checks
+
+Run the ESLint baseline and Prettier formatting check to ensure zero-warning output before committing:
+
+```bash
+npm run lint
+npm run format:check
+```
 
 Run the strict TypeScript baseline before committing changes:
 

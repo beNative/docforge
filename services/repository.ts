@@ -5,7 +5,6 @@ import type {
   NodeType,
   DocType,
   DocumentOrFolder,
-  DocumentVersion,
   DocumentTemplate,
   Settings,
   ContentStore,
@@ -192,19 +191,6 @@ const findNodeWithParent = (
     return { node: null, parent: null, index: -1 };
 };
 
-const removeNodeFromCollection = (collection: Node[], index: number) => {
-    collection.splice(index, 1);
-};
-
-const collectDescendantNodeIds = (node: Node, accumulator: string[] = []): string[] => {
-    accumulator.push(node.node_id);
-    if (node.children) {
-        for (const child of node.children) {
-            collectDescendantNodeIds(child, accumulator);
-        }
-    }
-    return accumulator;
-};
 
 const deleteDocumentData = (state: BrowserState, node: Node) => {
     if (node.document) {
@@ -246,7 +232,7 @@ const createSnippetFromContent = (content: string, term: string, snippetLength: 
     }
 
     const halfWindow = Math.max(0, Math.floor((snippetLength - lowerTerm.length) / 2));
-    let start = Math.max(0, matchIndex - halfWindow);
+    const start = Math.max(0, matchIndex - halfWindow);
     let end = Math.min(normalizedContent.length, matchIndex + lowerTerm.length + halfWindow);
 
     if (end - start > snippetLength) {
@@ -917,7 +903,7 @@ export const repository = {
 
         const sha = await cryptoService.sha256(newContent);
 
-        let content = await window.electronAPI!.dbGet(`SELECT content_id FROM content_store WHERE sha256_hex = ?`, [sha]);
+        const content = await window.electronAPI!.dbGet(`SELECT content_id FROM content_store WHERE sha256_hex = ?`, [sha]);
         let contentId;
         if (content) {
             contentId = content.content_id;

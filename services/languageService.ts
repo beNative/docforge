@@ -1,5 +1,3 @@
-import type { DocumentTemplate } from '../types';
-
 export const SUPPORTED_LANGUAGES = [
     { id: 'plaintext', label: 'Plain Text' },
     { id: 'javascript', label: 'JavaScript' },
@@ -103,9 +101,10 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
         case 'image/svg':
         case 'image/svg+xml':
             return 'image';
-        default:
+        default: {
             // Try to find a direct match in supported languages by id
             const match = SUPPORTED_LANGUAGES.find(l => l.id === extension.toLowerCase());
             return match ? match.id : 'plaintext';
+        }
     }
 }

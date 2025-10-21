@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import ReactDOM from 'react-dom';
 import { useDocuments } from './hooks/usePrompts';
 import { useTemplates } from './hooks/useTemplates';
 import { useSettings } from './hooks/useSettings';
@@ -137,7 +136,7 @@ interface UpdateToastState {
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
     const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, isLoading: areDocumentsLoading } = useDocuments();
-    const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
+    const { templates, addTemplate, updateTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
     
     const [tabState, setTabState] = useState<TabState>({ activeId: null, order: [] });

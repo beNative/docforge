@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 // Fix: Import correct types. DocumentVersion is an alias for DocVersion now.
-import type { DocumentOrFolder, DocumentVersion as Version } from '../types';
+import type { DocumentOrFolder } from '../types';
 // Fix: Import the new standalone hook.
 import { useDocumentHistory } from '../hooks/usePromptHistory';
 import Modal from './Modal';

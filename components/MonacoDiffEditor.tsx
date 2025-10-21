@@ -4,9 +4,6 @@ import { DEFAULT_SETTINGS } from '../constants';
 import { ensureMonaco } from '../services/editor/monacoLoader';
 import { applyDocforgeTheme } from '../services/editor/monacoTheme';
 
-// Let TypeScript know monaco is available on the window
-declare const monaco: any;
-
 interface MonacoDiffEditorProps {
   oldText: string;
   newText: string;
@@ -154,8 +151,7 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
                     });
                 }
             } catch (error) {
-                // eslint-disable-next-line no-console
-                console.error('Failed to initialize Monaco diff editor', error);
+                    console.error('Failed to initialize Monaco diff editor', error);
             }
         };
 

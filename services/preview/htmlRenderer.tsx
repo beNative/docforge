@@ -39,7 +39,7 @@ export class HtmlRenderer implements IRenderer {
 
   async render(
     content: string,
-    addLog?: (level: LogLevel, message: string) => void,
+    _addLog?: (level: LogLevel, message: string) => void,
     _languageId?: string | null,
     _settings?: Settings,
   ): Promise<{ output: React.ReactElement; error?: string }> {

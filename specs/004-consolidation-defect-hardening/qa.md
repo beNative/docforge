@@ -15,6 +15,7 @@
 
 | Date | Environment | Command / Scenario | Result | Notes |
 | 2025-10-21 | local devcontainer | `npx tsc --noEmit` | PASS | Verified strict compiler settings after Database and renderer type updates.【f6ed19†L1-L2】【884b30†L1-L18】 |
+| 2025-10-22 | local devcontainer | `npm run typecheck` | PASS | Re-enabled preview fixtures/Vitest config in the strict sweep; `services/preview/__tests__` and `vitest.config.ts` now compile cleanly.【ae4380†L1-L5】【11a544†L1-L14】 |
 
 ## IPC Validation Summary
 

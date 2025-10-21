@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { previewService } from '../services/previewService';
 import Spinner from './Spinner';
-import { useTheme } from '../hooks/useTheme';
 import type { LogLevel, Settings } from '../types';
 
 interface PreviewPaneProps {
@@ -16,7 +15,6 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
   const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { theme } = useTheme();
 
   useEffect(() => {
     let isCancelled = false;
