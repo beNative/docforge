@@ -12,7 +12,7 @@ import { DEFAULT_SETTINGS } from '../../../constants';
 const codeToHtmlMock = vi.fn((code: string) => {
   const lines = code.split('\n');
   const lineHtml = lines
-    .map((line) => `<span class="line">${line}</span>`)
+    .map((line) => `<span class="line"><span style="color:#d73a49">${line}</span></span>`)
     .join('');
   return `<pre class="shiki"><code>${lineHtml}</code></pre>`;
 });
@@ -60,13 +60,13 @@ interface ParityFixture {
   removeGithubSelectors?: string[];
 }
 
-const renderMarkdown = async (markdown: string) => {
+const renderMarkdown = async (markdown: string, theme: 'light' | 'dark' = 'light') => {
   const renderer = new MarkdownRenderer();
   const { output } = await renderer.render(markdown, undefined, 'markdown', DEFAULT_SETTINGS);
   let utils: ReturnType<typeof render> | undefined;
   await act(async () => {
     utils = render(
-      <ThemeContext.Provider value={{ theme: 'light', toggleTheme: vi.fn() }}>
+      <ThemeContext.Provider value={{ theme, toggleTheme: vi.fn() }}>
         <IconProvider value={{ iconSet: 'heroicons' }}>{output}</IconProvider>
       </ThemeContext.Provider>,
     );
@@ -160,11 +160,31 @@ describe('MarkdownRenderer', () => {
     expect(inline?.textContent).toBe('inline');
 
     const styles = container.querySelector('style')?.textContent ?? '';
+    expect(styles).toMatch(/--df-inline-code-bg:\s*rgba\(var\(--color-border\), 0\.35\)/);
+    expect(styles).toMatch(/--df-inline-code-border-color:\s*rgba\(var\(--color-border\), 0\.55\)/);
     expect(styles).toMatch(/\.df-markdown :not\(pre\) > code \{/);
     expect(styles).toMatch(/font-size:\s*var\(--markdown-font-size, 16px\)/);
-    expect(styles).toMatch(/background:\s*rgba\(/);
+    expect(styles).toMatch(/background-color:\s*var\(--df-inline-code-bg\)/);
     expect(styles).toMatch(/border:\s*1px solid/);
+    expect(styles).toMatch(/var\(--df-inline-code-border-color\)/);
     expect(styles).toMatch(/font-family:\s*var\(--markdown-code-font-family, 'JetBrains Mono', monospace\)/);
+    expect(styles).toMatch(/\.df-markdown-container\.light \.df-markdown \{/);
+    expect(styles).toMatch(/--df-inline-code-bg:\s*#f6f8fa/);
+    expect(styles).toMatch(/--df-inline-code-border-color:\s*#d0d7de/);
+  });
+
+  it('applies theme-aware inline code backgrounds', async () => {
+    const { container: lightContainer } = await renderMarkdown('`light` mode inline');
+    const lightStyles = lightContainer.querySelector('style')?.textContent ?? '';
+    expect(lightStyles).toMatch(/\.df-markdown-container\.light \.df-markdown \{/);
+    expect(lightStyles).toMatch(/--df-inline-code-bg:\s*#f6f8fa/);
+    expect(lightStyles).toMatch(/--df-inline-code-border-color:\s*#d0d7de/);
+
+    const { container: darkContainer } = await renderMarkdown('`dark` mode inline', 'dark');
+    const darkStyles = darkContainer.querySelector('style')?.textContent ?? '';
+    expect(darkStyles).toMatch(/\.df-markdown-container\.dark \.df-markdown \{/);
+    expect(darkStyles).toMatch(/--df-inline-code-bg:\s*rgba\(240, 246, 252, 0\.18\)/);
+    expect(darkStyles).toMatch(/--df-inline-code-border-color:\s*rgba\(240, 246, 252, 0\.25\)/);
   });
 
   it('renders horizontal rules with visible divider styling', async () => {
@@ -175,7 +195,10 @@ describe('MarkdownRenderer', () => {
 
     const styles = container.querySelector('style')?.textContent ?? '';
     expect(styles).toMatch(/\.df-divider \{/);
-    expect(styles).toMatch(/border-top: 1px solid/);
+    expect(styles).toMatch(/--df-divider-color:\s*rgba\(var\(--color-border\), 0\.9\)/);
+    expect(styles).toMatch(/background-color:\s*var\(--df-divider-color\)/);
+    expect(styles).toMatch(/\.df-markdown-container\.light \.df-markdown \{/);
+    expect(styles).toMatch(/--df-divider-color:\s*#d0d7de/);
   });
 
   it('injects GitHub-style table, divider, and code block styles', async () => {
@@ -188,6 +211,32 @@ describe('MarkdownRenderer', () => {
     expect(styles).toMatch(/\.df-table-header,/);
     expect(styles).toMatch(/\.df-divider \{/);
     expect(styles).toMatch(/\.df-code-block \{/);
+    expect(styles).toMatch(/--df-code-block-bg:\s*rgba\(var\(--color-border\), 0\.25\)/);
+    expect(styles).toMatch(/\.df-markdown-container\.light \.df-markdown \{/);
+    expect(styles).toMatch(/--df-code-block-bg:\s*#f6f8fa/);
+    expect(styles).toMatch(/--df-table-border-color:\s*#d0d7de/);
+  });
+
+  it('adds GitHub-themed styling for tables and dividers in dark mode', async () => {
+    const markdown = ['| Col |', '| --- |', '| Val |', '', '---'].join('\n');
+    const { container } = await renderMarkdown(markdown, 'dark');
+
+    const styles = container.querySelector('style')?.textContent ?? '';
+    expect(styles).toMatch(/\.df-markdown-container\.dark \.df-markdown \{/);
+    expect(styles).toMatch(/--df-table-border-color:\s*rgba\(240, 246, 252, 0\.18\)/);
+    expect(styles).toMatch(/--df-divider-color:\s*rgba\(240, 246, 252, 0\.18\)/);
+  });
+
+  it('decorates highlighted code blocks with Shiki output and language badges', async () => {
+    const markdown = ['```ts', 'const answer = 42;', '```'].join('\n');
+    const { container } = await renderMarkdown(markdown);
+
+    const shikiBlock = container.querySelector('.df-code-block-shiki');
+    expect(shikiBlock).not.toBeNull();
+    expect(shikiBlock).toHaveAttribute('data-language', 'TS');
+    expect(shikiBlock?.querySelector('.shiki')).not.toBeNull();
+    expect(shikiBlock?.querySelectorAll('.line').length).toBeGreaterThan(0);
+    expect(shikiBlock?.querySelector('[style*="color"]')).not.toBeNull();
   });
 
   it('renders accessible GitHub-style tables with semantic sections', async () => {

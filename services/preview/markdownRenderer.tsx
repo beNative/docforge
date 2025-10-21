@@ -353,6 +353,14 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
           line-height: var(--markdown-line-height, 1.7);
           color: rgb(var(--color-text-main));
           font-family: var(--markdown-body-font-family, 'Inter, sans-serif');
+          --df-inline-code-bg: rgba(var(--color-border), 0.35);
+          --df-inline-code-border-color: rgba(var(--color-border), 0.55);
+          --df-code-block-bg: rgba(var(--color-border), 0.25);
+          --df-code-block-border-color: rgba(var(--color-border), 0.6);
+          --df-table-border-color: rgba(var(--color-border), 0.65);
+          --df-table-header-bg: rgba(var(--color-border), 0.35);
+          --df-table-row-alt-bg: rgba(var(--color-border), 0.18);
+          --df-divider-color: rgba(var(--color-border), 0.9);
         }
 
         .df-markdown > * {
@@ -426,11 +434,12 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-markdown :not(pre) > code {
-          background: rgba(var(--color-border), 0.25);
+          display: inline-block;
+          background-color: var(--df-inline-code-bg);
           color: rgb(var(--color-text-main));
           padding: 0.2rem 0.45rem;
           border-radius: 0.35rem;
-          border: 1px solid rgba(var(--color-border), 0.5);
+          border: 1px solid var(--df-inline-code-border-color);
           font-family: var(--markdown-code-font-family, 'JetBrains Mono', monospace);
           font-size: var(--markdown-font-size, 16px);
           line-height: inherit;
@@ -438,8 +447,8 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-code-block {
-          background: var(--markdown-code-block-background, rgba(var(--color-text-secondary), 0.08));
-          border: 1px solid rgba(var(--color-border), 0.95);
+          background: var(--markdown-code-block-background, var(--df-code-block-bg));
+          border: 1px solid var(--df-code-block-border-color);
           border-radius: 0.9rem;
           padding: 1.25rem 1.5rem;
           font-family: var(--markdown-code-font-family, 'JetBrains Mono', monospace);
@@ -530,7 +539,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         .df-table-wrapper {
           overflow-x: auto;
           border-radius: 0.75rem;
-          border: 1px solid rgba(var(--color-border), 0.55);
+          border: 1px solid var(--df-table-border-color);
           background: rgba(var(--color-background), 0.96);
           margin: calc(var(--markdown-font-size, 16px) * 1.25) 0;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -543,16 +552,16 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         }
 
         .df-table-head .df-table-header {
-          background: rgba(var(--color-border), 0.15);
+          background: var(--df-table-header-bg);
         }
 
         .df-table-body .df-table-row:nth-child(even) .df-table-cell {
-          background: rgba(var(--color-border), 0.08);
+          background: var(--df-table-row-alt-bg);
         }
 
         .df-table-header,
         .df-table-cell {
-          border: 1px solid rgba(var(--color-border), 0.5);
+          border: 1px solid var(--df-table-border-color);
           padding: 0.75rem 1rem;
           text-align: left;
           vertical-align: top;
@@ -582,10 +591,32 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
 
         .df-divider {
           border: none;
-          border-top: 1px solid rgba(var(--color-border), 0.75);
-          background: rgba(var(--color-border), 0.75);
           height: 1px;
           margin: calc(var(--markdown-font-size, 16px) * 2.5) 0;
+          background-color: var(--df-divider-color);
+        }
+
+        .df-markdown-container.light .df-markdown {
+          --df-inline-code-bg: #f6f8fa;
+          --df-inline-code-border-color: #d0d7de;
+          --df-code-block-bg: #f6f8fa;
+          --df-code-block-border-color: #d0d7de;
+          --df-table-border-color: #d0d7de;
+          --df-table-header-bg: #f6f8fa;
+          --df-table-row-alt-bg: #f0f3f6;
+          --df-divider-color: #d0d7de;
+          color: #1f2328;
+        }
+
+        .df-markdown-container.dark .df-markdown {
+          --df-inline-code-bg: rgba(240, 246, 252, 0.18);
+          --df-inline-code-border-color: rgba(240, 246, 252, 0.25);
+          --df-code-block-bg: rgba(240, 246, 252, 0.07);
+          --df-code-block-border-color: rgba(240, 246, 252, 0.2);
+          --df-table-border-color: rgba(240, 246, 252, 0.18);
+          --df-table-header-bg: rgba(240, 246, 252, 0.07);
+          --df-table-row-alt-bg: rgba(240, 246, 252, 0.05);
+          --df-divider-color: rgba(240, 246, 252, 0.18);
         }
 
         .df-image {
