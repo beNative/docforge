@@ -52,7 +52,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  useImperativeHandle(ref, () => containerRef.current);
+  useImperativeHandle(ref, () => containerRef.current as HTMLDivElement);
 
   const [scale, setScaleState] = useState(initialScale);
   const [offset, setOffsetState] = useState({ x: 0, y: 0 });

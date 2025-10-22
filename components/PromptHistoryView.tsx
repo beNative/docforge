@@ -116,8 +116,9 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
 
   const handleCopy = async () => {
     if (!focusedVersion) return;
+    const contentToCopy = focusedVersion.content ?? '';
     try {
-        await navigator.clipboard.writeText(focusedVersion.content);
+        await navigator.clipboard.writeText(contentToCopy);
         setIsCopied(true);
         setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
@@ -328,7 +329,9 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                         <IconButton
                             onClick={() => {
                                 addLog('INFO', `User action: Restore version for document "${document.title}".`);
-                                onRestore(focusedVersion.content);
+                                if (focusedVersion?.content !== undefined) {
+                                    onRestore(focusedVersion.content);
+                                }
                             }}
                             disabled={focusedIndex === 0}
                             tooltip="Restore Selected Version"
@@ -342,8 +345,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                 
                 <div className="flex-1 min-h-0">
                     <MonacoDiffEditor
-                        oldText={olderVersion ? olderVersion.content : ''}
-                        newText={newerVersion ? newerVersion.content : ''}
+                        oldText={olderVersion?.content ?? ''}
+                        newText={newerVersion?.content ?? ''}
                         language={document.language_hint || 'plaintext'}
                         renderMode={diffRenderMode}
                         readOnly

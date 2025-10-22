@@ -358,6 +358,9 @@ const transformLegacyData = async (
                 doc_type: 'prompt',
                 language_hint: null,
                 default_view_mode: null,
+                language_source: 'unknown',
+                doc_type_source: 'unknown',
+                classification_updated_at: null,
                 current_version_id: null, // placeholder
             });
 

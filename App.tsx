@@ -1458,7 +1458,7 @@ const MainApp: React.FC = () => {
                             <p className="text-xs text-text-secondary">Grant clipboard access in your operating system settings, then try again.</p>
                         </div>
                     ),
-                    helpUrl,
+                    ...(helpUrl ? { helpUrl } : {}),
                 });
                 return;
             }

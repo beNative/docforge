@@ -102,7 +102,8 @@ const detectMimeFromBytes = (bytes: Uint8Array): SupportedImageType | null => {
 const createBlobUrlFromBytes = (bytes: Uint8Array, hintedType: SupportedImageType | null) => {
   const mimeType = detectMimeFromBytes(bytes) ?? hintedType ?? FALLBACK_IMAGE_TYPE;
   try {
-    return { url: URL.createObjectURL(new Blob([bytes], { type: mimeType })), isBlobUrl: true, mimeType };
+    const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    return { url: URL.createObjectURL(new Blob([arrayBuffer], { type: mimeType })), isBlobUrl: true, mimeType };
   } catch {
     return { url: null as string | null, isBlobUrl: false, mimeType };
   }

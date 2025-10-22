@@ -13,7 +13,7 @@ interface PreviewPaneProps {
 }
 
 const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ content, language, onScroll, addLog, settings }, ref) => {
-  const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | null>(null);
+  const [renderedOutput, setRenderedOutput] = useState<React.ReactNode>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { theme } = useTheme();
@@ -40,11 +40,10 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
           // Clone the returned element to inject the ref and onScroll handler
           // This allows renderers to provide components that can be scroll-synced.
           if (React.isValidElement(result.output)) {
-            const elementWithProps = React.cloneElement(result.output, { ref, onScroll });
-            setRenderedOutput(elementWithProps);
+            setRenderedOutput(result.output);
           } else {
             // Fallback for non-element outputs, though our current renderers all return elements.
-            setRenderedOutput(<div ref={ref} onScroll={onScroll}>{result.output}</div>);
+            setRenderedOutput(<div>{result.output}</div>);
           }
         }
         setIsLoading(false);
@@ -61,7 +60,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
   }, [content, language, addLog, ref, onScroll, settings]);
 
   return (
-    <div className="w-full h-full bg-secondary">
+    <div ref={ref} onScroll={onScroll} className="w-full h-full bg-secondary">
       {isLoading && (
         <div className="flex items-center justify-center h-full text-text-secondary p-6">
             <Spinner />

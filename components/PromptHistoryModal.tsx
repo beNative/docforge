@@ -36,6 +36,8 @@ const DocumentHistoryModal: React.FC<DocumentHistoryModalProps> = ({ document, o
 
   const selectedVersion = versionsWithCurrent[selectedIndex];
   const previousVersion = versionsWithCurrent[selectedIndex + 1];
+  const selectedVersionContent = selectedVersion?.content ?? '';
+  const previousVersionContent = previousVersion?.content ?? '';
 
   const handleCopy = async (content: string) => {
     try {
@@ -83,10 +85,10 @@ const DocumentHistoryModal: React.FC<DocumentHistoryModalProps> = ({ document, o
                     <p className="text-sm text-text-secondary">Compared to the previous version</p>
                 </div>
                  <div className="flex items-center gap-2">
-                    <IconButton onClick={() => handleCopy(selectedVersion.content)} tooltip={isCopied ? "Copied!" : "Copy Content"}>
+                    <IconButton onClick={() => handleCopy(selectedVersionContent)} tooltip={isCopied ? "Copied!" : "Copy Content"}>
                         {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
                     </IconButton>
-                    <Button onClick={() => onRestore(selectedVersion.content)} disabled={selectedIndex === 0} variant="secondary">
+                    <Button onClick={() => onRestore(selectedVersionContent)} disabled={selectedIndex === 0} variant="secondary">
                         <UndoIcon className="w-4 h-4 mr-2"/>
                         Restore this version
                     </Button>
@@ -95,8 +97,8 @@ const DocumentHistoryModal: React.FC<DocumentHistoryModalProps> = ({ document, o
             
             <div className="flex-1 min-h-0">
               <MonacoDiffEditor
-                  oldText={previousVersion ? previousVersion.content : ''}
-                  newText={selectedVersion.content}
+                  oldText={previousVersionContent}
+                  newText={selectedVersionContent}
                   language={document.language_hint || 'plaintext'}
               />
             </div>

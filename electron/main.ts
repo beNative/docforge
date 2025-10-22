@@ -21,17 +21,6 @@ declare const __dirname: string;
 
 // Note: The type declaration for process.resourcesPath has been moved to types.ts to centralize global augmentations.
 // This empty block is kept to satisfy the original file structure but the augmentation now happens in types.ts.
-declare global {
-  namespace NodeJS {
-    interface Process {
-      // The `resourcesPath` property is augmented in `types.ts`
-      // FIX: The augmentation from types.ts was not being picked up.
-      // Explicitly adding it here resolves the type error in this file.
-      resourcesPath: string;
-    }
-  }
-}
-
 // --- electron-log setup ---
 // Override console.log, console.error, etc. to write to a log file
 log.transports.file.resolvePathFn = () => path.join(app.getPath('userData'), 'logs', 'main.log');
@@ -154,8 +143,9 @@ pythonManager.events.on('run-status', (payload) => broadcastPythonEvent('python:
 // startup while still respecting the expectation that only published,
 // non-prerelease builds are considered when automatic updates are disabled for
 // prerelease channels.
-const originalGetLatestTagName = GitHubProvider.prototype.getLatestTagName;
-GitHubProvider.prototype.getLatestTagName = async function (this: GitHubProvider, cancellationToken) {
+const providerPrototype = GitHubProvider.prototype as any;
+const originalGetLatestTagName = providerPrototype.getLatestTagName as (this: GitHubProvider, token: unknown) => Promise<string>;
+providerPrototype.getLatestTagName = async function (this: GitHubProvider, cancellationToken: unknown) {
     const { owner, repo, host } = this.options;
     const apiHost = !host || host === 'github.com' ? 'https://api.github.com' : `https://${host}`;
     const apiPathPrefix = host && !['github.com', 'api.github.com'].includes(host) ? '/api/v3' : '';
@@ -176,7 +166,7 @@ GitHubProvider.prototype.getLatestTagName = async function (this: GitHubProvider
             const rawResponse = await this.httpRequest(
                 buildApiUrl(`/repos/${owner}/${repo}/releases/latest`),
                 requestHeaders,
-                cancellationToken
+                cancellationToken as any
             );
 
             if (!rawResponse) {
@@ -203,7 +193,7 @@ GitHubProvider.prototype.getLatestTagName = async function (this: GitHubProvider
             const rawResponse = await this.httpRequest(
                 buildApiUrl(`/repos/${owner}/${repo}/releases?per_page=15`),
                 requestHeaders,
-                cancellationToken
+                cancellationToken as any
             );
 
             if (!rawResponse) {

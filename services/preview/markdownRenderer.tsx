@@ -13,7 +13,7 @@ import type { LogLevel, Settings } from '../../types';
 import { DEFAULT_SETTINGS } from '../../constants';
 import { useTheme } from '../../hooks/useTheme';
 import { getSharedHighlighter } from './shikiHighlighter';
-import { PlantUMLDiagram, PLANTUML_LANGS } from './plantumlDiagram';
+import { PlantUMLDiagram, isPlantUmlLanguage } from './plantumlDiagram';
 import ZoomPanContainer from '../../components/ZoomPanContainer';
 
 import 'katex/dist/katex.min.css';
@@ -129,7 +129,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
   const rehypePlugins = useMemo(() => [rehypeSlug, rehypeKatex, rehypeRaw], []);
 
   const components = useMemo<Components>(() => ({
-    code({ inline, className, children, ...props }) {
+    code({ inline, className, children, ...props }: React.ComponentProps<'code'> & { inline?: boolean }) {
       if (inline) {
         return (
           <code className="df-inline-code" {...props}>
@@ -161,7 +161,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         return <MermaidDiagram code={raw} theme={viewTheme} />;
       }
 
-      if (normalizedLanguage && PLANTUML_LANGS.includes(normalizedLanguage) && codeChild) {
+      if (normalizedLanguage && isPlantUmlLanguage(normalizedLanguage) && codeChild) {
         const raw = React.Children.toArray(codeChild.props.children)
           .map((child) => (typeof child === 'string' ? child : ''))
           .join('');
@@ -190,12 +190,13 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
             .replace(/\n(<\/code>)/g, '$1')
             .replace(/\n(<\/pre>)/g, '$1');
 
+          const { ref: _ignoredRef, ...rest } = props as React.ComponentProps<'pre'>;
           return (
             <div
               className={[baseClassName, 'df-code-block-shiki'].filter(Boolean).join(' ')}
               data-language={normalizedLanguage ? normalizedLanguage.toUpperCase() : undefined}
               dangerouslySetInnerHTML={{ __html: compactHtml }}
-              {...props}
+              {...(rest as React.HTMLAttributes<HTMLDivElement>)}
             />
           );
         } catch (error) {

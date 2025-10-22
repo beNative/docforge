@@ -3,6 +3,9 @@ import plantumlEncoder from 'plantuml-encoder';
 import type { Settings } from '../../types';
 
 export const PLANTUML_LANGS = ['plantuml', 'puml', 'uml'] as const;
+export const isPlantUmlLanguage = (value: string): value is (typeof PLANTUML_LANGS)[number] => {
+  return (PLANTUML_LANGS as readonly string[]).includes(value);
+};
 const PLANTUML_SERVER = 'https://www.plantuml.com/plantuml/svg';
 
 interface PlantUMLDiagramProps {

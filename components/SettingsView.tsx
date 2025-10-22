@@ -1970,10 +1970,10 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
                 <SettingRow label="Settings Transfer" description="Export the current configuration or import it from a JSON file.">
                     <div className="flex flex-col gap-3">
                         <div className="flex flex-wrap gap-2">
-                            <Button onClick={handleExport} variant="secondary" size="sm">
+                            <Button onClick={handleExport} variant="secondary" className="px-2 py-1 text-xs">
                                 Export Settings
                             </Button>
-                            <Button onClick={handleImport} variant="secondary" size="sm">
+                            <Button onClick={handleImport} variant="secondary" className="px-2 py-1 text-xs">
                                 Import Settings
                             </Button>
                         </div>
