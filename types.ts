@@ -30,6 +30,7 @@ declare global {
         filesData: { path: string; name: string; content: string }[],
         targetParentId: string | null
       ) => Promise<{ success: boolean; error?: string; createdNodes?: ImportedNodeSummary[] }>;
+      readClipboardText: () => Promise<{ success: boolean; text?: string; mimeType?: string | null; error?: string; errorCode?: string }>;
       legacyFileExists: (filename: string) => Promise<boolean>;
       readLegacyFile: (filename: string) => Promise<{ success: boolean, data?: string, error?: string }>;
       getAppVersion: () => Promise<string>;
