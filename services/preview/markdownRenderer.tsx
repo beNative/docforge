@@ -173,7 +173,8 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         const childArray = React.Children.toArray(children);
         const codeChild = childArray.find(
           (child) =>
-            React.isValidElement(child) && (child.type === 'code' || child.type === MarkdownCode)
+            React.isValidElement(child) &&
+            (child.type === 'code' || child.type === MarkdownCode)
         ) as React.ReactElement | undefined;
 
         const codeProps = (codeChild?.props ?? {}) as Record<string, unknown>;
