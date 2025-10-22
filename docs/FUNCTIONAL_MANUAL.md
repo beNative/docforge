@@ -27,7 +27,7 @@ The resizable left panel is your main navigation and organization area.
 
 - **Search:** A search bar at the top lets you filter your documents and folders. It instantly checks titles while also running a background full-text search across document bodies, returning contextual snippets with the matched terms highlighted so you can quickly confirm relevance.
 - **Documents List:** A hierarchical tree view of all your documents and folders.
-    - **Action Toolbar:** A toolbar at the top of the list provides icon buttons to quickly create a new document, create a new root folder, create a new document from a template, and expand/collapse all folders.
+    - **Action Toolbar:** A toolbar at the top of the list provides icon buttons to quickly create a new document, create a new document directly from clipboard contents, create a new root folder, create a new document from a template, and expand/collapse all folders.
     - **Folders:** Can be expanded or collapsed.
     - **Documents:** Individual document files. Selecting a document opens it in the Main Content Area.
 - **Templates List:** A separate panel below your documents for managing reusable templates. This panel is resizable; you can drag its top border to adjust its height.
@@ -57,6 +57,7 @@ This is the largest part of the application and displays the active content.
 
 The Folder Overview organizes key insights about the currently selected folder so you can triage and navigate quickly.
 
+- **Header Actions:** The folder overview header includes quick actions to create a document from the clipboard, start a blank document, add a subfolder, import files, or rename the folder inline without leaving the overview.
 - **Metrics Cards:** At the top of the overview, metric tiles display counts for documents, subfolders, and templates contained in the selection, along with the timestamp of the most recent change. Use these at-a-glance totals to gauge activity or verify that bulk operations completed as expected.
 - **Document Type & Language Summaries:** Pie charts and legend rows aggregate the detected document types and languages inside the folder. Hovering or focusing on a slice reveals the exact counts so you can spot imbalances (for example, many notes still in plaintext instead of Markdown).
 - **Recent Activity List:** The "Recent" section highlights the latest files touched within the folder. Entries include the title, relative path, and last modified time so you can reopen in-progress work or audit recent edits.

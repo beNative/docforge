@@ -1,10 +1,15 @@
 # QA Evidence Log – New from Clipboard
 
-- **Commit tested:** `d4634fce9cd3190cfc0e895f87b802e9d2e0c3b9`
+- **Commit tested:** `79ee715f2921e69c2b2ac06176ebfaf6dcbfeaf5`
 - **Packaging artifacts:** _None produced (packaging not yet executed)_
 
 | Date (UTC) | Scenario | Command | Raw Exit Status | CI Run | Notes |
 | --- | --- | --- | --- | --- | --- |
+| 2025-10-22 | Build pipeline check | `npm run build` | 0 | — | Succeeded locally; esbuild warns about a nullish coalescing check in `components/Sidebar.tsx`. |
+| 2025-10-22 | Type safety sweep | `npx tsc --noEmit` | 1 | — | Fails with 37 existing type errors unrelated to the clipboard additions; needs follow-up per T-DATA-01. |
+| 2025-10-22 | GUI test plan validation | `npm test` | 0 | — | Passes; validation confirms documentation matrix but does not exercise clipboard flows. |
+| 2025-10-22 | Release workflow verification | `npm run test:release` | 0 | — | Passes while highlighting missing Windows asset for v0.6.7 (falls back to v0.6.6). |
+| 2025-10-22 | Auto-update asset audit | `npm run test:auto-update` | 0 | — | Passes with all metadata assets present for v0.6.7. |
 | 2025-10-22 | Copy Markdown snippet → New from Clipboard → Markdown classification | Manual | n/a | — | Pending execution. |
 | 2025-10-22 | Copy JSON content → New from Clipboard → JSON syntax + activity log entry | Manual | n/a | — | Pending execution. |
 | 2025-10-22 | Copy TypeScript code → New from Clipboard → `source_code` document | Manual | n/a | — | Pending execution. |
