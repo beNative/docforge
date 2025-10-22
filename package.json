@@ -12,7 +12,6 @@
     "prepare:icons": "node scripts/prepare-icons.mjs",
     "test": "node scripts/validate-gui-test-plan.mjs",
     "test:markdown": "vitest run",
-    "typecheck": "tsc --noEmit --project tsconfig.typecheck.json",
     "test:release": "node --test scripts/__tests__/release-workflow.test.mjs",
     "test:auto-update": "node scripts/test-auto-update.mjs",
     "postinstall": "electron-builder install-app-deps",
@@ -27,7 +26,8 @@
     "lint": "eslint --ext .ts,.tsx,.mts,.cts --max-warnings=0 .",
     "lint:fix": "eslint --ext .ts,.tsx,.mts,.cts . --fix",
     "format": "prettier --write \"**/*.{cjs,js,ts,tsx,jsx,json,md,css,scss,html}\"",
-    "format:check": "prettier --check \"**/*.{cjs,js,ts,tsx,jsx,json,md,css,scss,html}\""
+    "format:check": "prettier --check \"**/*.{cjs,js,ts,tsx,jsx,json,md,css,scss,html}\"",
+    "typecheck": "tsc --noEmit --project tsconfig.typecheck.json"
   },
   "author": {
     "name": "Tim Sinaeve",
