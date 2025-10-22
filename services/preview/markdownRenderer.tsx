@@ -13,7 +13,7 @@ import type { LogLevel, Settings } from '../../types';
 import { DEFAULT_SETTINGS } from '../../constants';
 import { useTheme } from '../../hooks/useTheme';
 import { getSharedHighlighter } from './shikiHighlighter';
-import { PlantUMLDiagram, PLANTUML_LANGS, isPlantUmlLanguage } from './plantumlDiagram';
+import { PlantUMLDiagram, isPlantUmlLanguage } from './plantumlDiagram';
 import ZoomPanContainer from '../../components/ZoomPanContainer';
 
 import 'katex/dist/katex.min.css';
@@ -142,7 +142,6 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         })
         .join('');
     };
-
     const mergeClassNames = (
       ...classNames: Array<string | undefined | null | false>
     ): string => classNames.filter(Boolean).join(' ');
