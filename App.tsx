@@ -1755,23 +1755,30 @@ const MainApp: React.FC = () => {
     };
 
     const handleRenameSelection = useCallback(() => {
-        if (selectedIds.size !== 1) {
+        let targetId: string | null = null;
+
+        if (selectedIds.size === 1) {
+            [targetId] = Array.from(selectedIds);
+        } else if (selectedIds.size === 0) {
+            targetId = lastClickedId;
+        }
+
+        if (!targetId && activeNodeId) {
+            targetId = activeNodeId;
+        }
+
+        if (!targetId) {
             return;
         }
 
-        const [selectedId] = Array.from(selectedIds);
-        if (!selectedId) {
-            return;
-        }
-
-        const target = items.find(item => item.id === selectedId);
+        const target = items.find(item => item.id === targetId);
 
         if (!target || (target.type !== 'document' && target.type !== 'folder')) {
             return;
         }
 
-        handleStartRenamingNode(selectedId);
-    }, [selectedIds, items, handleStartRenamingNode]);
+        handleStartRenamingNode(targetId);
+    }, [selectedIds, lastClickedId, activeNodeId, items, handleStartRenamingNode]);
     
     const handleCopyNodeContent = useCallback(async (nodeId: string) => {
         const item = items.find(p => p.id === nodeId);
