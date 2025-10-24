@@ -49,6 +49,8 @@ interface SidebarProps {
   onRenameComplete: () => void;
   commands: Command[];
   customShortcuts: Record<string, string[]>;
+  pendingRevealId: string | null;
+  onRevealHandled: () => void;
 
   templates: DocumentTemplate[];
   activeTemplateId: string | null;
@@ -92,7 +94,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       return false;
     }
     const activeItem = props.documents.find(item => item.id === props.activeNodeId);
-    return activeItem?.type === 'folder' ?? false;
+    return (activeItem?.type ?? null) === 'folder';
   }, [props.documents, props.activeNodeId]);
 
 
@@ -254,7 +256,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     }
 
     if (navigableItems.length === 0) return;
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const platform = typeof navigator !== 'undefined' ? navigator.platform ?? '' : '';
+    const isMac = platform.toUpperCase().includes('MAC');
 
     const selectAllShortcut = getEffectiveShortcut('document-tree-select-all');
     if (matchesShortcut(e, selectAllShortcut)) {

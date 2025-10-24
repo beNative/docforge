@@ -673,6 +673,35 @@ const MainApp: React.FC = () => {
         }
     }, [getPrimarySelectionId, documentTree, moveItems, addLog]);
 
+    const handleCopyNodeContent = useCallback(async (nodeId: string) => {
+        const item = items.find(p => p.id === nodeId);
+        if (!item) {
+            addLog('WARNING', 'Cannot copy content of an unknown item.');
+            return;
+        }
+
+        if (item.type === 'folder') {
+            addLog('WARNING', 'Cannot copy content of a folder.');
+            return;
+        }
+
+        if (!item.content) {
+            addLog('WARNING', 'Cannot copy content of an empty document.');
+            return;
+        }
+
+        try {
+            if (typeof navigator === 'undefined' || !navigator.clipboard) {
+                throw new Error('Clipboard API is unavailable in this environment.');
+            }
+            await navigator.clipboard.writeText(item.content);
+            addLog('INFO', `Content of document "${item.title}" copied to clipboard.`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Unknown error';
+            addLog('ERROR', `Failed to copy to clipboard: ${message}`);
+        }
+    }, [items, addLog]);
+
     const handleCopySelectionContent = useCallback(() => {
         const doc = items.find(item => selectedIds.has(item.id) && item.type === 'document');
         if (!doc) {
@@ -1851,22 +1880,6 @@ const MainApp: React.FC = () => {
         handleStartRenamingNode(targetId);
     }, [selectedIds, lastClickedId, activeNodeId, items, handleStartRenamingNode]);
     
-    const handleCopyNodeContent = useCallback(async (nodeId: string) => {
-        const item = items.find(p => p.id === nodeId);
-        if (item && item.type === 'document' && item.content) {
-            try {
-                await navigator.clipboard.writeText(item.content);
-                addLog('INFO', `Content of document "${item.title}" copied to clipboard.`);
-            } catch (err) {
-                addLog('ERROR', `Failed to copy to clipboard: ${err instanceof Error ? err.message : 'Unknown error'}`);
-            }
-        } else if (item?.type === 'folder') {
-            addLog('WARNING', 'Cannot copy content of a folder.');
-        } else {
-            addLog('WARNING', 'Cannot copy content of an empty document.');
-        }
-    }, [items, addLog]);
-
     const handleModelChange = (modelId: string) => {
         addLog('INFO', `User action: Set LLM model to "${modelId}".`);
         saveSettings({ ...settings, llmModelName: modelId });

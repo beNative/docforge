@@ -56,27 +56,38 @@ export const matchesShortcut = (
  * e.g., ["Control", "N"] -> "Ctrl+N"
  */
 export const formatShortcutForDisplay = (keys: string[]): string => {
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    const formattedKeys = keys.map(key => {
-        if (isMac) {
-            switch (key) {
-                case 'Control': return '⌃';
-                case 'Meta': return '⌘';
-                case 'Alt': return '⌥';
-                case 'Shift': return '⇧';
-                default: return key.toUpperCase();
-            }
-        } else {
-            switch (key) {
-                case 'Control': return 'Ctrl';
-                case 'Meta': return 'Win';
-                case 'Alt': return 'Alt';
-                case 'Shift': return 'Shift';
-                default: return key.toUpperCase();
-            }
-        }
-    });
-    return formattedKeys.join('+');
+  const platform = typeof navigator !== 'undefined' ? navigator.platform ?? '' : '';
+  const isMac = platform.toUpperCase().includes('MAC');
+  const formattedKeys = keys.map(key => {
+    if (isMac) {
+      switch (key) {
+        case 'Control':
+          return '⌃';
+        case 'Meta':
+          return '⌘';
+        case 'Alt':
+          return '⌥';
+        case 'Shift':
+          return '⇧';
+        default:
+          return key.toUpperCase();
+      }
+    }
+
+    switch (key) {
+      case 'Control':
+        return 'Ctrl';
+      case 'Meta':
+        return 'Win';
+      case 'Alt':
+        return 'Alt';
+      case 'Shift':
+        return 'Shift';
+      default:
+        return key.toUpperCase();
+    }
+  });
+  return formattedKeys.join('+');
 };
 
 
