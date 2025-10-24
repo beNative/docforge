@@ -2367,7 +2367,7 @@ const MainApp: React.FC = () => {
         { id: 'new-subfolder', name: 'Create New Subfolder', action: handleNewSubfolder, category: 'File', icon: FolderDownIcon, shortcut: ['Control', 'Alt', 'Shift', 'N'], keywords: 'add create directory child' },
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
         { id: 'new-from-template', name: 'New Document from Template...', action: () => { addLog('INFO', 'Command: New Document from Template.'); setCreateFromTemplateOpen(true); }, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create file instance' },
-        { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: CopyIcon, shortcut: ['Control', 'D'], keywords: 'copy clone' },
+        { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: CopyIcon, shortcut: ['Control', 'Alt', 'D'], keywords: 'copy clone' },
         { id: 'rename-item', name: 'Rename Selected Item', action: handleRenameSelection, category: 'File', icon: PencilIcon, shortcut: ['F2'], keywords: 'rename edit title' },
         { id: 'delete-item', name: 'Delete Selection', action: () => handleDeleteSelection(selectedIds), category: 'File', icon: TrashIcon, shortcut: ['Delete'], keywords: 'remove discard' },
         { id: 'document-tree-select-all', name: 'Select All Tree Items', action: handleDocumentTreeSelectAll, category: 'Document Tree', icon: CheckIcon, shortcut: ['Control', 'A'], keywords: 'select highlight all tree' },
