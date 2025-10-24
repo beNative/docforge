@@ -49,10 +49,8 @@ console.log(`Log file will be written to: ${log.transports.file.getFile().path}`
 if (process.platform === 'win32') {
   const arch = process.arch === 'ia32' ? 'ia32' : process.arch === 'arm64' ? 'arm64' : 'x64';
   const channel = `win32-${arch}`;
-  if (autoUpdater.channel !== channel) {
-    console.log(`Configuring auto-updater channel for Windows architecture: ${channel}`);
-    autoUpdater.channel = channel;
-  }
+  console.log(`Tracking Windows auto-update channel preference: ${channel}`);
+  (autoUpdater as unknown as { __docforgeWindowsChannel?: string }).__docforgeWindowsChannel = channel;
 }
 
 let mainWindow: BrowserWindow | null;
@@ -242,6 +240,24 @@ GitHubProvider.prototype.getLatestTagName = async function (this: GitHubProvider
     console.warn('Falling back to the default electron-updater GitHub provider behaviour for tag resolution.');
     return originalGetLatestTagName.call(this, cancellationToken);
 };
+
+const originalChannelDescriptor = Object.getOwnPropertyDescriptor(GitHubProvider.prototype, 'channel');
+if (originalChannelDescriptor?.get) {
+    Object.defineProperty(GitHubProvider.prototype, 'channel', {
+        get(this: GitHubProvider) {
+            const forcedChannel = (this.updater as unknown as { __docforgeWindowsChannel?: string })?.__docforgeWindowsChannel;
+            if (typeof forcedChannel === 'string' && forcedChannel.trim().length > 0) {
+                try {
+                    return this.getCustomChannelName(forcedChannel);
+                } catch (error) {
+                    console.warn('Failed to apply Windows-specific auto-update channel override. Falling back to default channel resolution.', error);
+                }
+            }
+
+            return originalChannelDescriptor.get.call(this);
+        },
+    });
+}
 
 // --- Auto Updater Setup ---
 // Note: For auto-updates to work, you need to configure `electron-builder` in package.json
