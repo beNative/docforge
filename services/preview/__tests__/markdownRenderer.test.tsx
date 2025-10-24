@@ -66,7 +66,7 @@ const renderMarkdown = async (markdown: string, theme: 'light' | 'dark' = 'light
   let utils: ReturnType<typeof render> | undefined;
   await act(async () => {
     utils = render(
-      <ThemeContext.Provider value={{ theme, toggleTheme: vi.fn() }}>
+      <ThemeContext.Provider value={{ theme, setTheme: vi.fn(), toggleTheme: vi.fn() }}>
         <IconProvider value={{ iconSet: 'heroicons' }}>{output}</IconProvider>
       </ThemeContext.Provider>,
     );
