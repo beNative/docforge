@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Command } from '../types';
 import { formatShortcutForDisplay } from '../services/shortcutService';
-import { XIcon } from './Icons';
+import { TrashIcon, XIcon } from './Icons';
 import IconButton from './IconButton';
 
 interface KeybindingInputProps {
@@ -18,6 +18,13 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
     const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
+
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        setKeys([]);
+        onSet([]);
+        onCancel();
+        return;
+      }
 
       const newKeys = [];
       if (e.ctrlKey) newKeys.push('Control');
@@ -36,45 +43,57 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
     };
 
     const handleBlur = () => {
-        onCancel();
+      onCancel();
     };
 
     const inputEl = inputRef.current;
     if (inputEl) {
-        inputEl.focus();
-        inputEl.addEventListener('keydown', handleKeyDown);
-        inputEl.addEventListener('blur', handleBlur);
+      inputEl.focus();
+      inputEl.addEventListener('keydown', handleKeyDown);
+      inputEl.addEventListener('blur', handleBlur);
     }
-    
+
     return () => {
-        if (inputEl) {
-            inputEl.removeEventListener('keydown', handleKeyDown);
-            inputEl.removeEventListener('blur', handleBlur);
-        }
+      if (inputEl) {
+        inputEl.removeEventListener('keydown', handleKeyDown);
+        inputEl.removeEventListener('blur', handleBlur);
+      }
     };
   }, [onSet, onCancel]);
 
   return (
-      <div className="flex flex-col items-end">
-        <div className="flex items-center gap-2">
-            <div
-            ref={inputRef}
-            tabIndex={0}
-            className={`flex items-center h-8 px-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${conflict ? 'border-destructive-border' : 'border-border-color'}`}
-            >
-                <span className="text-text-secondary">
-                    {keys.length > 0 ? formatShortcutForDisplay(keys) : 'Press desired keys...'}
-                </span>
-            </div>
-            <IconButton onClick={onCancel} tooltip="Cancel" size="sm" variant="ghost">
-                <XIcon className="w-4 h-4" />
-            </IconButton>
+    <div className="flex flex-col items-end">
+      <div className="flex items-center gap-2">
+        <div
+          ref={inputRef}
+          tabIndex={0}
+          className={`flex items-center h-8 px-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${conflict ? 'border-destructive-border' : 'border-border-color'}`}
+        >
+          <span className="text-text-secondary">
+            {keys.length > 0 ? formatShortcutForDisplay(keys) : 'Press desired keys...'}
+          </span>
         </div>
-        {conflict && (
-            <p className="text-xs text-destructive-text mt-1">
-                Conflicts with: "{conflict.name}"
-            </p>
-        )}
+        <IconButton
+          onClick={() => {
+            setKeys([]);
+            onSet([]);
+            onCancel();
+          }}
+          tooltip="Clear Shortcut"
+          size="sm"
+          variant="ghost"
+        >
+          <TrashIcon className="w-4 h-4" />
+        </IconButton>
+        <IconButton onClick={onCancel} tooltip="Cancel" size="sm" variant="ghost">
+          <XIcon className="w-4 h-4" />
+        </IconButton>
       </div>
+      {conflict && (
+        <p className="text-xs text-destructive-text mt-1">
+          Conflicts with: "{conflict.name}"
+        </p>
+      )}
+    </div>
   );
 };
