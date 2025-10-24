@@ -146,7 +146,10 @@ const StatusBar: React.FC<StatusBarProps> = ({
           <span className="font-medium">{text}</span>
         </div>
         {showStatusTooltip && statusTriggerRef.current && (
-          <Tooltip targetRef={statusTriggerRef} content={tooltip} />
+          <Tooltip
+            targetRef={statusTriggerRef}
+            content={<span className="block whitespace-pre-line break-words leading-snug text-left">{tooltip}</span>}
+          />
         )}
         <div className="h-4 w-px bg-border-color"></div>
         <div className="flex items-center gap-1">
