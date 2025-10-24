@@ -12,6 +12,21 @@ interface ModalProps {
 
 const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    previouslyFocusedElementRef.current = document.activeElement as HTMLElement | null;
+
+    return () => {
+      const previouslyFocusedElement = previouslyFocusedElementRef.current;
+      if (previouslyFocusedElement && typeof previouslyFocusedElement.focus === 'function') {
+        // Delay focus restoration to ensure the modal has been fully removed from the DOM.
+        window.setTimeout(() => {
+          previouslyFocusedElement.focus();
+        }, 0);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
