@@ -19,6 +19,7 @@ interface DocumentListProps {
   onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void | Promise<void>;
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onCopyNodeContent: (id: string) => void;
+  copyContentTooltip: string;
   searchTerm: string;
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
@@ -45,6 +46,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
   onImportNodes,
   onDropFiles,
   onCopyNodeContent,
+  copyContentTooltip,
   searchTerm,
   expandedIds,
   onToggleExpand,
@@ -254,6 +256,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onDropFiles={onDropFiles}
                 onToggleExpand={onToggleExpand}
                 onCopyNodeContent={onCopyNodeContent}
+                copyContentTooltip={copyContentTooltip}
                 searchTerm={searchTerm}
                 onMoveUp={onMoveUp}
                 onMoveDown={onMoveDown}

@@ -1,10 +1,18 @@
 import type { Command, Settings } from '../types';
 
+export interface ShortcutLikeEvent {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}
+
 /**
  * Formats a keyboard event into a consistent string representation.
  * e.g., "Control+Shift+P"
  */
-export const formatShortcut = (e: KeyboardEvent): string => {
+export const formatShortcut = (e: ShortcutLikeEvent): string => {
   const parts: string[] = [];
   if (e.ctrlKey) parts.push('Control');
   if (e.metaKey) parts.push('Meta');
@@ -20,32 +28,66 @@ export const formatShortcut = (e: KeyboardEvent): string => {
   return parts.join('+');
 };
 
+export const matchesShortcut = (
+  event: ShortcutLikeEvent,
+  shortcut?: string[],
+  options?: { allowExtraShift?: boolean }
+): boolean => {
+  if (!shortcut || shortcut.length === 0) {
+    return false;
+  }
+
+  const expected = shortcut.join('+');
+  const actual = formatShortcut(event);
+  if (actual === expected) {
+    return true;
+  }
+
+  if (options?.allowExtraShift && event.shiftKey && !shortcut.includes('Shift')) {
+    const withoutShift = formatShortcut({ ...event, shiftKey: false });
+    return withoutShift === expected;
+  }
+
+  return false;
+};
+
 /**
  * Formats an array of keys into a user-friendly, compact display string.
  * e.g., ["Control", "N"] -> "Ctrl+N"
  */
 export const formatShortcutForDisplay = (keys: string[]): string => {
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    const formattedKeys = keys.map(key => {
-        if (isMac) {
-            switch (key) {
-                case 'Control': return '⌃';
-                case 'Meta': return '⌘';
-                case 'Alt': return '⌥';
-                case 'Shift': return '⇧';
-                default: return key.toUpperCase();
-            }
-        } else {
-            switch (key) {
-                case 'Control': return 'Ctrl';
-                case 'Meta': return 'Win';
-                case 'Alt': return 'Alt';
-                case 'Shift': return 'Shift';
-                default: return key.toUpperCase();
-            }
-        }
-    });
-    return formattedKeys.join('+');
+  const platform = typeof navigator !== 'undefined' ? navigator.platform ?? '' : '';
+  const isMac = platform.toUpperCase().includes('MAC');
+  const formattedKeys = keys.map(key => {
+    if (isMac) {
+      switch (key) {
+        case 'Control':
+          return '⌃';
+        case 'Meta':
+          return '⌘';
+        case 'Alt':
+          return '⌥';
+        case 'Shift':
+          return '⇧';
+        default:
+          return key.toUpperCase();
+      }
+    }
+
+    switch (key) {
+      case 'Control':
+        return 'Ctrl';
+      case 'Meta':
+        return 'Win';
+      case 'Alt':
+        return 'Alt';
+      case 'Shift':
+        return 'Shift';
+      default:
+        return key.toUpperCase();
+    }
+  });
+  return formattedKeys.join('+');
 };
 
 

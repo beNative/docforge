@@ -29,6 +29,7 @@ interface DocumentTreeItemProps {
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onToggleExpand: (id: string) => void;
   onCopyNodeContent: (id: string) => void;
+  copyContentTooltip: string;
   isKnownNodeId: (id: string) => boolean;
   searchTerm: string;
   onMoveUp: (id: string) => void;
@@ -104,6 +105,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onDropFiles,
     onToggleExpand,
     onCopyNodeContent,
+    copyContentTooltip,
     onMoveUp,
     onMoveDown,
     canMoveUp,
@@ -337,7 +339,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         <ArrowDownIcon className="w-3.5 h-3.5" />
                     </IconButton>
                     {!isFolder && (
-                        <IconButton onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }} tooltip="Copy Content" size="xs" variant="ghost">
+                        <IconButton onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }} tooltip={copyContentTooltip} size="xs" variant="ghost">
                             <CopyIcon className="w-3.5 h-3.5" />
                         </IconButton>
                     )}
@@ -378,6 +380,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         activeDocumentId={activeDocumentId}
                         canMoveUp={index > 0}
                         canMoveDown={index < node.children.length - 1}
+                        copyContentTooltip={copyContentTooltip}
                     />
                 ))}
             </ul>
