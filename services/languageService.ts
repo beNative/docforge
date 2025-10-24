@@ -20,6 +20,7 @@ export const SUPPORTED_LANGUAGES = [
     { id: 'sql', label: 'SQL' },
     { id: 'xml', label: 'XML' },
     { id: 'yaml', label: 'YAML' },
+    { id: 'toml', label: 'TOML' },
     { id: 'pascal', label: 'Pascal' },
     { id: 'ini', label: 'INI' },
     { id: 'pdf', label: 'PDF' },
@@ -74,13 +75,15 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
         case 'yml':
         case 'yaml':
             return 'yaml';
+        case 'toml':
+            return 'toml';
         case 'pas':
             return 'pascal';
         case 'dfm':
         case 'lfm':
         case 'fmx':
         case 'ini':
-             return 'ini';
+            return 'ini';
         case 'application/pdf':
             return 'pdf';
         case 'pdf':

@@ -202,6 +202,7 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
         case 'sql': return 'sql';
         case 'xml': return 'xml';
         case 'yml': case 'yaml': return 'yaml';
+        case 'toml': return 'toml';
         case 'pas': return 'pascal';
         case 'dfm':
         case 'lfm':
