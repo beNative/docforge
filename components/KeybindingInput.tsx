@@ -74,6 +74,7 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
           </span>
         </div>
         <IconButton
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => {
             setKeys([]);
             onSet([]);
