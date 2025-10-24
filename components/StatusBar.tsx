@@ -123,19 +123,19 @@ const StatusBar: React.FC<StatusBarProps> = ({
   };
 
   const selectStyles: React.CSSProperties = {
-      maxWidth: '200px',
-      backgroundImage: 'var(--select-arrow-background)',
-      backgroundPosition: 'right 0.2rem center',
-      backgroundRepeat: 'no-repeat',
-      backgroundSize: '1.2em 1.2em',
+    maxWidth: '160px',
+    backgroundImage: 'var(--select-arrow-background)',
+    backgroundPosition: 'right 0.2rem center',
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: '1.2em 1.2em',
   };
   
   return (
     <footer className="flex items-center justify-between px-4 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <div
           ref={statusTriggerRef}
-          className="flex items-center gap-2 cursor-default focus:outline-none"
+          className="flex items-center gap-1.5 cursor-default focus:outline-none"
           onMouseEnter={() => setShowStatusTooltip(true)}
           onMouseLeave={() => setShowStatusTooltip(false)}
           onFocus={() => setShowStatusTooltip(true)}
@@ -150,13 +150,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
         )}
         <div className="h-4 w-px bg-border-color"></div>
         <div className="flex items-center gap-1">
-          <label htmlFor="status-bar-provider-select" className="shrink-0">Provider:</label>
-           <select
+          <label htmlFor="status-bar-provider-select" className="sr-only">LLM provider</label>
+          <select
             id="status-bar-provider-select"
             value={selectedService?.id || ''}
             onChange={(e) => onProviderChange(e.target.value)}
             disabled={discoveredServices.length === 0}
-            className="bg-transparent font-semibold text-text-main rounded-md py-0.5 px-1 -my-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-5"
+            className="bg-transparent font-semibold text-text-main rounded-md py-0.5 px-1 -my-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-4"
+            aria-label="LLM provider"
             style={selectStyles}
           >
             {llmProviderName && !selectedService && <option value="" disabled>{llmProviderName}</option>}
@@ -168,13 +169,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
         </div>
         <div className="h-4 w-px bg-border-color"></div>
         <div className="flex items-center gap-1">
-          <label htmlFor="status-bar-model-select" className="shrink-0">Model:</label>
+          <label htmlFor="status-bar-model-select" className="sr-only">LLM model</label>
           <select
             id="status-bar-model-select"
             value={modelName}
             onChange={(e) => onModelChange(e.target.value)}
             disabled={availableModels.length === 0}
-            className="bg-transparent font-semibold text-text-main rounded-md py-0.5 px-1 -my-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-5"
+            className="bg-transparent font-semibold text-text-main rounded-md py-0.5 px-1 -my-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-4"
+            aria-label="LLM model"
             style={selectStyles}
           >
             {availableModels.length > 0 ? (
