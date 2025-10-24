@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Command } from '../types';
 import { formatShortcutForDisplay } from '../services/shortcutService';
-import { TrashIcon, XIcon } from './Icons';
-import IconButton from './IconButton';
 
 interface KeybindingInputProps {
   onSet: (shortcut: string[]) => void;
   onCancel: () => void;
   conflict: Command | null;
+  focusBoundaryRef?: React.RefObject<HTMLElement>;
 }
 
-export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCancel, conflict }) => {
+export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCancel, conflict, focusBoundaryRef }) => {
   const [keys, setKeys] = useState<string[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const fallbackBoundaryRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,12 +26,12 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
         return;
       }
 
-      const newKeys = [];
+      const newKeys: string[] = [];
       if (e.ctrlKey) newKeys.push('Control');
       if (e.metaKey) newKeys.push('Meta');
       if (e.altKey) newKeys.push('Alt');
       if (e.shiftKey) newKeys.push('Shift');
-      
+
       const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
       if (!['Control', 'Meta', 'Alt', 'Shift'].includes(key)) {
         newKeys.push(key);
@@ -45,7 +44,8 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
 
     const handleBlur = (event: FocusEvent) => {
       const nextTarget = event.relatedTarget as Node | null;
-      if (nextTarget && containerRef.current?.contains(nextTarget)) {
+      const boundary = focusBoundaryRef?.current ?? fallbackBoundaryRef.current;
+      if (nextTarget && boundary?.contains(nextTarget)) {
         return;
       }
       onCancel();
@@ -64,34 +64,20 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
         inputEl.removeEventListener('blur', handleBlur);
       }
     };
-  }, [onSet, onCancel]);
-
-  const clearShortcut = (event?: React.SyntheticEvent) => {
-    event?.preventDefault();
-    event?.stopPropagation();
-    setKeys([]);
-    onSet([]);
-    onCancel();
-  };
+  }, [onSet, onCancel, focusBoundaryRef]);
 
   return (
-    <div ref={containerRef} className="flex flex-col items-end">
-      <div className="flex items-center gap-2">
-        <div
-          ref={inputRef}
-          tabIndex={0}
-          className={`flex items-center h-8 px-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${conflict ? 'border-destructive-border' : 'border-border-color'}`}
-        >
-          <span className="text-text-secondary">
-            {keys.length > 0 ? formatShortcutForDisplay(keys) : 'Press desired keys...'}
-          </span>
-        </div>
-        <IconButton onMouseDown={clearShortcut} onClick={clearShortcut} tooltip="Clear Shortcut" size="sm" variant="ghost">
-          <TrashIcon className="w-4 h-4" />
-        </IconButton>
-        <IconButton onClick={onCancel} tooltip="Cancel" size="sm" variant="ghost">
-          <XIcon className="w-4 h-4" />
-        </IconButton>
+    <div ref={fallbackBoundaryRef} className="flex flex-col items-end">
+      <div
+        ref={inputRef}
+        tabIndex={0}
+        className={`flex items-center h-8 px-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+          conflict ? 'border-destructive-border' : 'border-border-color'
+        }`}
+      >
+        <span className="text-text-secondary">
+          {keys.length > 0 ? formatShortcutForDisplay(keys) : 'Press desired keys...'}
+        </span>
       </div>
       {conflict && (
         <p className="text-xs text-destructive-text mt-1">
