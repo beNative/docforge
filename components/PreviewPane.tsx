@@ -3,6 +3,7 @@ import { previewService } from '../services/previewService';
 import Spinner from './Spinner';
 import { useTheme } from '../hooks/useTheme';
 import type { LogLevel, Settings } from '../types';
+import { PreviewZoomProvider } from '../contexts/PreviewZoomContext';
 
 interface PreviewPaneProps {
   content: string;
@@ -10,9 +11,28 @@ interface PreviewPaneProps {
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
   addLog: (level: LogLevel, message: string) => void;
   settings: Settings;
+  previewScale?: number;
+  onPreviewScaleChange?: (scale: number) => void;
+  previewZoomOptions?: {
+    minScale?: number;
+    maxScale?: number;
+    zoomStep?: number;
+    initialScale?: number;
+  };
+  previewResetSignal?: number;
 }
 
-const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ content, language, onScroll, addLog, settings }, ref) => {
+const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
+  content,
+  language,
+  onScroll,
+  addLog,
+  settings,
+  previewScale,
+  onPreviewScaleChange,
+  previewZoomOptions,
+  previewResetSignal,
+}, ref) => {
   const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,6 +80,26 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
     };
   }, [content, language, addLog, ref, onScroll, settings]);
 
+  const shouldProvideZoom = typeof previewScale === 'number' && typeof onPreviewScaleChange === 'function';
+
+  const contentElement = !isLoading && !error && renderedOutput
+    ? shouldProvideZoom
+      ? (
+          <PreviewZoomProvider
+            scale={previewScale!}
+            onScaleChange={onPreviewScaleChange!}
+            minScale={previewZoomOptions?.minScale}
+            maxScale={previewZoomOptions?.maxScale}
+            zoomStep={previewZoomOptions?.zoomStep}
+            initialScale={previewZoomOptions?.initialScale}
+            resetSignal={previewResetSignal}
+          >
+            {renderedOutput}
+          </PreviewZoomProvider>
+        )
+      : renderedOutput
+    : null;
+
   return (
     <div className="w-full h-full bg-secondary">
       {isLoading && (
@@ -69,7 +109,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ conten
         </div>
       )}
       {error && <div className="text-destructive-text p-3 bg-destructive-bg rounded-md m-6">{error}</div>}
-      {!isLoading && !error && renderedOutput}
+      {contentElement}
     </div>
   );
 });

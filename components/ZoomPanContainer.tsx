@@ -1,6 +1,7 @@
-import React, { useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import IconButton from './IconButton';
 import { MinusIcon, PlusIcon, RefreshIcon } from './Icons';
+import { usePreviewZoom } from '../contexts/PreviewZoomContext';
 
 interface ZoomPanContainerProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
@@ -51,21 +52,41 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     ...rest
   } = props;
 
+  const previewZoom = usePreviewZoom();
+
+  const effectiveMinScale = previewZoom?.minScale ?? minScale;
+  const effectiveMaxScale = previewZoom?.maxScale ?? maxScale;
+  const effectiveZoomStep = previewZoom?.zoomStep ?? zoomStep;
+
   const containerRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(ref, () => containerRef.current);
 
-  const [scale, setScaleState] = useState(initialScale);
+  const [uncontrolledScale, setUncontrolledScale] = useState(initialScale);
   const [offset, setOffsetState] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const scale = previewZoom ? previewZoom.scale : uncontrolledScale;
   const scaleRef = useRef(scale);
   const offsetRef = useRef(offset);
   const panPointer = useRef<{ id: number | null; lastX: number; lastY: number }>({ id: null, lastX: 0, lastY: 0 });
 
-  const setScale = useCallback((next: number) => {
-    const clamped = clamp(next, minScale, maxScale);
+  useEffect(() => {
+    const clamped = clamp(scale, effectiveMinScale, effectiveMaxScale);
     scaleRef.current = clamped;
-    setScaleState(clamped);
-  }, [maxScale, minScale]);
+    if (!previewZoom && uncontrolledScale !== clamped) {
+      setUncontrolledScale(clamped);
+    }
+  }, [effectiveMaxScale, effectiveMinScale, previewZoom, scale, uncontrolledScale]);
+
+
+  const setScale = useCallback((next: number) => {
+    const clamped = clamp(next, effectiveMinScale, effectiveMaxScale);
+    if (previewZoom) {
+      previewZoom.setScale(clamped);
+    } else {
+      scaleRef.current = clamped;
+      setUncontrolledScale(clamped);
+    }
+  }, [effectiveMaxScale, effectiveMinScale, previewZoom]);
 
   const setOffset = useCallback((next: React.SetStateAction<{ x: number; y: number }>) => {
     setOffsetState((prev) => {
@@ -74,6 +95,16 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
       return resolved;
     });
   }, []);
+
+  useEffect(() => {
+    if (!previewZoom) {
+      return;
+    }
+    const unregister = previewZoom.registerResetHandler(() => {
+      setOffset({ x: 0, y: 0 });
+    });
+    return unregister;
+  }, [previewZoom, setOffset]);
 
   const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
     if (disablePan && disableZoom) {
@@ -88,7 +119,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
       }
       const direction = deltaY > 0 ? -1 : 1;
       const magnitude = Math.min(Math.abs(deltaY) / 300, 1.5);
-      const factor = 1 + zoomStep * magnitude;
+      const factor = 1 + effectiveZoomStep * magnitude;
       const nextScale = direction > 0
         ? scaleRef.current * factor
         : scaleRef.current / factor;
@@ -105,7 +136,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
         y: prev.y - deltaY / scale,
       }));
     }
-  }, [disablePan, disableZoom, setOffset, setScale, zoomStep]);
+  }, [disablePan, disableZoom, effectiveZoomStep, setOffset, setScale]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (disablePan) {
@@ -162,14 +193,18 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     }
     event.preventDefault();
     const isZoomOut = event.shiftKey || event.altKey || event.button === 1;
-    const factor = 1 + zoomStep;
+    const factor = 1 + effectiveZoomStep;
     setScale(isZoomOut ? scaleRef.current / factor : scaleRef.current * factor);
-  }, [disableZoom, setScale, zoomStep]);
+  }, [disableZoom, effectiveZoomStep, setScale]);
 
   const handleResetView = useCallback(() => {
-    setScale(initialScale);
+    if (previewZoom) {
+      previewZoom.reset();
+    } else {
+      setScale(initialScale);
+    }
     setOffset({ x: 0, y: 0 });
-  }, [initialScale, setOffset, setScale]);
+  }, [initialScale, previewZoom, setOffset, setScale]);
 
   const transformStyle = useMemo(() => {
     return {
@@ -251,7 +286,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
       {...rest}
     >
       {renderContent()}
-      {!disableControls && !disableZoom && (
+      {!disableControls && !disableZoom && !previewZoom && (
         <div
           className="absolute bottom-4 right-4 flex items-center gap-2 rounded-lg border border-border-color bg-background/80 px-2 py-1 shadow-lg backdrop-blur"
           onPointerDown={(event) => event.stopPropagation()}
