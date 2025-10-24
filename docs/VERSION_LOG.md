@@ -1,5 +1,28 @@
 # Version Log
 
+## v0.6.8 - The Publication Polish Update
+
+This maintenance release keeps the publication workflow accurate by bumping
+the version metadata, refreshing the Markdown guides, and aligning the release
+tests with the assets that will accompany the new tag.
+
+### 🛠 Improvements
+
+-   Bumped the application version to `v0.6.8` and refreshed the release
+    tagging examples so the publishing checklist references the current
+    commands.
+-   Re-reviewed every Markdown guide (README, manuals, version log) and synced
+    the copies in `docs/` to ensure the distributed documentation matches the
+    repository source.
+-   Summarized the release tasks in this log so the GitHub release body can be
+    prepared directly from the latest entry.
+
+### 🐛 Fixes
+
+-   Updated the release workflow test fixtures to expect `v0.6.8`
+    identifiers and artifact names, preventing mismatches once the new
+    installer set is published.
+
 ## v0.6.7 - The Release Readiness Confirmation
 
 This maintenance release double-checks the release process ahead of the next
