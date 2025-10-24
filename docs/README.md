@@ -61,9 +61,18 @@ Run `specify check` inside the repository to confirm prerequisites.
    .specify/scripts/bash/create-new-feature.sh "<feature summary>"
    ```
 2. Use your preferred AI assistant with the `/speckit.*` commands to fill out the artifacts:
+
+   **Core commands**
+
    - `/speckit.constitution` updates the governance document.
    - `/speckit.specify`, `/speckit.plan`, and `/speckit.tasks` populate the feature spec, technical plan, and task list.
    - `/speckit.implement` can translate an approved plan into code.
+
+   **Optional commands**
+
+   - `/speckit.clarify` resolves ambiguous requirements before planning.
+   - `/speckit.analyze` checks alignment across spec, plan, and tasks prior to implementation.
+   - `/speckit.checklist` generates quality checklists tailored to the feature.
 3. Commit the spec folder before beginning implementation so reviewers can trace scope and acceptance criteria.
 
 ## Release Preparation
