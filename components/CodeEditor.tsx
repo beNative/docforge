@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS } from '../constants';
 import { ensureMonaco } from '../services/editor/monacoLoader';
 import { applyDocforgeTheme } from '../services/editor/monacoTheme';
 import { registerTomlLanguage } from '../services/editor/registerTomlLanguage';
+import { registerPlantumlLanguage } from '../services/editor/registerPlantumlLanguage';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -261,6 +262,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
 
                 monacoApiRef.current = monacoApi;
                 registerTomlLanguage(monacoApi);
+                registerPlantumlLanguage(monacoApi);
 
                 if (monacoInstanceRef.current) {
                     disposeEditorShortcuts();
