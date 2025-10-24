@@ -4,6 +4,7 @@ import { MONACO_KEYBINDING_DEFINITIONS } from '../services/editor/monacoKeybindi
 import { DEFAULT_SETTINGS } from '../constants';
 import { ensureMonaco } from '../services/editor/monacoLoader';
 import { applyDocforgeTheme } from '../services/editor/monacoTheme';
+import { registerTomlLanguage } from '../services/editor/registerTomlLanguage';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -259,6 +260,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 }
 
                 monacoApiRef.current = monacoApi;
+                registerTomlLanguage(monacoApi);
 
                 if (monacoInstanceRef.current) {
                     disposeEditorShortcuts();
