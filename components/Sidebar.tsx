@@ -265,12 +265,22 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
     const currentIndex = navigableItems.indexOf(currentItem);
 
-    const selectItem = (item: NavigableItem) => {
-        if (item.type === 'template') {
-            props.onSelectTemplate(item.id);
-        } else {
-            props.onSelectNode(item.id, { ctrlKey: isCtrl } as React.MouseEvent);
-        }
+    const selectItem = (
+      item: NavigableItem,
+      overrides?: { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }
+    ) => {
+      if (item.type === 'template') {
+        props.onSelectTemplate(item.id);
+        return;
+      }
+
+      const syntheticEvent = {
+        shiftKey: overrides?.shiftKey ?? false,
+        ctrlKey: overrides?.ctrlKey ?? e.ctrlKey,
+        metaKey: overrides?.metaKey ?? e.metaKey,
+      } as React.MouseEvent;
+
+      props.onSelectNode(item.id, syntheticEvent);
     };
 
     switch (key) {
@@ -293,13 +303,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
           setSelectedIds(new Set([newItem.id]));
           setLastClickedId(newItem.id);
         }
-        
+
         setFocusedItemId(newItem.id);
-        if (newItem.type === 'template') {
-          props.onSelectTemplate(newItem.id);
-        } else {
-          props.onSelectNode(newItem.id, { } as React.MouseEvent);
-        }
+        selectItem(newItem, { shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey });
         break;
       }
       case 'ArrowRight': {
