@@ -9,6 +9,7 @@ import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
 import { useLogger } from '../hooks/useLogger';
+import { matchesShortcut } from '../services/shortcutService';
 
 type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; parentId: string | null; };
 
@@ -47,6 +48,7 @@ interface SidebarProps {
   renamingNodeId: string | null;
   onRenameComplete: () => void;
   commands: Command[];
+  customShortcuts: Record<string, string[]>;
 
   templates: DocumentTemplate[];
   activeTemplateId: string | null;
@@ -77,7 +79,7 @@ const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: Document
 };
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, onNewFromClipboard } = props;
+  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, onNewFromClipboard, customShortcuts } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
@@ -220,6 +222,28 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       }
   }, [documentTree, props.onMoveNode]);
 
+  const commandMap = useMemo(() => {
+    const map = new Map<string, Command>();
+    for (const command of commands) {
+      map.set(command.id, command);
+    }
+    return map;
+  }, [commands]);
+
+  const getEffectiveShortcut = useCallback((commandId: string): string[] | null => {
+    const custom = customShortcuts[commandId];
+    if (custom && custom.length > 0) {
+      return custom;
+    }
+    const command = commandMap.get(commandId);
+    return command?.shortcut ?? null;
+  }, [commandMap, customShortcuts]);
+
+  const executeCommand = useCallback((commandId: string) => {
+    const command = commandMap.get(commandId);
+    command?.action();
+  }, [commandMap]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const target = e.target as HTMLElement | null;
     if (target) {
@@ -230,24 +254,75 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     }
 
     if (navigableItems.length === 0) return;
-    const key = e.key;
     const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    const isCtrl = isMac ? e.metaKey : e.ctrlKey;
 
-    if (isCtrl && (key === 'a' || key === 'A')) {
+    const selectAllShortcut = getEffectiveShortcut('document-tree-select-all');
+    if (matchesShortcut(e, selectAllShortcut)) {
       e.preventDefault();
-      setSelectedIds(new Set(navigableItems.map(i => i.id)));
+      e.stopPropagation();
+      executeCommand('document-tree-select-all');
       return;
     }
 
-    if (key === 'Delete' || (key === 'Backspace' && !isMac)) {
+    const deleteShortcut = getEffectiveShortcut('delete-item');
+    if (matchesShortcut(e, deleteShortcut, { allowExtraShift: true }) || (!isMac && e.key === 'Backspace')) {
       e.preventDefault();
+      e.stopPropagation();
       if (props.selectedIds.size > 0) {
         props.onDeleteSelection(props.selectedIds, { force: e.shiftKey });
       }
       return;
     }
 
+    const moveUpShortcut = getEffectiveShortcut('document-tree-move-selection-up');
+    if (matchesShortcut(e, moveUpShortcut)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (focusedItemId) {
+        handleMoveUp(focusedItemId);
+      } else if (navigableItems.length > 0) {
+        handleMoveUp(navigableItems[0].id);
+      }
+      return;
+    }
+
+    const moveDownShortcut = getEffectiveShortcut('document-tree-move-selection-down');
+    if (matchesShortcut(e, moveDownShortcut)) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (focusedItemId) {
+        handleMoveDown(focusedItemId);
+      } else if (navigableItems.length > 0) {
+        handleMoveDown(navigableItems[0].id);
+      }
+      return;
+    }
+
+    const expandAllShortcut = getEffectiveShortcut('document-tree-expand-all');
+    if (matchesShortcut(e, expandAllShortcut)) {
+      e.preventDefault();
+      e.stopPropagation();
+      onExpandAll();
+      return;
+    }
+
+    const collapseAllShortcut = getEffectiveShortcut('document-tree-collapse-all');
+    if (matchesShortcut(e, collapseAllShortcut)) {
+      e.preventDefault();
+      e.stopPropagation();
+      onCollapseAll();
+      return;
+    }
+
+    const copyShortcut = getEffectiveShortcut('document-tree-copy-content');
+    if (matchesShortcut(e, copyShortcut)) {
+      e.preventDefault();
+      e.stopPropagation();
+      executeCommand('document-tree-copy-content');
+      return;
+    }
+
+    const key = e.key;
     if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(key)) {
         return;
     }
@@ -340,7 +415,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
 
   return (
-    <div ref={sidebarRef} onKeyDown={handleKeyDown} tabIndex={0} className="h-full flex flex-col focus:outline-none">
+    <div ref={sidebarRef} onKeyDown={handleKeyDown} tabIndex={0} data-component="document-tree-sidebar" className="h-full flex flex-col focus:outline-none">
       <div className="h-7 px-2 flex items-center flex-shrink-0 border-b border-border-color">
         <div className="relative w-full">
             <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
@@ -370,10 +445,10 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 <header className="flex items-center justify-between p-1 flex-shrink-0 sticky top-0 bg-secondary z-10">
                     <h2 className="text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase">Documents</h2>
                     <div className="flex items-center gap-0.5">
-                    <IconButton onClick={onExpandAll} tooltip="Expand All" size="xs" tooltipPosition="bottom">
+                    <IconButton onClick={onExpandAll} tooltip={getTooltip('document-tree-expand-all', 'Expand All')} size="xs" tooltipPosition="bottom">
                         <ExpandAllIcon className="w-4 h-4" />
                     </IconButton>
-                    <IconButton onClick={onCollapseAll} tooltip="Collapse All" size="xs" tooltipPosition="bottom">
+                    <IconButton onClick={onCollapseAll} tooltip={getTooltip('document-tree-collapse-all', 'Collapse All')} size="xs" tooltipPosition="bottom">
                         <CollapseAllIcon className="w-4 h-4" />
                     </IconButton>
                     <div className="h-5 w-px bg-border-color mx-1"></div>
@@ -421,6 +496,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                                         onImportNodes={props.onImportNodes}
                     onDropFiles={props.onDropFiles}
                     onCopyNodeContent={props.onCopyNodeContent}
+                    copyContentTooltip={getTooltip('document-tree-copy-content', 'Copy Content')}
                     searchTerm={searchTerm}
                     expandedIds={props.expandedFolderIds}
                     onToggleExpand={props.onToggleExpand}

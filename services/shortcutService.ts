@@ -1,10 +1,18 @@
 import type { Command, Settings } from '../types';
 
+export interface ShortcutLikeEvent {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+}
+
 /**
  * Formats a keyboard event into a consistent string representation.
  * e.g., "Control+Shift+P"
  */
-export const formatShortcut = (e: KeyboardEvent): string => {
+export const formatShortcut = (e: ShortcutLikeEvent): string => {
   const parts: string[] = [];
   if (e.ctrlKey) parts.push('Control');
   if (e.metaKey) parts.push('Meta');
@@ -18,6 +26,29 @@ export const formatShortcut = (e: KeyboardEvent): string => {
   }
   
   return parts.join('+');
+};
+
+export const matchesShortcut = (
+  event: ShortcutLikeEvent,
+  shortcut?: string[],
+  options?: { allowExtraShift?: boolean }
+): boolean => {
+  if (!shortcut || shortcut.length === 0) {
+    return false;
+  }
+
+  const expected = shortcut.join('+');
+  const actual = formatShortcut(event);
+  if (actual === expected) {
+    return true;
+  }
+
+  if (options?.allowExtraShift && event.shiftKey && !shortcut.includes('Shift')) {
+    const withoutShift = formatShortcut({ ...event, shiftKey: false });
+    return withoutShift === expected;
+  }
+
+  return false;
 };
 
 /**

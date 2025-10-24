@@ -21,7 +21,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -118,6 +118,21 @@ interface DatabaseStatusState {
     message: string;
     tone: DatabaseStatusTone;
 }
+
+const findNodeAndSiblingsInTree = (nodes: DocumentNode[], id: string): { node: DocumentNode; siblings: DocumentNode[] } | null => {
+    for (const node of nodes) {
+        if (node.id === id) {
+            return { node, siblings: nodes };
+        }
+        if (node.type === 'folder' && node.children.length > 0) {
+            const found = findNodeAndSiblingsInTree(node.children, id);
+            if (found) {
+                return found;
+            }
+        }
+    }
+    return null;
+};
 
 type UpdateStatus = 'idle' | 'downloading' | 'downloaded' | 'error';
 
@@ -609,6 +624,62 @@ const MainApp: React.FC = () => {
 
         return { documentTree: finalTree, navigableItems: flatList };
     }, [itemsWithSearchMetadata, templates, searchTerm, expandedFolderIds]);
+
+    const getPrimarySelectionId = useCallback((): string | null => {
+        if (lastClickedId && selectedIds.has(lastClickedId)) {
+            return lastClickedId;
+        }
+        const iterator = selectedIds.values().next();
+        return iterator.done ? null : iterator.value;
+    }, [lastClickedId, selectedIds]);
+
+    const handleDocumentTreeSelectAll = useCallback(() => {
+        setSelectedIds(new Set(navigableItems.map(item => item.id)));
+    }, [navigableItems, setSelectedIds]);
+
+    const handleMoveSelectionUp = useCallback(() => {
+        const primaryId = getPrimarySelectionId();
+        if (!primaryId) {
+            return;
+        }
+        const result = findNodeAndSiblingsInTree(documentTree, primaryId);
+        if (!result) {
+            return;
+        }
+        const { siblings } = result;
+        const index = siblings.findIndex(sibling => sibling.id === primaryId);
+        if (index > 0) {
+            const targetSiblingId = siblings[index - 1].id;
+            addLog('INFO', `User action: Move node ${primaryId} up in document tree via keyboard.`);
+            void moveItems([primaryId], targetSiblingId, 'before');
+        }
+    }, [getPrimarySelectionId, documentTree, moveItems, addLog]);
+
+    const handleMoveSelectionDown = useCallback(() => {
+        const primaryId = getPrimarySelectionId();
+        if (!primaryId) {
+            return;
+        }
+        const result = findNodeAndSiblingsInTree(documentTree, primaryId);
+        if (!result) {
+            return;
+        }
+        const { siblings } = result;
+        const index = siblings.findIndex(sibling => sibling.id === primaryId);
+        if (index !== -1 && index < siblings.length - 1) {
+            const targetSiblingId = siblings[index + 1].id;
+            addLog('INFO', `User action: Move node ${primaryId} down in document tree via keyboard.`);
+            void moveItems([primaryId], targetSiblingId, 'after');
+        }
+    }, [getPrimarySelectionId, documentTree, moveItems, addLog]);
+
+    const handleCopySelectionContent = useCallback(() => {
+        const doc = items.find(item => selectedIds.has(item.id) && item.type === 'document');
+        if (!doc) {
+            return;
+        }
+        void handleCopyNodeContent(doc.id);
+    }, [items, selectedIds, handleCopyNodeContent]);
 
     const { metrics: activeFolderMetrics, documents: activeFolderDocuments } = useMemo(() => {
         if (!activeNode || activeNode.type !== 'folder') {
@@ -2277,15 +2348,21 @@ const MainApp: React.FC = () => {
 
     const commands: Command[] = useMemo(() => [
         { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Control', 'N'], keywords: 'add create file' },
-        { id: 'new-from-clipboard', name: 'New from Clipboard', action: () => { addLog('INFO', 'Command: New document from clipboard.'); void handleNewDocumentFromClipboard(); }, category: 'File', icon: CopyIcon, keywords: 'clipboard import paste new' },
+        { id: 'new-from-clipboard', name: 'New from Clipboard', action: () => { addLog('INFO', 'Command: New document from clipboard.'); void handleNewDocumentFromClipboard(); }, category: 'File', icon: CopyIcon, shortcut: ['Control', 'Alt', 'V'], keywords: 'clipboard import paste new' },
         { id: 'new-code-file', name: 'Create New Code File', action: handleOpenNewCodeFileModal, category: 'File', icon: CodeIcon, shortcut: ['Control', 'Shift', 'N'], keywords: 'add create script' },
-        { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, keywords: 'add create directory' },
-        { id: 'new-subfolder', name: 'Create New Subfolder', action: handleNewSubfolder, category: 'File', icon: FolderDownIcon, keywords: 'add create directory child' },
+        { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, shortcut: ['Control', 'Alt', 'N'], keywords: 'add create directory' },
+        { id: 'new-subfolder', name: 'Create New Subfolder', action: handleNewSubfolder, category: 'File', icon: FolderDownIcon, shortcut: ['Control', 'Alt', 'Shift', 'N'], keywords: 'add create directory child' },
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
         { id: 'new-from-template', name: 'New Document from Template...', action: () => { addLog('INFO', 'Command: New Document from Template.'); setCreateFromTemplateOpen(true); }, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create file instance' },
-        { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: CopyIcon, keywords: 'copy clone' },
+        { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: CopyIcon, shortcut: ['Control', 'D'], keywords: 'copy clone' },
         { id: 'rename-item', name: 'Rename Selected Item', action: handleRenameSelection, category: 'File', icon: PencilIcon, shortcut: ['F2'], keywords: 'rename edit title' },
-        { id: 'delete-item', name: 'Delete Selection', action: () => handleDeleteSelection(selectedIds), category: 'File', icon: TrashIcon, keywords: 'remove discard' },
+        { id: 'delete-item', name: 'Delete Selection', action: () => handleDeleteSelection(selectedIds), category: 'File', icon: TrashIcon, shortcut: ['Delete'], keywords: 'remove discard' },
+        { id: 'document-tree-select-all', name: 'Select All Tree Items', action: handleDocumentTreeSelectAll, category: 'Document Tree', icon: CheckIcon, shortcut: ['Control', 'A'], keywords: 'select highlight all tree' },
+        { id: 'document-tree-expand-all', name: 'Expand All Tree Folders', action: handleExpandAll, category: 'Document Tree', icon: ExpandAllIcon, shortcut: ['Control', 'Alt', 'ArrowRight'], keywords: 'open folders tree expand' },
+        { id: 'document-tree-collapse-all', name: 'Collapse All Tree Folders', action: handleCollapseAll, category: 'Document Tree', icon: CollapseAllIcon, shortcut: ['Control', 'Alt', 'ArrowLeft'], keywords: 'close folders tree collapse' },
+        { id: 'document-tree-move-selection-up', name: 'Move Selection Up', action: handleMoveSelectionUp, category: 'Document Tree', icon: ArrowUpIcon, shortcut: ['Alt', 'ArrowUp'], keywords: 'reorder move up tree' },
+        { id: 'document-tree-move-selection-down', name: 'Move Selection Down', action: handleMoveSelectionDown, category: 'Document Tree', icon: ArrowDownIcon, shortcut: ['Alt', 'ArrowDown'], keywords: 'reorder move down tree' },
+        { id: 'document-tree-copy-content', name: 'Copy Document Content', action: handleCopySelectionContent, category: 'Document Tree', icon: CopyIcon, shortcut: ['Control', 'Shift', 'C'], keywords: 'copy clipboard tree content' },
         { id: 'format-document', name: 'Format Document', action: handleFormatDocument, category: 'Editor', icon: FormatIcon, shortcut: ['Control', 'Shift', 'F'], keywords: 'beautify pretty print clean code' },
         { id: 'toggle-command-palette', name: 'Toggle Command Palette', action: handleToggleCommandPalette, category: 'View', icon: CommandIcon, shortcut: ['Control', 'Shift', 'P'], keywords: 'find action go to' },
         { id: 'toggle-editor', name: 'Switch to Editor View', action: () => { addLog('INFO', 'Command: Switch to Editor View.'); setView('editor'); }, category: 'View', icon: PencilIcon, keywords: 'main document' },
@@ -2293,7 +2370,7 @@ const MainApp: React.FC = () => {
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -2444,6 +2521,14 @@ const MainApp: React.FC = () => {
 
             if (isFormElement && !isPaletteInput && !isCommandPaletteToggle) {
                 return;
+            }
+
+            if (command?.category === 'Document Tree') {
+                const target = e.target as HTMLElement | null;
+                const isWithinSidebar = target?.closest('[data-component="document-tree-sidebar"]');
+                if (!isWithinSidebar) {
+                    return;
+                }
             }
 
             if (command) {
@@ -2617,6 +2702,7 @@ const MainApp: React.FC = () => {
                                         renamingNodeId={renamingNodeId}
                                         onRenameComplete={() => setRenamingNodeId(null)}
                                         commands={enrichedCommands}
+                                        customShortcuts={settings.customShortcuts}
                                         pendingRevealId={pendingRevealId}
                                         onRevealHandled={() => setPendingRevealId(null)}
                                         templates={templates}
