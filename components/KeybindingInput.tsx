@@ -61,6 +61,14 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
     };
   }, [onSet, onCancel]);
 
+  const clearShortcut = (event?: React.SyntheticEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    setKeys([]);
+    onSet([]);
+    onCancel();
+  };
+
   return (
     <div className="flex flex-col items-end">
       <div className="flex items-center gap-2">
@@ -73,17 +81,7 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
             {keys.length > 0 ? formatShortcutForDisplay(keys) : 'Press desired keys...'}
           </span>
         </div>
-        <IconButton
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            setKeys([]);
-            onSet([]);
-            onCancel();
-          }}
-          tooltip="Clear Shortcut"
-          size="sm"
-          variant="ghost"
-        >
+        <IconButton onMouseDown={clearShortcut} onClick={clearShortcut} tooltip="Clear Shortcut" size="sm" variant="ghost">
           <TrashIcon className="w-4 h-4" />
         </IconButton>
         <IconButton onClick={onCancel} tooltip="Cancel" size="sm" variant="ghost">
