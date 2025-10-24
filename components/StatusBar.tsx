@@ -66,6 +66,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const [showStatusTooltip, setShowStatusTooltip] = React.useState(false);
   const databaseTriggerRef = React.useRef<HTMLButtonElement>(null);
   const [showDatabaseTooltip, setShowDatabaseTooltip] = React.useState(false);
+  const databaseStatusRef = React.useRef<HTMLSpanElement>(null);
+  const [showDatabaseStatusTooltip, setShowDatabaseStatusTooltip] = React.useState(false);
 
   const databaseFileName = React.useMemo(() => {
     if (!databasePath) {
@@ -221,9 +223,25 @@ const StatusBar: React.FC<StatusBarProps> = ({
           />
         )}
         {databaseStatus?.message && (
-          <span className={`text-[11px] ${databaseStatusClass} max-w-[220px] truncate`} title={databaseStatus.message}>
-            {databaseStatus.message}
-          </span>
+          <>
+            <span
+              ref={databaseStatusRef}
+              className={`text-[11px] ${databaseStatusClass} max-w-[220px] truncate`}
+              onMouseEnter={() => setShowDatabaseStatusTooltip(true)}
+              onMouseLeave={() => setShowDatabaseStatusTooltip(false)}
+              onFocus={() => setShowDatabaseStatusTooltip(true)}
+              onBlur={() => setShowDatabaseStatusTooltip(false)}
+              tabIndex={0}
+            >
+              {databaseStatus.message}
+            </span>
+            {showDatabaseStatusTooltip && databaseStatusRef.current && (
+              <Tooltip
+                targetRef={databaseStatusRef}
+                content={<span className="block whitespace-pre-line break-words leading-snug text-left">{databaseStatus.message}</span>}
+              />
+            )}
+          </>
         )}
       </div>
       <div className="flex items-center gap-4">
