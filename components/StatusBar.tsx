@@ -23,6 +23,7 @@ interface StatusBarProps {
   databasePath?: string | null;
   databaseStatus?: DatabaseStatusHint | null;
   onDatabaseMenu?: (event: React.MouseEvent<HTMLElement>) => void;
+  onOpenAbout?: () => void;
 }
 
 const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: string }> = {
@@ -58,6 +59,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
     databasePath,
     databaseStatus,
     onDatabaseMenu,
+    onOpenAbout,
 }) => {
   const { text, color, tooltip } = statusConfig[status];
   const selectedService = discoveredServices.find(s => s.generateUrl === llmProviderUrl);
@@ -228,7 +230,20 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <div className="h-4 w-px bg-border-color"></div>
         <span>Last Saved: <span className="font-semibold text-text-main">{formatTimestamp(lastSaved)}</span></span>
         {appVersion && <div className="h-4 w-px bg-border-color"></div>}
-        {appVersion && <span>v{appVersion}</span>}
+        {appVersion && (
+          onOpenAbout ? (
+            <button
+              type="button"
+              onClick={onOpenAbout}
+              className="px-1 -mx-1 rounded-sm font-semibold text-text-main hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary"
+              aria-label="About DocForge"
+            >
+              v{appVersion}
+            </button>
+          ) : (
+            <span>v{appVersion}</span>
+          )
+        )}
       </div>
     </footer>
   );

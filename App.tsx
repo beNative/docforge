@@ -2655,6 +2655,7 @@ const MainApp: React.FC = () => {
                     databasePath={databasePath}
                     databaseStatus={databaseStatus}
                     onDatabaseMenu={handleDatabaseMenu}
+                    onOpenAbout={handleOpenAbout}
                 />
             </div>
             
