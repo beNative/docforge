@@ -12,6 +12,7 @@ interface KeybindingInputProps {
 
 export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCancel, conflict }) => {
   const [keys, setKeys] = useState<string[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,7 +43,11 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
       }
     };
 
-    const handleBlur = () => {
+    const handleBlur = (event: FocusEvent) => {
+      const nextTarget = event.relatedTarget as Node | null;
+      if (nextTarget && containerRef.current?.contains(nextTarget)) {
+        return;
+      }
       onCancel();
     };
 
@@ -70,7 +75,7 @@ export const KeybindingInput: React.FC<KeybindingInputProps> = ({ onSet, onCance
   };
 
   return (
-    <div className="flex flex-col items-end">
+    <div ref={containerRef} className="flex flex-col items-end">
       <div className="flex items-center gap-2">
         <div
           ref={inputRef}
