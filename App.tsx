@@ -1412,6 +1412,7 @@ const MainApp: React.FC = () => {
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
+        setRenamingNodeId(newDoc.id);
     }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog, activateDocumentTab]);
 
     const handleNewDocumentFromClipboard = useCallback(async (parentId?: string | null) => {
@@ -1511,6 +1512,7 @@ const MainApp: React.FC = () => {
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
+        setRenamingNodeId(newFolder.id);
     }, [addFolder, getParentIdForNewItem, ensureNodeVisible, addLog, setActiveItem]);
 
     const handleNewRootFolder = useCallback(async () => {
