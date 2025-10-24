@@ -213,6 +213,7 @@ const MainApp: React.FC = () => {
     const [previewScale, setPreviewScale] = useState(PREVIEW_INITIAL_SCALE);
     const [previewResetSignal, setPreviewResetSignal] = useState(0);
     const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+    const [isPreviewZoomReady, setIsPreviewZoomReady] = useState(false);
 
     const activeNodeId = tabState.activeId;
     const openDocumentIds = tabState.order;
@@ -448,6 +449,7 @@ const MainApp: React.FC = () => {
 
     useEffect(() => {
         setIsPreviewVisible(false);
+        setIsPreviewZoomReady(false);
         setPreviewScale(PREVIEW_INITIAL_SCALE);
         setPreviewResetSignal(prev => prev + 1);
     }, [activeNode?.id, activeNode?.type]);
@@ -455,6 +457,7 @@ const MainApp: React.FC = () => {
     useEffect(() => {
         if (view !== 'editor' || documentView !== 'editor') {
             setIsPreviewVisible(false);
+            setIsPreviewZoomReady(false);
         }
     }, [documentView, view]);
 
@@ -2651,6 +2654,7 @@ const MainApp: React.FC = () => {
                         previewInitialScale={PREVIEW_INITIAL_SCALE}
                         previewResetSignal={previewResetSignal}
                         onPreviewVisibilityChange={setIsPreviewVisible}
+                        onPreviewZoomAvailabilityChange={setIsPreviewZoomReady}
                     />
                 );
             }
@@ -2835,7 +2839,7 @@ const MainApp: React.FC = () => {
                     onPreviewZoomIn={handlePreviewZoomIn}
                     onPreviewZoomOut={handlePreviewZoomOut}
                     onPreviewReset={handlePreviewReset}
-                    isPreviewZoomAvailable={isPreviewVisible}
+                    isPreviewZoomAvailable={isPreviewVisible && isPreviewZoomReady}
                     previewMinScale={PREVIEW_MIN_SCALE}
                     previewMaxScale={PREVIEW_MAX_SCALE}
                     previewInitialScale={PREVIEW_INITIAL_SCALE}

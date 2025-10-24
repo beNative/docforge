@@ -21,6 +21,7 @@ interface PreviewZoomProviderProps {
   zoomStep?: number;
   initialScale?: number;
   resetSignal?: number;
+  onAvailabilityChange?: (isAvailable: boolean) => void;
 }
 
 const clamp = (value: number, min: number, max: number) => {
@@ -38,6 +39,7 @@ export const PreviewZoomProvider: React.FC<PreviewZoomProviderProps> = ({
   zoomStep = 0.25,
   initialScale = 1,
   resetSignal,
+  onAvailabilityChange,
 }) => {
   const resetHandlersRef = useRef(new Set<() => void>());
   const lastResetSignalRef = useRef<number | undefined>(resetSignal);
@@ -79,6 +81,16 @@ export const PreviewZoomProvider: React.FC<PreviewZoomProviderProps> = ({
     lastResetSignalRef.current = resetSignal;
     resetHandlersRef.current.forEach(handler => handler());
   }, [resetSignal]);
+
+  useEffect(() => {
+    if (!onAvailabilityChange) {
+      return;
+    }
+    onAvailabilityChange(true);
+    return () => {
+      onAvailabilityChange(false);
+    };
+  }, [onAvailabilityChange]);
 
   const value = useMemo<PreviewZoomContextValue>(() => ({
     scale: clampedScale,

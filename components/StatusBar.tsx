@@ -53,7 +53,7 @@ const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: st
   },
 };
 
-const zoomButtonTooltipClass = 'bg-transparent shadow-none p-0';
+const zoomButtonTooltipClass = '!bg-transparent !shadow-none !p-0 text-inherit';
 
 interface ZoomButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   hint: string;

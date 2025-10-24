@@ -32,6 +32,7 @@ interface DocumentEditorProps {
   previewInitialScale: number;
   previewResetSignal: number;
   onPreviewVisibilityChange?: (isVisible: boolean) => void;
+  onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
 }
 
 const PREVIEWABLE_LANGUAGES = new Set<string>([
@@ -97,6 +98,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   previewInitialScale,
   previewResetSignal,
   onPreviewVisibilityChange,
+  onPreviewZoomAvailabilityChange,
 }) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
@@ -477,18 +479,19 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }), [previewInitialScale, previewMaxScale, previewMinScale, previewZoomStep]);
 
   useEffect(() => {
-    if (!onPreviewVisibilityChange) {
-      return;
-    }
     const isPreviewVisible = supportsPreview && (viewMode === 'preview' || viewMode.startsWith('split-'));
-    onPreviewVisibilityChange(isPreviewVisible);
-  }, [onPreviewVisibilityChange, supportsPreview, viewMode]);
+    onPreviewVisibilityChange?.(isPreviewVisible);
+    if (!isPreviewVisible) {
+      onPreviewZoomAvailabilityChange?.(false);
+    }
+  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange, supportsPreview, viewMode]);
 
   useEffect(() => {
     return () => {
       onPreviewVisibilityChange?.(false);
+      onPreviewZoomAvailabilityChange?.(false);
     };
-  }, [onPreviewVisibilityChange]);
+  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange]);
 
   const handlePythonPanelResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -578,6 +581,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         onPreviewScaleChange={onPreviewScaleChange}
         previewZoomOptions={previewZoomOptions}
         previewResetSignal={previewResetSignal}
+        onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
       />
     );
     

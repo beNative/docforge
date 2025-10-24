@@ -20,9 +20,10 @@ interface PreviewPaneProps {
     initialScale?: number;
   };
   previewResetSignal?: number;
+  onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
 }
 
-const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
+const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ 
   content,
   language,
   onScroll,
@@ -32,6 +33,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
   onPreviewScaleChange,
   previewZoomOptions,
   previewResetSignal,
+  onPreviewZoomAvailabilityChange,
 }, ref) => {
   const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +84,12 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
 
   const shouldProvideZoom = typeof previewScale === 'number' && typeof onPreviewScaleChange === 'function';
 
+  useEffect(() => {
+    if (!shouldProvideZoom || !renderedOutput) {
+      onPreviewZoomAvailabilityChange?.(false);
+    }
+  }, [shouldProvideZoom, renderedOutput, onPreviewZoomAvailabilityChange]);
+
   const contentElement = !isLoading && !error && renderedOutput
     ? shouldProvideZoom
       ? (
@@ -93,6 +101,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
             zoomStep={previewZoomOptions?.zoomStep}
             initialScale={previewZoomOptions?.initialScale}
             resetSignal={previewResetSignal}
+            onAvailabilityChange={onPreviewZoomAvailabilityChange}
           >
             {renderedOutput}
           </PreviewZoomProvider>
