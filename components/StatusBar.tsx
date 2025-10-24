@@ -1,5 +1,6 @@
 import React from 'react';
 import Tooltip from './Tooltip';
+import Hint from './Hint';
 import type { LLMStatus, DiscoveredLLMModel, DiscoveredLLMService } from '../types';
 import { DatabaseIcon, ChevronDownIcon, MinusIcon, PlusIcon, RefreshIcon } from './Icons';
 
@@ -50,6 +51,60 @@ const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: st
     color: 'bg-error',
     tooltip: 'Failed to connect. Check your settings and ensure the provider is running.',
   },
+};
+
+const zoomButtonTooltipClass = 'bg-transparent shadow-none p-0';
+
+interface ZoomButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+  hint: string;
+  icon: React.ReactNode;
+}
+
+const ZoomButton: React.FC<ZoomButtonProps> = ({ hint, icon, className = '', disabled, ...buttonProps }) => {
+  const wrapperRef = React.useRef<HTMLSpanElement>(null);
+  const [showTooltip, setShowTooltip] = React.useState(false);
+  const hasHint = hint.trim().length > 0;
+
+  const handleShow = React.useCallback(() => {
+    if (hasHint) {
+      setShowTooltip(true);
+    }
+  }, [hasHint]);
+
+  const handleHide = React.useCallback(() => {
+    setShowTooltip(false);
+  }, []);
+
+  const { type, ...restButtonProps } = buttonProps;
+
+  return (
+    <>
+      <span
+        ref={wrapperRef}
+        className="inline-flex"
+        onMouseEnter={handleShow}
+        onMouseLeave={handleHide}
+        onFocus={handleShow}
+        onBlur={handleHide}
+      >
+        <button
+          type={type ?? 'button'}
+          className={`${className}`.trim()}
+          disabled={disabled}
+          {...restButtonProps}
+        >
+          {icon}
+        </button>
+      </span>
+      {hasHint && showTooltip && wrapperRef.current && (
+        <Tooltip
+          targetRef={wrapperRef}
+          content={<Hint role="note">{hint}</Hint>}
+          className={zoomButtonTooltipClass}
+        />
+      )}
+    </>
+  );
 };
 
 const StatusBar: React.FC<StatusBarProps> = ({
@@ -273,37 +328,31 @@ const StatusBar: React.FC<StatusBarProps> = ({
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5" role="group" aria-label="Preview zoom controls">
-            <button
-              type="button"
+            <ZoomButton
               className={zoomButtonClass}
               onClick={onPreviewZoomOut}
               disabled={isZoomDisabled || isAtMinZoom}
               aria-label="Zoom out"
-              title="Zoom out"
-            >
-              <MinusIcon className="w-3.5 h-3.5" />
-            </button>
+              hint="Zoom out"
+              icon={<MinusIcon className="w-3.5 h-3.5" />}
+            />
             <span className={zoomLabelClass}>{zoomPercentage}%</span>
-            <button
-              type="button"
+            <ZoomButton
               className={zoomButtonClass}
               onClick={onPreviewZoomIn}
               disabled={isZoomDisabled || isAtMaxZoom}
               aria-label="Zoom in"
-              title="Zoom in"
-            >
-              <PlusIcon className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
+              hint="Zoom in"
+              icon={<PlusIcon className="w-3.5 h-3.5" />}
+            />
+            <ZoomButton
               className={zoomButtonClass}
               onClick={onPreviewReset}
               disabled={isZoomDisabled || isAtInitialZoom}
               aria-label="Reset zoom"
-              title="Reset zoom"
-            >
-              <RefreshIcon className="w-3.5 h-3.5" />
-            </button>
+              hint="Reset zoom"
+              icon={<RefreshIcon className="w-3.5 h-3.5" />}
+            />
           </div>
         </div>
         <div className="h-4 w-px bg-border-color"></div>
