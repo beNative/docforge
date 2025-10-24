@@ -2,7 +2,6 @@ import React from 'react';
 import Tooltip from './Tooltip';
 import type { LLMStatus, DiscoveredLLMModel, DiscoveredLLMService } from '../types';
 import { DatabaseIcon, ChevronDownIcon, MinusIcon, PlusIcon, RefreshIcon } from './Icons';
-import Hint from './Hint';
 
 type DatabaseStatusHint = {
   message: string;
@@ -306,9 +305,6 @@ const StatusBar: React.FC<StatusBarProps> = ({
               <RefreshIcon className="w-3.5 h-3.5" />
             </button>
           </div>
-          {isZoomDisabled && (
-            <Hint role="note" className="whitespace-nowrap">Open the preview to enable zoom</Hint>
-          )}
         </div>
         <div className="h-4 w-px bg-border-color"></div>
         <span>Documents: <span className="font-semibold text-text-main">{documentCount}</span></span>
