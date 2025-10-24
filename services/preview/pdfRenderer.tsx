@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo } from 'react';
 import type { IRenderer } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
+import Hint from '../../components/Hint';
+import ZoomPanContainer from '../../components/ZoomPanContainer';
 
 interface PdfPreviewProps extends React.HTMLAttributes<HTMLDivElement> {
   content: string;
@@ -59,38 +61,36 @@ const PdfPreview = React.forwardRef<HTMLDivElement, PdfPreviewProps>(({ content,
     };
   }, [isBlobUrl, url]);
 
-  if (error) {
+  if (error || !url) {
+    const message = error ?? 'Unable to display the stored PDF document.';
     return (
       <div
         ref={ref}
-        className={`w-full h-full flex items-center justify-center text-text-secondary text-sm ${className ?? ''}`}
+        className={`w-full h-full flex items-center justify-center bg-secondary ${className ?? ''}`}
         {...rest}
       >
-        {error}
-      </div>
-    );
-  }
-
-  if (!url) {
-    return (
-      <div
-        ref={ref}
-        className={`w-full h-full flex items-center justify-center text-text-secondary text-sm ${className ?? ''}`}
-        {...rest}
-      >
-        Unable to display the stored PDF document.
+        <Hint role="note">{message}</Hint>
       </div>
     );
   }
 
   return (
-    <div ref={ref} className={`w-full h-full overflow-auto bg-secondary ${className ?? ''}`} {...rest}>
+    <ZoomPanContainer
+      ref={ref}
+      className={`w-full h-full overflow-auto bg-secondary ${className ?? ''}`}
+      contentClassName="w-full origin-top"
+      wrapperClassName="mx-auto"
+      layout="natural"
+      disablePan
+      lockOverflow={false}
+      {...rest}
+    >
       <iframe
         title="PDF Preview"
         src={url}
-        className="w-full h-full border-0 bg-white"
+        className="w-full h-full border border-border-color bg-white shadow-sm rounded-md"
       />
-    </div>
+    </ZoomPanContainer>
   );
 });
 

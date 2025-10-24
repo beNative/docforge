@@ -24,6 +24,15 @@ interface DocumentEditorProps {
   onLanguageChange: (language: string) => void;
   onViewModeChange: (mode: ViewMode) => void;
   formatTrigger: number;
+  previewScale: number;
+  onPreviewScaleChange: (scale: number) => void;
+  previewMinScale: number;
+  previewMaxScale: number;
+  previewZoomStep: number;
+  previewInitialScale: number;
+  previewResetSignal: number;
+  onPreviewVisibilityChange?: (isVisible: boolean) => void;
+  onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
 }
 
 const PREVIEWABLE_LANGUAGES = new Set<string>([
@@ -71,7 +80,26 @@ const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint:
   return 'edit';
 };
 
-const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, onCommitVersion, onDelete, settings, onShowHistory, onLanguageChange, onViewModeChange, formatTrigger }) => {
+const DocumentEditor: React.FC<DocumentEditorProps> = ({
+  documentNode,
+  onSave,
+  onCommitVersion,
+  onDelete,
+  settings,
+  onShowHistory,
+  onLanguageChange,
+  onViewModeChange,
+  formatTrigger,
+  previewScale,
+  onPreviewScaleChange,
+  previewMinScale,
+  previewMaxScale,
+  previewZoomStep,
+  previewInitialScale,
+  previewResetSignal,
+  onPreviewVisibilityChange,
+  onPreviewZoomAvailabilityChange,
+}) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
   const [baselineContent, setBaselineContent] = useState(documentNode.content || '');
@@ -443,6 +471,28 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
     workingDirectory: settings.pythonWorkingDirectory ?? settings.pythonDefaults.workingDirectory ?? null,
   }), [settings.pythonDefaults, settings.pythonWorkingDirectory]);
 
+  const previewZoomOptions = useMemo(() => ({
+    minScale: previewMinScale,
+    maxScale: previewMaxScale,
+    zoomStep: previewZoomStep,
+    initialScale: previewInitialScale,
+  }), [previewInitialScale, previewMaxScale, previewMinScale, previewZoomStep]);
+
+  useEffect(() => {
+    const isPreviewVisible = supportsPreview && (viewMode === 'preview' || viewMode.startsWith('split-'));
+    onPreviewVisibilityChange?.(isPreviewVisible);
+    if (!isPreviewVisible) {
+      onPreviewZoomAvailabilityChange?.(false);
+    }
+  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange, supportsPreview, viewMode]);
+
+  useEffect(() => {
+    return () => {
+      onPreviewVisibilityChange?.(false);
+      onPreviewZoomAvailabilityChange?.(false);
+    };
+  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange]);
+
   const handlePythonPanelResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -519,7 +569,21 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentNode, onSave, o
             activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
           />
         );
-    const preview = <PreviewPane ref={previewScrollRef} content={content} language={language} onScroll={handlePreviewScroll} addLog={addLog} settings={settings} />;
+    const preview = (
+      <PreviewPane
+        ref={previewScrollRef}
+        content={content}
+        language={language}
+        onScroll={handlePreviewScroll}
+        addLog={addLog}
+        settings={settings}
+        previewScale={previewScale}
+        onPreviewScaleChange={onPreviewScaleChange}
+        previewZoomOptions={previewZoomOptions}
+        previewResetSignal={previewResetSignal}
+        onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
+      />
+    );
     
     switch(viewMode) {
         case 'edit': return editor;

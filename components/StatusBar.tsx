@@ -1,7 +1,8 @@
 import React from 'react';
 import Tooltip from './Tooltip';
+import Hint from './Hint';
 import type { LLMStatus, DiscoveredLLMModel, DiscoveredLLMService } from '../types';
-import { DatabaseIcon, ChevronDownIcon } from './Icons';
+import { DatabaseIcon, ChevronDownIcon, MinusIcon, PlusIcon, RefreshIcon } from './Icons';
 
 type DatabaseStatusHint = {
   message: string;
@@ -24,6 +25,14 @@ interface StatusBarProps {
   databaseStatus?: DatabaseStatusHint | null;
   onDatabaseMenu?: (event: React.MouseEvent<HTMLElement>) => void;
   onOpenAbout?: () => void;
+  previewScale: number;
+  onPreviewZoomIn: () => void;
+  onPreviewZoomOut: () => void;
+  onPreviewReset: () => void;
+  isPreviewZoomAvailable: boolean;
+  previewMinScale: number;
+  previewMaxScale: number;
+  previewInitialScale: number;
 }
 
 const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: string }> = {
@@ -44,6 +53,60 @@ const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: st
   },
 };
 
+const zoomButtonTooltipClass = '!bg-transparent !shadow-none !p-0 text-inherit';
+
+interface ZoomButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+  hint: string;
+  icon: React.ReactNode;
+}
+
+const ZoomButton: React.FC<ZoomButtonProps> = ({ hint, icon, className = '', disabled, ...buttonProps }) => {
+  const wrapperRef = React.useRef<HTMLSpanElement>(null);
+  const [showTooltip, setShowTooltip] = React.useState(false);
+  const hasHint = hint.trim().length > 0;
+
+  const handleShow = React.useCallback(() => {
+    if (hasHint) {
+      setShowTooltip(true);
+    }
+  }, [hasHint]);
+
+  const handleHide = React.useCallback(() => {
+    setShowTooltip(false);
+  }, []);
+
+  const { type, ...restButtonProps } = buttonProps;
+
+  return (
+    <>
+      <span
+        ref={wrapperRef}
+        className="inline-flex"
+        onMouseEnter={handleShow}
+        onMouseLeave={handleHide}
+        onFocus={handleShow}
+        onBlur={handleHide}
+      >
+        <button
+          type={type ?? 'button'}
+          className={`${className}`.trim()}
+          disabled={disabled}
+          {...restButtonProps}
+        >
+          {icon}
+        </button>
+      </span>
+      {hasHint && showTooltip && wrapperRef.current && (
+        <Tooltip
+          targetRef={wrapperRef}
+          content={<Hint role="note">{hint}</Hint>}
+          className={zoomButtonTooltipClass}
+        />
+      )}
+    </>
+  );
+};
+
 const StatusBar: React.FC<StatusBarProps> = ({
     status,
     modelName,
@@ -60,6 +123,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
     databaseStatus,
     onDatabaseMenu,
     onOpenAbout,
+    previewScale,
+    onPreviewZoomIn,
+    onPreviewZoomOut,
+    onPreviewReset,
+    isPreviewZoomAvailable,
+    previewMinScale,
+    previewMaxScale,
+    previewInitialScale,
 }) => {
   const { text, color, tooltip } = statusConfig[status];
   const selectedService = discoveredServices.find(s => s.generateUrl === llmProviderUrl);
@@ -133,7 +204,15 @@ const StatusBar: React.FC<StatusBarProps> = ({
     backgroundRepeat: 'no-repeat',
     backgroundSize: '1.2em 1.2em',
   };
-  
+
+  const zoomButtonClass = 'p-1 rounded-sm text-text-secondary hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed';
+  const isZoomDisabled = !isPreviewZoomAvailable;
+  const isAtMinZoom = previewScale <= previewMinScale + 0.001;
+  const isAtMaxZoom = previewScale >= previewMaxScale - 0.001;
+  const isAtInitialZoom = Math.abs(previewScale - previewInitialScale) < 0.001;
+  const zoomLabelClass = `min-w-[3rem] text-center font-semibold ${isZoomDisabled ? 'text-text-secondary' : 'text-text-main'}`;
+  const zoomPercentage = Math.round(previewScale * 100);
+
   return (
     <footer className="flex items-center justify-between px-4 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30">
       <div className="flex items-center gap-3">
@@ -247,6 +326,36 @@ const StatusBar: React.FC<StatusBarProps> = ({
         )}
       </div>
       <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5" role="group" aria-label="Preview zoom controls">
+            <ZoomButton
+              className={zoomButtonClass}
+              onClick={onPreviewZoomOut}
+              disabled={isZoomDisabled || isAtMinZoom}
+              aria-label="Zoom out"
+              hint="Zoom out"
+              icon={<MinusIcon className="w-3.5 h-3.5" />}
+            />
+            <span className={zoomLabelClass}>{zoomPercentage}%</span>
+            <ZoomButton
+              className={zoomButtonClass}
+              onClick={onPreviewZoomIn}
+              disabled={isZoomDisabled || isAtMaxZoom}
+              aria-label="Zoom in"
+              hint="Zoom in"
+              icon={<PlusIcon className="w-3.5 h-3.5" />}
+            />
+            <ZoomButton
+              className={zoomButtonClass}
+              onClick={onPreviewReset}
+              disabled={isZoomDisabled || isAtInitialZoom}
+              aria-label="Reset zoom"
+              hint="Reset zoom"
+              icon={<RefreshIcon className="w-3.5 h-3.5" />}
+            />
+          </div>
+        </div>
+        <div className="h-4 w-px bg-border-color"></div>
         <span>Documents: <span className="font-semibold text-text-main">{documentCount}</span></span>
         <div className="h-4 w-px bg-border-color"></div>
         <span>Last Saved: <span className="font-semibold text-text-main">{formatTimestamp(lastSaved)}</span></span>

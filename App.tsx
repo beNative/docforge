@@ -45,6 +45,11 @@ const MIN_SIDEBAR_WIDTH = 200;
 const DEFAULT_LOGGER_HEIGHT = 288;
 const MIN_LOGGER_HEIGHT = 100;
 
+const PREVIEW_INITIAL_SCALE = 1;
+const PREVIEW_MIN_SCALE = 0.25;
+const PREVIEW_MAX_SCALE = 5;
+const PREVIEW_ZOOM_STEP = 0.25;
+
 const isElectron = !!window.electronAPI;
 
 const resolveClipboardHelpUrl = (): string | null => {
@@ -205,10 +210,35 @@ const MainApp: React.FC = () => {
     const [isDatabaseBusy, setIsDatabaseBusy] = useState(false);
     const [isRestoringActiveDocument, setIsRestoringActiveDocument] = useState(true);
     const [hasRestoredActiveDocument, setHasRestoredActiveDocument] = useState(false);
+    const [previewScale, setPreviewScale] = useState(PREVIEW_INITIAL_SCALE);
+    const [previewResetSignal, setPreviewResetSignal] = useState(0);
+    const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+    const [isPreviewZoomReady, setIsPreviewZoomReady] = useState(false);
 
     const activeNodeId = tabState.activeId;
     const openDocumentIds = tabState.order;
     const storedActiveDocumentIdRef = useRef<string | null>(null);
+
+    const clampPreviewScale = useCallback((value: number) => {
+        return Math.min(Math.max(value, PREVIEW_MIN_SCALE), PREVIEW_MAX_SCALE);
+    }, []);
+
+    const handlePreviewScaleChange = useCallback((value: number) => {
+        setPreviewScale(clampPreviewScale(value));
+    }, [clampPreviewScale]);
+
+    const handlePreviewZoomIn = useCallback(() => {
+        setPreviewScale(prev => clampPreviewScale(prev * (1 + PREVIEW_ZOOM_STEP)));
+    }, [clampPreviewScale]);
+
+    const handlePreviewZoomOut = useCallback(() => {
+        setPreviewScale(prev => clampPreviewScale(prev / (1 + PREVIEW_ZOOM_STEP)));
+    }, [clampPreviewScale]);
+
+    const handlePreviewReset = useCallback(() => {
+        setPreviewScale(PREVIEW_INITIAL_SCALE);
+        setPreviewResetSignal(prev => prev + 1);
+    }, []);
 
     const activateDocumentTab = useCallback((documentId: string) => {
         setTabState(prev => {
@@ -416,6 +446,20 @@ const MainApp: React.FC = () => {
 
     const documentItems = useMemo(() => items.filter(item => item.type === 'document'), [items]);
     const activeDocumentId = activeDocument?.id ?? null;
+
+    useEffect(() => {
+        setIsPreviewVisible(false);
+        setIsPreviewZoomReady(false);
+        setPreviewScale(PREVIEW_INITIAL_SCALE);
+        setPreviewResetSignal(prev => prev + 1);
+    }, [activeNode?.id, activeNode?.type]);
+
+    useEffect(() => {
+        if (view !== 'editor' || documentView !== 'editor') {
+            setIsPreviewVisible(false);
+            setIsPreviewZoomReady(false);
+        }
+    }, [documentView, view]);
 
     useEffect(() => {
         let isCancelled = false;
@@ -2591,7 +2635,7 @@ const MainApp: React.FC = () => {
                     );
                 }
                 return (
-                    <DocumentEditor 
+                    <DocumentEditor
                         key={activeNode.id}
                         documentNode={activeNode}
                         onSave={handleSaveDocumentTitle}
@@ -2602,6 +2646,15 @@ const MainApp: React.FC = () => {
                         onLanguageChange={handleLanguageChange}
                         onViewModeChange={handleViewModeChange}
                         formatTrigger={formatTrigger}
+                        previewScale={previewScale}
+                        onPreviewScaleChange={handlePreviewScaleChange}
+                        previewMinScale={PREVIEW_MIN_SCALE}
+                        previewMaxScale={PREVIEW_MAX_SCALE}
+                        previewZoomStep={PREVIEW_ZOOM_STEP}
+                        previewInitialScale={PREVIEW_INITIAL_SCALE}
+                        previewResetSignal={previewResetSignal}
+                        onPreviewVisibilityChange={setIsPreviewVisible}
+                        onPreviewZoomAvailabilityChange={setIsPreviewZoomReady}
                     />
                 );
             }
@@ -2782,6 +2835,14 @@ const MainApp: React.FC = () => {
                     databaseStatus={databaseStatus}
                     onDatabaseMenu={handleDatabaseMenu}
                     onOpenAbout={handleOpenAbout}
+                    previewScale={previewScale}
+                    onPreviewZoomIn={handlePreviewZoomIn}
+                    onPreviewZoomOut={handlePreviewZoomOut}
+                    onPreviewReset={handlePreviewReset}
+                    isPreviewZoomAvailable={isPreviewVisible && isPreviewZoomReady}
+                    previewMinScale={PREVIEW_MIN_SCALE}
+                    previewMaxScale={PREVIEW_MAX_SCALE}
+                    previewInitialScale={PREVIEW_INITIAL_SCALE}
                 />
             </div>
             
