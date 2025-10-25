@@ -27,6 +27,8 @@ export type ThemeSlot = typeof THEME_SLOTS[number];
 
 export type ThemeDefinition = Record<ThemeSlot, string>;
 
+export type ThemeOverrides = Partial<Record<ThemeSlot, string>>;
+
 export type ThemeId = 'light' | 'dark';
 
 const baseLightTheme: ThemeDefinition = {

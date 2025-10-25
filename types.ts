@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { ThemeId, ThemeOverrides } from './themes/themeTokens';
 
 // Fix: Add global declaration for window.electronAPI to inform TypeScript of the preload script's additions.
 // Added NodeJS.Process augmentation to fix type error in main process.
@@ -333,6 +334,13 @@ export interface DocumentTemplate {
   updated_at: string;
 }
 
+export interface ThemePreference {
+  overrides: ThemeOverrides;
+  contrastOffset: number;
+}
+
+export type ThemePreferences = Record<ThemeId, ThemePreference>;
+
 export interface Settings {
   llmProviderUrl: string;
   llmModelName: string;
@@ -363,6 +371,7 @@ export interface Settings {
   markdownCodeBlockBackgroundDark: string;
   markdownContentPadding: number;
   markdownParagraphSpacing: number;
+  themePreferences: ThemePreferences;
   pythonDefaults: PythonEnvironmentDefaults;
   pythonWorkingDirectory: string | null;
   pythonConsoleTheme: 'light' | 'dark';

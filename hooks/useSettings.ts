@@ -26,6 +26,32 @@ export const useSettings = () => {
       
       // Merge with defaults to ensure all properties exist for existing users after an update.
       const mergedSettings = { ...DEFAULT_SETTINGS, ...loadedSettingsFromDB };
+      const defaultThemePrefs = DEFAULT_SETTINGS.themePreferences;
+      const persistedThemePrefs = (
+        (loadedSettingsFromDB as Partial<Settings>).themePreferences ?? {}
+      ) as Partial<Settings['themePreferences']>;
+      mergedSettings.themePreferences = {
+        light: {
+          overrides: {
+            ...defaultThemePrefs.light.overrides,
+            ...(persistedThemePrefs.light?.overrides ?? {}),
+          },
+          contrastOffset:
+            typeof persistedThemePrefs.light?.contrastOffset === 'number'
+              ? persistedThemePrefs.light.contrastOffset
+              : defaultThemePrefs.light.contrastOffset,
+        },
+        dark: {
+          overrides: {
+            ...defaultThemePrefs.dark.overrides,
+            ...(persistedThemePrefs.dark?.overrides ?? {}),
+          },
+          contrastOffset:
+            typeof persistedThemePrefs.dark?.contrastOffset === 'number'
+              ? persistedThemePrefs.dark.contrastOffset
+              : defaultThemePrefs.dark.contrastOffset,
+        },
+      };
 
       // If provider name is missing but URL is present, try to discover it.
       if (mergedSettings.llmProviderUrl && !mergedSettings.llmProviderName) {

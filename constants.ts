@@ -47,6 +47,16 @@ export const DEFAULT_SETTINGS: Settings = {
   markdownCodeBlockBackgroundDark: '#1f2933',
   markdownContentPadding: 48,
   markdownParagraphSpacing: 0.75,
+  themePreferences: {
+    light: {
+      overrides: {},
+      contrastOffset: 0,
+    },
+    dark: {
+      overrides: {},
+      contrastOffset: 0,
+    },
+  },
   pythonDefaults: {
     targetPythonVersion: '3.11',
     basePackages: [

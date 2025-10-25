@@ -35,6 +35,7 @@ import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { LOCAL_STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 import { repository } from './services/repository';
+import { configureThemePreferences } from './services/themeService';
 import { DocumentNode } from './components/PromptTreeItem';
 import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './services/shortcutService';
 import { readClipboardText, ClipboardPermissionError, ClipboardUnavailableError } from './services/clipboardService';
@@ -381,6 +382,13 @@ const MainApp: React.FC = () => {
             (document.documentElement.style as any).zoom = `${settings.uiScale / 100}`;
         }
     }, [settings.uiScale, settingsLoaded]);
+
+    useEffect(() => {
+        if (!settingsLoaded) {
+            return;
+        }
+        configureThemePreferences(settings.themePreferences);
+    }, [configureThemePreferences, settings.themePreferences, settingsLoaded]);
 
     useEffect(() => {
         if (settingsLoaded) {
