@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import Modal from './Modal';
 
 const appIconUrl = new URL('../assets/icon.svg', import.meta.url).href;
@@ -8,8 +8,10 @@ interface AboutModalProps {
 }
 
 const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
+  const githubLinkRef = useRef<HTMLAnchorElement>(null);
+
   return (
-    <Modal title="About DocForge" onClose={onClose}>
+    <Modal title="About DocForge" onClose={onClose} initialFocusRef={githubLinkRef}>
       <div className="p-8 text-center text-text-main space-y-6">
         <div className="flex flex-col items-center space-y-4">
           <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-border-color bg-background shadow-sm">
@@ -21,6 +23,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
           </div>
         </div>
         <a
+          ref={githubLinkRef}
           href="https://github.com/beNative/docforge"
           target="_blank"
           rel="noopener noreferrer"
