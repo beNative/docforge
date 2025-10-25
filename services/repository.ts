@@ -489,14 +489,11 @@ export const repository = {
             SELECT
                 n.*,
                 d.document_id, d.doc_type, d.language_hint, d.language_source, d.doc_type_source, d.classification_updated_at, d.default_view_mode, d.current_version_id,
-                cs.text_content as content,
                 ps.env_id as python_env_id,
                 ps.auto_detect_env as python_auto_detect_env,
                 ps.last_run_id as python_last_run_id
             FROM nodes n
             LEFT JOIN documents d ON n.node_id = d.node_id
-            LEFT JOIN doc_versions dv ON d.current_version_id = dv.version_id
-            LEFT JOIN content_store cs ON dv.content_id = cs.content_id
             LEFT JOIN node_python_settings ps ON n.node_id = ps.node_id
             ORDER BY n.sort_order
         `);
@@ -524,7 +521,6 @@ export const repository = {
                     classification_updated_at: record.classification_updated_at ?? null,
                     default_view_mode: record.default_view_mode,
                     current_version_id: record.current_version_id,
-                    content: record.content,
                 } : undefined,
                 pythonSettings: record.python_env_id !== null || record.python_auto_detect_env !== null || record.python_last_run_id !== null ? {
                     nodeId: record.node_id,
@@ -544,6 +540,47 @@ export const repository = {
             }
         }
         return rootNodes;
+    },
+
+    async getDocumentContent(nodeId: string): Promise<string> {
+        if (!nodeId) {
+            return '';
+        }
+
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const { node } = findNodeWithParent(nodeId, state.nodes);
+            if (!node || !node.document) {
+                return '';
+            }
+
+            if (typeof node.document.content === 'string') {
+                return node.document.content;
+            }
+
+            const documentId = node.document.document_id;
+            const versions = state.docVersions[documentId] ?? [];
+            const latest = versions.find(v => v.version_id === node.document.current_version_id)
+                ?? versions[versions.length - 1];
+            return latest?.content ?? '';
+        }
+
+        if (!window.electronAPI?.dbGet) {
+            return '';
+        }
+
+        const row = await window.electronAPI.dbGet(
+            `
+            SELECT cs.text_content as content
+            FROM documents d
+            LEFT JOIN doc_versions dv ON d.current_version_id = dv.version_id
+            LEFT JOIN content_store cs ON dv.content_id = cs.content_id
+            WHERE d.node_id = ?
+        `,
+            [nodeId],
+        );
+
+        return typeof row?.content === 'string' ? row.content : '';
     },
 
     async searchDocumentsByBody(searchTerm: string, limit: number = 50): Promise<{ nodeId: string; snippet: string }[]> {

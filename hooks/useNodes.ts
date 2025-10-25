@@ -21,6 +21,50 @@ export const useNodes = () => {
     }
   }, [addLog]);
 
+  const loadDocumentContent = useCallback(async (nodeId: string): Promise<string> => {
+    const fetchedContent = await repository.getDocumentContent(nodeId);
+
+    setNodes(prevNodes => {
+      const applyUpdate = (nodes: Node[]): { next: Node[]; changed: boolean } => {
+        let changed = false;
+        const nextNodes = nodes.map(node => {
+          let updatedNode = node;
+
+          if (node.node_id === nodeId && node.document) {
+            if (node.document.content !== fetchedContent) {
+              updatedNode = {
+                ...node,
+                document: {
+                  ...node.document,
+                  content: fetchedContent,
+                },
+              };
+              changed = true;
+            }
+          }
+
+          if (node.children) {
+            const { next: updatedChildren, changed: childChanged } = applyUpdate(node.children);
+            if (childChanged) {
+              updatedNode = updatedNode === node ? { ...node } : updatedNode;
+              updatedNode.children = updatedChildren;
+              changed = true;
+            }
+          }
+
+          return updatedNode;
+        });
+
+        return { next: changed ? nextNodes : nodes, changed };
+      };
+
+      const { next, changed } = applyUpdate(prevNodes);
+      return changed ? next : prevNodes;
+    });
+
+    return fetchedContent;
+  }, []);
+
   useEffect(() => {
     refreshNodes();
   }, [refreshNodes]);
@@ -104,5 +148,5 @@ export const useNodes = () => {
     return result;
   }, [addLog, refreshNodes]);
 
-  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, addLog };
+  return { nodes, isLoading, refreshNodes, loadDocumentContent, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, addLog };
 };

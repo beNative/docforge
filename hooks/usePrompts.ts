@@ -55,7 +55,7 @@ const getDescendantIdsRecursive = (nodeId: string, allNodes: Node[]): Set<string
  * This allows the UI to function without a full refactor of all components.
  */
 export const useDocuments = () => {
-  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, addLog, isLoading } = useNodes();
+  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, loadDocumentContent, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, addLog, isLoading } = useNodes();
 
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
@@ -119,9 +119,11 @@ export const useDocuments = () => {
 
   const commitVersion = useCallback(async (nodeId: string, content: string) => {
       await updateDocumentContent(nodeId, content);
-      // After committing a new version, we need to refresh to get the new content.
+      // After committing a new version, we need to refresh to get updated metadata.
       await refreshNodes();
-  }, [updateDocumentContent, refreshNodes]);
+      // Ensure the latest content is available for the active document without waiting for another user action.
+      await loadDocumentContent(nodeId);
+  }, [updateDocumentContent, refreshNodes, loadDocumentContent]);
 
   const deleteItem = useCallback(async (id: string) => {
       await deleteNode(id);
@@ -188,5 +190,5 @@ export const useDocuments = () => {
       return getDescendantIdsRecursive(nodeId, allNodesFlat);
   }, [allNodesFlat]);
 
-  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard: createDocumentFromClipboardAdapter, isLoading };
+  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard: createDocumentFromClipboardAdapter, loadDocumentContent, isLoading };
 };

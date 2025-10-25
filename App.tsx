@@ -156,7 +156,7 @@ interface UpdateToastState {
 
 const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, isLoading: areDocumentsLoading } = useDocuments();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, loadDocumentContent, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
     
@@ -429,6 +429,21 @@ const MainApp: React.FC = () => {
     const activeNode = useMemo(() => {
         return itemsWithSearchMetadata.find(p => p.id === tabState.activeId) || null;
     }, [itemsWithSearchMetadata, tabState.activeId]);
+
+    useEffect(() => {
+        if (!activeNode || activeNode.type !== 'document') {
+            return;
+        }
+
+        if (activeNode.content !== undefined) {
+            return;
+        }
+
+        loadDocumentContent(activeNode.id).catch(error => {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog('ERROR', `Failed to load content for "${activeNode.title}" (${activeNode.id}): ${message}`);
+        });
+    }, [activeNode, loadDocumentContent, addLog]);
 
     useEffect(() => {
         setFolderSearchTerm('');
