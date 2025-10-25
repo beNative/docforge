@@ -77,9 +77,9 @@ const PdfPreview = React.forwardRef<HTMLDivElement, PdfPreviewProps>(({ content,
   return (
     <ZoomPanContainer
       ref={ref}
-      className={`w-full h-full overflow-auto bg-secondary ${className ?? ''}`}
-      contentClassName="w-full h-full min-h-full origin-top flex"
-      wrapperClassName="mx-auto"
+      className={`w-full h-full bg-secondary ${className ?? ''}`}
+      contentClassName="w-full h-full min-h-full origin-top flex items-stretch"
+      wrapperClassName="w-full h-full min-h-full"
       layout="natural"
       disablePan
       lockOverflow={false}
@@ -88,7 +88,7 @@ const PdfPreview = React.forwardRef<HTMLDivElement, PdfPreviewProps>(({ content,
       <iframe
         title="PDF Preview"
         src={url}
-        className="w-full h-full min-h-full flex-1 border border-border-color bg-white shadow-sm rounded-md"
+        className="w-full h-full min-h-full flex-1 border border-border-color bg-white shadow-sm"
       />
     </ZoomPanContainer>
   );
