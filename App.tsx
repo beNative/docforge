@@ -463,8 +463,6 @@ const MainApp: React.FC = () => {
     const activeDocumentId = activeDocument?.id ?? null;
 
     useEffect(() => {
-        setIsPreviewVisible(false);
-        setIsPreviewZoomReady(false);
         setPreviewScale(PREVIEW_INITIAL_SCALE);
         setPreviewResetSignal(prev => prev + 1);
     }, [activeNode?.id, activeNode?.type]);
