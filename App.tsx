@@ -34,7 +34,7 @@ import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { LOCAL_STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
-import { repository } from './services/repository';
+import { repository, type RepositoryStartupTiming } from './services/repository';
 import { DocumentNode } from './components/PromptTreeItem';
 import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './services/shortcutService';
 import { readClipboardText, ClipboardPermissionError, ClipboardUnavailableError } from './services/clipboardService';
@@ -81,12 +81,27 @@ const App: React.FC = () => {
     const [initError, setInitError] = useState<string | null>(null);
 
     useEffect(() => {
+        const logStartupTimings = (timings: RepositoryStartupTiming[]) => {
+            timings.forEach(timing => {
+                const detailPart = timing.detail ? ` (${timing.detail})` : '';
+                const duration = timing.durationMs.toFixed(1);
+                const message = `[Startup] ${timing.step} ${timing.success ? 'completed' : 'failed'} in ${duration}ms${detailPart}`;
+                const finalMessage = timing.error ? `${message} Error: ${timing.error}` : message;
+                addLog(timing.success ? 'INFO' : 'ERROR', finalMessage);
+            });
+        };
+
         const initializeApp = async () => {
             try {
-                await repository.init();
+                const timings = await repository.init();
+                logStartupTimings(timings);
                 addLog('INFO', 'Application repository initialized successfully.');
                 setIsInitialized(true);
             } catch (error) {
+                const timings = (error as Error & { startupTimings?: RepositoryStartupTiming[] }).startupTimings;
+                if (timings) {
+                    logStartupTimings(timings);
+                }
                 const message = `Fatal: Application initialization failed. ${error instanceof Error ? error.message : String(error)}`;
                 addLog('ERROR', message);
                 setInitError(message);
