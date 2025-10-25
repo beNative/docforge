@@ -89,7 +89,7 @@ const PdfPreview = React.forwardRef<HTMLDivElement, PdfPreviewProps>(({ content,
         <iframe
           title="PDF Preview"
           src={url}
-          className="w-full h-full border border-border-color bg-white shadow-sm rounded-md"
+          className="w-full h-full border border-border-color bg-white shadow-sm"
         />
       </div>
     </ZoomPanContainer>
