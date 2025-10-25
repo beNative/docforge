@@ -408,37 +408,121 @@ const transformLegacyData = async (
     return { nodes, documents, docVersions, contentStore, templates: legacyTemplates, settings };
 };
 
+export type RepositoryStartupTiming = {
+    step: string;
+    durationMs: number;
+    success: boolean;
+    detail?: string;
+    error?: string;
+};
+
+const getTimestamp = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+
 export const repository = {
     _isInitialized: false,
 
-    async init() {
-        if (this._isInitialized) return;
+    async init(): Promise<RepositoryStartupTiming[]> {
+        const timings: RepositoryStartupTiming[] = [];
+        const runStartedAt = getTimestamp();
 
-        if (!isElectron) {
-            ensureBrowserState();
-            console.warn('Repository initialized in browser preview mode. Data will not be persisted to a local database.');
-            this._isInitialized = true;
-            return;
+        const pushTiming = (entry: RepositoryStartupTiming) => {
+            timings.push(entry);
+            const formattedDuration = entry.durationMs.toFixed(1);
+            const detailPart = entry.detail ? ` (${entry.detail})` : '';
+            const baseMessage = `[Startup] ${entry.step} ${entry.success ? 'completed' : 'failed'} in ${formattedDuration}ms${detailPart}`;
+            if (entry.success) {
+                console.log(baseMessage);
+            } else {
+                const errorMessage = entry.error ? `${baseMessage}: ${entry.error}` : baseMessage;
+                console.error(errorMessage);
+            }
+        };
+
+        const withTimingsAttached = (error: unknown): Error => {
+            if (error instanceof Error) {
+                (error as Error & { startupTimings?: RepositoryStartupTiming[] }).startupTimings = timings.slice();
+                return error;
+            }
+            const err = new Error(String(error));
+            (err as Error & { startupTimings?: RepositoryStartupTiming[] }).startupTimings = timings.slice();
+            return err;
+        };
+
+        const runStep = async <T>(
+            step: string,
+            fn: () => Promise<T> | T,
+            detail?: (result: T) => string | undefined,
+        ): Promise<T> => {
+            const stepStartedAt = getTimestamp();
+            try {
+                const result = await fn();
+                const durationMs = getTimestamp() - stepStartedAt;
+                const detailValue = detail?.(result);
+                pushTiming({ step, durationMs, success: true, detail: detailValue });
+                return result;
+            } catch (error) {
+                const durationMs = getTimestamp() - stepStartedAt;
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                pushTiming({ step, durationMs, success: false, error: errorMessage });
+                throw withTimingsAttached(error);
+            }
+        };
+
+        if (this._isInitialized) {
+            pushTiming({
+                step: 'Repository initialization',
+                durationMs: 0,
+                success: true,
+                detail: 'Skipped (already initialized)',
+            });
+            return timings;
         }
 
-        if (!window.electronAPI) {
-            throw new Error("Electron API is not available. This application is designed to run in Electron.");
-        }
+        try {
+            if (!isElectron) {
+                await runStep('Load browser preview state', async () => {
+                    ensureBrowserState();
+                });
+                console.warn('Repository initialized in browser preview mode. Data will not be persisted to a local database.');
+                this._isInitialized = true;
+            } else {
+                if (!window.electronAPI) {
+                    throw new Error("Electron API is not available. This application is designed to run in Electron.");
+                }
 
-        const isNewDb = await window.electronAPI.dbIsNew();
-        const legacyPromptsExist = await window.electronAPI.legacyFileExists(LOCAL_STORAGE_KEYS.LEGACY_PROMPTS);
+                const isNewDb = await runStep(
+                    'Check if database is new',
+                    () => window.electronAPI!.dbIsNew(),
+                    result => `result: ${result}`,
+                );
+                const legacyPromptsExist = await runStep(
+                    'Check for legacy prompt data',
+                    () => window.electronAPI!.legacyFileExists(LOCAL_STORAGE_KEYS.LEGACY_PROMPTS),
+                    result => `result: ${result}`,
+                );
 
-        if (isNewDb && legacyPromptsExist) {
-            console.log("New database and legacy files found. Starting migration...");
-            await this.migrateFromJson();
-        }
-        
-        const templates = await this.getAllTemplates();
-        if (templates.length === 0) {
-            await this.addDefaultTemplates();
-        }
+                if (isNewDb && legacyPromptsExist) {
+                    await runStep('Migrate legacy data', () => this.migrateFromJson());
+                }
 
-        this._isInitialized = true;
+                const templates = await runStep(
+                    'Load templates',
+                    () => this.getAllTemplates(),
+                    result => `count: ${result.length}`,
+                );
+                if (templates.length === 0) {
+                    await runStep('Seed default templates', () => this.addDefaultTemplates());
+                }
+
+                this._isInitialized = true;
+            }
+
+            const totalDuration = getTimestamp() - runStartedAt;
+            pushTiming({ step: 'Repository initialization total', durationMs: totalDuration, success: true });
+            return timings;
+        } catch (error) {
+            throw withTimingsAttached(error);
+        }
     },
 
     async migrateFromJson() {
