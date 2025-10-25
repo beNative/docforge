@@ -214,8 +214,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const zoomPercentage = Math.round(previewScale * 100);
 
   return (
-    <footer className="flex items-center justify-between px-4 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30">
-      <div className="flex items-center gap-3">
+    <footer className="flex items-center justify-between px-4 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30 whitespace-nowrap">
+      <div className="flex items-center gap-3 whitespace-nowrap min-w-0">
         <div
           ref={statusTriggerRef}
           className="flex items-center gap-1.5 cursor-default focus:outline-none"
@@ -325,7 +325,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
           </>
         )}
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 whitespace-nowrap min-w-0">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5" role="group" aria-label="Preview zoom controls">
             <ZoomButton
