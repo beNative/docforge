@@ -1,4 +1,14 @@
 import type { Settings, DocumentTemplate } from './types';
+import {
+  DEFAULT_DARK_THEME,
+  DEFAULT_LIGHT_THEME,
+  DEFAULT_THEME_ACCENT_SATURATION,
+  DEFAULT_THEME_MODE,
+  DEFAULT_THEME_PRESET,
+  DEFAULT_THEME_SURFACE_TONE,
+  DEFAULT_THEME_TEXT_CONTRAST,
+  DEFAULT_THEME_USE_CUSTOM_COLORS,
+} from './theme/presets';
 
 export const LOCAL_STORAGE_KEYS = {
   // UI state persistence:
@@ -47,6 +57,14 @@ export const DEFAULT_SETTINGS: Settings = {
   markdownCodeBlockBackgroundDark: '#1f2933',
   markdownContentPadding: 48,
   markdownParagraphSpacing: 0.75,
+  themeMode: DEFAULT_THEME_MODE,
+  themePreset: DEFAULT_THEME_PRESET,
+  themeTextContrast: DEFAULT_THEME_TEXT_CONTRAST,
+  themeSurfaceTone: DEFAULT_THEME_SURFACE_TONE,
+  themeAccentSaturation: DEFAULT_THEME_ACCENT_SATURATION,
+  themeUseCustomColors: DEFAULT_THEME_USE_CUSTOM_COLORS,
+  themeCustomLight: DEFAULT_LIGHT_THEME,
+  themeCustomDark: DEFAULT_DARK_THEME,
   pythonDefaults: {
     targetPythonVersion: '3.11',
     basePackages: [

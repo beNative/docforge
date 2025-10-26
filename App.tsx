@@ -38,6 +38,7 @@ import { repository, type RepositoryStartupTiming } from './services/repository'
 import { DocumentNode } from './components/PromptTreeItem';
 import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './services/shortcutService';
 import { readClipboardText, ClipboardPermissionError, ClipboardUnavailableError } from './services/clipboardService';
+import { preferencesFromSettings } from './services/themeEngine';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -173,7 +174,7 @@ const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
     const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
-    const { theme } = useTheme();
+    const { theme, setThemeMode, setThemePreferences } = useTheme();
     
     const [tabState, setTabState] = useState<TabState>({ activeId: null, order: [] });
     const [selectedIds, setSelectedIds] = useState(new Set<string>());
@@ -396,6 +397,31 @@ const MainApp: React.FC = () => {
             (document.documentElement.style as any).zoom = `${settings.uiScale / 100}`;
         }
     }, [settings.uiScale, settingsLoaded]);
+
+    useEffect(() => {
+        if (!settingsLoaded) {
+            return;
+        }
+        setThemeMode(settings.themeMode);
+    }, [settings.themeMode, settingsLoaded, setThemeMode]);
+
+    useEffect(() => {
+        if (!settingsLoaded) {
+            return;
+        }
+        const themePreferences = preferencesFromSettings(settings);
+        setThemePreferences(themePreferences);
+    }, [
+        settings.themePreset,
+        settings.themeUseCustomColors,
+        settings.themeTextContrast,
+        settings.themeSurfaceTone,
+        settings.themeAccentSaturation,
+        settings.themeCustomLight,
+        settings.themeCustomDark,
+        settingsLoaded,
+        setThemePreferences,
+    ]);
 
     useEffect(() => {
         if (settingsLoaded) {

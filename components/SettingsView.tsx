@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { Settings, DiscoveredLLMService, DiscoveredLLMModel, DatabaseStats, Command, PythonEnvironmentConfig, PythonPackageSpec } from '../types';
+import type { Settings, DiscoveredLLMService, DiscoveredLLMModel, DatabaseStats, Command, PythonEnvironmentConfig, PythonPackageSpec, ThemePaletteOverride, ThemePreset, ThemeModeSetting } from '../types';
 import { llmDiscoveryService } from '../services/llmDiscoveryService';
 import { DEFAULT_SETTINGS } from '../constants';
 import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon, TerminalIcon, RefreshIcon, PlusIcon } from './Icons';
@@ -19,6 +19,9 @@ import SettingsTreeEditor from './SettingsTreeEditor';
 import { useLogger } from '../hooks/useLogger';
 import KeyboardShortcutsSection from './KeyboardShortcutsSection';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
+import { useTheme } from '../hooks/useTheme';
+import { THEME_PRESET_DEFINITIONS } from '../theme/presets';
+import { preferencesFromSettings } from '../services/themeEngine';
 
 interface SettingsViewProps {
   settings: Settings;
@@ -87,6 +90,15 @@ const FONT_PRESETS: Record<FontField, Record<PlatformId, string[]>> = {
     linux: ['"Ubuntu Mono", monospace', '"DejaVu Sans Mono", monospace'],
   },
 };
+
+const cloneThemePalette = (palette: ThemePaletteOverride): ThemePaletteOverride => ({
+  background: palette.background,
+  surface: palette.surface,
+  text: palette.text,
+  mutedText: palette.mutedText,
+  border: palette.border,
+  accent: palette.accent,
+});
 
 const serializePackageSpecs = (packages: PythonPackageSpec[]): string => {
   return packages
@@ -366,7 +378,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           />
         );
       case 'appearance':
-        return <AppearanceSettingsSection {...{ settings: currentSettings, setCurrentSettings }} />;
+        return <AppearanceSettingsSection settings={currentSettings} setCurrentSettings={setCurrentSettings} originalSettings={settings} />;
       case 'shortcuts':
         return (
           <KeyboardShortcutsSection
@@ -559,7 +571,7 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
     );
 };
 
-const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings'>> = ({ settings, setCurrentSettings }) => {
+const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings'> & { originalSettings: Settings }> = ({ settings, setCurrentSettings, originalSettings }) => {
     const CardButton: React.FC<{name: string, value: any, children: React.ReactNode, onClick: (value: any) => void, isSelected: boolean}> = ({ name, value, children, onClick, isSelected }) => (
 
         <button
@@ -593,12 +605,427 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
     const highlightColorPickerValueDark = isHighlightHexDark ? resolvedHighlightColorDark : DEFAULT_SETTINGS.editorActiveLineHighlightColorDark;
     const highlightColorDisplayDark = isHighlightHexDark ? resolvedHighlightColorDark.toUpperCase() : resolvedHighlightColorDark;
 
+    const { setThemeMode, setThemePreferences } = useTheme();
+    const themePreviewBaselineRef = useRef({
+        mode: originalSettings.themeMode,
+        preferences: preferencesFromSettings(originalSettings),
+    });
 
+    useEffect(() => {
+        themePreviewBaselineRef.current = {
+            mode: originalSettings.themeMode,
+            preferences: preferencesFromSettings(originalSettings),
+        };
+    }, [
+        originalSettings.themeMode,
+        originalSettings.themePreset,
+        originalSettings.themeUseCustomColors,
+        originalSettings.themeTextContrast,
+        originalSettings.themeSurfaceTone,
+        originalSettings.themeAccentSaturation,
+        originalSettings.themeCustomLight,
+        originalSettings.themeCustomDark,
+    ]);
+
+    useEffect(() => {
+        const previewPreferences = preferencesFromSettings(settings);
+        setThemeMode(settings.themeMode);
+        setThemePreferences(previewPreferences);
+    }, [
+        settings.themeMode,
+        settings.themePreset,
+        settings.themeUseCustomColors,
+        settings.themeTextContrast,
+        settings.themeSurfaceTone,
+        settings.themeAccentSaturation,
+        settings.themeCustomLight,
+        settings.themeCustomDark,
+        setThemeMode,
+        setThemePreferences,
+    ]);
+
+    useEffect(() => {
+        return () => {
+            setThemeMode(themePreviewBaselineRef.current.mode);
+            setThemePreferences(themePreviewBaselineRef.current.preferences);
+        };
+    }, [setThemeMode, setThemePreferences]);
+
+    const handleThemeModeSelect = useCallback((mode: ThemeModeSetting) => {
+        setCurrentSettings((prev) => ({ ...prev, themeMode: mode }));
+    }, [setCurrentSettings]);
+
+    const themeModeOptions: { id: ThemeModeSetting; label: string; description: string }[] = useMemo(() => ([
+        { id: 'system', label: 'System', description: 'Match your operating system preference automatically.' },
+        { id: 'light', label: 'Light', description: 'Use a bright UI ideal for well-lit environments.' },
+        { id: 'dark', label: 'Dark', description: 'Reduce glare with a dimmed interface.' },
+    ]), []);
+
+    const activePresetDefinition = THEME_PRESET_DEFINITIONS[settings.themePreset] ?? THEME_PRESET_DEFINITIONS['default'];
+
+    const handlePresetChange = useCallback((preset: ThemePreset) => {
+        setCurrentSettings((prev) => {
+            if (prev.themePreset === preset) {
+                return prev;
+            }
+            const definition = THEME_PRESET_DEFINITIONS[preset] ?? THEME_PRESET_DEFINITIONS['default'];
+            const next: Settings = {
+                ...prev,
+                themePreset: preset,
+            };
+            if (!prev.themeUseCustomColors) {
+                next.themeCustomLight = cloneThemePalette(definition.light);
+                next.themeCustomDark = cloneThemePalette(definition.dark);
+            }
+            if (definition.recommended) {
+                next.themeTextContrast = definition.recommended.textContrast ?? prev.themeTextContrast;
+                next.themeSurfaceTone = definition.recommended.surfaceTone ?? prev.themeSurfaceTone;
+                next.themeAccentSaturation = definition.recommended.accentSaturation ?? prev.themeAccentSaturation;
+            }
+            return next;
+        });
+    }, [setCurrentSettings]);
+
+    const handleUseCustomColors = useCallback((enabled: boolean) => {
+        setCurrentSettings((prev) => ({
+            ...prev,
+            themeUseCustomColors: enabled,
+            themeCustomLight: enabled ? prev.themeCustomLight : cloneThemePalette(activePresetDefinition.light),
+            themeCustomDark: enabled ? prev.themeCustomDark : cloneThemePalette(activePresetDefinition.dark),
+        }));
+    }, [setCurrentSettings, activePresetDefinition.light, activePresetDefinition.dark]);
+
+    const handlePaletteColorChange = useCallback((mode: 'light' | 'dark', key: keyof ThemePaletteOverride, value: string) => {
+        const normalized = value.trim();
+        setCurrentSettings((prev) => {
+            const paletteKey = mode === 'light' ? 'themeCustomLight' : 'themeCustomDark';
+            const nextPalette = { ...prev[paletteKey], [key]: normalized } as ThemePaletteOverride;
+            return { ...prev, [paletteKey]: nextPalette };
+        });
+    }, [setCurrentSettings]);
+
+    const handleResetPalette = useCallback((mode: 'light' | 'dark') => {
+        setCurrentSettings((prev) => {
+            const paletteKey = mode === 'light' ? 'themeCustomLight' : 'themeCustomDark';
+            const presetPalette = mode === 'light' ? activePresetDefinition.light : activePresetDefinition.dark;
+            return { ...prev, [paletteKey]: cloneThemePalette(presetPalette) };
+        });
+    }, [setCurrentSettings, activePresetDefinition.light, activePresetDefinition.dark]);
+
+    const applyPresetDefaults = useCallback(() => {
+        const recommendations = activePresetDefinition.recommended;
+        setCurrentSettings((prev) => ({
+            ...prev,
+            themeTextContrast: recommendations?.textContrast ?? prev.themeTextContrast,
+            themeSurfaceTone: recommendations?.surfaceTone ?? prev.themeSurfaceTone,
+            themeAccentSaturation: recommendations?.accentSaturation ?? prev.themeAccentSaturation,
+            themeCustomLight: cloneThemePalette(activePresetDefinition.light),
+            themeCustomDark: cloneThemePalette(activePresetDefinition.dark),
+        }));
+    }, [setCurrentSettings, activePresetDefinition]);
+
+    const themeTextContrastPercent = Math.round(settings.themeTextContrast * 100);
+    const themeSurfaceTonePercent = Math.round(settings.themeSurfaceTone * 100);
+    const themeAccentSaturationPercent = Math.round(settings.themeAccentSaturation * 100);
+
+    const ThemeColorInputControl: React.FC<{
+        id: string;
+        label: string;
+        value: string;
+        presetValue: string;
+        onChange: (value: string) => void;
+        disabled: boolean;
+    }> = ({ id, label, value, presetValue, onChange, disabled }) => {
+        const trimmed = value.trim();
+        const normalized = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmed) ? trimmed : presetValue;
+        return (
+            <div className="space-y-2">
+                <label htmlFor={id} className="block text-[11px] font-semibold text-text-secondary uppercase tracking-wide">{label}</label>
+                <div className="flex items-center gap-2">
+                    <input
+                        id={`${id}-picker`}
+                        type="color"
+                        value={normalized}
+                        onChange={(event) => onChange(event.target.value)}
+                        disabled={disabled}
+                        className="h-9 w-9 rounded-md border border-border-color bg-background cursor-pointer disabled:opacity-50"
+                    />
+                    <input
+                        id={id}
+                        type="text"
+                        value={value}
+                        onChange={(event) => onChange(event.target.value)}
+                        placeholder={presetValue}
+                        disabled={disabled}
+                        className="flex-1 px-2 py-1 text-xs rounded-md border border-border-color bg-background text-text-main focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 font-mono uppercase"
+                    />
+                </div>
+            </div>
+        );
+    };
+
+    const isCustomColorsEnabled = settings.themeUseCustomColors;
+    const lightPalette = settings.themeCustomLight;
+    const darkPalette = settings.themeCustomDark;
 
     return (
         <section className="pt-2 pb-6">
             <h2 className="text-lg font-semibold text-text-main mb-4">Appearance</h2>
             <div className="space-y-6">
+                <SettingRow
+                    label="Theme Mode"
+                    description="Choose how DocForge responds to light and dark environments."
+                >
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {themeModeOptions.map((option) => {
+                            const isSelected = settings.themeMode === option.id;
+                            return (
+                                <button
+                                    key={option.id}
+                                    type="button"
+                                    onClick={() => handleThemeModeSelect(option.id)}
+                                    className={`text-left p-3 rounded-lg border transition-colors h-full ${isSelected ? 'border-primary bg-primary/10' : 'border-border-color bg-secondary hover:border-primary/50'}`}
+                                >
+                                    <p className="text-sm font-semibold text-text-main">{option.label}</p>
+                                    <p className="text-[11px] text-text-secondary mt-1 leading-snug">{option.description}</p>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </SettingRow>
+                <SettingRow
+                    label="Color Preset"
+                    description="Switch between curated palettes optimised for different lighting and accessibility needs."
+                >
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {Object.entries(THEME_PRESET_DEFINITIONS).map(([presetKey, definition]) => {
+                            const key = presetKey as ThemePreset;
+                            const isSelected = settings.themePreset === key;
+                            return (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => handlePresetChange(key)}
+                                    className={`p-3 rounded-lg border transition-colors text-left h-full ${isSelected ? 'border-primary bg-primary/10 shadow-sm' : 'border-border-color bg-secondary hover:border-primary/50'}`}
+                                >
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="w-6 h-6 rounded-md border border-border-color" style={{ background: definition.light.background }} aria-hidden="true" />
+                                        <span className="w-6 h-6 rounded-md border border-border-color" style={{ background: definition.dark.background }} aria-hidden="true" />
+                                        <span className="w-6 h-6 rounded-md border border-border-color" style={{ background: definition.light.accent }} aria-hidden="true" />
+                                    </div>
+                                    <p className="text-sm font-semibold text-text-main">{definition.label}</p>
+                                    <p className="text-[11px] text-text-secondary mt-1 leading-snug">{definition.description}</p>
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div className="flex items-center justify-between mt-3">
+                        <p className="text-[11px] text-text-secondary">Apply a preset, then fine tune sliders or custom colors.</p>
+                        <Button type="button" variant="ghost" className="px-2 py-1 text-xs" onClick={applyPresetDefaults}>
+                            Apply preset defaults
+                        </Button>
+                    </div>
+                </SettingRow>
+                <SettingRow
+                    label="Text Contrast"
+                    description="Increase for higher readability or decrease for softer typography."
+                >
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="themeTextContrast"
+                            type="range"
+                            min="0.6"
+                            max="1.4"
+                            step="0.05"
+                            value={settings.themeTextContrast}
+                            onChange={(event) => setCurrentSettings((prev) => ({ ...prev, themeTextContrast: Number(event.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{themeTextContrastPercent}%</span>
+                    </div>
+                </SettingRow>
+                <SettingRow
+                    label="Surface Tone"
+                    description="Blend a hint of accent colour into panels to adjust overall warmth."
+                >
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="themeSurfaceTone"
+                            type="range"
+                            min="0"
+                            max="0.6"
+                            step="0.02"
+                            value={settings.themeSurfaceTone}
+                            onChange={(event) => setCurrentSettings((prev) => ({ ...prev, themeSurfaceTone: Number(event.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{themeSurfaceTonePercent}%</span>
+                    </div>
+                </SettingRow>
+                <SettingRow
+                    label="Accent Saturation"
+                    description="Control how vivid buttons and highlights appear."
+                >
+                    <div className="flex items-center gap-4 w-60">
+                        <input
+                            id="themeAccentSaturation"
+                            type="range"
+                            min="0.5"
+                            max="1.5"
+                            step="0.05"
+                            value={settings.themeAccentSaturation}
+                            onChange={(event) => setCurrentSettings((prev) => ({ ...prev, themeAccentSaturation: Number(event.target.value) }))}
+                            className="w-full h-2 bg-border-color rounded-lg appearance-none cursor-pointer range-slider"
+                        />
+                        <span className="font-semibold text-text-main tabular-nums min-w-[50px] text-right text-xs">{themeAccentSaturationPercent}%</span>
+                    </div>
+                </SettingRow>
+                <SettingRow
+                    label="Custom Colors"
+                    description="Enable fine-grained control for background, surface, text, and accent colours in each theme."
+                >
+                    <div className="flex items-center gap-3">
+                        <ToggleSwitch
+                            id="themeUseCustomColors"
+                            checked={isCustomColorsEnabled}
+                            onChange={handleUseCustomColors}
+                        />
+                        <span className="text-xs text-text-secondary">{isCustomColorsEnabled ? 'Custom palette active' : 'Using preset palette'}</span>
+                    </div>
+                </SettingRow>
+                <SettingRow
+                    label="Palette Overrides"
+                    description="Provide hex colours (e.g. #1f2937). Invalid values fall back to the preset."
+                >
+                    <div className="space-y-6">
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <p className="text-sm font-semibold text-text-main">Light theme</p>
+                                <button
+                                    type="button"
+                                    onClick={() => handleResetPalette('light')}
+                                    className="text-xs font-semibold text-primary hover:text-primary-hover disabled:opacity-50"
+                                    disabled={!isCustomColorsEnabled}
+                                >
+                                    Reset to preset
+                                </button>
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <ThemeColorInputControl
+                                    id="light-background-color"
+                                    label="Background"
+                                    value={lightPalette.background}
+                                    presetValue={activePresetDefinition.light.background}
+                                    onChange={(value) => handlePaletteColorChange('light', 'background', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="light-surface-color"
+                                    label="Surface"
+                                    value={lightPalette.surface}
+                                    presetValue={activePresetDefinition.light.surface}
+                                    onChange={(value) => handlePaletteColorChange('light', 'surface', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="light-border-color"
+                                    label="Border"
+                                    value={lightPalette.border}
+                                    presetValue={activePresetDefinition.light.border}
+                                    onChange={(value) => handlePaletteColorChange('light', 'border', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="light-text-color"
+                                    label="Text"
+                                    value={lightPalette.text}
+                                    presetValue={activePresetDefinition.light.text}
+                                    onChange={(value) => handlePaletteColorChange('light', 'text', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="light-muted-color"
+                                    label="Muted text"
+                                    value={lightPalette.mutedText}
+                                    presetValue={activePresetDefinition.light.mutedText}
+                                    onChange={(value) => handlePaletteColorChange('light', 'mutedText', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="light-accent-color"
+                                    label="Accent"
+                                    value={lightPalette.accent}
+                                    presetValue={activePresetDefinition.light.accent}
+                                    onChange={(value) => handlePaletteColorChange('light', 'accent', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <div className="flex items-center justify-between mb-3">
+                                <p className="text-sm font-semibold text-text-main">Dark theme</p>
+                                <button
+                                    type="button"
+                                    onClick={() => handleResetPalette('dark')}
+                                    className="text-xs font-semibold text-primary hover:text-primary-hover disabled:opacity-50"
+                                    disabled={!isCustomColorsEnabled}
+                                >
+                                    Reset to preset
+                                </button>
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <ThemeColorInputControl
+                                    id="dark-background-color"
+                                    label="Background"
+                                    value={darkPalette.background}
+                                    presetValue={activePresetDefinition.dark.background}
+                                    onChange={(value) => handlePaletteColorChange('dark', 'background', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="dark-surface-color"
+                                    label="Surface"
+                                    value={darkPalette.surface}
+                                    presetValue={activePresetDefinition.dark.surface}
+                                    onChange={(value) => handlePaletteColorChange('dark', 'surface', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="dark-border-color"
+                                    label="Border"
+                                    value={darkPalette.border}
+                                    presetValue={activePresetDefinition.dark.border}
+                                    onChange={(value) => handlePaletteColorChange('dark', 'border', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="dark-text-color"
+                                    label="Text"
+                                    value={darkPalette.text}
+                                    presetValue={activePresetDefinition.dark.text}
+                                    onChange={(value) => handlePaletteColorChange('dark', 'text', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="dark-muted-color"
+                                    label="Muted text"
+                                    value={darkPalette.mutedText}
+                                    presetValue={activePresetDefinition.dark.mutedText}
+                                    onChange={(value) => handlePaletteColorChange('dark', 'mutedText', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                                <ThemeColorInputControl
+                                    id="dark-accent-color"
+                                    label="Accent"
+                                    value={darkPalette.accent}
+                                    presetValue={activePresetDefinition.dark.accent}
+                                    onChange={(value) => handlePaletteColorChange('dark', 'accent', value)}
+                                    disabled={!isCustomColorsEnabled}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </SettingRow>
                 <SettingRow label="Interface Scale" description="Adjust the size of all UI elements in the application.">
                     <div className="flex items-center gap-4 w-60">
                         <input
