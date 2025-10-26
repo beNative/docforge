@@ -333,6 +333,23 @@ export interface DocumentTemplate {
   updated_at: string;
 }
 
+export type ThemeMode = 'light' | 'dark';
+
+export type ThemeTone = 'neutral' | 'warm' | 'cool';
+
+export type ThemeContrastPreference = 'normal' | 'high' | 'max';
+
+export type ThemeColorToken =
+  | 'background'
+  | 'secondary'
+  | 'textMain'
+  | 'textSecondary'
+  | 'accent'
+  | 'accentText'
+  | 'border';
+
+export type ThemeColorOverrides = Record<ThemeMode, Partial<Record<ThemeColorToken, string>>>;
+
 export interface Settings {
   llmProviderUrl: string;
   llmModelName: string;
@@ -363,6 +380,9 @@ export interface Settings {
   markdownCodeBlockBackgroundDark: string;
   markdownContentPadding: number;
   markdownParagraphSpacing: number;
+  themeTone: Record<ThemeMode, ThemeTone>;
+  themeContrast: ThemeContrastPreference;
+  themeColorOverrides: ThemeColorOverrides;
   pythonDefaults: PythonEnvironmentDefaults;
   pythonWorkingDirectory: string | null;
   pythonConsoleTheme: 'light' | 'dark';

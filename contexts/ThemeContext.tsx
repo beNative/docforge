@@ -1,24 +1,23 @@
 import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useLogger } from '../hooks/useLogger';
-
-type Theme = 'light' | 'dark';
+import type { ThemeMode } from '../types';
 
 interface ThemeContextType {
-  theme: Theme;
+  theme: ThemeMode;
   toggleTheme: () => void;
 }
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<Theme>('light'); // Default to light, will be updated by effect
+  const [theme, setTheme] = useState<ThemeMode>('light'); // Default to light, will be updated by effect
   const { addLog } = useLogger();
 
   // Effect to set initial theme from localStorage or system preference
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
+    const savedTheme = localStorage.getItem('theme') as ThemeMode | null;
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    let initialTheme: Theme = 'light';
+    let initialTheme: ThemeMode = 'light';
 
     if (savedTheme) {
       initialTheme = savedTheme;

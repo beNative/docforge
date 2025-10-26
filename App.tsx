@@ -4,6 +4,7 @@ import { useDocuments } from './hooks/usePrompts';
 import { useTemplates } from './hooks/useTemplates';
 import { useSettings } from './hooks/useSettings';
 import { useTheme } from './hooks/useTheme';
+import { useApplyThemeCustomizations } from './hooks/useApplyThemeCustomizations';
 import { useLLMStatus } from './hooks/useLLMStatus';
 import { useLogger } from './hooks/useLogger';
 import Sidebar from './components/Sidebar';
@@ -174,6 +175,8 @@ const MainApp: React.FC = () => {
     const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
+
+    useApplyThemeCustomizations(theme, settings, settingsLoaded);
     
     const [tabState, setTabState] = useState<TabState>({ activeId: null, order: [] });
     const [selectedIds, setSelectedIds] = useState(new Set<string>());
