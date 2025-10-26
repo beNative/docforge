@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { Settings, DiscoveredLLMService, DiscoveredLLMModel, DatabaseStats, Command, PythonEnvironmentConfig, PythonPackageSpec } from '../types';
+import type {
+  Settings,
+  DiscoveredLLMService,
+  DiscoveredLLMModel,
+  DatabaseStats,
+  Command,
+  PythonEnvironmentConfig,
+  PythonPackageSpec,
+  ThemeTone,
+  ThemeContrastPreference,
+  ThemeMode,
+  ThemeColorToken,
+} from '../types';
 import { llmDiscoveryService } from '../services/llmDiscoveryService';
 import { DEFAULT_SETTINGS } from '../constants';
 import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon, TerminalIcon, RefreshIcon, PlusIcon } from './Icons';
@@ -19,6 +31,7 @@ import SettingsTreeEditor from './SettingsTreeEditor';
 import { useLogger } from '../hooks/useLogger';
 import KeyboardShortcutsSection from './KeyboardShortcutsSection';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
+import { computeThemePalette, cssColorToHex, THEME_COLOR_TOKENS, type ThemePalette } from '../services/themeCustomization';
 
 interface SettingsViewProps {
   settings: Settings;
@@ -86,6 +99,88 @@ const FONT_PRESETS: Record<FontField, Record<PlatformId, string[]>> = {
     windows: ['"Consolas", monospace', '"Cascadia Code", monospace'],
     linux: ['"Ubuntu Mono", monospace', '"DejaVu Sans Mono", monospace'],
   },
+};
+
+const TONE_OPTIONS: { value: ThemeTone; label: string; description: string }[] = [
+  {
+    value: 'neutral',
+    label: 'Neutral',
+    description: 'Balanced default palette suitable for most environments.',
+  },
+  {
+    value: 'warm',
+    label: 'Warm',
+    description: 'Amber-leaning neutrals that create a softer, more inviting feel.',
+  },
+  {
+    value: 'cool',
+    label: 'Cool',
+    description: 'Blue-leaning palette that emphasizes clarity and focus.',
+  },
+];
+
+const CONTRAST_OPTIONS: { value: ThemeContrastPreference; label: string; description: string }[] = [
+  {
+    value: 'normal',
+    label: 'Standard',
+    description: 'Meets WCAG AA contrast for body copy and controls.',
+  },
+  {
+    value: 'high',
+    label: 'High',
+    description: 'Boosts text and border separation toward WCAG AAA guidance.',
+  },
+  {
+    value: 'max',
+    label: 'Maximum',
+    description: 'Uses pure light/dark text for maximum legibility.',
+  },
+];
+
+const THEME_MODE_LABELS: Record<ThemeMode, string> = {
+  light: 'Light Theme',
+  dark: 'Dark Theme',
+};
+
+const COLOR_TOKEN_METADATA: Record<ThemeColorToken, { label: string; description: string }> = {
+  background: {
+    label: 'Background',
+    description: 'Primary canvas color behind the entire interface.',
+  },
+  secondary: {
+    label: 'Surface',
+    description: 'Cards, panels, and secondary surfaces.',
+  },
+  textMain: {
+    label: 'Primary Text',
+    description: 'Headings and primary body copy.',
+  },
+  textSecondary: {
+    label: 'Secondary Text',
+    description: 'Helper text, metadata, and subdued copy.',
+  },
+  accent: {
+    label: 'Accent',
+    description: 'Buttons, highlights, and interactive accents.',
+  },
+  accentText: {
+    label: 'Accent Text',
+    description: 'Text and icons placed on the accent color.',
+  },
+  border: {
+    label: 'Border',
+    description: 'Dividers, outlines, and panel separators.',
+  },
+};
+
+const COLOR_TOKEN_TO_PALETTE_KEY: Record<ThemeColorToken, keyof ThemePalette> = {
+  background: 'background',
+  secondary: 'secondary',
+  textMain: 'textMain',
+  textSecondary: 'textSecondary',
+  accent: 'accent',
+  accentText: 'accentText',
+  border: 'border',
 };
 
 const serializePackageSpecs = (packages: PythonPackageSpec[]): string => {
@@ -593,6 +688,132 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
     const highlightColorPickerValueDark = isHighlightHexDark ? resolvedHighlightColorDark : DEFAULT_SETTINGS.editorActiveLineHighlightColorDark;
     const highlightColorDisplayDark = isHighlightHexDark ? resolvedHighlightColorDark.toUpperCase() : resolvedHighlightColorDark;
 
+    const lightPalette = useMemo(() => computeThemePalette('light', settings), [settings]);
+    const darkPalette = useMemo(() => computeThemePalette('dark', settings), [settings]);
+    const activeTones = useMemo(() => ({
+        light: settings.themeTone?.light ?? DEFAULT_SETTINGS.themeTone.light,
+        dark: settings.themeTone?.dark ?? DEFAULT_SETTINGS.themeTone.dark,
+    }), [settings.themeTone]);
+    const activeContrast = settings.themeContrast ?? DEFAULT_SETTINGS.themeContrast;
+    const contrastSummary = useMemo(() => CONTRAST_OPTIONS.find((option) => option.value === activeContrast) ?? CONTRAST_OPTIONS[0], [activeContrast]);
+
+    const handleToneChange = useCallback((mode: ThemeMode, tone: ThemeTone) => {
+        setCurrentSettings((prev) => {
+            const baseTone = prev.themeTone ?? DEFAULT_SETTINGS.themeTone;
+            return {
+                ...prev,
+                themeTone: { ...baseTone, [mode]: tone },
+            };
+        });
+    }, [setCurrentSettings]);
+
+    const handleContrastChange = useCallback((contrast: ThemeContrastPreference) => {
+        setCurrentSettings((prev) => ({ ...prev, themeContrast: contrast }));
+    }, [setCurrentSettings]);
+
+    const handleColorOverrideChange = useCallback((mode: ThemeMode, token: ThemeColorToken, rawValue: string) => {
+        const value = rawValue.trim();
+        setCurrentSettings((prev) => {
+            const baseLight = { ...(prev.themeColorOverrides?.light ?? DEFAULT_SETTINGS.themeColorOverrides.light) };
+            const baseDark = { ...(prev.themeColorOverrides?.dark ?? DEFAULT_SETTINGS.themeColorOverrides.dark) };
+            const nextOverrides = {
+                light: baseLight,
+                dark: baseDark,
+            };
+            const target = mode === 'light' ? baseLight : baseDark;
+            if (value) {
+                target[token] = value;
+            } else {
+                delete target[token];
+            }
+            return {
+                ...prev,
+                themeColorOverrides: nextOverrides,
+            };
+        });
+    }, [setCurrentSettings]);
+
+    const handleColorOverrideReset = useCallback((mode: ThemeMode, token: ThemeColorToken) => {
+        handleColorOverrideChange(mode, token, '');
+    }, [handleColorOverrideChange]);
+
+    const renderToneControls = useCallback((mode: ThemeMode) => {
+        const selectedTone = activeTones[mode];
+        return (
+            <div className="flex w-full flex-wrap gap-2">
+                {TONE_OPTIONS.map((option) => {
+                    const isActive = selectedTone === option.value;
+                    return (
+                        <button
+                            key={`${mode}-${option.value}`}
+                            type="button"
+                            onClick={() => handleToneChange(mode, option.value)}
+                            className={`flex-1 min-w-[140px] rounded-lg border px-3 py-2 text-left transition ${isActive ? 'border-primary bg-primary/10 text-primary' : 'border-border-color bg-secondary hover:border-primary/40'}`}
+                            aria-pressed={isActive}
+                        >
+                            <span className="block text-sm font-semibold text-current">{option.label}</span>
+                            <span className="mt-1 block text-xs text-text-secondary">{option.description}</span>
+                        </button>
+                    );
+                })}
+            </div>
+        );
+    }, [activeTones, handleToneChange]);
+
+    const renderColorOverrideControls = useCallback((mode: ThemeMode, palette: ThemePalette) => {
+        const overrides = settings.themeColorOverrides?.[mode] ?? {};
+        return (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {THEME_COLOR_TOKENS.map((token) => {
+                    const overrideValue = overrides[token] ?? '';
+                    const trimmedOverride = overrideValue.trim();
+                    const paletteKey = COLOR_TOKEN_TO_PALETTE_KEY[token];
+                    const paletteValue = palette[paletteKey];
+                    const fallbackHex = cssColorToHex(paletteValue) ?? paletteValue;
+                    const colorPickerValue = trimmedOverride && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(trimmedOverride)
+                        ? trimmedOverride
+                        : cssColorToHex(paletteValue) ?? '#000000';
+                    const displayValue = trimmedOverride || fallbackHex;
+                    return (
+                        <div key={`${mode}-${token}`} className="space-y-3 rounded-lg border border-border-color bg-secondary/60 p-3">
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="color"
+                                    value={colorPickerValue}
+                                    onChange={(event) => handleColorOverrideChange(mode, token, event.target.value)}
+                                    className="h-10 w-12 cursor-pointer rounded-md border border-border-color bg-background"
+                                    aria-label={`${THEME_MODE_LABELS[mode]} ${COLOR_TOKEN_METADATA[token].label} color`}
+                                />
+                                <div>
+                                    <h4 className="text-sm font-semibold text-text-main">{COLOR_TOKEN_METADATA[token].label}</h4>
+                                    <p className="text-xs text-text-secondary">{COLOR_TOKEN_METADATA[token].description}</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={trimmedOverride}
+                                    onChange={(event) => handleColorOverrideChange(mode, token, event.target.value)}
+                                    placeholder={fallbackHex.toString().toUpperCase()}
+                                    className="flex-1 min-w-[140px] rounded-md border border-border-color bg-background px-2 py-1 text-xs text-text-main focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                                />
+                                <span className="font-mono text-[11px] text-text-secondary">Active: {displayValue.toUpperCase()}</span>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="px-2 py-1 text-xs"
+                                    onClick={() => handleColorOverrideReset(mode, token)}
+                                >
+                                    Reset
+                                </Button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }, [handleColorOverrideChange, handleColorOverrideReset, settings.themeColorOverrides]);
+
 
 
     return (
@@ -662,6 +883,35 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                              <MaterialIcons.PlusIcon className="w-5 h-5" /> <MaterialIcons.SparklesIcon className="w-5 h-5" /> <MaterialIcons.FolderIcon className="w-5 h-5" />
                         </CardButton>
                     </div>
+                </SettingRow>
+                <SettingRow label="Contrast Mode" description="Adjust the global text contrast for better readability.">
+                    <div className="w-full max-w-sm space-y-2">
+                        <select
+                            id="themeContrast"
+                            value={activeContrast}
+                            onChange={(event) => handleContrastChange(event.target.value as ThemeContrastPreference)}
+                            className="w-full rounded-md border border-border-color bg-background px-3 py-2 text-sm text-text-main focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        >
+                            {CONTRAST_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                    {option.label}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-text-secondary">{contrastSummary.description}</p>
+                    </div>
+                </SettingRow>
+                <SettingRow label="Light Theme Tone" description="Choose the overall mood for surfaces while using the light theme.">
+                    {renderToneControls('light')}
+                </SettingRow>
+                <SettingRow label="Dark Theme Tone" description="Choose the overall mood for surfaces while using the dark theme.">
+                    {renderToneControls('dark')}
+                </SettingRow>
+                <SettingRow label="Light Theme Colors" description="Override specific color tokens for the light theme. Leave fields blank to inherit tone defaults.">
+                    {renderColorOverrideControls('light', lightPalette)}
+                </SettingRow>
+                <SettingRow label="Dark Theme Colors" description="Override specific color tokens for the dark theme. Leave fields blank to inherit tone defaults.">
+                    {renderColorOverrideControls('dark', darkPalette)}
                 </SettingRow>
                 <SettingRow label="Markdown Font Size" description="Adjust the base font size for the Markdown preview.">
                     <div className="flex items-center gap-4 w-60">
