@@ -8,7 +8,7 @@ import rehypeKatex from 'rehype-katex';
 import type { Components } from 'react-markdown';
 import type { Highlighter } from 'shiki';
 import mermaid from 'mermaid';
-import type { IRenderer } from './IRenderer';
+import type { IRenderer, RendererRenderOptions } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
 import { DEFAULT_SETTINGS } from '../../constants';
 import { useTheme } from '../../hooks/useTheme';
@@ -752,6 +752,7 @@ export class MarkdownRenderer implements IRenderer {
     addLog?: (level: LogLevel, message: string) => void,
     languageId?: string | null,
     settings?: Settings,
+    _options?: RendererRenderOptions,
   ): Promise<{ output: React.ReactElement; error?: string }> {
     try {
       const effectiveSettings = settings ?? DEFAULT_SETTINGS;

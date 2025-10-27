@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { previewService } from '../services/previewService';
 import Spinner from './Spinner';
 import { useTheme } from '../hooks/useTheme';
-import type { LogLevel, Settings } from '../types';
+import type { LogLevel, PreviewMetadata, Settings } from '../types';
 import { PreviewZoomProvider } from '../contexts/PreviewZoomContext';
 
 interface PreviewPaneProps {
@@ -21,6 +21,7 @@ interface PreviewPaneProps {
   };
   previewResetSignal?: number;
   onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
+  onMetadataChange?: (metadata: PreviewMetadata | null) => void;
 }
 
 const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ 
@@ -34,6 +35,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
   previewZoomOptions,
   previewResetSignal,
   onPreviewZoomAvailabilityChange,
+  onMetadataChange,
 }, ref) => {
   const [renderedOutput, setRenderedOutput] = useState<React.ReactElement | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,14 +52,18 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
       }, 150);
 
       setError(null);
+      onMetadataChange?.(null);
       const renderer = previewService.getRendererForLanguage(language);
-      const result = await renderer.render(content, addLog, language, settings);
+      const result = await renderer.render(content, addLog, language, settings, {
+        onMetadataChange,
+      });
 
       clearTimeout(loadingTimer);
       if (!isCancelled) {
         if (result.error) {
           setError(result.error);
           setRenderedOutput(null);
+          onMetadataChange?.(null);
         } else {
           // Clone the returned element to inject the ref and onScroll handler
           // This allows renderers to provide components that can be scroll-synced.
@@ -79,8 +85,14 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
     return () => {
       isCancelled = true;
       clearTimeout(debounceTimer);
+      onMetadataChange?.(null);
     };
-  }, [content, language, addLog, ref, onScroll, settings]);
+  }, [content, language, addLog, ref, onScroll, settings, onMetadataChange]);
+  useEffect(() => {
+    return () => {
+      onMetadataChange?.(null);
+    };
+  }, [onMetadataChange]);
 
   const shouldProvideZoom = typeof previewScale === 'number' && typeof onPreviewScaleChange === 'function';
 

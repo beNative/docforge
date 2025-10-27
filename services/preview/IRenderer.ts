@@ -1,5 +1,9 @@
 import type React from 'react';
-import type { LogLevel, Settings } from '../../types';
+import type { LogLevel, PreviewMetadata, Settings } from '../../types';
+
+export interface RendererRenderOptions {
+  onMetadataChange?: (metadata: PreviewMetadata | null) => void;
+}
 
 export interface IRenderer {
   /**
@@ -15,5 +19,6 @@ export interface IRenderer {
     addLog?: (level: LogLevel, message: string) => void,
     languageId?: string | null,
     settings?: Settings,
+    options?: RendererRenderOptions,
   ): Promise<{ output: React.ReactElement | string; error?: string }>;
 }

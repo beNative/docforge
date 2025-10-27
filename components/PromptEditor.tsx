@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { DocumentOrFolder, Settings, ViewMode } from '../types';
+import type { DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
 import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon } from './Icons';
 import Spinner from './Spinner';
@@ -33,6 +33,7 @@ interface DocumentEditorProps {
   previewResetSignal: number;
   onPreviewVisibilityChange?: (isVisible: boolean) => void;
   onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
+  onPreviewMetadataChange?: (metadata: PreviewMetadata | null) => void;
 }
 
 const PREVIEWABLE_LANGUAGES = new Set<string>([
@@ -99,6 +100,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   previewResetSignal,
   onPreviewVisibilityChange,
   onPreviewZoomAvailabilityChange,
+  onPreviewMetadataChange,
 }) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
@@ -483,15 +485,23 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     onPreviewVisibilityChange?.(isPreviewVisible);
     if (!isPreviewVisible) {
       onPreviewZoomAvailabilityChange?.(false);
+      onPreviewMetadataChange?.(null);
     }
-  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange, supportsPreview, viewMode]);
+  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange, onPreviewMetadataChange, supportsPreview, viewMode]);
 
   useEffect(() => {
     return () => {
       onPreviewVisibilityChange?.(false);
       onPreviewZoomAvailabilityChange?.(false);
+      onPreviewMetadataChange?.(null);
     };
-  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange]);
+  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange, onPreviewMetadataChange]);
+
+  useEffect(() => {
+    if (!supportsPreview) {
+      onPreviewMetadataChange?.(null);
+    }
+  }, [supportsPreview, onPreviewMetadataChange]);
 
   const handlePythonPanelResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -582,6 +592,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         previewZoomOptions={previewZoomOptions}
         previewResetSignal={previewResetSignal}
         onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
+        onMetadataChange={onPreviewMetadataChange}
       />
     );
     

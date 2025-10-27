@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import ZoomPanContainer from '../../components/ZoomPanContainer';
-import type { IRenderer } from './IRenderer';
+import type { IRenderer, RendererRenderOptions } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
 import { DEFAULT_SETTINGS } from '../../constants';
 import { PlantUMLDiagram } from './plantumlDiagram';
@@ -96,6 +96,7 @@ export class PlantUMLRenderer implements IRenderer {
     addLog?: (level: LogLevel, message: string) => void,
     _languageId?: string | null,
     settings?: Settings,
+    _options?: RendererRenderOptions,
   ): Promise<{ output: React.ReactElement; error?: string }> {
     const effectiveSettings = settings ?? DEFAULT_SETTINGS;
 

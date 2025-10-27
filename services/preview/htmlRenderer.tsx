@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { IRenderer } from './IRenderer';
+import type { IRenderer, RendererRenderOptions } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
 import ZoomPanContainer from '../../components/ZoomPanContainer';
 
@@ -42,6 +42,7 @@ export class HtmlRenderer implements IRenderer {
     addLog?: (level: LogLevel, message: string) => void,
     _languageId?: string | null,
     _settings?: Settings,
+    _options?: RendererRenderOptions,
   ): Promise<{ output: React.ReactElement; error?: string }> {
     return {
       output: <HtmlPreview content={content} />,
