@@ -99,12 +99,20 @@ const InfoView: React.FC<InfoViewProps> = ({
 
   useEffect(() => {
     onPreviewVisibilityChange?.(true);
-    onPreviewZoomAvailabilityChange?.(false);
     return () => {
       onPreviewVisibilityChange?.(false);
       onPreviewZoomAvailabilityChange?.(false);
     };
   }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange]);
+
+  const activeTabContent = documents[activeTab];
+  const isLoadingActiveTab = activeTabContent === 'Loading...';
+
+  useEffect(() => {
+    if (isLoadingActiveTab) {
+      onPreviewZoomAvailabilityChange?.(false);
+    }
+  }, [isLoadingActiveTab, onPreviewZoomAvailabilityChange]);
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden min-h-0">
@@ -127,14 +135,14 @@ const InfoView: React.FC<InfoViewProps> = ({
       </header>
       {error && <div className="mx-4 mt-3 text-[11px] text-destructive-text p-2 bg-destructive-bg/80 rounded-md">{error}</div>}
       <div className="flex-1 bg-secondary overflow-y-auto mt-2 border-t border-border-color">
-        {documents[activeTab] === 'Loading...' ? (
+        {isLoadingActiveTab ? (
           <div className="flex items-center justify-center h-full text-text-secondary gap-2 text-[11px]">
             <Spinner />
             <span>Loading documentation...</span>
           </div>
         ) : (
           <PreviewPane
-            content={documents[activeTab]}
+            content={activeTabContent}
             language="markdown"
             addLog={addLog}
             settings={settings}
