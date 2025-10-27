@@ -15,9 +15,28 @@ const docFiles: Record<DocTab, string> = {
 
 interface InfoViewProps {
   settings: Settings;
+  previewScale: number;
+  onPreviewScaleChange: (scale: number) => void;
+  previewZoomOptions?: {
+    minScale?: number;
+    maxScale?: number;
+    zoomStep?: number;
+    initialScale?: number;
+  };
+  previewResetSignal?: number;
+  onPreviewVisibilityChange?: (isVisible: boolean) => void;
+  onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
 }
 
-const InfoView: React.FC<InfoViewProps> = ({ settings }) => {
+const InfoView: React.FC<InfoViewProps> = ({
+  settings,
+  previewScale,
+  onPreviewScaleChange,
+  previewZoomOptions,
+  previewResetSignal,
+  onPreviewVisibilityChange,
+  onPreviewZoomAvailabilityChange,
+}) => {
   const [activeTab, setActiveTab] = useState<DocTab>('Readme');
   const [documents, setDocuments] = useState<Record<DocTab, string>>({
     'Readme': 'Loading...',
@@ -78,6 +97,15 @@ const InfoView: React.FC<InfoViewProps> = ({ settings }) => {
     fetchDocs();
   }, []);
 
+  useEffect(() => {
+    onPreviewVisibilityChange?.(true);
+    onPreviewZoomAvailabilityChange?.(false);
+    return () => {
+      onPreviewVisibilityChange?.(false);
+      onPreviewZoomAvailabilityChange?.(false);
+    };
+  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange]);
+
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden min-h-0">
       <header className="flex items-center justify-between px-4 h-7 border-b border-border-color bg-secondary flex-shrink-0">
@@ -105,7 +133,17 @@ const InfoView: React.FC<InfoViewProps> = ({ settings }) => {
             <span>Loading documentation...</span>
           </div>
         ) : (
-          <PreviewPane content={documents[activeTab]} language="markdown" addLog={addLog} settings={settings} />
+          <PreviewPane
+            content={documents[activeTab]}
+            language="markdown"
+            addLog={addLog}
+            settings={settings}
+            previewScale={previewScale}
+            onPreviewScaleChange={onPreviewScaleChange}
+            previewZoomOptions={previewZoomOptions}
+            previewResetSignal={previewResetSignal}
+            onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
+          />
         )}
       </div>
     </div>
