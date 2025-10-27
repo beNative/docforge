@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
-import type { IRenderer } from './IRenderer';
+import type { IRenderer, RendererRenderOptions } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
 import Hint from '../../components/Hint';
 import { usePreviewZoom } from '../../contexts/PreviewZoomContext';
@@ -272,6 +272,7 @@ export class PdfRenderer implements IRenderer {
     addLog?: (level: LogLevel, message: string) => void,
     languageId?: string | null,
     _settings?: Settings,
+    _options?: RendererRenderOptions,
   ) {
     return { output: <PdfPreview content={content} /> };
   }

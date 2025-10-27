@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import ZoomPanContainer from '../../components/ZoomPanContainer';
-import type { IRenderer } from './IRenderer';
-import type { LogLevel, Settings } from '../../types';
+import type { IRenderer, RendererRenderOptions } from './IRenderer';
+import type { LogLevel, PreviewMetadata, Settings } from '../../types';
 
 type SupportedImageType =
   | 'image/png'
@@ -139,10 +139,10 @@ const createBlobUrlFromText = (input: string, hintedType: SupportedImageType | n
 interface ImagePreviewProps extends React.HTMLAttributes<HTMLDivElement> {
   content: string;
   languageId?: string | null;
+  onMetadataChange?: (metadata: PreviewMetadata | null) => void;
 }
 
-const ImagePreview = React.forwardRef<HTMLDivElement, ImagePreviewProps>(({ content, className, languageId, ...rest }, ref) => {
-  const [dimensions, setDimensions] = useState<{ width: number; height: number } | null>(null);
+const ImagePreview = React.forwardRef<HTMLDivElement, ImagePreviewProps>(({ content, className, languageId, onMetadataChange, ...rest }, ref) => {
 
   const { url, error, isBlobUrl, mimeType } = useMemo(() => {
     const trimmed = content.trim();
@@ -216,13 +216,28 @@ const ImagePreview = React.forwardRef<HTMLDivElement, ImagePreviewProps>(({ cont
     };
   }, [isBlobUrl, url]);
 
+  useEffect(() => {
+    onMetadataChange?.(null);
+  }, [url, error, onMetadataChange]);
+
+  useEffect(() => {
+    return () => {
+      onMetadataChange?.(null);
+    };
+  }, [onMetadataChange]);
+
   const handleImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = event.currentTarget;
-    setDimensions({ width: naturalWidth, height: naturalHeight });
+    onMetadataChange?.({
+      kind: 'image',
+      width: naturalWidth,
+      height: naturalHeight,
+      mimeType,
+    });
   };
 
   const handleImageError = () => {
-    setDimensions(null);
+    onMetadataChange?.(null);
   };
 
   if (error) {
@@ -254,14 +269,6 @@ const ImagePreview = React.forwardRef<HTMLDivElement, ImagePreviewProps>(({ cont
       ref={ref}
       className={`w-full h-full ${className ?? ''}`}
       contentClassName="p-6"
-      overlay={
-        dimensions ? (
-          <div className="absolute bottom-4 left-4 rounded-full bg-black/60 px-3 py-1 text-xs text-white shadow-md">
-            {dimensions.width} × {dimensions.height} px
-            {mimeType ? ` • ${mimeType.replace('image/', '').toUpperCase()}` : ''}
-          </div>
-        ) : null
-      }
       {...rest}
     >
       <div className="max-w-full">
@@ -311,7 +318,8 @@ export class ImageRenderer implements IRenderer {
     addLog?: (level: LogLevel, message: string) => void,
     languageId?: string | null,
     _settings?: Settings,
+    options?: RendererRenderOptions,
   ) {
-    return { output: <ImagePreview content={content} languageId={languageId} /> };
+    return { output: <ImagePreview content={content} languageId={languageId} onMetadataChange={options?.onMetadataChange} /> };
   }
 }

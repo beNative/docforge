@@ -126,6 +126,14 @@ export interface ClassificationSummary {
 }
 export type ViewMode = 'edit' | 'preview' | 'split-vertical' | 'split-horizontal';
 
+export type PreviewMetadata =
+  | {
+      kind: 'image';
+      width: number;
+      height: number;
+      mimeType?: string | null;
+    };
+
 export interface ImportedNodeSummary {
   nodeId: string;
   parentId: string | null;

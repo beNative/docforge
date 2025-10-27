@@ -30,7 +30,7 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer, UpdateAvailableInfo } from './types';
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer, UpdateAvailableInfo, PreviewMetadata } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
@@ -232,6 +232,19 @@ const MainApp: React.FC = () => {
     const [previewResetSignal, setPreviewResetSignal] = useState(0);
     const [isPreviewVisible, setIsPreviewVisible] = useState(false);
     const [isPreviewZoomReady, setIsPreviewZoomReady] = useState(false);
+    const [previewMetadata, setPreviewMetadata] = useState<PreviewMetadata | null>(null);
+
+    useEffect(() => {
+        if (!isPreviewVisible) {
+            setPreviewMetadata(null);
+        }
+    }, [isPreviewVisible]);
+
+    useEffect(() => {
+        if (view !== 'editor') {
+            setPreviewMetadata(null);
+        }
+    }, [view]);
 
     const activeNodeId = tabState.activeId;
     const openDocumentIds = tabState.order;
@@ -461,6 +474,12 @@ const MainApp: React.FC = () => {
     const activeDocument = useMemo(() => {
         return activeNode?.type === 'document' ? activeNode : null;
     }, [activeNode]);
+
+    useEffect(() => {
+        if (!activeDocument) {
+            setPreviewMetadata(null);
+        }
+    }, [activeDocument]);
 
     const documentItems = useMemo(() => items.filter(item => item.type === 'document'), [items]);
     const activeDocumentId = activeDocument?.id ?? null;
@@ -2671,6 +2690,7 @@ const MainApp: React.FC = () => {
                         previewResetSignal={previewResetSignal}
                         onPreviewVisibilityChange={setIsPreviewVisible}
                         onPreviewZoomAvailabilityChange={setIsPreviewZoomReady}
+                        onPreviewMetadataChange={setPreviewMetadata}
                     />
                 );
             }
@@ -2859,6 +2879,7 @@ const MainApp: React.FC = () => {
                     previewMinScale={PREVIEW_MIN_SCALE}
                     previewMaxScale={PREVIEW_MAX_SCALE}
                     previewInitialScale={PREVIEW_INITIAL_SCALE}
+                    previewMetadata={previewMetadata}
                 />
             </div>
             

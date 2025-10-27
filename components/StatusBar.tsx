@@ -1,7 +1,7 @@
 import React from 'react';
 import Tooltip from './Tooltip';
 import Hint from './Hint';
-import type { LLMStatus, DiscoveredLLMModel, DiscoveredLLMService } from '../types';
+import type { LLMStatus, DiscoveredLLMModel, DiscoveredLLMService, PreviewMetadata } from '../types';
 import { DatabaseIcon, ChevronDownIcon, MinusIcon, PlusIcon, RefreshIcon } from './Icons';
 
 type DatabaseStatusHint = {
@@ -33,6 +33,7 @@ interface StatusBarProps {
   previewMinScale: number;
   previewMaxScale: number;
   previewInitialScale: number;
+  previewMetadata?: PreviewMetadata | null;
 }
 
 const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: string }> = {
@@ -131,6 +132,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
     previewMinScale,
     previewMaxScale,
     previewInitialScale,
+    previewMetadata,
 }) => {
   const { text, color, tooltip } = statusConfig[status];
   const selectedService = discoveredServices.find(s => s.generateUrl === llmProviderUrl);
@@ -212,6 +214,28 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const isAtInitialZoom = Math.abs(previewScale - previewInitialScale) < 0.001;
   const zoomLabelClass = `min-w-[3rem] text-center font-semibold ${isZoomDisabled ? 'text-text-secondary' : 'text-text-main'}`;
   const zoomPercentage = Math.round(previewScale * 100);
+
+  const previewMetadataDisplay = React.useMemo(() => {
+    if (!previewMetadata) {
+      return null;
+    }
+
+    if (previewMetadata.kind === 'image') {
+      const baseLabel = 'Image';
+      const sizeText = `${previewMetadata.width} × ${previewMetadata.height} px`;
+      const typeText = previewMetadata.mimeType
+        ? (previewMetadata.mimeType.startsWith('image/')
+            ? previewMetadata.mimeType.replace('image/', '').toUpperCase()
+            : previewMetadata.mimeType.toUpperCase())
+        : null;
+      return {
+        label: baseLabel,
+        text: typeText ? `${sizeText} • ${typeText}` : sizeText,
+      };
+    }
+
+    return null;
+  }, [previewMetadata]);
 
   return (
     <footer className="flex items-center justify-between px-4 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30 whitespace-nowrap">
@@ -355,6 +379,15 @@ const StatusBar: React.FC<StatusBarProps> = ({
             />
           </div>
         </div>
+        {previewMetadataDisplay && (
+          <>
+            <div className="h-4 w-px bg-border-color"></div>
+            <span>
+              {previewMetadataDisplay.label}:{' '}
+              <span className="font-semibold text-text-main">{previewMetadataDisplay.text}</span>
+            </span>
+          </>
+        )}
         <div className="h-4 w-px bg-border-color"></div>
         <span>Documents: <span className="font-semibold text-text-main">{documentCount}</span></span>
         <div className="h-4 w-px bg-border-color"></div>

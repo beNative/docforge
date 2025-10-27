@@ -1,5 +1,5 @@
 import React from 'react';
-import type { IRenderer } from './IRenderer';
+import type { IRenderer, RendererRenderOptions } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
 
 export class PlaintextRenderer implements IRenderer {
@@ -13,6 +13,7 @@ export class PlaintextRenderer implements IRenderer {
     addLog?: (level: LogLevel, message: string) => void,
     languageId?: string | null,
     _settings?: Settings,
+    _options?: RendererRenderOptions,
   ): Promise<{ output: React.ReactElement; error?: string }> {
     const output = <pre className="whitespace-pre-wrap break-words text-text-secondary">{content}</pre>;
     return { output };
