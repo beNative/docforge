@@ -108,6 +108,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       filters: [{ name: 'JSON Files', extensions: ['json'] }, { name: 'All Files', extensions: ['*'] }]
   }, content),
 
+  nodesExport: (content: string, options?: { defaultFileName?: string }) =>
+    ipcRenderer.invoke('nodes:export', content, options ?? {}),
+
+  nodesImport: () => ipcRenderer.invoke('nodes:import'),
+
   settingsImport: () => ipcRenderer.invoke('dialog:open', {
       title: 'Import Settings',
       filters: [{ name: 'JSON Files', extensions: ['json'] }],

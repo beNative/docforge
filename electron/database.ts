@@ -863,10 +863,24 @@ export const databaseService = {
           );
 
           const newDocumentId = Number(docResult.lastInsertRowid);
-          const effectiveContent = content;
 
-          if (effectiveContent && effectiveContent.length > 0) {
-            const sha = crypto.createHash('sha256').update(effectiveContent).digest('hex');
+          const normalizedVersions = Array.isArray(node.versions)
+            ? node.versions
+              .map(version => ({
+                createdAt: typeof version.created_at === 'string' ? version.created_at : now,
+                content: typeof version.content === 'string' ? version.content : '',
+              }))
+              .filter(entry => typeof entry.createdAt === 'string')
+            : [];
+
+          if (normalizedVersions.length === 0 && content) {
+            normalizedVersions.push({ createdAt: now, content });
+          }
+
+          let latestVersionId: number | null = null;
+
+          for (const entry of normalizedVersions) {
+            const sha = crypto.createHash('sha256').update(entry.content).digest('hex');
             const existingContent = db
               .prepare('SELECT content_id FROM content_store WHERE sha256_hex = ?')
               .get(sha) as { content_id: number } | undefined;
@@ -876,15 +890,36 @@ export const databaseService = {
               : Number(
                   db
                     .prepare('INSERT INTO content_store (sha256_hex, text_content) VALUES (?, ?)')
-                    .run(sha, effectiveContent).lastInsertRowid
+                    .run(sha, entry.content).lastInsertRowid
                 );
 
             const versionResult = db
               .prepare('INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)')
-              .run(newDocumentId, now, contentId);
+              .run(newDocumentId, entry.createdAt, contentId);
 
-            const versionId = Number(versionResult.lastInsertRowid);
-            db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?').run(versionId, newDocumentId);
+            latestVersionId = Number(versionResult.lastInsertRowid);
+          }
+
+          if (latestVersionId !== null) {
+            db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?').run(latestVersionId, newDocumentId);
+          }
+
+          if (node.python_settings) {
+            const envId = typeof node.python_settings.env_id === 'string' && node.python_settings.env_id.trim().length > 0
+              ? node.python_settings.env_id
+              : null;
+            const autoDetect = node.python_settings.auto_detect_environment !== undefined
+              ? Boolean(node.python_settings.auto_detect_environment)
+              : true;
+            const lastRunId = typeof node.python_settings.last_run_id === 'string'
+              ? node.python_settings.last_run_id
+              : null;
+
+            db.prepare(
+              `INSERT INTO node_python_settings (node_id, env_id, auto_detect_env, last_run_id, updated_at)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(node_id) DO UPDATE SET env_id = excluded.env_id, auto_detect_env = excluded.auto_detect_env, last_run_id = excluded.last_run_id, updated_at = excluded.updated_at`
+            ).run(newNodeId, envId, autoDetect ? 1 : 0, lastRunId, now);
           }
         }
 

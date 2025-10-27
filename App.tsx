@@ -22,7 +22,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, DownloadIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -30,7 +30,8 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer, UpdateAvailableInfo, PreviewMetadata } from './types';
+import NodeExportModal, { type NodeExportOptions } from './components/NodeExportModal';
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer, UpdateAvailableInfo, PreviewMetadata, SerializedDocumentVersionEntry } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
@@ -39,6 +40,14 @@ import { repository, type RepositoryStartupTiming } from './services/repository'
 import { DocumentNode } from './components/PromptTreeItem';
 import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './services/shortcutService';
 import { readClipboardText, ClipboardPermissionError, ClipboardUnavailableError } from './services/clipboardService';
+import {
+    adaptRepositoryNodesToTransferable,
+    buildDraggedNodePayload,
+    buildTransferContext,
+    collectRootNodesForSelection,
+    mapDocumentVersionsToSerializedEntries,
+    type TransferableTreeNode,
+} from './services/nodeTransfer';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -198,6 +207,8 @@ const MainApp: React.FC = () => {
     const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
     const [loggerPanelHeight, setLoggerPanelHeight] = useState(DEFAULT_LOGGER_HEIGHT);
     const [availableModels, setAvailableModels] = useState<DiscoveredLLMModel[]>([]);
+    const [exportDialogState, setExportDialogState] = useState<{ isOpen: boolean; targetIds: string[] }>({ isOpen: false, targetIds: [] });
+    const [isExportingNodes, setIsExportingNodes] = useState(false);
     const [discoveredServices, setDiscoveredServices] = useState<DiscoveredLLMService[]>([]);
     const [isDetecting, setIsDetecting] = useState(false);
     const [appVersion, setAppVersion] = useState('');
@@ -792,6 +803,236 @@ const MainApp: React.FC = () => {
         }
         void handleCopyNodeContent(doc.id);
     }, [items, selectedIds, handleCopyNodeContent]);
+
+    const openExportDialog = useCallback((ids?: Iterable<string>) => {
+        const selection = Array.from(ids ?? selectedIds);
+        if (selection.length === 0) {
+            addLog('WARNING', 'Export requested but no nodes are selected.');
+            return;
+        }
+        setExportDialogState({ isOpen: true, targetIds: selection });
+    }, [selectedIds, addLog]);
+
+    const closeExportDialog = useCallback(() => {
+        setExportDialogState({ isOpen: false, targetIds: [] });
+    }, []);
+
+    const performExportNodes = useCallback(async (options: NodeExportOptions) => {
+        if (exportDialogState.targetIds.length === 0) {
+            addLog('WARNING', 'No nodes are queued for export.');
+            setExportDialogState({ isOpen: false, targetIds: [] });
+            return;
+        }
+
+        const saveJsonInBrowser = async (fileName: string, content: string) => {
+            const anyWindow = window as typeof window & { showSaveFilePicker?: (options: any) => Promise<any> };
+            if (typeof anyWindow.showSaveFilePicker === 'function') {
+                try {
+                    const handle = await anyWindow.showSaveFilePicker({
+                        suggestedName: fileName,
+                        types: [
+                            {
+                                description: 'DocForge Nodes',
+                                accept: { 'application/json': ['.dfnodes', '.json'] },
+                            },
+                        ],
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(content);
+                    await writable.close();
+                    return;
+                } catch (error) {
+                    if (error instanceof DOMException && error.name === 'AbortError') {
+                        throw new Error('Export cancelled');
+                    }
+                    throw error instanceof Error ? error : new Error(String(error));
+                }
+            }
+
+            const blob = new Blob([content], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = fileName;
+            document.body.appendChild(anchor);
+            anchor.click();
+            document.body.removeChild(anchor);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        };
+
+        const gatherDocumentIds = (nodes: TransferableTreeNode[], accumulator: Set<string>) => {
+            for (const node of nodes) {
+                if (node.type === 'document') {
+                    accumulator.add(node.id);
+                }
+                if (node.children?.length) {
+                    gatherDocumentIds(node.children as TransferableTreeNode[], accumulator);
+                }
+            }
+        };
+
+        setIsExportingNodes(true);
+        try {
+            const repositoryNodes = await repository.getNodeTree();
+            const transferableTree = adaptRepositoryNodesToTransferable(repositoryNodes);
+            const context = buildTransferContext(transferableTree);
+            const rootNodes = collectRootNodesForSelection(exportDialogState.targetIds, context);
+
+            if (rootNodes.length === 0) {
+                addLog('WARNING', 'The current selection could not be resolved for export.');
+                return;
+            }
+
+            let histories: Map<string, SerializedDocumentVersionEntry[]> | undefined;
+            if (options.includeHistory) {
+                const documentIds = new Set<string>();
+                gatherDocumentIds(rootNodes as TransferableTreeNode[], documentIds);
+
+                if (documentIds.size > 0) {
+                    histories = new Map();
+                    await Promise.all(
+                        Array.from(documentIds).map(async (nodeId) => {
+                            try {
+                                const versions = await repository.getVersionsForNode(nodeId);
+                                if (versions.length > 0) {
+                                    histories!.set(nodeId, mapDocumentVersionsToSerializedEntries(versions));
+                                }
+                            } catch (error) {
+                                console.warn('Failed to load document history for export', nodeId, error);
+                            }
+                        })
+                    );
+
+                    if (histories.size === 0) {
+                        histories = undefined;
+                    }
+                }
+            }
+
+            const payload = buildDraggedNodePayload(exportDialogState.targetIds, context, {
+                includePythonSettings: options.includePythonSettings,
+                histories,
+            });
+
+            if (!payload) {
+                addLog('WARNING', 'Nothing to export from the current selection.');
+                return;
+            }
+
+            const serialized = JSON.stringify(payload, null, 2);
+            const timestamp = new Date().toISOString().replace(/[:]/g, '-');
+            const suffix = options.includeHistory ? '-full' : '';
+            const defaultFileName = `docforge-nodes${suffix}-${timestamp}.dfnodes`;
+
+            if (isElectron && window.electronAPI?.nodesExport) {
+                const result = await window.electronAPI.nodesExport(serialized, { defaultFileName });
+                if (!result.success) {
+                    if (result.error) {
+                        throw new Error(result.error);
+                    }
+                    addLog('INFO', 'Node export cancelled.');
+                    return;
+                }
+                addLog('INFO', `Exported ${payload.nodes.length} node(s) to disk.`);
+            } else {
+                try {
+                    await saveJsonInBrowser(defaultFileName, serialized);
+                    addLog('INFO', `Exported ${payload.nodes.length} node(s) as a download.`);
+                } catch (error) {
+                    if (error instanceof Error && error.message === 'Export cancelled') {
+                        addLog('INFO', 'Node export cancelled.');
+                        return;
+                    }
+                    throw error;
+                }
+            }
+
+            setExportDialogState({ isOpen: false, targetIds: [] });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog('ERROR', `Failed to export nodes: ${message}`);
+        } finally {
+            setIsExportingNodes(false);
+        }
+    }, [exportDialogState, addLog, repository]);
+
+    const handleImportNodesFromFile = useCallback(async (selection?: Iterable<string>) => {
+        const effectiveSelection = Array.from(selection ?? selectedIds);
+
+        const resolveTargetFolder = (): string | null => {
+            for (const id of effectiveSelection) {
+                const item = items.find(entry => entry.id === id);
+                if (item?.type === 'folder') {
+                    return item.id;
+                }
+            }
+            return null;
+        };
+
+        const targetFolderId = resolveTargetFolder();
+
+        const readFileInBrowser = async (): Promise<string | null> => {
+            return new Promise(resolve => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.dfnodes,.json,application/json';
+                input.onchange = () => {
+                    const file = input.files?.[0];
+                    input.remove();
+                    if (!file) {
+                        resolve(null);
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        resolve(typeof reader.result === 'string' ? reader.result : null);
+                    };
+                    reader.onerror = () => resolve(null);
+                    reader.readAsText(file);
+                };
+                input.click();
+            });
+        };
+
+        try {
+            let fileContent: string | null = null;
+            if (isElectron && window.electronAPI?.nodesImport) {
+                const result = await window.electronAPI.nodesImport();
+                if (!result.success || !result.content) {
+                    if (result?.error) {
+                        throw new Error(result.error);
+                    }
+                    addLog('INFO', 'Node import cancelled.');
+                    return;
+                }
+                fileContent = result.content;
+            } else {
+                fileContent = await readFileInBrowser();
+                if (!fileContent) {
+                    addLog('INFO', 'Node import cancelled.');
+                    return;
+                }
+            }
+
+            let payload: DraggedNodeTransfer;
+            try {
+                payload = JSON.parse(fileContent) as DraggedNodeTransfer;
+            } catch {
+                throw new Error('The selected file is not valid JSON.');
+            }
+
+            if (payload.schema !== 'docforge/nodes' || payload.version !== 1 || !Array.isArray(payload.nodes)) {
+                throw new Error('The selected file is not a DocForge node export.');
+            }
+
+            await handleImportNodesFromTransfer(payload, targetFolderId, 'inside');
+            const scopeDescription = targetFolderId ? `folder ${targetFolderId}` : 'the root workspace';
+            addLog('INFO', `Imported ${payload.nodes.length} node(s) into ${scopeDescription}.`);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog('ERROR', `Failed to import nodes from file: ${message}`);
+        }
+    }, [selectedIds, items, addLog, handleImportNodesFromTransfer]);
 
     const { metrics: activeFolderMetrics, documents: activeFolderDocuments } = useMemo(() => {
         if (!activeNode || activeNode.type !== 'folder') {
@@ -2451,6 +2692,8 @@ const MainApp: React.FC = () => {
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
         { id: 'new-from-template', name: 'New Document from Template...', action: () => { addLog('INFO', 'Command: New Document from Template.'); setCreateFromTemplateOpen(true); }, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create file instance' },
         { id: 'duplicate-item', name: 'Duplicate Selection', action: handleDuplicateSelection, category: 'File', icon: CopyIcon, shortcut: ['Control', 'D'], keywords: 'copy clone' },
+        { id: 'export-nodes', name: 'Export Selected Nodes…', action: () => { addLog('INFO', 'Command: Export selected nodes.'); openExportDialog(); }, category: 'File', icon: SaveIcon, keywords: 'export save share json package' },
+        { id: 'import-nodes', name: 'Import Nodes from File…', action: () => { addLog('INFO', 'Command: Import nodes from file.'); void handleImportNodesFromFile(); }, category: 'File', icon: DownloadIcon, keywords: 'import load json workspace' },
         { id: 'rename-item', name: 'Rename Selected Item', action: handleRenameSelection, category: 'File', icon: PencilIcon, shortcut: ['F2'], keywords: 'rename edit title' },
         { id: 'delete-item', name: 'Delete Selection', action: () => handleDeleteSelection(selectedIds), category: 'File', icon: TrashIcon, shortcut: ['Delete'], keywords: 'remove discard' },
         { id: 'document-tree-select-all', name: 'Select All Tree Items', action: handleDocumentTreeSelectAll, category: 'Document Tree', icon: CheckIcon, shortcut: ['Control', 'A'], keywords: 'select highlight all tree' },
@@ -2466,7 +2709,7 @@ const MainApp: React.FC = () => {
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, openExportDialog, handleImportNodesFromFile]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -2522,6 +2765,8 @@ const MainApp: React.FC = () => {
                 { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0, shortcut: getCommand('duplicate-item')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Copy Content', icon: CopyIcon, action: () => hasDocuments && handleCopyNodeContent(selectedNodes.find(n => n.type === 'document')!.id), disabled: !hasDocuments},
+                { label: 'Export Selection…', icon: SaveIcon, action: () => openExportDialog(currentSelection), disabled: currentSelection.size === 0, shortcut: getCommand('export-nodes')?.shortcutString },
+                { label: 'Import Nodes…', icon: DownloadIcon, action: () => { void handleImportNodesFromFile(currentSelection); }, shortcut: getCommand('import-nodes')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Delete', icon: TrashIcon, action: () => handleDeleteSelection(currentSelection), disabled: currentSelection.size === 0, shortcut: getCommand('delete-item')?.shortcutString }
             );
@@ -2531,7 +2776,10 @@ const MainApp: React.FC = () => {
                 { label: 'New from Clipboard', icon: CopyIcon, action: () => { void handleNewDocumentFromClipboard(null); }, shortcut: getCommand('new-from-clipboard')?.shortcutString },
                 { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null), shortcut: getCommand('new-folder')?.shortcutString },
-                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString }
+                { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
+                { type: 'separator' },
+                { label: 'Export Selection…', icon: SaveIcon, action: () => openExportDialog(currentSelection), disabled: currentSelection.size === 0, shortcut: getCommand('export-nodes')?.shortcutString },
+                { label: 'Import Nodes…', icon: DownloadIcon, action: () => { void handleImportNodesFromFile(currentSelection); }, shortcut: getCommand('import-nodes')?.shortcutString }
             );
         }
 
@@ -2540,7 +2788,7 @@ const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, openExportDialog, handleImportNodesFromFile]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -2936,6 +3184,15 @@ const MainApp: React.FC = () => {
                 <NewCodeFileModal
                     onClose={() => setIsNewCodeFileModalOpen(false)}
                     onCreate={handleNewCodeFile}
+                />
+            )}
+
+            {exportDialogState.isOpen && (
+                <NodeExportModal
+                    selectedCount={exportDialogState.targetIds.length}
+                    isExporting={isExportingNodes}
+                    onCancel={closeExportDialog}
+                    onConfirm={performExportNodes}
                 />
             )}
 

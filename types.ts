@@ -55,6 +55,11 @@ declare global {
       saveLog: (defaultFilename: string, content: string) => Promise<{ success: boolean; error?: string }>;
       settingsExport: (content: string) => Promise<{ success: boolean; error?: string }>;
       settingsImport: () => Promise<{ success: boolean; content?: string; error?: string }>;
+      nodesExport?: (
+        content: string,
+        options?: { defaultFileName?: string }
+      ) => Promise<{ success: boolean; error?: string }>;
+      nodesImport?: () => Promise<{ success: boolean; content?: string; path?: string; error?: string }>;
       readDoc: (filename: string) => Promise<{ success: true; content: string } | { success: false; error: string }>;
       pythonListEnvironments: () => Promise<PythonEnvironmentConfig[]>;
       pythonDetectInterpreters: () => Promise<PythonInterpreterInfo[]>;
@@ -301,6 +306,18 @@ export interface DocumentOrFolder {
   searchSnippet?: string;
 }
 
+export interface SerializedPythonSettings {
+  env_id: string | null;
+  auto_detect_environment: boolean;
+  last_run_id: string | null;
+}
+
+export interface SerializedDocumentVersionEntry {
+  version_id: number | string;
+  created_at: string;
+  content?: string | null;
+}
+
 export interface SerializedNodeForTransfer {
   type: NodeType;
   title: string;
@@ -311,6 +328,8 @@ export interface SerializedNodeForTransfer {
   language_source?: ClassificationSource | null;
   doc_type_source?: ClassificationSource | null;
   classification_updated_at?: string | null;
+  python_settings?: SerializedPythonSettings;
+  versions?: SerializedDocumentVersionEntry[];
   children?: SerializedNodeForTransfer[];
 }
 
@@ -319,6 +338,10 @@ export interface DraggedNodeTransfer {
   version: 1;
   exportedAt: string;
   nodes: SerializedNodeForTransfer[];
+  options?: {
+    includeHistory?: boolean;
+    includePythonSettings?: boolean;
+  };
 }
 
 // Fix: Renamed LegacyPromptVersion to DocumentVersion and aliased it to the new DocVersion type

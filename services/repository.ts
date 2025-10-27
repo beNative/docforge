@@ -1256,23 +1256,34 @@ export const repository = {
                     }
 
                     const documentId = state.nextDocumentId++;
-                    const effectiveContent = content;
-                    let versionId: number | null = null;
+                    const normalizedVersions = Array.isArray(node.versions)
+                        ? node.versions
+                            .map(version => ({
+                                created_at: typeof version.created_at === 'string' ? version.created_at : now,
+                                content: typeof version.content === 'string' ? version.content : '',
+                            }))
+                            .filter(entry => typeof entry.created_at === 'string')
+                        : [];
 
-                    if (!state.docVersions[documentId]) {
-                        state.docVersions[documentId] = [];
+                    if (normalizedVersions.length === 0 && content) {
+                        normalizedVersions.push({ created_at: now, content });
                     }
 
-                    if (effectiveContent) {
-                        versionId = state.nextVersionId++;
-                        state.docVersions[documentId].push({
+                    const docVersions: DocVersion[] = [];
+                    normalizedVersions.forEach(entry => {
+                        const versionId = state.nextVersionId++;
+                        docVersions.push({
                             version_id: versionId,
                             document_id: documentId,
-                            created_at: now,
+                            created_at: entry.created_at,
                             content_id: versionId,
-                            content: effectiveContent,
+                            content: entry.content,
                         });
-                    }
+                    });
+
+                    state.docVersions[documentId] = docVersions;
+
+                    const latestVersion = docVersions[docVersions.length - 1] ?? null;
 
                     baseNode.document = {
                         document_id: documentId,
@@ -1283,9 +1294,24 @@ export const repository = {
                         doc_type_source: docTypeSource,
                         classification_updated_at: classificationUpdatedAt,
                         default_view_mode: defaultViewMode,
-                        current_version_id: versionId,
-                        content: effectiveContent,
+                        current_version_id: latestVersion ? latestVersion.version_id : null,
+                        content: latestVersion?.content ?? '',
                     } as Document;
+
+                    if (node.python_settings) {
+                        baseNode.pythonSettings = {
+                            nodeId: newNodeId,
+                            envId: typeof node.python_settings.env_id === 'string' && node.python_settings.env_id.trim().length > 0
+                                ? node.python_settings.env_id
+                                : null,
+                            autoDetectEnvironment: node.python_settings.auto_detect_environment !== undefined
+                                ? Boolean(node.python_settings.auto_detect_environment)
+                                : true,
+                            lastUsedRunId: typeof node.python_settings.last_run_id === 'string'
+                                ? node.python_settings.last_run_id
+                                : null,
+                        };
+                    }
                 }
 
                 const children = Array.isArray(node.children) ? node.children : [];

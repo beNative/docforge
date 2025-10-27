@@ -685,6 +685,61 @@ ipcMain.handle('dialog:save', async (_, options, content) => {
     }
 });
 
+ipcMain.handle('nodes:export', async (_, content: string, options: { defaultFileName?: string } = {}) => {
+    if (!mainWindow) {
+        return { success: false, error: 'Main window not available' };
+    }
+
+    const suggestedName = options.defaultFileName ?? `docforge-nodes-${new Date().toISOString().replace(/[:]/g, '-')}.dfnodes`;
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export Nodes',
+        defaultPath: suggestedName,
+        filters: [
+            { name: 'DocForge Node Export', extensions: ['dfnodes'] },
+            { name: 'JSON Files', extensions: ['json'] },
+            { name: 'All Files', extensions: ['*'] },
+        ],
+    });
+
+    if (canceled || !filePath) {
+        return { success: false };
+    }
+
+    try {
+        await fs.writeFile(filePath, content, 'utf-8');
+        return { success: true, path: filePath };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to save nodes export.' };
+    }
+});
+
+ipcMain.handle('nodes:import', async () => {
+    if (!mainWindow) {
+        return { success: false, error: 'Main window not available' };
+    }
+
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+        title: 'Import Nodes',
+        filters: [
+            { name: 'DocForge Node Export', extensions: ['dfnodes'] },
+            { name: 'JSON Files', extensions: ['json'] },
+            { name: 'All Files', extensions: ['*'] },
+        ],
+        properties: ['openFile'],
+    });
+
+    if (canceled || filePaths.length === 0) {
+        return { success: false };
+    }
+
+    try {
+        const content = await fs.readFile(filePaths[0], 'utf-8');
+        return { success: true, content, path: filePaths[0] };
+    } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to read nodes export.' };
+    }
+});
+
 ipcMain.handle('dialog:open', async (_, options) => {
     if (!mainWindow) return { success: false, error: 'Main window not available' };
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, options);

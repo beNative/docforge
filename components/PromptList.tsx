@@ -1,7 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
-import type { DocumentOrFolder, DraggedNodeTransfer, SerializedNodeForTransfer } from '../types';
+import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import DocumentTreeItem, { DocumentNode, DOCFORGE_DRAG_MIME } from './PromptTreeItem';
+import {
+  buildDraggedNodePayload,
+  buildTransferContext,
+  type TransferableTreeNode,
+} from '../services/nodeTransfer';
 
 interface DocumentListProps {
   tree: DocumentNode[];
@@ -59,81 +64,18 @@ const DocumentList: React.FC<DocumentListProps> = ({
   // Fix: Corrected useState declaration syntax from `=>` to `=`. This resolves all subsequent "cannot find name" errors.
   const [isRootDropping, setIsRootDropping] = useState(false);
   
-  const nodeLookup = useMemo(() => {
-    const map = new Map<string, DocumentNode>();
-    const traverse = (nodes: DocumentNode[]) => {
-        for (const node of nodes) {
-            map.set(node.id, node);
-            if (node.children.length > 0) {
-                traverse(node.children);
-            }
-        }
-    };
-    traverse(tree);
-    return map;
-  }, [tree]);
+  const transferContext = useMemo(
+    () => buildTransferContext(tree as unknown as TransferableTreeNode[]),
+    [tree]
+  );
 
-  const parentLookup = useMemo(() => {
-    const map = new Map<string, string | null>();
-    const traverse = (nodes: DocumentNode[], parentId: string | null) => {
-        for (const node of nodes) {
-            map.set(node.id, parentId);
-            if (node.children.length > 0) {
-                traverse(node.children, node.id);
-            }
-        }
-    };
-    traverse(tree, null);
-    return map;
-  }, [tree]);
+  const buildTransferPayload = useCallback(
+    (ids: string[]): DraggedNodeTransfer | null =>
+      buildDraggedNodePayload(ids, transferContext, { includePythonSettings: true }),
+    [transferContext]
+  );
 
-  const serializeNode = useCallback(function serialize(node: DocumentNode): SerializedNodeForTransfer {
-    const children = node.children.length > 0 ? node.children.map(serialize) : undefined;
-    return {
-      type: node.type,
-      title: node.title,
-      content: node.content,
-      doc_type: node.doc_type,
-      language_hint: node.language_hint ?? null,
-      default_view_mode: node.default_view_mode ?? null,
-      children,
-    };
-  }, []);
-
-  const buildTransferPayload = useCallback((ids: string[]): DraggedNodeTransfer | null => {
-    if (!ids.length) {
-      return null;
-    }
-    const idSet = new Set(ids);
-    const rootIds = ids.filter(id => {
-      let current = parentLookup.get(id) ?? null;
-      while (current) {
-        if (idSet.has(current)) {
-          return false;
-        }
-        current = parentLookup.get(current) ?? null;
-      }
-      return true;
-    });
-
-    const nodes = rootIds
-      .map(id => nodeLookup.get(id))
-      .filter((node): node is DocumentNode => Boolean(node))
-      .map(serializeNode);
-
-    if (nodes.length === 0) {
-      return null;
-    }
-
-    return {
-      schema: 'docforge/nodes',
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      nodes,
-    };
-  }, [nodeLookup, parentLookup, serializeNode]);
-
-  const isKnownNodeId = useCallback((id: string) => nodeLookup.has(id), [nodeLookup]);
+  const isKnownNodeId = useCallback((id: string) => transferContext.nodeLookup.has(id), [transferContext]);
 
   const handleRootDrop = (e: React.DragEvent) => {
     e.preventDefault();
