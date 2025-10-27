@@ -490,6 +490,10 @@ const MainApp: React.FC = () => {
     }, [activeNode?.id, activeNode?.type]);
 
     useEffect(() => {
+        if (view === 'info') {
+            return;
+        }
+
         if (view !== 'editor' || documentView !== 'editor') {
             setIsPreviewVisible(false);
             setIsPreviewZoomReady(false);
@@ -2646,7 +2650,24 @@ const MainApp: React.FC = () => {
     }
 
     const renderMainContent = () => {
-        if (view === 'info') return <InfoView settings={settings} />;
+        if (view === 'info') {
+            return (
+                <InfoView
+                    settings={settings}
+                    previewScale={previewScale}
+                    onPreviewScaleChange={handlePreviewScaleChange}
+                    previewZoomOptions={{
+                        minScale: PREVIEW_MIN_SCALE,
+                        maxScale: PREVIEW_MAX_SCALE,
+                        zoomStep: PREVIEW_ZOOM_STEP,
+                        initialScale: PREVIEW_INITIAL_SCALE,
+                    }}
+                    previewResetSignal={previewResetSignal}
+                    onPreviewVisibilityChange={setIsPreviewVisible}
+                    onPreviewZoomAvailabilityChange={setIsPreviewZoomReady}
+                />
+            );
+        }
         if (view === 'settings') return <SettingsView settings={settings} onSave={saveSettings} discoveredServices={discoveredServices} onDetectServices={handleDetectServices} isDetecting={isDetecting} commands={enrichedCommands} />;
         
         if (activeTemplate) {
