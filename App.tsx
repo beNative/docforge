@@ -490,6 +490,10 @@ const MainApp: React.FC = () => {
     }, [activeNode?.id, activeNode?.type]);
 
     useEffect(() => {
+        if (view === 'info') {
+            return;
+        }
+
         if (view !== 'editor' || documentView !== 'editor') {
             setIsPreviewVisible(false);
             setIsPreviewZoomReady(false);

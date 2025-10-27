@@ -102,6 +102,16 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
     }
   }, [shouldProvideZoom, renderedOutput, onPreviewZoomAvailabilityChange]);
 
+  useEffect(() => {
+    if (!shouldProvideZoom) {
+      return;
+    }
+
+    if (renderedOutput && !isLoading && !error) {
+      onPreviewZoomAvailabilityChange?.(true);
+    }
+  }, [shouldProvideZoom, renderedOutput, isLoading, error, onPreviewZoomAvailabilityChange]);
+
   const contentElement = !isLoading && !error && renderedOutput
     ? shouldProvideZoom
       ? (
