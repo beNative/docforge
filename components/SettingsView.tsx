@@ -42,13 +42,15 @@ interface SettingsViewProps {
   commands: Command[];
 }
 
-type SettingsCategory = 'provider' | 'appearance' | 'shortcuts' | 'python' | 'general' | 'database' | 'advanced';
+type SettingsCategory = 'provider' | 'appearance' | 'shortcuts' | 'python' | 'shell' | 'powershell' | 'general' | 'database' | 'advanced';
 
 const categories: { id: SettingsCategory; label: string; icon: React.FC<{className?: string}> }[] = [
   { id: 'provider', label: 'LLM Provider', icon: SparklesIcon },
   { id: 'appearance', label: 'Appearance', icon: SunIcon },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: KeyboardIcon },
   { id: 'python', label: 'Python', icon: TerminalIcon },
+  { id: 'shell', label: 'Shell', icon: TerminalIcon },
+  { id: 'powershell', label: 'PowerShell', icon: TerminalIcon },
   { id: 'general', label: 'General', icon: GearIcon },
   { id: 'database', label: 'Database', icon: DatabaseIcon },
   { id: 'advanced', label: 'Advanced', icon: FileIcon },
@@ -378,6 +380,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
   const { addLog } = useLogger();
   const [pythonValidationError, setPythonValidationError] = useState<string | null>(null);
+  const [shellValidationError, setShellValidationError] = useState<string | null>(null);
+  const [powershellValidationError, setPowershellValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentSettings(settings);
@@ -398,7 +402,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   const navButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const isSaveDisabled = !isDirty || !!pythonValidationError;
+  const validationMessage = pythonValidationError ?? shellValidationError ?? powershellValidationError;
+  const isSaveDisabled = !isDirty || !!validationMessage;
 
   const activeCategory = useMemo(
     () => categories.find((category) => category.id === visibleCategory) ?? categories[0],
@@ -482,6 +487,28 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             }}
           />
         );
+      case 'shell':
+        return (
+          <ScriptDefaultsSection
+            {...{
+              settings: currentSettings,
+              setCurrentSettings,
+              target: 'shell',
+              onValidationChange: setShellValidationError,
+            }}
+          />
+        );
+      case 'powershell':
+        return (
+          <ScriptDefaultsSection
+            {...{
+              settings: currentSettings,
+              setCurrentSettings,
+              target: 'powershell',
+              onValidationChange: setPowershellValidationError,
+            }}
+          />
+        );
       case 'general':
         return <GeneralSettingsSection {...{ settings: currentSettings, setCurrentSettings }} />;
       case 'database':
@@ -498,9 +525,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <header className="flex items-center justify-between px-4 h-7 border-b border-border-color bg-secondary flex-shrink-0">
         <h1 className="text-xs font-semibold text-text-secondary tracking-wider uppercase">Settings</h1>
         <div className="flex items-center gap-2">
-          {pythonValidationError && (
+          {validationMessage && (
             <p className="text-[10px] text-destructive-text max-w-xs text-right leading-tight">
-              Python settings error: {pythonValidationError}
+              Settings error: {validationMessage}
             </p>
           )}
           <Button onClick={handleSave} disabled={isSaveDisabled} variant="primary" className="whitespace-nowrap">
@@ -1717,6 +1744,122 @@ requests"
           </form>
         </Modal>
       )}
+    </section>
+  );
+};
+
+interface ScriptDefaultsSectionProps extends SectionProps {
+  target: 'shell' | 'powershell';
+  onValidationChange: (error: string | null) => void;
+}
+
+const ScriptDefaultsSection: React.FC<ScriptDefaultsSectionProps> = ({
+  settings,
+  setCurrentSettings,
+  target,
+  onValidationChange,
+}) => {
+  const defaults = target === 'shell' ? settings.shellDefaults : settings.powershellDefaults;
+  const [envVarJson, setEnvVarJson] = useState(() => JSON.stringify(defaults.environmentVariables, null, 2));
+  const [envVarError, setEnvVarError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEnvVarJson(JSON.stringify(defaults.environmentVariables, null, 2));
+    setEnvVarError(null);
+    onValidationChange(null);
+  }, [defaults.environmentVariables, onValidationChange]);
+
+  const sectionTitle = target === 'shell' ? 'Shell Execution Defaults' : 'PowerShell Execution Defaults';
+  const description =
+    target === 'shell'
+      ? 'Configure default environment variables, working directory, and interpreter override for shell scripts.'
+      : 'Configure default environment variables, working directory, and interpreter override for PowerShell scripts.';
+
+  const updateDefaults = (updates: Partial<typeof defaults>) => {
+    setCurrentSettings((prev) => {
+      if (target === 'shell') {
+        return { ...prev, shellDefaults: { ...prev.shellDefaults, ...updates } };
+      }
+      return { ...prev, powershellDefaults: { ...prev.powershellDefaults, ...updates } };
+    });
+  };
+
+  const handleEnvVarChange = (value: string) => {
+    setEnvVarJson(value);
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setEnvVarError(null);
+      onValidationChange(null);
+      updateDefaults({ environmentVariables: {} });
+      return;
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Value must be a JSON object.');
+      }
+      const result: Record<string, string> = {};
+      for (const [key, raw] of Object.entries(parsed)) {
+        if (typeof raw !== 'string') {
+          throw new Error(`Value for "${key}" must be a string.`);
+        }
+        if (!key.trim()) {
+          throw new Error('Environment variable keys cannot be empty.');
+        }
+        result[key] = raw;
+      }
+      setEnvVarError(null);
+      onValidationChange(null);
+      updateDefaults({ environmentVariables: result });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid JSON format.';
+      setEnvVarError(message);
+      onValidationChange(message);
+    }
+  };
+
+  const handleWorkingDirectoryChange = (value: string) => {
+    const trimmed = value.trim();
+    updateDefaults({ workingDirectory: trimmed ? trimmed : null });
+  };
+
+  const handleExecutableChange = (value: string) => {
+    const trimmed = value.trim();
+    updateDefaults({ executable: trimmed ? trimmed : null });
+  };
+
+  return (
+    <section className="pt-2 pb-6">
+      <h2 className="text-lg font-semibold text-text-main mb-4">{sectionTitle}</h2>
+      <p className="text-xs text-text-secondary max-w-3xl mb-6">{description}</p>
+      <div className="space-y-6">
+        <SettingRow label="Default Environment Variables" description="JSON object defining environment variables applied to every run.">
+          <textarea
+            value={envVarJson}
+            onChange={(event) => handleEnvVarChange(event.target.value)}
+            className="w-full h-32 bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+          />
+          {envVarError && <p className="text-xs text-destructive-text mt-2">{envVarError}</p>}
+        </SettingRow>
+        <SettingRow label="Default Working Directory" description="Optional directory used when running scripts.">
+          <input
+            type="text"
+            value={defaults.workingDirectory ?? ''}
+            onChange={(event) => handleWorkingDirectoryChange(event.target.value)}
+            className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+            placeholder={target === 'powershell' ? 'C:\\scripts' : '/path/to/projects'}
+          />
+        </SettingRow>
+        <SettingRow label="Executable Override" description="Optional interpreter to run scripts. Leave blank to use the platform default.">
+          <input
+            type="text"
+            value={defaults.executable ?? ''}
+            onChange={(event) => handleExecutableChange(event.target.value)}
+            className="w-full bg-background border border-border-color rounded-md px-3 py-2 text-sm text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+            placeholder={target === 'shell' ? 'bash' : 'pwsh'}
+          />
+        </SettingRow>
+      </div>
     </section>
   );
 };

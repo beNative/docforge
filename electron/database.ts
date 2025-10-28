@@ -248,7 +248,7 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
     console.log('Database does not exist, creating new one...');
     connection.exec(INITIAL_SCHEMA);
     // Set PRAGMAs for a new database
-    connection.pragma('user_version = 4');
+    connection.pragma('user_version = 5');
     connection.exec('PRAGMA journal_mode = WAL;');
     connection.exec('PRAGMA foreign_keys = ON;');
     console.log('Database created and schema applied.');
@@ -385,6 +385,59 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
       console.log('Migration to version 4 complete.');
     } catch (e) {
       console.error('Fatal: Failed to migrate database to version 4:', e);
+    }
+  }
+
+  if (currentVersion < 5) {
+    console.log(`Migrating schema from version ${currentVersion} to 5...`);
+    try {
+      const transaction = connection.transaction(() => {
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS script_execution_runs (
+            run_id TEXT PRIMARY KEY,
+            node_id TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
+            language TEXT NOT NULL,
+            status TEXT NOT NULL,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            exit_code INTEGER,
+            error_message TEXT,
+            duration_ms INTEGER
+          );
+        `);
+
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS script_execution_logs (
+            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_id TEXT NOT NULL REFERENCES script_execution_runs(run_id) ON DELETE CASCADE,
+            timestamp TEXT NOT NULL,
+            level TEXT NOT NULL,
+            message TEXT NOT NULL
+          );
+        `);
+
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS node_script_settings (
+            node_id TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
+            language TEXT NOT NULL,
+            env_vars_json TEXT NOT NULL,
+            working_directory TEXT,
+            executable TEXT,
+            last_run_id TEXT REFERENCES script_execution_runs(run_id) ON DELETE SET NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (node_id, language)
+          );
+        `);
+
+        connection.exec('CREATE INDEX IF NOT EXISTS idx_script_runs_node_lang ON script_execution_runs(node_id, language);');
+        connection.exec('CREATE INDEX IF NOT EXISTS idx_script_logs_run ON script_execution_logs(run_id);');
+
+        connection.pragma('user_version = 5');
+      });
+      transaction();
+      console.log('Migration to version 5 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 5:', e);
     }
   }
 };
