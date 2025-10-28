@@ -209,6 +209,12 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
         case 'fmx':
         case 'ini':
             return 'ini';
+        case 'sh':
+        case 'bash':
+        case 'zsh':
+        case 'ksh':
+        case 'shell':
+            return 'shell';
         case 'application/pdf':
         case 'pdf':
             return 'pdf';
