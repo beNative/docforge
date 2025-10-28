@@ -26,6 +26,7 @@ export const SUPPORTED_LANGUAGES = [
     { id: 'pdf', label: 'PDF' },
     { id: 'image', label: 'Image' },
     { id: 'shell', label: 'Shell / Bash' },
+    { id: 'powershell', label: 'PowerShell' },
 ];
 
 export const mapExtensionToLanguageId = (extension: string | null): string => {
@@ -91,6 +92,10 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
         case 'ksh':
         case 'shell':
             return 'shell';
+        case 'ps1':
+        case 'psm1':
+        case 'psd1':
+            return 'powershell';
         case 'application/pdf':
             return 'pdf';
         case 'pdf':
