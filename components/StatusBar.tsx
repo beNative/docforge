@@ -239,7 +239,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
 
   return (
     <footer className="flex items-center justify-between px-3 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30 whitespace-nowrap">
-      <div className="flex items-center gap-2 whitespace-nowrap min-w-0">
+      <div className="flex flex-1 items-center gap-2 whitespace-nowrap min-w-0">
         <div
           ref={statusTriggerRef}
           className="flex items-center gap-1.5 cursor-default focus:outline-none"
@@ -329,23 +329,27 @@ const StatusBar: React.FC<StatusBarProps> = ({
         )}
         {databaseStatus?.message && (
           <>
-            <span
-              ref={databaseStatusRef}
-              className={`text-[11px] ${databaseStatusClass} max-w-[220px] truncate`}
-              onMouseEnter={() => setShowDatabaseStatusTooltip(true)}
-              onMouseLeave={() => setShowDatabaseStatusTooltip(false)}
-              onFocus={() => setShowDatabaseStatusTooltip(true)}
-              onBlur={() => setShowDatabaseStatusTooltip(false)}
-              tabIndex={0}
-            >
-              {databaseStatus.message}
-            </span>
-            {showDatabaseStatusTooltip && databaseStatusRef.current && (
-              <Tooltip
-                targetRef={databaseStatusRef}
-                content={<span className="block whitespace-pre-line break-words leading-snug text-left">{databaseStatus.message}</span>}
-              />
-            )}
+            <div className="h-4 w-px bg-border-color"></div>
+            <div className="flex flex-1 items-center min-w-0">
+              <span
+                ref={databaseStatusRef}
+                className={`text-[11px] ${databaseStatusClass} truncate`}
+                onMouseEnter={() => setShowDatabaseStatusTooltip(true)}
+                onMouseLeave={() => setShowDatabaseStatusTooltip(false)}
+                onFocus={() => setShowDatabaseStatusTooltip(true)}
+                onBlur={() => setShowDatabaseStatusTooltip(false)}
+                tabIndex={0}
+              >
+                {databaseStatus.message}
+              </span>
+              {showDatabaseStatusTooltip && databaseStatusRef.current && (
+                <Tooltip
+                  targetRef={databaseStatusRef}
+                  content={<span className="block whitespace-pre-line break-words leading-snug text-left">{databaseStatus.message}</span>}
+                />
+              )}
+            </div>
+            <div className="h-4 w-px bg-border-color"></div>
           </>
         )}
       </div>
