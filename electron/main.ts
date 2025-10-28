@@ -9,6 +9,8 @@ import { autoUpdater } from 'electron-updater';
 import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider';
 import { databaseService } from './database';
 import { pythonManager } from './pythonManager';
+import { scriptRunner } from './scriptRunner';
+import type { ScriptLanguage } from '../types';
 import log from 'electron-log/main';
 import * as zlib from 'zlib';
 import * as os from 'os';
@@ -141,8 +143,21 @@ const broadcastPythonEvent = (channel: string, payload: any) => {
   }
 };
 
+const broadcastScriptEvent = (channel: string, payload: any) => {
+  const targets = BrowserWindow.getAllWindows();
+  for (const window of targets) {
+    try {
+      window.webContents.send(channel, payload);
+    } catch (error) {
+      console.error(`Failed to forward script event ${channel}:`, error);
+    }
+  }
+};
+
 pythonManager.events.on('run-log', (payload) => broadcastPythonEvent('python:run-log', payload));
 pythonManager.events.on('run-status', (payload) => broadcastPythonEvent('python:run-status', payload));
+scriptRunner.events.on('run-log', (payload) => broadcastScriptEvent('script:run-log', payload));
+scriptRunner.events.on('run-status', (payload) => broadcastScriptEvent('script:run-status', payload));
 
 // Work around GitHub returning HTTP 406 for JSON-only requests to the
 // `/releases/latest` endpoint by resolving the latest tag via the REST API.
@@ -978,4 +993,28 @@ ipcMain.handle('python:get-run-logs', async (_, runId: string) => {
 
 ipcMain.handle('python:get-run', async (_, runId: string) => {
     return pythonManager.getRun(runId);
+});
+
+ipcMain.handle('script:get-node-settings', async (_, nodeId: string, language: string) => {
+    return scriptRunner.getNodeSettings(nodeId, language as ScriptLanguage);
+});
+
+ipcMain.handle('script:update-node-settings', async (_, nodeId: string, language: string, updates) => {
+    return scriptRunner.updateNodeSettings(nodeId, language as ScriptLanguage, updates);
+});
+
+ipcMain.handle('script:run', async (_, payload) => {
+    return scriptRunner.runScript(payload);
+});
+
+ipcMain.handle('script:get-runs-for-node', async (_, nodeId: string, language: string, limit = 20) => {
+    return scriptRunner.getRunsForNode(nodeId, language as ScriptLanguage, limit);
+});
+
+ipcMain.handle('script:get-run-logs', async (_, runId: string) => {
+    return scriptRunner.getRunLogs(runId);
+});
+
+ipcMain.handle('script:get-run', async (_, runId: string) => {
+    return scriptRunner.getRun(runId);
 });

@@ -25,7 +25,22 @@ export const useSettings = () => {
       }
       
       // Merge with defaults to ensure all properties exist for existing users after an update.
-      const mergedSettings = { ...DEFAULT_SETTINGS, ...loadedSettingsFromDB };
+      const mergedSettings: Settings = {
+        ...DEFAULT_SETTINGS,
+        ...loadedSettingsFromDB,
+        pythonDefaults: {
+          ...DEFAULT_SETTINGS.pythonDefaults,
+          ...(loadedSettingsFromDB.pythonDefaults ?? DEFAULT_SETTINGS.pythonDefaults),
+        },
+        shellDefaults: {
+          ...DEFAULT_SETTINGS.shellDefaults,
+          ...(loadedSettingsFromDB.shellDefaults ?? DEFAULT_SETTINGS.shellDefaults),
+        },
+        powershellDefaults: {
+          ...DEFAULT_SETTINGS.powershellDefaults,
+          ...(loadedSettingsFromDB.powershellDefaults ?? DEFAULT_SETTINGS.powershellDefaults),
+        },
+      };
 
       // If provider name is missing but URL is present, try to discover it.
       if (mergedSettings.llmProviderUrl && !mergedSettings.llmProviderName) {
