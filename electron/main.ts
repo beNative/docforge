@@ -15,6 +15,7 @@ import * as os from 'os';
 import * as stream from 'stream';
 import { promisify } from 'util';
 import { spawn } from 'child_process';
+import type { SaveFilePayload } from '../types';
 
 // Fix: Inform TypeScript about the __dirname global variable provided by Node.js, which is present in a CommonJS-like environment.
 declare const __dirname: string;
@@ -671,15 +672,53 @@ ipcMain.on('window:close', () => mainWindow?.close());
 
 
 // Dialogs
-ipcMain.handle('dialog:save', async (_, options, content) => {
+const isSaveFilePayload = (payload: unknown): payload is SaveFilePayload => {
+    return (
+        typeof payload === 'object' &&
+        payload !== null &&
+        'kind' in payload &&
+        ((payload as SaveFilePayload).kind === 'text' || (payload as SaveFilePayload).kind === 'binary')
+    );
+};
+
+const writePayloadToFile = async (filePath: string, payload: unknown) => {
+    if (isSaveFilePayload(payload)) {
+        if (payload.kind === 'binary') {
+            await fs.writeFile(filePath, Buffer.from(payload.data));
+            return;
+        }
+        const encoding = payload.encoding ?? 'utf-8';
+        await fs.writeFile(filePath, payload.content, { encoding: encoding as BufferEncoding });
+        return;
+    }
+
+    if (payload instanceof Uint8Array) {
+        await fs.writeFile(filePath, Buffer.from(payload));
+        return;
+    }
+
+    if (payload instanceof ArrayBuffer) {
+        await fs.writeFile(filePath, Buffer.from(new Uint8Array(payload)));
+        return;
+    }
+
+    if (typeof payload === 'string') {
+        await fs.writeFile(filePath, payload, 'utf-8');
+        return;
+    }
+
+    await fs.writeFile(filePath, JSON.stringify(payload ?? ''), 'utf-8');
+};
+
+ipcMain.handle('dialog:save', async (_, options, payload) => {
     if (!mainWindow) return { success: false, error: 'Main window not available' };
     const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, options);
     if (canceled || !filePath) {
-        return { success: false };
+        return { success: false, canceled: true };
     }
     try {
-        await fs.writeFile(filePath, content, 'utf-8');
-        return { success: true };
+        await writePayloadToFile(filePath, payload);
+        return { success: true, filePath };
     } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : 'Failed to save file.' };
     }

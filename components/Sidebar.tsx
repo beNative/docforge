@@ -38,6 +38,7 @@ interface SidebarProps {
   onNewFromClipboard: () => void;
   onDuplicateSelection: () => void;
   onCopyNodeContent: (id: string) => void;
+  onSaveNodeToFile: (id: string) => void;
   expandedFolderIds: Set<string>;
   onToggleExpand: (id: string) => void;
   onExpandAll: () => void;
@@ -496,10 +497,12 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onDeleteNode={props.onDeleteNode}
                     onRenameNode={props.onRenameNode}
                                         onMoveNode={props.onMoveNode}
-                                        onImportNodes={props.onImportNodes}
+                    onImportNodes={props.onImportNodes}
                     onDropFiles={props.onDropFiles}
                     onCopyNodeContent={props.onCopyNodeContent}
                     copyContentTooltip={getTooltip('document-tree-copy-content', 'Copy Content')}
+                    onSaveNodeToFile={props.onSaveNodeToFile}
+                    saveToFileTooltip={getTooltip('document-tree-save-to-file', 'Save to File')}
                     searchTerm={searchTerm}
                     expandedIds={props.expandedFolderIds}
                     onToggleExpand={props.onToggleExpand}

@@ -41,6 +41,9 @@ export const storageService = {
       // The default filename is handled in the main process via the saveLog preload method
       const result = await window.electronAPI.saveLog('', content);
       if (!result.success) {
+        if (result.canceled) {
+          return;
+        }
         throw new Error(result.error || 'Failed to save log file.');
       }
     } else {

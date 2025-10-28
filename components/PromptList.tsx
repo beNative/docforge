@@ -20,6 +20,8 @@ interface DocumentListProps {
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onCopyNodeContent: (id: string) => void;
   copyContentTooltip: string;
+  onSaveNodeToFile: (id: string) => void;
+  saveToFileTooltip: string;
   searchTerm: string;
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
@@ -47,6 +49,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
   onDropFiles,
   onCopyNodeContent,
   copyContentTooltip,
+  onSaveNodeToFile,
+  saveToFileTooltip,
   searchTerm,
   expandedIds,
   onToggleExpand,
@@ -257,6 +261,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onToggleExpand={onToggleExpand}
                 onCopyNodeContent={onCopyNodeContent}
                 copyContentTooltip={copyContentTooltip}
+                onSaveNodeToFile={onSaveNodeToFile}
+                saveToFileTooltip={saveToFileTooltip}
                 searchTerm={searchTerm}
                 onMoveUp={onMoveUp}
                 onMoveDown={onMoveDown}

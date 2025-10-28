@@ -2155,6 +2155,10 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
                 setTransferStatus({ type: 'success', message: 'Settings exported successfully.' });
                 return;
             }
+            if (result.canceled) {
+                addLog('INFO', 'Settings export canceled by user.');
+                return;
+            }
             const message = result.error ?? 'Failed to export settings.';
             setTransferStatus({ type: 'error', message });
             addLog('ERROR', `Settings export failed: ${message}`);

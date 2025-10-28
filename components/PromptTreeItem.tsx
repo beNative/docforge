@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon } from './Icons';
+import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, SaveIcon } from './Icons';
 
 export interface DocumentNode extends DocumentOrFolder {
   children: DocumentNode[];
@@ -30,6 +30,8 @@ interface DocumentTreeItemProps {
   onToggleExpand: (id: string) => void;
   onCopyNodeContent: (id: string) => void;
   copyContentTooltip: string;
+  onSaveNodeToFile: (id: string) => void;
+  saveToFileTooltip: string;
   isKnownNodeId: (id: string) => boolean;
   searchTerm: string;
   onMoveUp: (id: string) => void;
@@ -113,6 +115,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onToggleExpand,
     onCopyNodeContent,
     copyContentTooltip,
+    onSaveNodeToFile,
+    saveToFileTooltip,
     onMoveUp,
     onMoveDown,
     canMoveUp,
@@ -365,9 +369,14 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         <ArrowDownIcon className="w-3.5 h-3.5" />
                     </IconButton>
                     {!isFolder && (
+                      <>
                         <IconButton onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }} tooltip={copyContentTooltip} size="xs" variant="ghost">
-                            <CopyIcon className="w-3.5 h-3.5" />
+                          <CopyIcon className="w-3.5 h-3.5" />
                         </IconButton>
+                        <IconButton onClick={(e) => { e.stopPropagation(); onSaveNodeToFile(node.id); }} tooltip={saveToFileTooltip} size="xs" variant="ghost">
+                          <SaveIcon className="w-3.5 h-3.5" />
+                        </IconButton>
+                      </>
                     )}
                     <IconButton onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id, e.shiftKey); }} tooltip="Delete" size="xs" variant="destructive">
                         <TrashIcon className="w-3.5 h-3.5" />
