@@ -238,8 +238,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
   }, [previewMetadata]);
 
   return (
-    <footer className="flex items-center justify-between px-4 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30 whitespace-nowrap">
-      <div className="flex items-center gap-3 whitespace-nowrap min-w-0">
+    <footer className="flex items-center justify-between px-3 h-5 bg-secondary border-t border-border-color text-[11px] text-text-secondary flex-shrink-0 z-30 whitespace-nowrap">
+      <div className="flex items-center gap-2 whitespace-nowrap min-w-0">
         <div
           ref={statusTriggerRef}
           className="flex items-center gap-1.5 cursor-default focus:outline-none"
@@ -259,7 +259,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
           />
         )}
         <div className="h-4 w-px bg-border-color"></div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <label htmlFor="status-bar-provider-select" className="sr-only">LLM provider</label>
           <select
             id="status-bar-provider-select"
@@ -278,7 +278,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
           </select>
         </div>
         <div className="h-4 w-px bg-border-color"></div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <label htmlFor="status-bar-model-select" className="sr-only">LLM model</label>
           <select
             id="status-bar-model-select"
@@ -306,7 +306,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             event.preventDefault();
             handleDatabaseMenu(event);
           }}
-          className={`flex items-center gap-2 px-2 py-1 -my-1 rounded-md transition-colors ${onDatabaseMenu ? 'hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer' : 'cursor-default'}`}
+          className={`flex items-center gap-1.5 px-1.5 py-1 -my-1 rounded-md transition-colors ${onDatabaseMenu ? 'hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer' : 'cursor-default'}`}
           disabled={!onDatabaseMenu}
           ref={databaseTriggerRef}
           onMouseEnter={() => setShowDatabaseTooltip(true)}
@@ -349,8 +349,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
           </>
         )}
       </div>
-      <div className="flex items-center gap-4 whitespace-nowrap min-w-0">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3 whitespace-nowrap min-w-0">
+        <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-1.5" role="group" aria-label="Preview zoom controls">
             <ZoomButton
               className={zoomButtonClass}
