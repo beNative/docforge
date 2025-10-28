@@ -140,6 +140,22 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isCodeFile = node.doc_type === 'source_code';
   const isOpenInTab = !isFolder && openDocumentIds.has(node.id);
   const emojiForNode = !isFolder ? extractEmoji(node.title) : null;
+  const displayTitle = React.useMemo(() => {
+    if (!emojiForNode || isFolder) {
+      return node.title;
+    }
+
+    const emojiWithTrailingSpace = `${emojiForNode} `;
+    if (node.title.startsWith(emojiWithTrailingSpace)) {
+      return node.title.slice(emojiWithTrailingSpace.length);
+    }
+
+    if (node.title.startsWith(emojiForNode)) {
+      return node.title.slice(emojiForNode.length);
+    }
+
+    return node.title;
+  }, [emojiForNode, isFolder, node.title]);
   const isActiveTab = isOpenInTab && activeDocumentId === node.id;
   
   useEffect(() => {
@@ -336,7 +352,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                 ) : (
-                    <span className="truncate flex-1 px-1">{highlightMatches(node.title, searchTerm)}</span>
+                    <span className="truncate flex-1 px-1">{highlightMatches(displayTitle, searchTerm)}</span>
                 )}
             </div>
 
