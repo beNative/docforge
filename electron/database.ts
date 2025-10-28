@@ -215,6 +215,10 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
         case 'ksh':
         case 'shell':
             return 'shell';
+        case 'ps1':
+        case 'psm1':
+        case 'psd1':
+            return 'powershell';
         case 'application/pdf':
         case 'pdf':
             return 'pdf';
