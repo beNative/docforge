@@ -139,4 +139,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('python:run-status', handler);
     return () => ipcRenderer.removeListener('python:run-status', handler);
   },
+
+  // --- Shell & PowerShell execution ---
+  scriptGetNodeSettings: (nodeId: string, language: string) => ipcRenderer.invoke('script:get-node-settings', nodeId, language),
+  scriptSetNodeSettings: (
+    nodeId: string,
+    language: string,
+    settings: { environmentVariables: Record<string, string>; workingDirectory: string | null }
+  ) => ipcRenderer.invoke('script:set-node-settings', nodeId, language, settings),
+  scriptClearNodeSettings: (nodeId: string, language: string) => ipcRenderer.invoke('script:clear-node-settings', nodeId, language),
+  scriptRun: (payload: any) => ipcRenderer.invoke('script:run', payload),
+  scriptGetRunsForNode: (nodeId: string, language: string, limit?: number) =>
+    ipcRenderer.invoke('script:get-runs-for-node', nodeId, language, limit),
+  scriptGetRunLogs: (runId: string) => ipcRenderer.invoke('script:get-run-logs', runId),
+  scriptGetRun: (runId: string) => ipcRenderer.invoke('script:get-run', runId),
+  onScriptRunLog: (callback: (payload: any) => void) => {
+    const handler = (_: IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on('script:run-log', handler);
+    return () => ipcRenderer.removeListener('script:run-log', handler);
+  },
+  onScriptRunStatus: (callback: (payload: any) => void) => {
+    const handler = (_: IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on('script:run-status', handler);
+    return () => ipcRenderer.removeListener('script:run-status', handler);
+  },
 });

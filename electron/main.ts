@@ -9,12 +9,14 @@ import { autoUpdater } from 'electron-updater';
 import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider';
 import { databaseService } from './database';
 import { pythonManager } from './pythonManager';
+import { scriptRunner } from './scriptRunner';
 import log from 'electron-log/main';
 import * as zlib from 'zlib';
 import * as os from 'os';
 import * as stream from 'stream';
 import { promisify } from 'util';
 import { spawn } from 'child_process';
+import type { ScriptLanguage, ScriptRunRequestPayload } from '../types';
 
 // Fix: Inform TypeScript about the __dirname global variable provided by Node.js, which is present in a CommonJS-like environment.
 declare const __dirname: string;
@@ -143,6 +145,20 @@ const broadcastPythonEvent = (channel: string, payload: any) => {
 
 pythonManager.events.on('run-log', (payload) => broadcastPythonEvent('python:run-log', payload));
 pythonManager.events.on('run-status', (payload) => broadcastPythonEvent('python:run-status', payload));
+
+const broadcastScriptEvent = (channel: string, payload: any) => {
+  const targets = BrowserWindow.getAllWindows();
+  for (const window of targets) {
+    try {
+      window.webContents.send(channel, payload);
+    } catch (error) {
+      console.error(`Failed to forward script event ${channel}:`, error);
+    }
+  }
+};
+
+scriptRunner.events.on('run-log', (payload) => broadcastScriptEvent('script:run-log', payload));
+scriptRunner.events.on('run-status', (payload) => broadcastScriptEvent('script:run-status', payload));
 
 // Work around GitHub returning HTTP 406 for JSON-only requests to the
 // `/releases/latest` endpoint by resolving the latest tag via the REST API.
@@ -978,4 +994,37 @@ ipcMain.handle('python:get-run-logs', async (_, runId: string) => {
 
 ipcMain.handle('python:get-run', async (_, runId: string) => {
     return pythonManager.getRun(runId);
+});
+
+ipcMain.handle('script:get-node-settings', async (_, nodeId: string, language: ScriptLanguage) => {
+    return scriptRunner.getNodeSettings(nodeId, language);
+});
+
+ipcMain.handle('script:set-node-settings', async (
+    _,
+    nodeId: string,
+    language: ScriptLanguage,
+    settings: { environmentVariables: Record<string, string>; workingDirectory: string | null }
+) => {
+    return scriptRunner.setNodeSettings(nodeId, language, settings);
+});
+
+ipcMain.handle('script:clear-node-settings', async (_, nodeId: string, language: ScriptLanguage) => {
+    await scriptRunner.clearNodeSettings(nodeId, language);
+});
+
+ipcMain.handle('script:run', async (_, payload: ScriptRunRequestPayload) => {
+    return scriptRunner.runScript(payload);
+});
+
+ipcMain.handle('script:get-runs-for-node', async (_, nodeId: string, language: ScriptLanguage, limit = 20) => {
+    return scriptRunner.getRunsForNode(nodeId, language, limit);
+});
+
+ipcMain.handle('script:get-run-logs', async (_, runId: string) => {
+    return scriptRunner.getRunLogs(runId);
+});
+
+ipcMain.handle('script:get-run', async (_, runId: string) => {
+    return scriptRunner.getRun(runId);
 });

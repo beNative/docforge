@@ -71,6 +71,14 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   pythonWorkingDirectory: null,
   pythonConsoleTheme: 'dark',
+  shellDefaults: {
+    environmentVariables: {},
+    workingDirectory: null,
+  },
+  powershellDefaults: {
+    environmentVariables: {},
+    workingDirectory: null,
+  },
 };
 
 export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [

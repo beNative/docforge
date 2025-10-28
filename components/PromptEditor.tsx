@@ -13,6 +13,7 @@ import MonacoDiffEditor from './MonacoDiffEditor';
 import PreviewPane from './PreviewPane';
 import { SUPPORTED_LANGUAGES } from '../services/languageService';
 import PythonExecutionPanel from './PythonExecutionPanel';
+import ScriptExecutionPanel from './ScriptExecutionPanel';
 
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
@@ -62,6 +63,12 @@ const PREVIEWABLE_LANGUAGES = new Set<string>([
   'image/svg',
   'image/svg+xml',
 ]);
+
+const SCRIPT_PANEL_STORAGE = {
+  python: { height: 'docforge.python.panelHeight', collapsed: 'docforge.python.panelCollapsed' },
+  shell: { height: 'docforge.shell.panelHeight', collapsed: 'docforge.shell.panelCollapsed' },
+  powershell: { height: 'docforge.powershell.panelHeight', collapsed: 'docforge.powershell.panelCollapsed' },
+} as const;
 
 const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint: string | null | undefined): ViewMode => {
   if (mode) return mode;
@@ -128,26 +135,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     addLog,
   });
   
-  const pythonPanelMinHeight = 180;
-  const [isPythonPanelCollapsed, setIsPythonPanelCollapsed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.localStorage.getItem('docforge.python.panelCollapsed') === 'true';
-    }
-    return false;
-  });
-  const [pythonPanelHeight, setPythonPanelHeight] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = window.localStorage.getItem('docforge.python.panelHeight');
-      if (stored) {
-        const parsed = parseInt(stored, 10);
-        if (!Number.isNaN(parsed)) {
-          const maxHeight = Math.max(pythonPanelMinHeight, window.innerHeight - 220);
-          return Math.min(Math.max(parsed, pythonPanelMinHeight), maxHeight);
-        }
-      }
-    }
-    return 260;
-  });
+  const scriptPanelMinHeight = 180;
+  const [isScriptPanelCollapsed, setIsScriptPanelCollapsed] = useState(false);
+  const [scriptPanelHeight, setScriptPanelHeight] = useState(scriptPanelMinHeight);
 
   const isResizing = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
@@ -162,19 +152,51 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const prevDocumentContentRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem('docforge.python.panelHeight', String(Math.round(pythonPanelHeight)));
-  }, [pythonPanelHeight]);
+    if (!scriptLanguage || typeof window === 'undefined') {
+      setIsScriptPanelCollapsed(false);
+      setScriptPanelHeight(scriptPanelMinHeight);
+      return;
+    }
+
+    const { collapsed, height } = SCRIPT_PANEL_STORAGE[scriptLanguage];
+    const storedCollapsed = window.localStorage.getItem(collapsed);
+    setIsScriptPanelCollapsed(storedCollapsed === 'true');
+
+    const storedHeight = window.localStorage.getItem(height);
+    const parsed = storedHeight ? parseInt(storedHeight, 10) : NaN;
+    const maxHeight = Math.max(scriptPanelMinHeight, window.innerHeight - 220);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      setScriptPanelHeight(Math.min(Math.max(parsed, scriptPanelMinHeight), maxHeight));
+    } else {
+      setScriptPanelHeight(Math.min(Math.max(260, scriptPanelMinHeight), maxHeight));
+    }
+  }, [scriptLanguage, scriptPanelMinHeight]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!scriptLanguage || typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      SCRIPT_PANEL_STORAGE[scriptLanguage].height,
+      String(Math.round(scriptPanelHeight))
+    );
+  }, [scriptLanguage, scriptPanelHeight]);
+
+  useEffect(() => {
+    if (!scriptLanguage || typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      SCRIPT_PANEL_STORAGE[scriptLanguage].collapsed,
+      isScriptPanelCollapsed ? 'true' : 'false'
+    );
+  }, [scriptLanguage, isScriptPanelCollapsed]);
+
+  useEffect(() => {
+    if (!scriptLanguage || typeof window === 'undefined') return;
     const handleWindowResize = () => {
-      const maxHeight = Math.max(pythonPanelMinHeight, window.innerHeight - 220);
-      setPythonPanelHeight((current) => Math.min(Math.max(current, pythonPanelMinHeight), maxHeight));
+      const maxHeight = Math.max(scriptPanelMinHeight, window.innerHeight - 220);
+      setScriptPanelHeight((current) => Math.min(Math.max(current, scriptPanelMinHeight), maxHeight));
     };
     window.addEventListener('resize', handleWindowResize);
     return () => window.removeEventListener('resize', handleWindowResize);
-  }, [pythonPanelMinHeight]);
+  }, [scriptLanguage, scriptPanelMinHeight]);
 
   // Keep local editor state in sync with document updates without clobbering unsaved edits.
   useEffect(() => {
@@ -467,11 +489,22 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const canAddEmojiToTitle = documentNode.type === 'document';
   const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
   const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
-  const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
+  const isElectronAvailable = typeof window !== 'undefined' && !!window.electronAPI;
+  const scriptLanguage = useMemo(() => {
+    if (!isElectronAvailable) return null;
+    if (normalizedLanguage === 'python') return 'python';
+    if (normalizedLanguage === 'shell') return 'shell';
+    if (normalizedLanguage === 'powershell') return 'powershell';
+    return null;
+  }, [isElectronAvailable, normalizedLanguage]);
+  const isScriptDocument = scriptLanguage !== null;
+
   const pythonDefaults = useMemo(() => ({
     ...settings.pythonDefaults,
     workingDirectory: settings.pythonWorkingDirectory ?? settings.pythonDefaults.workingDirectory ?? null,
   }), [settings.pythonDefaults, settings.pythonWorkingDirectory]);
+  const shellDefaults = useMemo(() => settings.shellDefaults, [settings.shellDefaults]);
+  const powershellDefaults = useMemo(() => settings.powershellDefaults, [settings.powershellDefaults]);
 
   const previewZoomOptions = useMemo(() => ({
     minScale: previewMinScale,
@@ -503,24 +536,24 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
   }, [supportsPreview, onPreviewMetadataChange]);
 
-  const handlePythonPanelResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+  const handleScriptPanelResizeStart = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !scriptLanguage) return;
     event.preventDefault();
     const startY = event.clientY;
-    const startHeight = pythonPanelHeight;
+    const startHeight = scriptPanelHeight;
     const pointerId = event.pointerId;
     const target = event.currentTarget;
 
     const getMaxHeight = () => {
       if (typeof window === 'undefined') return startHeight;
-      return Math.max(pythonPanelMinHeight, window.innerHeight - 220);
+      return Math.max(scriptPanelMinHeight, window.innerHeight - 220);
     };
 
     const handlePointerMove = (pointerEvent: PointerEvent) => {
       const delta = startY - pointerEvent.clientY;
       const maxHeight = getMaxHeight();
-      const nextHeight = Math.min(Math.max(startHeight + delta, pythonPanelMinHeight), maxHeight);
-      setPythonPanelHeight(nextHeight);
+      const nextHeight = Math.min(Math.max(startHeight + delta, scriptPanelMinHeight), maxHeight);
+      setScriptPanelHeight(nextHeight);
     };
 
     const cleanup = () => {
@@ -546,7 +579,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     target.addEventListener('pointermove', handlePointerMove);
     target.addEventListener('pointerup', handlePointerUp);
     target.addEventListener('pointercancel', handlePointerCancel);
-  }, [pythonPanelHeight, pythonPanelMinHeight]);
+  }, [scriptPanelHeight, scriptPanelMinHeight, scriptLanguage]);
   
   const renderContent = () => {
     const editor = isDiffMode
@@ -701,26 +734,38 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         </div>
       </div>
       <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>
-      {isPythonDocument && (
+      {isScriptDocument && (
         <div
           className="flex-shrink-0 flex flex-col bg-secondary"
-          style={{ height: isPythonPanelCollapsed ? 'auto' : pythonPanelHeight }}
+          style={{ height: isScriptPanelCollapsed ? 'auto' : scriptPanelHeight }}
         >
-          {!isPythonPanelCollapsed && (
+          {!isScriptPanelCollapsed && (
             <div
               className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
-              onPointerDown={handlePythonPanelResizeStart}
+              onPointerDown={handleScriptPanelResizeStart}
             />
           )}
-          <div className={`${isPythonPanelCollapsed ? 'flex-shrink-0' : 'flex-1'} overflow-hidden`}>
-            <div className={`px-4 ${isPythonPanelCollapsed ? 'py-2' : 'pb-4 h-full overflow-auto'}`}>
-              <PythonExecutionPanel
-                nodeId={documentNode.id}
-                code={content}
-                defaults={pythonDefaults}
-                consoleTheme={settings.pythonConsoleTheme}
-                onCollapseChange={setIsPythonPanelCollapsed}
-              />
+          <div className={`${isScriptPanelCollapsed ? 'flex-shrink-0' : 'flex-1'} overflow-hidden`}>
+            <div className={`px-4 ${isScriptPanelCollapsed ? 'py-2' : 'pb-4 h-full overflow-auto'}`}>
+              {scriptLanguage === 'python' ? (
+                <PythonExecutionPanel
+                  nodeId={documentNode.id}
+                  code={content}
+                  defaults={pythonDefaults}
+                  consoleTheme={settings.pythonConsoleTheme}
+                  onCollapseChange={setIsScriptPanelCollapsed}
+                />
+              ) : (
+                scriptLanguage && (
+                  <ScriptExecutionPanel
+                    nodeId={documentNode.id}
+                    code={content}
+                    language={scriptLanguage}
+                    defaults={scriptLanguage === 'shell' ? shellDefaults : powershellDefaults}
+                    onCollapseChange={setIsScriptPanelCollapsed}
+                  />
+                )
+              )}
             </div>
           </div>
         </div>

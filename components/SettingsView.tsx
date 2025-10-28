@@ -11,10 +11,11 @@ import type {
   ThemeContrastPreference,
   ThemeMode,
   ThemeColorToken,
+  ScriptLanguage,
 } from '../types';
 import { llmDiscoveryService } from '../services/llmDiscoveryService';
 import { DEFAULT_SETTINGS } from '../constants';
-import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon, TerminalIcon, RefreshIcon, PlusIcon } from './Icons';
+import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon, TerminalIcon, RefreshIcon, PlusIcon, CodeIcon } from './Icons';
 import * as HeroIcons from './iconsets/Heroicons';
 import * as LucideIcons from './iconsets/Lucide';
 import * as FeatherIcons from './iconsets/Feather';
@@ -32,6 +33,7 @@ import { useLogger } from '../hooks/useLogger';
 import KeyboardShortcutsSection from './KeyboardShortcutsSection';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
 import { computeThemePalette, cssColorToHex, THEME_COLOR_TOKENS, type ThemePalette } from '../services/themeCustomization';
+import { parseEnvironmentJson, stringifyEnvironmentJson } from '../services/environmentVariables';
 
 interface SettingsViewProps {
   settings: Settings;
@@ -42,13 +44,14 @@ interface SettingsViewProps {
   commands: Command[];
 }
 
-type SettingsCategory = 'provider' | 'appearance' | 'shortcuts' | 'python' | 'general' | 'database' | 'advanced';
+type SettingsCategory = 'provider' | 'appearance' | 'shortcuts' | 'python' | 'scripting' | 'general' | 'database' | 'advanced';
 
 const categories: { id: SettingsCategory; label: string; icon: React.FC<{className?: string}> }[] = [
   { id: 'provider', label: 'LLM Provider', icon: SparklesIcon },
   { id: 'appearance', label: 'Appearance', icon: SunIcon },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: KeyboardIcon },
   { id: 'python', label: 'Python', icon: TerminalIcon },
+  { id: 'scripting', label: 'Shell & PowerShell', icon: CodeIcon },
   { id: 'general', label: 'General', icon: GearIcon },
   { id: 'database', label: 'Database', icon: DatabaseIcon },
   { id: 'advanced', label: 'Advanced', icon: FileIcon },
@@ -218,27 +221,6 @@ const parsePackagesInput = (input: string): PythonPackageSpec[] => {
   return specs;
 };
 
-const parseEnvironmentJson = (value: string): Record<string, string> => {
-  if (!value.trim()) {
-    return {};
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(value);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid JSON: ${message}`);
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error('Environment variables must be a JSON object.');
-  }
-  const result: Record<string, string> = {};
-  for (const [key, val] of Object.entries(parsed)) {
-    result[String(key)] = val === undefined || val === null ? '' : String(val);
-  }
-  return result;
-};
-
 const buildFontOptions = (field: FontField, platform: PlatformId): FontOption[] => {
   const presets = FONT_PRESETS[field];
   const ordered = [
@@ -378,6 +360,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [visibleCategory, setVisibleCategory] = useState<SettingsCategory>('provider');
   const { addLog } = useLogger();
   const [pythonValidationError, setPythonValidationError] = useState<string | null>(null);
+  const [scriptValidationErrors, setScriptValidationErrors] = useState<{ shell: string | null; powershell: string | null }>(
+    { shell: null, powershell: null }
+  );
 
   useEffect(() => {
     setCurrentSettings(settings);
@@ -398,7 +383,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   const navButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  const isSaveDisabled = !isDirty || !!pythonValidationError;
+  const hasScriptValidationError = useMemo(() => Object.values(scriptValidationErrors).some(Boolean), [scriptValidationErrors]);
+  const isSaveDisabled = !isDirty || !!pythonValidationError || hasScriptValidationError;
+  const scriptErrorMessage = useMemo(() => {
+    if (scriptValidationErrors.shell) {
+      return `Shell settings error: ${scriptValidationErrors.shell}`;
+    }
+    if (scriptValidationErrors.powershell) {
+      return `PowerShell settings error: ${scriptValidationErrors.powershell}`;
+    }
+    return null;
+  }, [scriptValidationErrors]);
 
   const activeCategory = useMemo(
     () => categories.find((category) => category.id === visibleCategory) ?? categories[0],
@@ -482,6 +477,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             }}
           />
         );
+      case 'scripting':
+        return (
+          <ScriptingSettingsSection
+            {...{
+              settings: currentSettings,
+              setCurrentSettings,
+              onValidationChange: (language, message) =>
+                setScriptValidationErrors((prev) => ({ ...prev, [language]: message })),
+            }}
+          />
+        );
       case 'general':
         return <GeneralSettingsSection {...{ settings: currentSettings, setCurrentSettings }} />;
       case 'database':
@@ -501,6 +507,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           {pythonValidationError && (
             <p className="text-[10px] text-destructive-text max-w-xs text-right leading-tight">
               Python settings error: {pythonValidationError}
+            </p>
+          )}
+          {scriptErrorMessage && (
+            <p className="text-[10px] text-destructive-text max-w-xs text-right leading-tight">
+              {scriptErrorMessage}
             </p>
           )}
           <Button onClick={handleSave} disabled={isSaveDisabled} variant="primary" className="whitespace-nowrap">
@@ -1220,6 +1231,157 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
 interface PythonSectionProps extends SectionProps {
   onValidationChange?: (message: string | null) => void;
 }
+
+interface ScriptingSectionProps extends SectionProps {
+  onValidationChange?: (language: Extract<ScriptLanguage, 'shell' | 'powershell'>, message: string | null) => void;
+}
+
+const ScriptingSettingsSection: React.FC<ScriptingSectionProps> = ({ settings, setCurrentSettings, onValidationChange }) => {
+  const [shellEnvInput, setShellEnvInput] = useState(() =>
+    stringifyEnvironmentJson(settings.shellDefaults.environmentVariables, true)
+  );
+  const [powershellEnvInput, setPowershellEnvInput] = useState(() =>
+    stringifyEnvironmentJson(settings.powershellDefaults.environmentVariables, true)
+  );
+  const [shellEnvError, setShellEnvError] = useState<string | null>(null);
+  const [powershellEnvError, setPowershellEnvError] = useState<string | null>(null);
+  const [shellWorkingDirectory, setShellWorkingDirectory] = useState(settings.shellDefaults.workingDirectory ?? '');
+  const [powershellWorkingDirectory, setPowershellWorkingDirectory] = useState(
+    settings.powershellDefaults.workingDirectory ?? ''
+  );
+
+  useEffect(() => {
+    setShellEnvInput(stringifyEnvironmentJson(settings.shellDefaults.environmentVariables, true));
+    setShellEnvError(null);
+  }, [settings.shellDefaults.environmentVariables]);
+
+  useEffect(() => {
+    setPowershellEnvInput(stringifyEnvironmentJson(settings.powershellDefaults.environmentVariables, true));
+    setPowershellEnvError(null);
+  }, [settings.powershellDefaults.environmentVariables]);
+
+  useEffect(() => {
+    setShellWorkingDirectory(settings.shellDefaults.workingDirectory ?? '');
+  }, [settings.shellDefaults.workingDirectory]);
+
+  useEffect(() => {
+    setPowershellWorkingDirectory(settings.powershellDefaults.workingDirectory ?? '');
+  }, [settings.powershellDefaults.workingDirectory]);
+
+  useEffect(() => {
+    onValidationChange?.('shell', shellEnvError);
+  }, [shellEnvError, onValidationChange]);
+
+  useEffect(() => {
+    onValidationChange?.('powershell', powershellEnvError);
+  }, [powershellEnvError, onValidationChange]);
+
+  useEffect(() => () => {
+    onValidationChange?.('shell', null);
+    onValidationChange?.('powershell', null);
+  }, [onValidationChange]);
+
+  const handleShellEnvChange = (value: string) => {
+    setShellEnvInput(value);
+    try {
+      const parsed = parseEnvironmentJson(value);
+      setCurrentSettings((prev) => ({
+        ...prev,
+        shellDefaults: { ...prev.shellDefaults, environmentVariables: parsed },
+      }));
+      setShellEnvError(null);
+    } catch (error) {
+      setShellEnvError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handlePowershellEnvChange = (value: string) => {
+    setPowershellEnvInput(value);
+    try {
+      const parsed = parseEnvironmentJson(value);
+      setCurrentSettings((prev) => ({
+        ...prev,
+        powershellDefaults: { ...prev.powershellDefaults, environmentVariables: parsed },
+      }));
+      setPowershellEnvError(null);
+    } catch (error) {
+      setPowershellEnvError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleShellWorkingDirectoryChange = (value: string) => {
+    setShellWorkingDirectory(value);
+    const trimmed = value.trim();
+    setCurrentSettings((prev) => ({
+      ...prev,
+      shellDefaults: { ...prev.shellDefaults, workingDirectory: trimmed ? trimmed : null },
+    }));
+  };
+
+  const handlePowershellWorkingDirectoryChange = (value: string) => {
+    setPowershellWorkingDirectory(value);
+    const trimmed = value.trim();
+    setCurrentSettings((prev) => ({
+      ...prev,
+      powershellDefaults: { ...prev.powershellDefaults, workingDirectory: trimmed ? trimmed : null },
+    }));
+  };
+
+  return (
+    <section className="pt-2 pb-6">
+      <h2 className="text-lg font-semibold text-text-main mb-4">Shell &amp; PowerShell Execution</h2>
+      <p className="text-xs text-text-secondary max-w-3xl mb-6">
+        Configure default environment variables and working directories that DocForge applies when running shell or PowerShell
+        scripts. You can override these defaults for a specific document inside the execution panel.
+      </p>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-text-main">Shell</h3>
+          <p className="text-xs text-text-secondary">
+            Provide environment variables as JSON. These values are merged with per-document overrides before running a Bash-compatible script.
+          </p>
+          <textarea
+            className="w-full bg-background border border-border-color/60 rounded-md px-2.5 py-2 text-xs font-mono text-text-main focus:outline-none focus:ring-1 focus:ring-primary min-h-[100px]"
+            value={shellEnvInput}
+            onChange={(event) => handleShellEnvChange(event.target.value)}
+            aria-invalid={shellEnvError ? 'true' : 'false'}
+          />
+          {shellEnvError && <p className="text-xs text-destructive-text">{shellEnvError}</p>}
+          <label className="text-xs font-semibold text-text-secondary uppercase tracking-wide block">Working directory</label>
+          <input
+            type="text"
+            className="w-full bg-background border border-border-color/60 rounded-md px-2.5 py-1 text-xs text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+            value={shellWorkingDirectory}
+            placeholder="Leave blank to inherit the document directory"
+            onChange={(event) => handleShellWorkingDirectoryChange(event.target.value)}
+          />
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-text-main">PowerShell</h3>
+          <p className="text-xs text-text-secondary">
+            Defaults applied when running PowerShell scripts. Values merge with document-specific overrides.
+          </p>
+          <textarea
+            className="w-full bg-background border border-border-color/60 rounded-md px-2.5 py-2 text-xs font-mono text-text-main focus:outline-none focus:ring-1 focus:ring-primary min-h-[100px]"
+            value={powershellEnvInput}
+            onChange={(event) => handlePowershellEnvChange(event.target.value)}
+            aria-invalid={powershellEnvError ? 'true' : 'false'}
+          />
+          {powershellEnvError && <p className="text-xs text-destructive-text">{powershellEnvError}</p>}
+          <label className="text-xs font-semibold text-text-secondary uppercase tracking-wide block">Working directory</label>
+          <input
+            type="text"
+            className="w-full bg-background border border-border-color/60 rounded-md px-2.5 py-1 text-xs text-text-main focus:outline-none focus:ring-1 focus:ring-primary"
+            value={powershellWorkingDirectory}
+            placeholder="Leave blank to inherit the document directory"
+            onChange={(event) => handlePowershellWorkingDirectoryChange(event.target.value)}
+          />
+        </div>
+      </div>
+    </section>
+  );
+};
 
 const PythonSettingsSection: React.FC<PythonSectionProps> = ({ settings, setCurrentSettings, onValidationChange }) => {
   const { addLog } = useLogger();
