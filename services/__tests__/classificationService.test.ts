@@ -24,4 +24,25 @@ describe('classificationService', () => {
     expect(result.docType).toBe('source_code');
     expect(result.summary.primaryMatch).toContain('Extension indicates powershell');
   });
+
+  it('classifies Dockerfiles by filename when no extension exists', () => {
+    const result = classifyDocumentContent({
+      content: 'FROM node:20-alpine\nCMD ["node", "index.js"]\n',
+      title: 'Dockerfile',
+    });
+
+    expect(result.languageHint).toBe('dockerfile');
+    expect(result.docType).toBe('source_code');
+    expect(result.summary.primaryMatch).toContain('Filename indicates Dockerfile');
+  });
+
+  it('classifies Dockerfiles by heuristics when filename is missing', () => {
+    const result = classifyDocumentContent({
+      content: '# syntax=docker/dockerfile:1\n\nFROM ubuntu:24.04\nRUN apt-get update && apt-get install -y curl\n',
+    });
+
+    expect(result.languageHint).toBe('dockerfile');
+    expect(result.docType).toBe('source_code');
+    expect(result.summary.primaryMatch).toContain('Dockerfile instruction heuristics matched');
+  });
 });

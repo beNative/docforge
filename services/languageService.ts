@@ -25,6 +25,7 @@ export const SUPPORTED_LANGUAGES = [
     { id: 'ini', label: 'INI' },
     { id: 'pdf', label: 'PDF' },
     { id: 'image', label: 'Image' },
+    { id: 'dockerfile', label: 'Dockerfile' },
     { id: 'shell', label: 'Shell / Bash' },
     { id: 'powershell', label: 'PowerShell' },
 ];
@@ -86,6 +87,9 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
         case 'fmx':
         case 'ini':
             return 'ini';
+        case 'docker':
+        case 'dockerfile':
+            return 'dockerfile';
         case 'sh':
         case 'bash':
         case 'zsh':
