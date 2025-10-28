@@ -67,6 +67,13 @@ const getDropPosition = (
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const emojiRegex = /\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*/u;
+
+const extractEmoji = (text: string): string | null => {
+  const match = text.match(emojiRegex);
+  return match ? match[0] : null;
+};
+
 const highlightMatches = (text: string, term: string): React.ReactNode => {
   if (!term.trim()) {
     return text;
@@ -132,6 +139,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isFolder = node.type === 'folder';
   const isCodeFile = node.doc_type === 'source_code';
   const isOpenInTab = !isFolder && openDocumentIds.has(node.id);
+  const emojiForNode = !isFolder ? extractEmoji(node.title) : null;
   const isActiveTab = isOpenInTab && activeDocumentId === node.id;
   
   useEffect(() => {
@@ -303,6 +311,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
 
                 {isFolder ? (
                     isExpanded ? <FolderOpenIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FolderIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                ) : emojiForNode ? (
+                    <span className="w-3.5 h-3.5 flex items-center justify-center text-base leading-none" aria-hidden="true">{emojiForNode}</span>
                 ) : (
                     isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
                 )}
