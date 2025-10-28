@@ -170,7 +170,7 @@ interface UpdateToastState {
     errorDetails: string | null;
 }
 
-const MainApp: React.FC = () => {
+export const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
     const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
@@ -2650,6 +2650,19 @@ const MainApp: React.FC = () => {
     }
 
     const renderMainContent = () => {
+        if (areDocumentsLoading) {
+            return (
+                <div
+                    className="flex h-full w-full flex-1 items-center justify-center gap-3"
+                    role="status"
+                    aria-live="polite"
+                    aria-busy="true"
+                >
+                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-border-color/60 border-t-primary" />
+                    <span className="sr-only">Loading documents...</span>
+                </div>
+            );
+        }
         if (view === 'info') {
             return (
                 <InfoView
