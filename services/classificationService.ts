@@ -110,6 +110,28 @@ const looksLikeHtml = (content: string): boolean => {
   return /<(!doctype\s+)?html/.test(sample) || /<head>/.test(sample) || /<body>/.test(sample);
 };
 
+const looksLikeDockerfile = (content: string): boolean => {
+  const lines = content.split(/\r?\n/).slice(0, 40);
+  let sawFromInstruction = false;
+  let score = 0;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) {
+      continue;
+    }
+    if (/^from\s+\S+/i.test(line)) {
+      sawFromInstruction = true;
+      score += 2;
+      continue;
+    }
+    if (/^(run|cmd|copy|add|entrypoint|env|arg|workdir|expose|user|label|volume|healthcheck|shell)\b/i.test(line)) {
+      score += 1;
+    }
+  }
+
+  return sawFromInstruction && score >= 2;
+};
+
 const detectProgrammingLanguage = (content: string): string | null => {
   const sample = content.slice(0, 2000);
   if (/@startuml/i.test(sample)) {
@@ -156,6 +178,7 @@ export const classifyDocumentContent = (options: ClassificationOptions): Classif
   const content = options.content ?? '';
   const trimmed = content.trim();
   const extension = title && title.includes('.') ? title.split('.').pop()?.toLowerCase() ?? null : null;
+  const normalizedTitle = title?.toLowerCase() ?? null;
 
   if (!trimmed) {
     return classifyWith('markdown', 'prompt', null, 0, 'Empty content – defaulted to Markdown', [], true);
@@ -193,8 +216,16 @@ export const classifyDocumentContent = (options: ClassificationOptions): Classif
     }
   }
 
+  if (normalizedTitle === 'dockerfile') {
+    return classifyWith('dockerfile', 'source_code', null, 0.85, 'Filename indicates Dockerfile');
+  }
+
   if (/^@startuml/i.test(trimmed)) {
     return classifyWith('plantuml', 'source_code', 'split-vertical', 0.85, 'Detected PlantUML directive');
+  }
+
+  if (looksLikeDockerfile(trimmed)) {
+    return classifyWith('dockerfile', 'source_code', null, 0.8, 'Dockerfile instruction heuristics matched');
   }
 
   if (tryParseJson(trimmed)) {

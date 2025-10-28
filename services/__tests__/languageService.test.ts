@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { SUPPORTED_LANGUAGES, mapExtensionToLanguageId } from '../languageService';
 
 describe('languageService', () => {
-  it('includes TOML, Shell, and PowerShell in the supported languages list', () => {
+  it('includes TOML, Shell, PowerShell, and Dockerfile in the supported languages list', () => {
     const hasToml = SUPPORTED_LANGUAGES.some(lang => lang.id === 'toml' && lang.label === 'TOML');
     const hasShell = SUPPORTED_LANGUAGES.some(lang => lang.id === 'shell' && lang.label === 'Shell / Bash');
     const hasPowerShell = SUPPORTED_LANGUAGES.some(lang => lang.id === 'powershell' && lang.label === 'PowerShell');
+    const hasDockerfile = SUPPORTED_LANGUAGES.some(lang => lang.id === 'dockerfile' && lang.label === 'Dockerfile');
     expect(hasToml).toBe(true);
     expect(hasShell).toBe(true);
     expect(hasPowerShell).toBe(true);
+    expect(hasDockerfile).toBe(true);
   });
 
   it('maps toml file extensions to the toml language id', () => {
@@ -28,6 +30,12 @@ describe('languageService', () => {
     expect(mapExtensionToLanguageId('ps1')).toBe('powershell');
     expect(mapExtensionToLanguageId('psm1')).toBe('powershell');
     expect(mapExtensionToLanguageId('psd1')).toBe('powershell');
+  });
+
+  it('maps Dockerfile related extensions and filenames to the dockerfile language id', () => {
+    expect(mapExtensionToLanguageId('docker')).toBe('dockerfile');
+    expect(mapExtensionToLanguageId('dockerfile')).toBe('dockerfile');
+    expect(mapExtensionToLanguageId('Dockerfile')).toBe('dockerfile');
   });
 
   it('falls back to plaintext when extension is null', () => {
