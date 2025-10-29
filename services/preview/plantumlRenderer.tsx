@@ -7,10 +7,10 @@ import { PlantUMLDiagram } from './plantumlDiagram';
 
 interface PlantUMLPreviewProps {
   content: string;
-  settings: Settings;
+  mode: Settings['plantumlRendererMode'];
 }
 
-const PlantUMLPreview: React.FC<PlantUMLPreviewProps> = ({ content, settings }) => {
+const PlantUMLPreviewComponent: React.FC<PlantUMLPreviewProps> = ({ content, mode }) => {
   const trimmed = useMemo(() => content.trim(), [content]);
 
   return (
@@ -21,7 +21,7 @@ const PlantUMLPreview: React.FC<PlantUMLPreviewProps> = ({ content, settings }) 
       maxScale={6}
       role="document"
     >
-      <PlantUMLDiagram code={trimmed} mode={settings.plantumlRendererMode} />
+      <PlantUMLDiagram code={trimmed} mode={mode} />
       <style>{`
         .df-plantuml-preview {
           width: 100%;
@@ -85,6 +85,13 @@ const PlantUMLPreview: React.FC<PlantUMLPreviewProps> = ({ content, settings }) 
   );
 };
 
+const PlantUMLPreview = React.memo(
+  PlantUMLPreviewComponent,
+  (prev, next) => prev.mode === next.mode && prev.content === next.content,
+);
+
+PlantUMLPreview.displayName = 'PlantUMLPreview';
+
 export class PlantUMLRenderer implements IRenderer {
   canRender(languageId: string): boolean {
     const normalized = languageId.toLowerCase();
@@ -105,7 +112,7 @@ export class PlantUMLRenderer implements IRenderer {
     }
 
     return {
-      output: <PlantUMLPreview content={content} settings={effectiveSettings} />,
+      output: <PlantUMLPreview content={content} mode={effectiveSettings.plantumlRendererMode} />,
     };
   }
 }
