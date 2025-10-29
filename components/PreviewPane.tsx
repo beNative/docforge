@@ -24,7 +24,7 @@ interface PreviewPaneProps {
   onMetadataChange?: (metadata: PreviewMetadata | null) => void;
 }
 
-const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ 
+const PreviewPaneComponent = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ 
   content,
   language,
   onScroll,
@@ -144,5 +144,24 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
     </div>
   );
 });
+
+PreviewPaneComponent.displayName = 'PreviewPane';
+
+const arePreviewPanePropsEqual = (prev: Readonly<PreviewPaneProps>, next: Readonly<PreviewPaneProps>) => {
+  if (prev.content !== next.content) return false;
+  if (prev.language !== next.language) return false;
+  if (prev.addLog !== next.addLog) return false;
+  if (prev.settings !== next.settings) return false;
+  if (prev.previewScale !== next.previewScale) return false;
+  if (prev.onPreviewScaleChange !== next.onPreviewScaleChange) return false;
+  if (prev.previewZoomOptions !== next.previewZoomOptions) return false;
+  if (prev.previewResetSignal !== next.previewResetSignal) return false;
+  if (prev.onPreviewZoomAvailabilityChange !== next.onPreviewZoomAvailabilityChange) return false;
+  if (prev.onMetadataChange !== next.onMetadataChange) return false;
+  if (prev.onScroll !== next.onScroll) return false;
+  return true;
+};
+
+const PreviewPane = React.memo(PreviewPaneComponent, arePreviewPanePropsEqual);
 
 export default PreviewPane;
