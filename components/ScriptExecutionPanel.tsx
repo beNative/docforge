@@ -54,6 +54,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<ScriptExecutionLogEntry[]>([]);
   const [activeRunMode, setActiveRunMode] = useState<ScriptExecutionMode | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -152,8 +153,11 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
           const message = error instanceof Error ? error.message : String(error);
           addLog('ERROR', `Failed to refresh ${language} run history: ${message}`);
         });
-        if (runId === selectedRunId) {
+        if (runId === activeRunId) {
           setActiveRunMode(null);
+        }
+        if (runId === activeRunId) {
+          setActiveRunId(null);
         }
       }
     });
@@ -161,7 +165,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
       unsubscribeLog();
       unsubscribeStatus();
     };
-  }, [language, selectedRunId, refreshRuns, addLog]);
+  }, [language, refreshRuns, addLog, activeRunId]);
 
   const handleSaveSettings = useCallback(async () => {
     const parsed = parseEnvJson();
@@ -204,15 +208,21 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
         overrides: parsed,
         mode,
       });
+      const isRunActive = run.status === 'running' || run.status === 'pending';
+      setActiveRunId(isRunActive ? run.runId : null);
       setSelectedRunId(run.runId);
       setLogEntries([]);
       setRunHistory((prev) => [run, ...prev]);
       setIsConfigDirty(false);
+      if (!isRunActive) {
+        setActiveRunMode(null);
+      }
       addLog('INFO', `${mode === 'test' ? `${label} test` : label} started.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setRunError(message);
       setActiveRunMode(null);
+      setActiveRunId(null);
       addLog('ERROR', `${mode === 'test' ? `${label} test` : label} failed to start: ${message}`);
     }
   }, [parseEnvJson, defaults.environmentVariables, defaults.workingDirectory, defaults.executable, nodeId, language, code, workingDirectory, executable, addLog, label]);
