@@ -233,7 +233,7 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({
   }, [environments]);
 
   const headerClasses = isCollapsed
-    ? 'flex items-center justify-between flex-shrink-0 px-2 py-1'
+    ? 'flex items-center justify-between flex-shrink-0 p-1'
     : 'flex flex-wrap items-center justify-between gap-2 px-2 pt-2 pb-3 border-b border-border-color/50';
 
   return (
@@ -243,7 +243,7 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({
       }`}
     >
       <div className={headerClasses}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <IconButton
             type="button"
             onClick={() => setIsCollapsed((prev) => !prev)}
@@ -253,12 +253,12 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({
             aria-controls="python-execution-panel-content"
             aria-label={isCollapsed ? 'Expand Python execution panel' : 'Collapse Python execution panel'}
           >
-            <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
+            <ChevronDownIcon className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
           </IconButton>
-          <div className="flex items-center gap-1.5 text-text-secondary">
-            <TerminalIcon className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider leading-none">Python Execution</span>
-          </div>
+          <h2 className="flex items-center gap-1 text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase leading-none">
+            <TerminalIcon className="w-4 h-4" />
+            Python Execution
+          </h2>
         </div>
         {!isCollapsed && (
           <div className="flex items-center gap-2">

@@ -238,7 +238,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
   }, [defaults.environmentVariables]);
 
   const headerContainerClasses = isCollapsed
-    ? 'flex items-center justify-between flex-shrink-0 px-2 py-1'
+    ? 'flex items-center justify-between flex-shrink-0 p-1'
     : 'flex flex-wrap items-center justify-between gap-2 px-2 pt-2 pb-3 border-b border-border-color/50';
 
   return (
@@ -248,7 +248,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
       }`}
     >
       <div className={headerContainerClasses}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <IconButton
             type="button"
             onClick={() => setIsCollapsed((prev) => !prev)}
@@ -258,12 +258,12 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
             aria-controls={`script-execution-panel-${language}`}
             aria-label={isCollapsed ? `Expand ${label} panel` : `Collapse ${label} panel`}
           >
-            <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
+            <ChevronDownIcon className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
           </IconButton>
-          <div className="flex items-center gap-1.5 text-text-secondary">
-            <TerminalIcon className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider leading-none">{label}</span>
-          </div>
+          <h2 className="flex items-center gap-1 text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase leading-none">
+            <TerminalIcon className="w-4 h-4" />
+            {label}
+          </h2>
         </div>
         {!isCollapsed && (
           <div className="flex flex-wrap items-center justify-end gap-2">
