@@ -28,6 +28,7 @@ The resizable left panel is your main navigation and organization area.
 - **Search:** A search bar at the top lets you filter your documents and folders. It instantly checks titles while also running a background full-text search across document bodies, returning contextual snippets with the matched terms highlighted so you can quickly confirm relevance.
 - **Documents List:** A hierarchical tree view of all your documents and folders.
     - **Action Toolbar:** A toolbar at the top of the list provides icon buttons to quickly create a new document, create a new root folder, create a new document from a template, expand/collapse all folders, and toggle the active document's lock state.
+    - **Row Quick Actions:** Hover or focus any row to reveal a compact strip of icons for the most common tasks—duplicate, export, rename, lock/unlock (for editable repositories), and more. The quick actions float over the right edge so the row keeps its full height and the title stays readable.
     - **Folders:** Can be expanded or collapsed.
     - **Documents:** Individual document files. Selecting a document opens it in the Main Content Area.
 - **Templates List:** A separate panel below your documents for managing reusable templates. This panel is resizable; you can drag its top border to adjust its height.
@@ -115,8 +116,10 @@ The document editor is powered by Monaco, the same editor core used in VS Code, 
     - **Editor Only:** The default text editing view.
     - **Preview Only:** A rendered view of your content.
     - **Split Vertical/Horizontal:** A side-by-side or top-and-bottom view of the editor and the live preview.
+- **Aligned Controls:** The language selector, Cancel Changes button, and preview toggles are grouped together so the toolbar stays organized even as you resize the window.
 - **Toolbar Actions:**
     - **Save Version:** Manually save the current content as a new version in the document's history. The button icon will be highlighted when there are unsaved changes.
+    - **Cancel Changes:** Discard all unsaved edits and revert to the last saved version without closing the tab or navigating away.
     - **Version History:** Open a view to see all saved versions of the document.
     - **Format:** Automatically tidy up supported languages—Markdown, JSON, JavaScript, and TypeScript—using DocForge's integrated formatter.
     - **Lock/Unlock:** Click the padlock icon to switch the document between editable and read-only modes. Locked documents disable title regeneration, formatting, AI refinement, and manual saves until you unlock them.

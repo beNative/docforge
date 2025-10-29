@@ -1,6 +1,15 @@
 # Version Log
 
-## v0.6.9 - The Release Prep Maintenance
+## v0.6.9 - The Workflow & Execution Update
+
+### ✨ Features
+
+-   Added Save to File actions across the document tree, editor toolbar, and command palette so any document can be exported with a context-aware filename and extension.
+-   Introduced Shell and PowerShell execution panels that let you test or run scripts with per-document environment overrides, surfaced logs, and remembered histories alongside the existing Python runner.
+-   Added a Cancel Changes button to the editor toolbar, enabling you to instantly discard unsaved edits and return to the last saved version without leaving the document.
+-   Enabled document locking throughout the UI so a quick padlock toggle puts the editor into read-only mode, preventing accidental saves, formatting, or AI refinements until you explicitly unlock it again.
+-   Refined the sidebar tree so quick actions collapse into an icon row on hover, labels maintain their full width, and repository-backed nodes display a lock toggle beside other controls.
+-   Polished the editor toolbar layout by grouping the language selector and preview controls, keeping the action cluster aligned even as the window resizes.
 
 ### 🐛 Fixes
 
@@ -8,17 +17,11 @@
 
 ### 📝 Documentation
 
--   Refreshed the release preparation guides so every README and manual references the `v0.6.9` tagging flow and synchronized documentation updates.
+-   Refreshed the release preparation guides so every README and manual references the `v0.6.9` tagging flow, the new export workflow, and script execution guidance.
 
-## Unreleased - The Document Export Primer
+## Unreleased
 
-### ✨ New
-
--   Added a Save to File action throughout the document tree and command palette so any document can be exported with a context-aware filename and extension.
-
-### 📝 Documentation
-
--   Documented the export workflow across the README and manuals, including technical notes about the new `documentExportService` and how the Electron bridge streams files to disk.
+-   _No entries yet._
 
 ## v0.6.8 - The Shortcut & Clipboard Update
 
@@ -52,11 +55,6 @@
     catch duplicate uploads or mismatched digests before shipping builds.
 -   Integrated GitHub Spec Kit workflows and refreshed assets so future changes
     arrive with automated specification checks.
-
-> TODO: Document how to clear or reset keyboard shortcuts in the Functional
-> Manual's settings chapter.
-> TODO: Call out PlantUML and TOML syntax coverage in the published manuals so
-> users can discover the new language support.
 
 ## v0.6.7 - The Auto-Update Reliability Pass
 
