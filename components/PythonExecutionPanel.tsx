@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import Button from './Button';
 import { TerminalIcon, RefreshIcon, ChevronDownIcon } from './Icons';
+import IconButton from './IconButton';
 import { pythonService } from '../services/pythonService';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
 import { useLogger } from '../hooks/useLogger';
@@ -231,24 +232,33 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({
     return options;
   }, [environments]);
 
+  const headerClasses = isCollapsed
+    ? 'flex items-center justify-between flex-shrink-0 px-2 py-1'
+    : 'flex flex-wrap items-center justify-between gap-2 px-2 pt-2 pb-3 border-b border-border-color/50';
+
   return (
-    <div className={`flex flex-col text-sm text-text-main ${isCollapsed ? '' : 'h-full min-h-0'}`}>
-      <div
-        className={`flex flex-wrap items-center justify-between gap-2 ${isCollapsed ? 'py-2' : 'pt-2 pb-3 border-b border-border-color/50'}`}
-      >
-        <div className="flex items-center gap-2 font-semibold">
-          <button
+    <div
+      className={`flex flex-col text-sm text-text-main border-t border-border-color ${
+        isCollapsed ? '' : 'h-full min-h-0'
+      }`}
+    >
+      <div className={headerClasses}>
+        <div className="flex items-center gap-2">
+          <IconButton
             type="button"
             onClick={() => setIsCollapsed((prev) => !prev)}
-            className="flex items-center justify-center w-6 h-6 rounded-md text-text-secondary hover:text-text-main hover:bg-border-color transition-colors"
+            tooltip={isCollapsed ? 'Show Python Execution' : 'Hide Python Execution'}
+            size="sm"
             aria-expanded={!isCollapsed}
             aria-controls="python-execution-panel-content"
             aria-label={isCollapsed ? 'Expand Python execution panel' : 'Collapse Python execution panel'}
           >
             <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
-          </button>
-          <TerminalIcon className="w-4 h-4" />
-          <span>Python Execution</span>
+          </IconButton>
+          <div className="flex items-center gap-1.5 text-text-secondary">
+            <TerminalIcon className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider leading-none">Python Execution</span>
+          </div>
         </div>
         {!isCollapsed && (
           <div className="flex items-center gap-2">
