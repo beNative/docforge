@@ -97,6 +97,15 @@ This system provides a consistent and extensible editing experience for all docu
 -   **Renderer Plugins (`services/preview/`):** Each file format with a preview is supported by a dedicated renderer class that implements the `IRenderer` interface. This makes the system highly extensible: to support a new format, one only needs to create a new renderer class and add it to the `previewService` registry. The bundled plugins cover Markdown (with Mermaid + PlantUML support), standalone PlantUML documents, HTML, PDFs, common image formats, and a plaintext fallback renderer.
     -   Both the Markdown renderer and the standalone PlantUML renderer share the `PlantUMLDiagram` component, which routes diagrams through either the remote plantuml.com server or the offline Java-based IPC bridge depending on the active setting.
 
+### Document Export Service (`services/documentExportService.ts`)
+
+The export service centralizes all logic for saving documents to disk.
+
+-   **Extension Inference:** It inspects the document's type, Monaco language hint, and any embedded MIME metadata to choose the best file extension. Titles are sanitized and de-duplicated so the suggested filename is always valid.
+-   **Payload Preparation:** Text documents are serialized with UTF-8 defaults, while PDFs and images are decoded from data URLs or base64 strings into `Uint8Array` buffers before saving.
+-   **Renderer Integration:** Renderer components call `handleSaveNodeToFile()` which delegates to the export service. In Electron builds the payload is sent over IPC to `electron/main.ts`, which opens a native save dialog and streams the bytes. Browser builds fall back to programmatically triggering a download with the correct MIME type.
+-   **Cancellation Handling:** If a user dismisses the save dialog, the service returns a `canceled` result that callers treat as a no-op so logs and notifications stay quiet.
+
 ### LLM Service (`services/llmService.ts`)
 
 This module handles all communication with the external Large Language Model. It is largely unchanged by the database migration.

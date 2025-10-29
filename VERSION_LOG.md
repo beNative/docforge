@@ -1,5 +1,15 @@
 # Version Log
 
+## Unreleased - The Document Export Primer
+
+### ✨ New
+
+-   Added a Save to File action throughout the document tree and command palette so any document can be exported with a context-aware filename and extension.
+
+### 📝 Documentation
+
+-   Documented the export workflow across the README and manuals, including technical notes about the new `documentExportService` and how the Electron bridge streams files to disk.
+
 ## v0.6.8 - The Publication Polish Update
 
 This maintenance release keeps the publication workflow accurate by bumping
