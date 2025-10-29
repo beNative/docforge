@@ -10,144 +10,194 @@
 
 -   Documented the export workflow across the README and manuals, including technical notes about the new `documentExportService` and how the Electron bridge streams files to disk.
 
-## v0.6.8 - The Publication Polish Update
+## v0.6.8 - The Shortcut & Clipboard Update
 
-This maintenance release keeps the publication workflow accurate by bumping
-the version metadata, refreshing the Markdown guides, and aligning the release
-tests with the assets that will accompany the new tag.
+### ✨ Features
 
-### 🛠 Improvements
-
--   Bumped the application version to `v0.6.8` and refreshed the release
-    tagging examples so the publishing checklist references the current
-    commands.
--   Re-reviewed every Markdown guide (README, manuals, version log) and synced
-    the copies in `docs/` to ensure the distributed documentation matches the
-    repository source.
--   Summarized the release tasks in this log so the GitHub release body can be
-    prepared directly from the latest entry.
+-   Added a **New from Clipboard** action that classifies the pasted content,
+    chooses the correct language mode, and drops the result directly into the
+    selected folder or overview toolbar for rapid capture of external notes.
+-   Expanded the keyboard shortcut editor to cover document tree commands such
+    as rename, copy, and clipboard-driven creation, and introduced a clear
+    button so bindings can be reset without editing JSON by hand.
+-   Extended syntax support with dedicated PlantUML highlighting and TOML
+    language detection, keeping previews and the Monaco editor in sync for
+    infrastructure-as-code files and diagram sources.
 
 ### 🐛 Fixes
 
--   Updated the release workflow test fixtures to expect `v0.6.8`
-    identifiers and artifact names, preventing mismatches once the new
-    installer set is published.
+-   Restored reliable focus handling after dialogs and creation modals so
+    keyboard-driven workflows resume in the document tree without manual
+    clicks.
+-   Enabled shift-based range selection and improved status bar messaging,
+    making large sidebar edits clearer and keyboard-friendly.
+-   Tightened Markdown preview spacing and blank-line preservation to match the
+    rendered output across divider, code block, and prose layouts.
+-   Hardened Windows auto-update manifests so renamed installers still publish
+    valid metadata and the updater never stalls on checksum verification.
 
-## v0.6.7 - The Release Readiness Confirmation
+### 🛠 Infrastructure
 
-This maintenance release double-checks the release process ahead of the next
-build by updating the version metadata, aligning the release tests, and
-resyncing the documentation bundle.
+-   Added regression coverage and logging around release manifest generation to
+    catch duplicate uploads or mismatched digests before shipping builds.
+-   Integrated GitHub Spec Kit workflows and refreshed assets so future changes
+    arrive with automated specification checks.
 
-### 🛠 Improvements
+> TODO: Document how to clear or reset keyboard shortcuts in the Functional
+> Manual's settings chapter.
+> TODO: Call out PlantUML and TOML syntax coverage in the published manuals so
+> users can discover the new language support.
 
--   Bumped the application version to `v0.6.7` and refreshed the release
-    tagging examples so the workflow documentation continues to reflect the
-    current command sequence.
--   Reverified every Markdown guide (README, manuals, version log) and synced
-    the `docs/` copies to ensure the published documentation matches the
-    repository sources.
+## v0.6.7 - The Auto-Update Reliability Pass
 
-### 🐛 Fixes
+### ✨ Features
 
--   Updated the release workflow tests to expect the new versioned installer
-    artifacts, preventing false failures when validating the publishing
-    pipeline.
-
-## v0.6.6 - The Documentation Assurance Update
-
-This patch release keeps the publishing workflow aligned ahead of the next
-build by refreshing the documentation set and confirming the release checklist
-continues to match the automated pipeline.
-
-### 🛠 Improvements
-
--   Bumped the application version to `v0.6.6` and refreshed the release
-    tagging examples so contributors follow the current command sequence when
-    preparing a build.
--   Revalidated every Markdown guide (README, manuals, version log) and synced
-    the `docs/` copies to ensure the published documentation mirrors the
-    repository sources.
+-   Verified update metadata before downloads so the in-app updater refuses
+    corrupted releases and surfaces actionable status messages instead of
+    silent failures.
 
 ### 🐛 Fixes
 
--   Replaced outdated tag references that still pointed to `v0.6.5`, avoiding
-    confusion when publishing the release to GitHub.
+-   Repaired checksum selection logic and prevented duplicate manifest uploads,
+    eliminating the checksum mismatch loop affecting Windows users.
+-   Ignored unpacked app directories and tightened manifest naming, keeping the
+    published feed aligned with the installers actually shipped.
 
-## v0.6.5 - The Automated Release Update
+### 🛠 Infrastructure
 
-This maintenance release introduces a hands-free publishing workflow so tagged
-builds automatically land on GitHub with installers for every supported
-platform.
+-   Added regression tests for remote auto-update flows and release metadata to
+    guard against future publishing regressions.
 
-### 🛠 Improvements
+## v0.6.6 - The Update Controls Release
 
--   Added a GitHub Actions release pipeline that rebuilds the application for
-    macOS, Windows (x64/ia32), and Linux (x64/arm64/armv7l) whenever a tagged
-    version is pushed and attaches the generated installers to the release.
--   Refreshed the release preparation checklist across the documentation set to
-    describe the tagging workflow and clarify how release notes flow from the
-    version log into GitHub releases.
--   Synced all Markdown documentation so the published guides continue to match
-    the repository sources.
+### ✨ Features
 
-### 🐛 Fixes
-
--   Removed stale guidance that referenced manually uploading binaries, keeping
-    the publishing process consistent with the automated workflow.
-
-## v0.6.4 - The Checklist Confidence Update
-
-This maintenance release polishes the publishing checklist and documentation so
-preparing the GitHub release is straightforward every time.
-
-### 🛠 Improvements
-
--   Clarified the release preparation steps to call out copying the latest
-    changelog entry into the GitHub release description after publishing.
--   Reconfirmed that every Markdown guide and its counterpart in `docs/` are in
-    sync, ensuring the published documentation mirrors the repository sources.
+-   Added manual update controls in Settings so administrators can disable
+    background downloads or opt into pre-release builds on their schedule.
+-   Introduced a progressive auto-update toast that surfaces download progress,
+    installation status, and restart prompts inside the app.
 
 ### 🐛 Fixes
 
--   Tidied minor inconsistencies across the README and technical manual so the
-    release workflow references match the expected commands and sequencing.
+-   Resolved GitHub tag lookup, feed parsing, and digest validation regressions
+    so update checks succeed across every supported platform.
+-   Removed unused elevation helpers from release bundles, shrinking Windows
+    installers and avoiding antivirus prompts.
 
-## v0.6.3 - The Release Readiness Refresh
+### 🛠 Infrastructure
 
-This maintenance release aligns the publishing workflow documentation with the
-latest release checklist so preparing builds remains predictable and
-well-documented.
+-   Rebuilt the GitHub Actions release workflows to create tags, upload
+    manifests, and publish installers automatically once a version is pushed.
 
-### 🛠 Improvements
+> TODO: Extend the manuals with guidance for the new manual update controls and
+> notification toasts.
 
--   Clarified the release preparation steps in the README and technical manual
-    to include drafting release notes and syncing the published documentation
-    bundle.
--   Ensured the `docs/` copies of the manuals stay in lockstep with the root
-    documentation to avoid drift between the repository and published guides.
+## v0.6.5 - The Settings & Workspace Upgrade
 
-### 🐛 Fixes
+### ✨ Features
 
--   Restored the missing release workflow section in the published technical
-    manual so hosted documentation once again includes the full checklist.
-
-## v0.6.2 - The Documentation Polish Update
-
-This maintenance release focuses on keeping the documentation set in sync with the
-project's release workflow so the publishing checklist is easy to follow.
-
-### 🛠 Improvements
-
--   Synced the release preparation guidance between the project README and the
-    documentation bundle to avoid diverging instructions.
--   Linked the README to the version history so maintainers can quickly review
-    prior changes when drafting release notes.
+-   Reorganized the Settings view into focused categories and added JSON
+    import/export so configurations can be shared between machines.
+-   Enabled bootstrapping brand new workspace databases from the UI, letting
+    teams spin up fresh environments without touching the filesystem.
+-   Added a configurable active-line highlight for the editor to improve focus
+    in dark themes and high-contrast setups.
 
 ### 🐛 Fixes
 
--   Corrected outdated documentation references that omitted the release
-    preparation steps from the published docs bundle.
+-   Restored `Ctrl+Shift+P` access to the command palette inside Monaco so
+    keyboard users can launch commands without leaving the editor.
+-   Fixed Markdown preview zoom overflow and ensured restored documents scroll
+    into view, smoothing everyday navigation across large notebooks.
+
+### 🛠 Infrastructure
+
+-   Shipped cross-platform build workflows that package macOS, Windows, and
+    Linux installers on every release and attach them to GitHub automatically.
+-   Bundled the PlantUML runtime with desktop builds and improved offline
+    renderer error reporting to support fully offline diagram previews.
+
+> TODO: Document the active-line highlight preference in the Settings reference
+> and note that new workspaces can be created directly from the UI.
+
+## v0.6.4 - The Workspace Mobility Update
+
+### ✨ Features
+
+-   Let users choose custom database locations and surface the active workspace
+    path in the status bar for quick auditing of production versus sandbox
+    files.
+-   Enabled copying documents across workspaces via drag-and-drop, making it
+    easy to reuse content between projects without exporting archives.
+-   Added a one-click **Format** button to the editor toolbar so Markdown, JSON,
+    and script files stay tidy.
+
+### 🐛 Fixes
+
+-   Resolved cross-workspace drag-and-drop edge cases and ensured imported
+    nodes land exactly where they were dropped.
+-   Corrected folder overview navigation and search result selection so the
+    summary view always opens the intended document.
+
+### 🛠 Infrastructure
+
+-   Updated documentation and status bar tooltips to reflect the new database
+    controls and workspace visibility details.
+
+> TODO: Describe cross-workspace drag-and-drop behavior in the Functional
+> Manual so multi-database teams know it exists.
+
+## v0.6.3 - The Workspace Navigation Update
+
+### ✨ Features
+
+-   Introduced document tab management with overflow navigation controls,
+    keeping frequently edited files within reach even on narrow displays.
+-   Expanded the Folder Overview with activity summaries, scoped search, and
+    inline rename so teams can triage large directories without diving into the
+    tree.
+-   Added standalone PlantUML previews and an offline rendering mode for
+    diagrams, eliminating the dependency on external services when a local JRE
+    is available.
+
+### 🐛 Fixes
+
+-   Fixed a regression that left the Monaco editor blank after launch by
+    ensuring initialization completes before mounting the view.
+
+### 🛠 Infrastructure
+
+-   Added an `npm run dev` alias and related build tweaks to streamline local
+    development during the tab overhaul.
+
+> TODO: Capture document tab overflow controls in the manuals so users discover
+> the new navigation affordances.
+
+## v0.6.2 - The Preview & Personalization Release
+
+### ✨ Features
+
+-   Added PDF and common image previews with dedicated renderers so binary
+    assets open directly inside DocForge.
+-   Enhanced sidebar search with full-text snippets, highlighting matches in
+    context to speed up content discovery.
+-   Introduced editor font/background settings and adjustable document tree
+    spacing so the workspace can be tuned to different accessibility needs.
+
+### 🐛 Fixes
+
+-   Preserved binary payloads during PDF imports and repaired the drop overlay
+    that lingered after file uploads.
+-   Tightened Markdown spacing and syntax highlighting so rendered previews
+    match the source even in fenced code blocks.
+
+### 🛠 Infrastructure
+
+-   Swapped the application icon pipeline to build from the canonical SVG and
+    corrected the GitHub publishing target, keeping release assets consistent.
+
+> TODO: Document the editor font/background controls and tree spacing options
+> in the customization sections of the manuals.
 
 ## v0.6.1 - The Release Prep Update
 
