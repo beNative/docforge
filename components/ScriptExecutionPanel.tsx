@@ -11,6 +11,7 @@ import Button from './Button';
 import { ChevronDownIcon, RefreshIcon, TerminalIcon } from './Icons';
 import { scriptService } from '../services/scriptService';
 import { useLogger } from '../hooks/useLogger';
+import IconButton from './IconButton';
 
 interface ScriptExecutionPanelProps {
   nodeId: string;
@@ -236,27 +237,32 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
     return entries.join(', ');
   }, [defaults.environmentVariables]);
 
+  const headerContainerClasses = isCollapsed
+    ? 'flex items-center justify-between h-8 px-2'
+    : 'flex flex-wrap items-center justify-between gap-2 px-2 pt-2 pb-3 border-b border-border-color/50';
+
   return (
     <div className={`flex flex-col text-sm text-text-main ${isCollapsed ? '' : 'h-full min-h-0'}`}>
-      <div
-        className={`flex flex-wrap items-center justify-between gap-2 ${isCollapsed ? 'py-2' : 'pt-2 pb-3 border-b border-border-color/50'}`}
-      >
-        <div className="flex items-center gap-2 font-semibold">
-          <button
+      <div className={headerContainerClasses}>
+        <div className="flex items-center gap-2">
+          <IconButton
             type="button"
             onClick={() => setIsCollapsed((prev) => !prev)}
-            className="flex items-center justify-center w-6 h-6 rounded-md text-text-secondary hover:text-text-main hover:bg-border-color transition-colors"
+            tooltip={isCollapsed ? `Show ${label}` : `Hide ${label}`}
+            size="sm"
             aria-expanded={!isCollapsed}
             aria-controls={`script-execution-panel-${language}`}
             aria-label={isCollapsed ? `Expand ${label} panel` : `Collapse ${label} panel`}
           >
             <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
-          </button>
-          <TerminalIcon className="w-4 h-4" />
-          <span>{label}</span>
+          </IconButton>
+          <div className="flex items-center gap-1.5 text-text-secondary">
+            <TerminalIcon className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider leading-none">{label}</span>
+          </div>
         </div>
         {!isCollapsed && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               variant="secondary"
               onClick={() => refreshRuns(selectedRunId)}
