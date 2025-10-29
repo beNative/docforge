@@ -42,6 +42,7 @@ const PreviewPaneComponent = React.forwardRef<HTMLDivElement, PreviewPaneProps>(
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { theme } = useTheme();
+  const settingsSignature = React.useMemo(() => JSON.stringify(settings), [settings]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -88,7 +89,7 @@ const PreviewPaneComponent = React.forwardRef<HTMLDivElement, PreviewPaneProps>(
       clearTimeout(debounceTimer);
       onMetadataChange?.(null);
     };
-  }, [content, language, addLog, ref, onScroll, settings, onMetadataChange]);
+  }, [content, language, addLog, ref, onScroll, settingsSignature, onMetadataChange]);
   useEffect(() => {
     return () => {
       onMetadataChange?.(null);

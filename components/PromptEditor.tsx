@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, useLayoutEffect } from 'react';
 import type { DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
 import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon } from './Icons';
@@ -119,6 +119,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
   const [splitSize, setSplitSize] = useState(50);
   const { addLog } = useLogger();
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const shouldRestoreTitleFocus = useRef(false);
   const { skipNextAutoSave } = useDocumentAutoSave({
     documentId: documentNode.id,
     content,
@@ -233,6 +235,29 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   useEffect(() => {
     setTitle(documentNode.title);
   }, [documentNode.id, documentNode.title]);
+
+  useLayoutEffect(() => {
+    if (!shouldRestoreTitleFocus.current) {
+      return;
+    }
+
+    const inputEl = titleInputRef.current;
+    if (!inputEl) {
+      return;
+    }
+
+    if (document.activeElement === inputEl) {
+      return;
+    }
+
+    inputEl.focus({ preventScroll: true });
+    const end = inputEl.value.length;
+    try {
+      inputEl.setSelectionRange(end, end);
+    } catch {
+      // Ignore browsers that do not support setSelectionRange on this input type.
+    }
+  }, [title]);
 
   useEffect(() => {
     if (viewMode === 'preview' && isDiffMode) {
@@ -714,7 +739,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate"/>
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onFocus={() => { shouldRestoreTitleFocus.current = true; }}
+              onBlur={() => { shouldRestoreTitleFocus.current = false; }}
+              placeholder="Document Title"
+              disabled={isGeneratingTitle}
+              className="bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate"
+            />
             {canAddEmojiToTitle && (
               <IconButton
                 onClick={handleAddEmojiToTitle}
