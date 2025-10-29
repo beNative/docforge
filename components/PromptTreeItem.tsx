@@ -133,9 +133,12 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(node.title);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside' | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [lockedRowHeight, setLockedRowHeight] = useState<number | null>(null);
 
   const renameInputRef = useRef<HTMLInputElement>(null);
   const itemRef = useRef<HTMLLIElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
 
   const isSelected = selectedIds.has(node.id);
   const isFocused = focusedItemId === node.id;
@@ -143,6 +146,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isFolder = node.type === 'folder';
   const isCodeFile = node.doc_type === 'source_code';
   const isOpenInTab = !isFolder && openDocumentIds.has(node.id);
+  const areActionsVisible = isSelected || isFocused || isHovered;
   const emojiForNode = !isFolder ? extractEmoji(node.title) : null;
   const displayTitle = React.useMemo(() => {
     if (!emojiForNode || isFolder) {
@@ -313,14 +317,30 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       data-item-id={node.id}
     >
         <div
+            ref={rowRef}
             onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
             onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
-            style={{ paddingTop: `${paddingTopBottom}px`, paddingBottom: `${paddingTopBottom}px`, paddingLeft: `${rowPaddingLeft}px` }}
+            onMouseEnter={() => {
+                if (rowRef.current) {
+                    setLockedRowHeight(rowRef.current.getBoundingClientRect().height);
+                }
+                setIsHovered(true);
+            }}
+            onMouseLeave={() => {
+                setIsHovered(false);
+                setLockedRowHeight(null);
+            }}
+            style={{
+                paddingTop: `${paddingTopBottom}px`,
+                paddingBottom: `${paddingTopBottom}px`,
+                paddingLeft: `${rowPaddingLeft}px`,
+                minHeight: lockedRowHeight !== null ? `${lockedRowHeight}px` : undefined,
+            }}
             className={`w-full text-left pr-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
                 isSelected ? 'bg-tree-selected text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
             } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
         >
-            <div className="flex items-center gap-1.5 flex-1 truncate">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
                 {isFolder && node.children.length > 0 ? (
                     <button onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }} className="-ml-1 p-0.5 rounded hover:bg-border-color">
                         {isExpanded ? <ChevronDownIcon className="w-3.5 h-3.5" /> : <ChevronRightIcon className="w-3.5 h-3.5" />}
@@ -356,12 +376,26 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                 ) : (
-                    <span className="truncate flex-1 px-1">{highlightMatches(displayTitle, searchTerm)}</span>
+                    <span
+                        className={`flex-1 px-1 ${
+                            areActionsVisible ? 'truncate' : 'whitespace-normal break-words'
+                        }`}
+                    >
+                        {highlightMatches(displayTitle, searchTerm)}
+                    </span>
                 )}
             </div>
 
             {!isRenaming && (
-                <div className={`transition-opacity pr-1 flex items-center ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                <div
+                    className={`transition-opacity flex items-center ${
+                        areActionsVisible ? 'opacity-100 pr-1' : 'opacity-0 pr-0 pointer-events-none'
+                    }`}
+                    style={{
+                        width: areActionsVisible ? undefined : 0,
+                        overflow: areActionsVisible ? undefined : 'hidden',
+                    }}
+                >
                     <IconButton onClick={(e) => { e.stopPropagation(); onMoveUp(node.id); }} tooltip="Move Up" size="xs" variant="ghost" disabled={!canMoveUp}>
                         <ArrowUpIcon className="w-3.5 h-3.5" />
                     </IconButton>
