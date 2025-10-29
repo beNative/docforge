@@ -90,6 +90,19 @@ The bar at the bottom of the window provides at-a-glance information about the a
 - **New Subfolder:** Select an existing folder and click the "New Subfolder" icon to create a folder inside it.
 - **Duplicate Selection:** Select one or more items and click the "Duplicate" icon to create a deep copy.
 
+### Exporting Documents
+
+Use the **Save to File…** action whenever you need a local copy of a document outside DocForge.
+
+- **From the Sidebar:** Hover a document in the tree and click the floppy disk quick action, or open the item's context menu and choose **Save to File…**.
+- **From the Command Palette:** Type `Save Document to File` to export whichever document is currently focused in the tree.
+- **Suggested Filenames:** DocForge proposes a sanitized filename based on the document title and strips any duplicate extension you might already have in the title.
+- **Smart Extensions:** The exporter inspects the document type, detected language mode, and embedded MIME hints (for images and PDFs) to choose the most appropriate file extension automatically.
+- **Binary Support:** Binary payloads such as PDFs and images are decoded before saving, so the exported file opens natively.
+- **Desktop & Browser Friendly:** On Electron builds the action opens the operating system's save dialog; the web preview falls back to a standard browser download prompt.
+
+If you cancel the dialog, the action silently stops so you can continue working without dismissing extra alerts.
+
 ### Editing Documents
 
 The document editor is powered by Monaco, the same editor core used in VS Code, providing a rich and consistent experience for all document types.

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
+import type { SaveFilePayload } from '../types';
 
 type UpdateAvailableInfo = {
   version: string | null;
@@ -101,6 +102,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       defaultPath: `docforge-log-${new Date().toISOString().split('T')[0]}.log`,
       filters: [{ name: 'Log Files', extensions: ['log'] }, { name: 'All Files', extensions: ['*'] }]
   }, content),
+
+  saveDocument: (
+    options: { defaultPath: string; filters: { name: string; extensions: string[] }[]; title?: string },
+    payload: SaveFilePayload
+  ) => ipcRenderer.invoke('dialog:save', {
+      title: options.title ?? 'Save Document',
+      defaultPath: options.defaultPath,
+      filters: options.filters,
+  }, payload),
   
   settingsExport: (content: string) => ipcRenderer.invoke('dialog:save', {
       title: 'Export Settings',

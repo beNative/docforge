@@ -33,6 +33,7 @@ import NewCodeFileModal from './components/NewCodeFileModal';
 import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer, UpdateAvailableInfo, PreviewMetadata } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
+import { exportDocumentToFile } from './services/documentExportService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { LOCAL_STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 import { repository, type RepositoryStartupTiming } from './services/repository';
@@ -792,6 +793,40 @@ export const MainApp: React.FC = () => {
         }
         void handleCopyNodeContent(doc.id);
     }, [items, selectedIds, handleCopyNodeContent]);
+
+    const handleSaveNodeToFile = useCallback(async (nodeId: string) => {
+        const item = items.find(p => p.id === nodeId);
+        if (!item) {
+            addLog('WARNING', 'Cannot save an unknown item to a file.');
+            return;
+        }
+
+        if (item.type !== 'document') {
+            addLog('WARNING', 'Only documents can be saved to files.');
+            return;
+        }
+
+        try {
+            const result = await exportDocumentToFile(item);
+            if (result.canceled) {
+                addLog('INFO', `Save to file canceled for document "${item.title}".`);
+                return;
+            }
+            const target = result.filePath ?? result.suggestedFileName;
+            addLog('INFO', `Document "${item.title}" saved to ${target}.`);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            addLog('ERROR', `Failed to save document "${item.title}" to a file: ${message}`);
+        }
+    }, [items, addLog]);
+
+    const handleSaveSelectionToFile = useCallback(() => {
+        const doc = items.find(item => selectedIds.has(item.id) && item.type === 'document');
+        if (!doc) {
+            return;
+        }
+        void handleSaveNodeToFile(doc.id);
+    }, [items, selectedIds, handleSaveNodeToFile]);
 
     const { metrics: activeFolderMetrics, documents: activeFolderDocuments } = useMemo(() => {
         if (!activeNode || activeNode.type !== 'folder') {
@@ -2459,6 +2494,7 @@ export const MainApp: React.FC = () => {
         { id: 'document-tree-move-selection-up', name: 'Move Selection Up', action: handleMoveSelectionUp, category: 'Document Tree', icon: ArrowUpIcon, shortcut: ['Alt', 'ArrowUp'], keywords: 'reorder move up tree' },
         { id: 'document-tree-move-selection-down', name: 'Move Selection Down', action: handleMoveSelectionDown, category: 'Document Tree', icon: ArrowDownIcon, shortcut: ['Alt', 'ArrowDown'], keywords: 'reorder move down tree' },
         { id: 'document-tree-copy-content', name: 'Copy Document Content', action: handleCopySelectionContent, category: 'Document Tree', icon: CopyIcon, shortcut: ['Control', 'Shift', 'C'], keywords: 'copy clipboard tree content' },
+        { id: 'document-tree-save-to-file', name: 'Save Document to File', action: handleSaveSelectionToFile, category: 'Document Tree', icon: SaveIcon, keywords: 'save export download file tree document' },
         { id: 'format-document', name: 'Format Document', action: handleFormatDocument, category: 'Editor', icon: FormatIcon, shortcut: ['Control', 'Shift', 'F'], keywords: 'beautify pretty print clean code' },
         { id: 'toggle-command-palette', name: 'Toggle Command Palette', action: handleToggleCommandPalette, category: 'View', icon: CommandIcon, shortcut: ['Control', 'Shift', 'P'], keywords: 'find action go to' },
         { id: 'toggle-editor', name: 'Switch to Editor View', action: () => { addLog('INFO', 'Command: Switch to Editor View.'); setView('editor'); }, category: 'View', icon: PencilIcon, keywords: 'main document' },
@@ -2466,7 +2502,7 @@ export const MainApp: React.FC = () => {
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -2495,6 +2531,7 @@ export const MainApp: React.FC = () => {
         const menuItems: MenuItem[] = [];
         const selectedNodes = items.filter(item => currentSelection.has(item.id));
         const hasDocuments = selectedNodes.some(n => n.type === 'document');
+        const primaryDocument = selectedNodes.find(n => n.type === 'document');
         const firstSelectedNode = nodeId ? items.find(i => i.id === nodeId) : null;
         const parentIdForNewItem = firstSelectedNode?.type === 'folder' ? firstSelectedNode.id : firstSelectedNode?.parentId ?? null;
         
@@ -2521,7 +2558,8 @@ export const MainApp: React.FC = () => {
                 { label: 'Rename', icon: PencilIcon, action: () => handleStartRenamingNode(nodeId), disabled: currentSelection.size !== 1, shortcut: getCommand('rename-item')?.shortcutString },
                 { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0, shortcut: getCommand('duplicate-item')?.shortcutString },
                 { type: 'separator' },
-                { label: 'Copy Content', icon: CopyIcon, action: () => hasDocuments && handleCopyNodeContent(selectedNodes.find(n => n.type === 'document')!.id), disabled: !hasDocuments},
+                { label: 'Copy Content', icon: CopyIcon, action: () => primaryDocument && handleCopyNodeContent(primaryDocument.id), disabled: !primaryDocument},
+                { label: 'Save to File…', icon: SaveIcon, action: () => { if (primaryDocument) { void handleSaveNodeToFile(primaryDocument.id); } }, disabled: !primaryDocument, shortcut: getCommand('document-tree-save-to-file')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Delete', icon: TrashIcon, action: () => handleDeleteSelection(currentSelection), disabled: currentSelection.size === 0, shortcut: getCommand('delete-item')?.shortcutString }
             );
@@ -2540,7 +2578,7 @@ export const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -2828,6 +2866,7 @@ export const MainApp: React.FC = () => {
                                         onNewFromClipboard={() => { void handleNewDocumentFromClipboard(); }}
                                         onDuplicateSelection={handleDuplicateSelection}
                                         onCopyNodeContent={handleCopyNodeContent}
+                                        onSaveNodeToFile={handleSaveNodeToFile}
                                         expandedFolderIds={expandedFolderIds}
                                         onToggleExpand={handleToggleExpand}
                                         onExpandAll={handleExpandAll}

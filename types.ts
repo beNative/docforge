@@ -52,8 +52,17 @@ declare global {
       maximizeWindow: () => void;
       closeWindow: () => void;
       onWindowStateChange: (callback: (state: { isMaximized: boolean }) => void) => () => void;
-      saveLog: (defaultFilename: string, content: string) => Promise<{ success: boolean; error?: string }>;
-      settingsExport: (content: string) => Promise<{ success: boolean; error?: string }>;
+      saveLog: (
+        defaultFilename: string,
+        content: string
+      ) => Promise<{ success: boolean; error?: string; canceled?: boolean; filePath?: string }>;
+      settingsExport: (
+        content: string
+      ) => Promise<{ success: boolean; error?: string; canceled?: boolean; filePath?: string }>;
+      saveDocument: (
+        options: { defaultPath: string; filters: { name: string; extensions: string[] }[]; title?: string },
+        payload: SaveFilePayload
+      ) => Promise<{ success: boolean; error?: string; canceled?: boolean; filePath?: string }>;
       settingsImport: () => Promise<{ success: boolean; content?: string; error?: string }>;
       readDoc: (filename: string) => Promise<{ success: true; content: string } | { success: false; error: string }>;
       pythonListEnvironments: () => Promise<PythonEnvironmentConfig[]>;
@@ -135,6 +144,10 @@ export interface UpdateErrorPayload {
 export type NodeType = 'folder' | 'document';
 export type DocType = 'prompt' | 'source_code' | 'pdf' | 'image';
 export type ClassificationSource = 'auto' | 'user' | 'imported' | 'unknown';
+
+export type SaveFilePayload =
+  | { kind: 'text'; content: string; encoding?: 'utf-8' | 'utf8' }
+  | { kind: 'binary'; data: Uint8Array };
 
 export interface ClassificationSummary {
   languageHint: string | null;
