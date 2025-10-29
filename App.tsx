@@ -2887,6 +2887,7 @@ export const MainApp: React.FC = () => {
                                         onNewFromClipboard={() => { void handleNewDocumentFromClipboard(); }}
                                         onDuplicateSelection={handleDuplicateSelection}
                                         onToggleActiveDocumentLock={() => { void handleToggleActiveDocumentLock(); }}
+                                        onToggleNodeLock={(id, locked) => { void handleSetNodeLockState(id, locked); }}
                                         onCopyNodeContent={handleCopyNodeContent}
                                         onSaveNodeToFile={handleSaveNodeToFile}
                                         expandedFolderIds={expandedFolderIds}
