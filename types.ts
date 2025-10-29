@@ -91,6 +91,7 @@ declare global {
         callback: (payload: { language: ScriptLanguage; runId: string; status: ScriptExecutionStatus }) => void
       ) => () => void;
     };
+    __DOCFORGE_SCRIPT_PREVIEW__?: ScriptExecutionBridge;
   }
   // This is for the Electron main process, to add properties attached by Electron.
   namespace NodeJS {
@@ -255,6 +256,8 @@ export interface PythonRunRequestPayload {
 
 export type ScriptLanguage = 'shell' | 'powershell';
 
+export type ScriptExecutionMode = 'run' | 'test';
+
 export interface ScriptExecutionDefaults {
   environmentVariables: Record<string, string>;
   workingDirectory: string | null;
@@ -269,6 +272,7 @@ export interface ScriptRunRequestPayload {
   workingDirectory: string | null;
   executable: string | null;
   overrides: Record<string, string>;
+  mode: ScriptExecutionMode;
 }
 
 export type ScriptExecutionStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
@@ -277,6 +281,7 @@ export interface ScriptExecutionRun {
   runId: string;
   nodeId: string;
   language: ScriptLanguage;
+  mode: ScriptExecutionMode;
   status: ScriptExecutionStatus;
   startedAt: string;
   finishedAt: string | null;
@@ -290,6 +295,29 @@ export interface ScriptExecutionLogEntry {
   timestamp: string;
   level: 'INFO' | 'ERROR';
   message: string;
+}
+
+export interface ScriptExecutionBridge {
+  scriptGetNodeSettings(nodeId: string, language: ScriptLanguage): Promise<NodeScriptSettings>;
+  scriptUpdateNodeSettings(
+    nodeId: string,
+    language: ScriptLanguage,
+    updates: ScriptNodeSettingsUpdate
+  ): Promise<NodeScriptSettings>;
+  scriptRun(payload: ScriptRunRequestPayload): Promise<ScriptExecutionRun>;
+  scriptGetRunsForNode(
+    nodeId: string,
+    language: ScriptLanguage,
+    limit?: number
+  ): Promise<ScriptExecutionRun[]>;
+  scriptGetRunLogs(runId: string): Promise<ScriptExecutionLogEntry[]>;
+  scriptGetRun(runId: string): Promise<ScriptExecutionRun | null>;
+  onScriptRunLog(
+    callback: (payload: { language: ScriptLanguage; runId: string; entry: ScriptExecutionLogEntry }) => void
+  ): () => void;
+  onScriptRunStatus(
+    callback: (payload: { language: ScriptLanguage; runId: string; status: ScriptExecutionStatus }) => void
+  ): () => void;
 }
 
 export interface NodeScriptSettings {

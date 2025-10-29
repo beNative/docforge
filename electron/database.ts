@@ -248,7 +248,7 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
     console.log('Database does not exist, creating new one...');
     connection.exec(INITIAL_SCHEMA);
     // Set PRAGMAs for a new database
-    connection.pragma('user_version = 5');
+    connection.pragma('user_version = 6');
     connection.exec('PRAGMA journal_mode = WAL;');
     connection.exec('PRAGMA foreign_keys = ON;');
     console.log('Database created and schema applied.');
@@ -397,6 +397,7 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
             run_id TEXT PRIMARY KEY,
             node_id TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
             language TEXT NOT NULL,
+            mode TEXT NOT NULL DEFAULT 'run',
             status TEXT NOT NULL,
             started_at TEXT NOT NULL,
             finished_at TEXT,
@@ -438,6 +439,19 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
       console.log('Migration to version 5 complete.');
     } catch (e) {
       console.error('Fatal: Failed to migrate database to version 5:', e);
+    }
+  }
+
+  if (currentVersion < 6) {
+    try {
+      const transaction = connection.transaction(() => {
+        connection.exec("ALTER TABLE script_execution_runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'run';");
+        connection.pragma('user_version = 6');
+      });
+      transaction();
+      console.log('Migration to version 6 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 6:', e);
     }
   }
 };

@@ -10,12 +10,14 @@ import { databaseService } from './database';
 import type {
   NodeScriptSettings,
   ScriptExecutionLogEntry,
+  ScriptExecutionMode,
   ScriptExecutionRun,
   ScriptExecutionStatus,
   ScriptLanguage,
   ScriptNodeSettingsUpdate,
   ScriptRunRequestPayload,
 } from '../types';
+import { buildScriptArguments, supportsTestMode } from './scriptArgs';
 
 const scriptEvents = new EventEmitter();
 
@@ -92,21 +94,6 @@ const resolveExecutable = (language: ScriptLanguage, preferred: string | null): 
   return process.platform === 'win32' ? 'bash' : '/bin/bash';
 };
 
-const buildArgs = (language: ScriptLanguage, executable: string, scriptPath: string): string[] => {
-  if (language === 'powershell') {
-    const args = ['-NoLogo', '-NoProfile', '-NonInteractive'];
-    if (process.platform === 'win32' && executable.toLowerCase().includes('powershell')) {
-      args.push('-ExecutionPolicy', 'Bypass');
-    }
-    args.push('-File', scriptPath);
-    return args;
-  }
-  if (executable.endsWith('.cmd') || executable.toLowerCase().includes('cmd.exe')) {
-    return ['/c', scriptPath];
-  }
-  return [scriptPath];
-};
-
 const loadNodeScriptSettings = (row: any, nodeId: string, language: ScriptLanguage): NodeScriptSettings => {
   const envVars = row?.env_vars_json ? JSON.parse(row.env_vars_json) : {};
   return {
@@ -158,14 +145,14 @@ export const scriptRunner = {
   },
 
   async runScript(payload: ScriptRunRequestPayload): Promise<ScriptExecutionRun> {
-    const { nodeId, language, code, environmentVariables, workingDirectory, executable, overrides } = payload;
+    const { nodeId, language, code, environmentVariables, workingDirectory, executable, overrides, mode } = payload;
     const runId = uuidv4();
     const startedAt = new Date().toISOString();
 
     databaseService.run(
-      `INSERT INTO script_execution_runs (run_id, node_id, language, status, started_at)
-       VALUES (?, ?, ?, ?, ?)` ,
-      [runId, nodeId, language, 'running', startedAt]
+      `INSERT INTO script_execution_runs (run_id, node_id, language, mode, status, started_at)
+       VALUES (?, ?, ?, ?, ?, ?)` ,
+      [runId, nodeId, language, mode, 'running', startedAt]
     );
 
     databaseService.run(
@@ -188,11 +175,38 @@ export const scriptRunner = {
       ]
     );
 
-    appendRunLog(language, runId, 'INFO', `Starting ${language} script execution.`);
+    const modeLabel = mode === 'test' ? 'test' : 'execution';
+    appendRunLog(language, runId, 'INFO', `Starting ${language} script ${modeLabel}.`);
 
     const env = normalizeEnv(environmentVariables ?? {});
     const resolvedExecutable = resolveExecutable(language, executable);
     const { filePath, dir } = await writeScriptToTempFile(language, code);
+
+    if (mode === 'test' && !supportsTestMode(language, resolvedExecutable)) {
+      const message = `Test mode is not supported for executable "${resolvedExecutable}". Choose a POSIX-compatible shell for syntax checks.`;
+      const finishedAt = new Date().toISOString();
+      appendRunLog(language, runId, 'ERROR', message);
+      updateRunStatus(runId, 'failed', {
+        finishedAt,
+        exitCode: null,
+        errorMessage: message,
+        durationMs: 0,
+      });
+      scriptEvents.emit('run-status', { language, runId, status: 'failed' as ScriptExecutionStatus });
+      await cleanupTempDir(dir);
+      return {
+        runId,
+        nodeId,
+        language,
+        mode,
+        status: 'failed',
+        startedAt,
+        finishedAt,
+        exitCode: null,
+        errorMessage: message,
+        durationMs: 0,
+      };
+    }
 
     const startTime = Date.now();
 
@@ -203,7 +217,8 @@ export const scriptRunner = {
     ) => {
       const finishedAt = new Date().toISOString();
       if (status === 'succeeded') {
-        appendRunLog(language, runId, 'INFO', 'Execution completed successfully.');
+        const successMessage = mode === 'test' ? 'Syntax check completed successfully.' : 'Execution completed successfully.';
+        appendRunLog(language, runId, 'INFO', successMessage);
       } else if (errorMessage) {
         appendRunLog(language, runId, 'ERROR', errorMessage);
       }
@@ -217,7 +232,7 @@ export const scriptRunner = {
       await cleanupTempDir(dir);
     };
 
-    const childArgs = buildArgs(language, resolvedExecutable, filePath);
+    const childArgs = buildScriptArguments(language, resolvedExecutable, filePath, mode);
 
     let child: ChildProcess;
     try {
@@ -266,6 +281,7 @@ export const scriptRunner = {
       runId,
       nodeId,
       language,
+      mode,
       status: 'running',
       startedAt,
       finishedAt: null,
@@ -283,7 +299,7 @@ export const scriptRunner = {
     limit = 20
   ): Promise<ScriptExecutionRun[]> {
     const rows = databaseService.all(
-      `SELECT run_id, node_id, language, status, started_at, finished_at, exit_code, error_message, duration_ms
+      `SELECT run_id, node_id, language, mode, status, started_at, finished_at, exit_code, error_message, duration_ms
        FROM script_execution_runs
        WHERE node_id = ? AND language = ?
        ORDER BY datetime(started_at) DESC
@@ -294,6 +310,7 @@ export const scriptRunner = {
       runId: row.run_id,
       nodeId: row.node_id,
       language: row.language,
+      mode: row.mode as ScriptExecutionMode,
       status: row.status,
       startedAt: row.started_at,
       finishedAt: row.finished_at ?? null,
@@ -318,7 +335,7 @@ export const scriptRunner = {
 
   async getRun(runId: string): Promise<ScriptExecutionRun | null> {
     const row = databaseService.get(
-      `SELECT run_id, node_id, language, status, started_at, finished_at, exit_code, error_message, duration_ms
+      `SELECT run_id, node_id, language, mode, status, started_at, finished_at, exit_code, error_message, duration_ms
        FROM script_execution_runs WHERE run_id = ?`,
       [runId]
     );
@@ -329,6 +346,7 @@ export const scriptRunner = {
       runId: row.run_id,
       nodeId: row.node_id,
       language: row.language,
+      mode: row.mode as ScriptExecutionMode,
       status: row.status,
       startedAt: row.started_at,
       finishedAt: row.finished_at ?? null,

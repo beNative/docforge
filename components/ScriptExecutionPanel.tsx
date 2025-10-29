@@ -3,6 +3,7 @@ import type {
   NodeScriptSettings,
   ScriptExecutionDefaults,
   ScriptExecutionLogEntry,
+  ScriptExecutionMode,
   ScriptExecutionRun,
   ScriptLanguage,
 } from '../types';
@@ -51,7 +52,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
   const [runHistory, setRunHistory] = useState<ScriptExecutionRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<ScriptExecutionLogEntry[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
+  const [activeRunMode, setActiveRunMode] = useState<ScriptExecutionMode | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -151,7 +152,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
           addLog('ERROR', `Failed to refresh ${language} run history: ${message}`);
         });
         if (runId === selectedRunId) {
-          setIsRunning(false);
+          setActiveRunMode(null);
         }
       }
     });
@@ -182,7 +183,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
     }
   }, [parseEnvJson, nodeId, language, workingDirectory, executable, addLog]);
 
-  const handleRun = useCallback(async () => {
+  const handleRun = useCallback(async (mode: ScriptExecutionMode) => {
     const parsed = parseEnvJson();
     if (!parsed) {
       setRunError('Fix environment variable errors before running.');
@@ -190,7 +191,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
     }
     setRunError(null);
     try {
-      setIsRunning(true);
+      setActiveRunMode(mode);
       const mergedEnv: Record<string, string> = { ...defaults.environmentVariables, ...parsed };
       const run = await scriptService.runScript({
         nodeId,
@@ -200,17 +201,18 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
         workingDirectory: workingDirectory.trim() ? workingDirectory.trim() : (defaults.workingDirectory ?? null),
         executable: executable.trim() ? executable.trim() : (defaults.executable ?? null),
         overrides: parsed,
+        mode,
       });
       setSelectedRunId(run.runId);
       setLogEntries([]);
       setRunHistory((prev) => [run, ...prev]);
       setIsConfigDirty(false);
-      addLog('INFO', `${label} started.`);
+      addLog('INFO', `${mode === 'test' ? `${label} test` : label} started.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setRunError(message);
-      setIsRunning(false);
-      addLog('ERROR', `${label} failed to start: ${message}`);
+      setActiveRunMode(null);
+      addLog('ERROR', `${mode === 'test' ? `${label} test` : label} failed to start: ${message}`);
     }
   }, [parseEnvJson, defaults.environmentVariables, defaults.workingDirectory, defaults.executable, nodeId, language, code, workingDirectory, executable, addLog, label]);
 
@@ -272,9 +274,18 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
               Save Config
             </Button>
             <Button
-              onClick={handleRun}
-              isLoading={isRunning}
-              disabled={!code.trim() || !!envError}
+              variant="secondary"
+              onClick={() => handleRun('test')}
+              isLoading={activeRunMode === 'test'}
+              disabled={!code.trim() || !!envError || activeRunMode !== null}
+              className="px-2.5 py-1 text-[11px]"
+            >
+              <TerminalIcon className="w-3.5 h-3.5 mr-1" /> Test Script
+            </Button>
+            <Button
+              onClick={() => handleRun('run')}
+              isLoading={activeRunMode === 'run'}
+              disabled={!code.trim() || !!envError || activeRunMode !== null}
               className="px-2.5 py-1 text-[11px]"
             >
               <TerminalIcon className="w-3.5 h-3.5 mr-1" /> Run Script
@@ -363,7 +374,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
                       onClick={() => setSelectedRunId(run.runId)}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-text-main">{run.status.toUpperCase()}</span>
+                        <span className="font-semibold text-text-main">{run.mode.toUpperCase()} • {run.status.toUpperCase()}</span>
                         <span className="text-text-secondary">{formatTimestamp(run.startedAt)}</span>
                       </div>
                       <div className="mt-1 text-text-secondary">
