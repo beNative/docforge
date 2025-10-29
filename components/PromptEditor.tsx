@@ -287,14 +287,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [formatTrigger]);
 
   // --- Resizable Splitter Logic ---
-  const handleSplitterMouseDown = (e: React.MouseEvent) => {
+  const handleSplitterMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isResizing.current = true;
     // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
     document.body.style.userSelect = 'none';
     // Fix: The 'document' prop was shadowing the global 'document' object. Renamed the prop to 'documentNode' to resolve this.
     document.body.style.cursor = viewMode === 'split-vertical' ? 'col-resize' : 'row-resize';
-  };
+  }, [viewMode]);
 
   const handleGlobalMouseUp = useCallback(() => {
     isResizing.current = false;
@@ -587,81 +587,128 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     target.addEventListener('pointercancel', handlePointerCancel);
   }, [scriptPanelHeight, scriptPanelMinHeight]);
   
-  const renderContent = () => {
-    const editor = isDiffMode
-      ? (
-          <MonacoDiffEditor
-            oldText={baselineContent}
-            newText={content}
-            language={language}
-            renderMode="inline"
-            readOnly={false}
-            onChange={setContent}
-            onScroll={handleEditorScroll}
-            fontFamily={settings.editorFontFamily}
-            fontSize={settings.editorFontSize}
-            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
-            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
-          />
-        )
-      : (
-          <MonacoEditor
-            ref={editorRef}
-            content={content}
-            language={language}
-            onChange={setContent}
-            onScroll={handleEditorScroll}
-            customShortcuts={settings.customShortcuts}
-            fontFamily={settings.editorFontFamily}
-            fontSize={settings.editorFontSize}
-            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
-            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
-          />
-        );
-    const preview = (
-      <PreviewPane
-        ref={previewScrollRef}
+  const editor = useMemo(() => {
+    if (isDiffMode) {
+      return (
+        <MonacoDiffEditor
+          oldText={baselineContent}
+          newText={content}
+          language={language}
+          renderMode="inline"
+          readOnly={false}
+          onChange={setContent}
+          onScroll={handleEditorScroll}
+          fontFamily={settings.editorFontFamily}
+          fontSize={settings.editorFontSize}
+          activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+          activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+        />
+      );
+    }
+
+    return (
+      <MonacoEditor
+        ref={editorRef}
         content={content}
         language={language}
-        onScroll={handlePreviewScroll}
-        addLog={addLog}
-        settings={settings}
-        previewScale={previewScale}
-        onPreviewScaleChange={onPreviewScaleChange}
-        previewZoomOptions={previewZoomOptions}
-        previewResetSignal={previewResetSignal}
-        onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
-        onMetadataChange={onPreviewMetadataChange}
+        onChange={setContent}
+        onScroll={handleEditorScroll}
+        customShortcuts={settings.customShortcuts}
+        fontFamily={settings.editorFontFamily}
+        fontSize={settings.editorFontSize}
+        activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+        activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
       />
     );
-    
-    switch(viewMode) {
-        case 'edit': return editor;
-        case 'preview': return supportsPreview ? preview : editor;
-        case 'split-vertical':
-            return (
-                <div ref={splitContainerRef} className="grid h-full" style={{ gridTemplateColumns: `${splitSize}% auto minmax(0, 1fr)` }}>
-                    <div className="h-full overflow-hidden min-w-0">{editor}</div>
-                    <div
-                      onMouseDown={handleSplitterMouseDown}
-                      className="w-1.5 h-full cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
-                    />
-                    <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
-                </div>
-            );
-        case 'split-horizontal':
-            return (
-                <div ref={splitContainerRef} className="grid w-full h-full" style={{ gridTemplateRows: `${splitSize}% auto minmax(0, 1fr)` }}>
-                    <div className="w-full overflow-hidden min-h-0">{editor}</div>
-                    <div
-                      onMouseDown={handleSplitterMouseDown}
-                      className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
-                    />
-                    <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
-                </div>
-            );
+  }, [
+    baselineContent,
+    content,
+    handleEditorScroll,
+    isDiffMode,
+    language,
+    settings.customShortcuts,
+    settings.editorActiveLineHighlightColor,
+    settings.editorActiveLineHighlightColorDark,
+    settings.editorFontFamily,
+    settings.editorFontSize,
+  ]);
+
+  const preview = useMemo(() => (
+    <PreviewPane
+      ref={previewScrollRef}
+      content={content}
+      language={language}
+      onScroll={handlePreviewScroll}
+      addLog={addLog}
+      settings={settings}
+      previewScale={previewScale}
+      onPreviewScaleChange={onPreviewScaleChange}
+      previewZoomOptions={previewZoomOptions}
+      previewResetSignal={previewResetSignal}
+      onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
+      onMetadataChange={onPreviewMetadataChange}
+    />
+  ), [
+    addLog,
+    content,
+    handlePreviewScroll,
+    language,
+    onPreviewMetadataChange,
+    onPreviewScaleChange,
+    onPreviewZoomAvailabilityChange,
+    previewResetSignal,
+    previewScale,
+    previewZoomOptions,
+    settings,
+  ]);
+
+  const contentView = useMemo(() => {
+    switch (viewMode) {
+      case 'edit':
+        return editor;
+      case 'preview':
+        return supportsPreview ? preview : editor;
+      case 'split-vertical':
+        return (
+          <div
+            ref={splitContainerRef}
+            className="grid h-full"
+            style={{ gridTemplateColumns: `${splitSize}% auto minmax(0, 1fr)` }}
+          >
+            <div className="h-full overflow-hidden min-w-0">{editor}</div>
+            <div
+              onMouseDown={handleSplitterMouseDown}
+              className="w-1.5 h-full cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
+            />
+            <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
+          </div>
+        );
+      case 'split-horizontal':
+        return (
+          <div
+            ref={splitContainerRef}
+            className="grid w-full h-full"
+            style={{ gridTemplateRows: `${splitSize}% auto minmax(0, 1fr)` }}
+          >
+            <div className="w-full overflow-hidden min-h-0">{editor}</div>
+            <div
+              onMouseDown={handleSplitterMouseDown}
+              className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
+            />
+            <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
+          </div>
+        );
+      default:
+        return editor;
     }
-  }
+  }, [
+    editor,
+    handleSplitterMouseDown,
+    preview,
+    splitSize,
+    supportsPreview,
+    viewMode,
+  ]);
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
@@ -739,7 +786,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             <IconButton onClick={handleDeleteDocument} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
         </div>
       </div>
-      <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>
+      <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{contentView}</div>
       {isPythonDocument && (
         <div
           className="flex-shrink-0 flex flex-col bg-secondary"
