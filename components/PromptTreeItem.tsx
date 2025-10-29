@@ -134,9 +134,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const [renameValue, setRenameValue] = useState(node.title);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside' | null>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [lockedRowHeight, setLockedRowHeight] = useState<number | null>(null);
 
   const renameInputRef = useRef<HTMLInputElement>(null);
   const itemRef = useRef<HTMLLIElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
 
   const isSelected = selectedIds.has(node.id);
   const isFocused = focusedItemId === node.id;
@@ -315,11 +317,25 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       data-item-id={node.id}
     >
         <div
+            ref={rowRef}
             onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
             onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            style={{ paddingTop: `${paddingTopBottom}px`, paddingBottom: `${paddingTopBottom}px`, paddingLeft: `${rowPaddingLeft}px` }}
+            onMouseEnter={() => {
+                if (rowRef.current) {
+                    setLockedRowHeight(rowRef.current.getBoundingClientRect().height);
+                }
+                setIsHovered(true);
+            }}
+            onMouseLeave={() => {
+                setIsHovered(false);
+                setLockedRowHeight(null);
+            }}
+            style={{
+                paddingTop: `${paddingTopBottom}px`,
+                paddingBottom: `${paddingTopBottom}px`,
+                paddingLeft: `${rowPaddingLeft}px`,
+                minHeight: lockedRowHeight !== null ? `${lockedRowHeight}px` : undefined,
+            }}
             className={`w-full text-left pr-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
                 isSelected ? 'bg-tree-selected text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
             } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
@@ -360,7 +376,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                 ) : (
-                    <span className="flex-1 px-1 truncate">
+                    <span
+                        className={`flex-1 px-1 ${
+                            areActionsVisible ? 'truncate' : 'whitespace-normal break-words'
+                        }`}
+                    >
                         {highlightMatches(displayTitle, searchTerm)}
                     </span>
                 )}
