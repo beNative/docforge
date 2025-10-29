@@ -11,7 +11,7 @@ import Button from './Button';
 import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
 import MonacoDiffEditor from './MonacoDiffEditor';
 import PreviewPane from './PreviewPane';
-import { SUPPORTED_LANGUAGES } from '../services/languageService';
+import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
 import ScriptExecutionPanel from './ScriptExecutionPanel';
 
@@ -759,7 +759,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             )}
         </div>
         <div className="flex items-center gap-2">
-            <div className="flex items-center"><label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">Language:</label><select id="language-select" value={language} onChange={(e) => onLanguageChange(e.target.value)} className="bg-background text-text-main text-xs rounded-md py-0.5 pl-2 pr-6 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none" style={{ backgroundImage: 'var(--select-arrow-background)', backgroundPosition: 'right 0.1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.2em 1.2em' }}>{SUPPORTED_LANGUAGES.map(lang => (<option key={lang.id} value={lang.id}>{lang.label}</option>))}</select></div>
+            <div className="flex items-center">
+              <label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">
+                Language:
+              </label>
+              <LanguageDropdown id="language-select" value={language} onChange={onLanguageChange} />
+            </div>
             <div className="h-5 w-px bg-border-color mx-1"></div>
             {supportsPreview && (
               <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
