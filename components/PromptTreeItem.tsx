@@ -133,6 +133,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(node.title);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside' | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
 
   const renameInputRef = useRef<HTMLInputElement>(null);
   const itemRef = useRef<HTMLLIElement>(null);
@@ -315,12 +316,14 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         <div
             onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
             onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
             style={{ paddingTop: `${paddingTopBottom}px`, paddingBottom: `${paddingTopBottom}px`, paddingLeft: `${rowPaddingLeft}px` }}
             className={`w-full text-left pr-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
                 isSelected ? 'bg-tree-selected text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
             } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
         >
-            <div className="flex items-center gap-1.5 flex-1 truncate">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
                 {isFolder && node.children.length > 0 ? (
                     <button onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }} className="-ml-1 p-0.5 rounded hover:bg-border-color">
                         {isExpanded ? <ChevronDownIcon className="w-3.5 h-3.5" /> : <ChevronRightIcon className="w-3.5 h-3.5" />}
@@ -356,7 +359,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                 ) : (
-                    <span className="truncate flex-1 px-1">{highlightMatches(displayTitle, searchTerm)}</span>
+                    <span
+                        className={`flex-1 px-1 ${isSelected || isFocused || isHovered ? 'truncate' : 'break-words'}`}
+                    >
+                        {highlightMatches(displayTitle, searchTerm)}
+                    </span>
                 )}
             </div>
 
