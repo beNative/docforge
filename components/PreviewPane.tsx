@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import deepEqual from 'fast-deep-equal';
 import { previewService } from '../services/previewService';
 import Spinner from './Spinner';
 import { useTheme } from '../hooks/useTheme';
@@ -151,10 +152,10 @@ const arePreviewPanePropsEqual = (prev: Readonly<PreviewPaneProps>, next: Readon
   if (prev.content !== next.content) return false;
   if (prev.language !== next.language) return false;
   if (prev.addLog !== next.addLog) return false;
-  if (prev.settings !== next.settings) return false;
+  if (!deepEqual(prev.settings, next.settings)) return false;
   if (prev.previewScale !== next.previewScale) return false;
   if (prev.onPreviewScaleChange !== next.onPreviewScaleChange) return false;
-  if (prev.previewZoomOptions !== next.previewZoomOptions) return false;
+  if (!deepEqual(prev.previewZoomOptions, next.previewZoomOptions)) return false;
   if (prev.previewResetSignal !== next.previewResetSignal) return false;
   if (prev.onPreviewZoomAvailabilityChange !== next.onPreviewZoomAvailabilityChange) return false;
   if (prev.onMetadataChange !== next.onMetadataChange) return false;
