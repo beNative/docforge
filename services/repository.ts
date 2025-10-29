@@ -95,6 +95,7 @@ const createSampleBrowserState = (): BrowserState => {
       sort_order: 0,
       created_at: now,
       updated_at: now,
+      locked: false,
       document,
     };
 
@@ -119,6 +120,7 @@ const createSampleBrowserState = (): BrowserState => {
       sort_order: 1,
       created_at: now,
       updated_at: now,
+      locked: false,
       document: shellDocument,
     };
 
@@ -143,6 +145,7 @@ const createSampleBrowserState = (): BrowserState => {
       sort_order: 2,
       created_at: now,
       updated_at: now,
+      locked: false,
       document: powershellDocument,
     };
 
@@ -154,6 +157,7 @@ const createSampleBrowserState = (): BrowserState => {
       sort_order: 0,
       created_at: now,
       updated_at: now,
+      locked: false,
       children: [documentNode, shellNode, powershellNode],
     };
 
@@ -214,6 +218,9 @@ const loadBrowserState = (): BrowserState => {
         const parsed = JSON.parse(raw) as BrowserState;
         // Ensure arrays exist and sort orders are respected.
         sortNodeTree(parsed.nodes);
+        mapNodeTree(parsed.nodes, node => {
+            node.locked = Boolean(node.locked);
+        });
         return parsed;
     } catch {
         return createSampleBrowserState();
@@ -669,6 +676,7 @@ export const repository = {
                 sort_order: record.sort_order,
                 created_at: record.created_at,
                 updated_at: record.updated_at,
+                locked: Boolean(record.is_locked),
                 children: [],
                 document: record.document_id ? {
                     document_id: record.document_id,
@@ -828,6 +836,7 @@ export const repository = {
                 sort_order: 0,
                 created_at: now,
                 updated_at: now,
+                locked: Boolean(nodeData.locked),
             };
 
             let siblings: Node[];
@@ -894,8 +903,8 @@ export const repository = {
         const sortOrder = (maxSortOrderResult?.max_order ?? -1) + 1;
 
         await window.electronAPI!.dbRun(
-            `INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [newNodeId, nodeData.parent_id, nodeData.node_type, nodeData.title, sortOrder, now, now]
+            `INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [newNodeId, nodeData.parent_id, nodeData.node_type, nodeData.title, sortOrder, now, now, nodeData.locked ? 1 : 0]
         );
 
         if (nodeData.node_type === 'document' && nodeData.document) {
@@ -918,7 +927,20 @@ export const repository = {
         }
 
         const createdNode = await window.electronAPI!.dbGet(`SELECT * FROM nodes WHERE node_id = ?`, [newNodeId]);
-        return createdNode as Node;
+        if (!createdNode) {
+            throw new Error('Failed to fetch created node.');
+        }
+
+        return {
+            node_id: createdNode.node_id,
+            parent_id: createdNode.parent_id,
+            node_type: createdNode.node_type,
+            title: createdNode.title,
+            sort_order: createdNode.sort_order,
+            created_at: createdNode.created_at,
+            updated_at: createdNode.updated_at,
+            locked: Boolean(createdNode.is_locked),
+        } as Node;
     },
     async createDocumentFromClipboard({ parentId, content, title }: { parentId: string | null; content: string; title?: string | null; }): Promise<{ node: Node; summary: ClassificationSummary }> {
         const effectiveContent = content ?? '';
@@ -1025,6 +1047,10 @@ export const repository = {
                 throw new Error(`No document found for node ${nodeId}`);
             }
 
+            if (node.locked) {
+                throw new Error('Document is locked and cannot be modified.');
+            }
+
             const docId = node.document.document_id;
             const now = new Date().toISOString();
             node.document.content = newContent;
@@ -1045,12 +1071,23 @@ export const repository = {
             return;
         }
 
-        let docId = documentId;
-        if (!docId) {
-            const doc = await window.electronAPI!.dbGet(`SELECT document_id FROM documents WHERE node_id = ?`, [nodeId]);
-            if (!doc) throw new Error(`No document found for node ${nodeId}`);
-            docId = doc.document_id;
+        const docRecord = await window.electronAPI!.dbGet(
+            `SELECT d.document_id as document_id, n.is_locked as is_locked
+             FROM documents d
+             JOIN nodes n ON n.node_id = d.node_id
+             WHERE d.node_id = ?`,
+            [nodeId],
+        );
+
+        if (!docRecord) {
+            throw new Error(`No document found for node ${nodeId}`);
         }
+
+        if (docRecord.is_locked) {
+            throw new Error('Document is locked and cannot be modified.');
+        }
+
+        const docId = documentId ?? docRecord.document_id;
 
         const sha = await cryptoService.sha256(newContent);
 
@@ -1071,6 +1108,23 @@ export const repository = {
 
         await window.electronAPI!.dbRun(`UPDATE documents SET current_version_id = ? WHERE document_id = ?`, [newVersionId, docId]);
         await window.electronAPI!.dbRun(`UPDATE nodes SET updated_at = ? WHERE node_id = ?`, [new Date().toISOString(), nodeId]);
+    },
+
+    async setNodeLock(nodeId: string, locked: boolean) {
+        if (!isElectron) {
+            const state = ensureBrowserState();
+            const { node } = findNodeWithParent(nodeId, state.nodes);
+            if (!node) return;
+            node.locked = locked;
+            node.updated_at = new Date().toISOString();
+            persistBrowserState(state);
+            return;
+        }
+
+        await window.electronAPI!.dbRun(
+            `UPDATE nodes SET is_locked = ?, updated_at = ? WHERE node_id = ?`,
+            [locked ? 1 : 0, new Date().toISOString(), nodeId],
+        );
     },
     
     async deleteNode(nodeId: string) {
@@ -1284,6 +1338,7 @@ export const repository = {
                     sort_order: sortOrder,
                     created_at: now,
                     updated_at: now,
+                    locked: Boolean(node.locked),
                     children: [],
                 };
 
