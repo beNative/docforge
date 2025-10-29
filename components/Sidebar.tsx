@@ -38,6 +38,7 @@ interface SidebarProps {
   onNewFromClipboard: () => void;
   onDuplicateSelection: () => void;
   onToggleActiveDocumentLock: () => void;
+  onToggleNodeLock: (id: string, locked: boolean) => void | Promise<void>;
   onCopyNodeContent: (id: string) => void;
   onSaveNodeToFile: (id: string) => void;
   expandedFolderIds: Set<string>;
@@ -512,9 +513,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                                         onMoveNode={props.onMoveNode}
                     onImportNodes={props.onImportNodes}
                     onDropFiles={props.onDropFiles}
-                    onCopyNodeContent={props.onCopyNodeContent}
-                    copyContentTooltip={getTooltip('document-tree-copy-content', 'Copy Content')}
-                    onSaveNodeToFile={props.onSaveNodeToFile}
+                onCopyNodeContent={props.onCopyNodeContent}
+                onToggleLock={props.onToggleNodeLock}
+                getToggleLockTooltip={(locked) => getTooltip('toggle-document-lock', locked ? 'Unlock Document' : 'Lock Document')}
+                copyContentTooltip={getTooltip('document-tree-copy-content', 'Copy Content')}
+                onSaveNodeToFile={props.onSaveNodeToFile}
                     saveToFileTooltip={getTooltip('document-tree-save-to-file', 'Save to File')}
                     searchTerm={searchTerm}
                     expandedIds={props.expandedFolderIds}

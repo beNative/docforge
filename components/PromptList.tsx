@@ -22,6 +22,8 @@ interface DocumentListProps {
   copyContentTooltip: string;
   onSaveNodeToFile: (id: string) => void;
   saveToFileTooltip: string;
+  onToggleLock: (id: string, locked: boolean) => void | Promise<void>;
+  getToggleLockTooltip: (locked: boolean) => string;
   searchTerm: string;
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
@@ -51,6 +53,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
   copyContentTooltip,
   onSaveNodeToFile,
   saveToFileTooltip,
+  onToggleLock,
+  getToggleLockTooltip,
   searchTerm,
   expandedIds,
   onToggleExpand,
@@ -261,6 +265,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onToggleExpand={onToggleExpand}
                 onCopyNodeContent={onCopyNodeContent}
                 copyContentTooltip={copyContentTooltip}
+                onToggleLock={onToggleLock}
+                getToggleLockTooltip={getToggleLockTooltip}
                 onSaveNodeToFile={onSaveNodeToFile}
                 saveToFileTooltip={saveToFileTooltip}
                 searchTerm={searchTerm}

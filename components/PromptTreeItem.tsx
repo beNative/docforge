@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, SaveIcon } from './Icons';
+import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, SaveIcon, LockClosedIcon, LockOpenIcon } from './Icons';
 
 export interface DocumentNode extends DocumentOrFolder {
   children: DocumentNode[];
@@ -32,6 +32,8 @@ interface DocumentTreeItemProps {
   copyContentTooltip: string;
   onSaveNodeToFile: (id: string) => void;
   saveToFileTooltip: string;
+  onToggleLock: (id: string, locked: boolean) => void | Promise<void>;
+  getToggleLockTooltip: (locked: boolean) => string;
   isKnownNodeId: (id: string) => boolean;
   searchTerm: string;
   onMoveUp: (id: string) => void;
@@ -117,6 +119,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     copyContentTooltip,
     onSaveNodeToFile,
     saveToFileTooltip,
+    onToggleLock,
+    getToggleLockTooltip,
     onMoveUp,
     onMoveDown,
     canMoveUp,
@@ -406,6 +410,22 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                       <>
                         <IconButton onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }} tooltip={copyContentTooltip} size="xs" variant="ghost">
                           <CopyIcon className="w-3.5 h-3.5" />
+                        </IconButton>
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void onToggleLock(node.id, !node.locked);
+                          }}
+                          tooltip={getToggleLockTooltip(node.locked)}
+                          size="xs"
+                          variant="ghost"
+                          className={node.locked ? 'text-primary' : ''}
+                        >
+                          {node.locked ? (
+                            <LockClosedIcon className="w-3.5 h-3.5" />
+                          ) : (
+                            <LockOpenIcon className="w-3.5 h-3.5" />
+                          )}
                         </IconButton>
                         <IconButton onClick={(e) => { e.stopPropagation(); onSaveNodeToFile(node.id); }} tooltip={saveToFileTooltip} size="xs" variant="ghost">
                           <SaveIcon className="w-3.5 h-3.5" />
