@@ -238,11 +238,15 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
   }, [defaults.environmentVariables]);
 
   const headerContainerClasses = isCollapsed
-    ? 'flex items-center justify-between h-8 px-2'
+    ? 'flex items-center justify-between flex-shrink-0 px-2 py-1'
     : 'flex flex-wrap items-center justify-between gap-2 px-2 pt-2 pb-3 border-b border-border-color/50';
 
   return (
-    <div className={`flex flex-col text-sm text-text-main ${isCollapsed ? '' : 'h-full min-h-0'}`}>
+    <div
+      className={`flex flex-col text-sm text-text-main border-t border-border-color ${
+        isCollapsed ? '' : 'h-full min-h-0'
+      }`}
+    >
       <div className={headerContainerClasses}>
         <div className="flex items-center gap-2">
           <IconButton
