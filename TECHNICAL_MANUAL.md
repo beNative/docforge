@@ -97,6 +97,15 @@ This system provides a consistent and extensible editing experience for all docu
 -   **Renderer Plugins (`services/preview/`):** Each file format with a preview is supported by a dedicated renderer class that implements the `IRenderer` interface. This makes the system highly extensible: to support a new format, one only needs to create a new renderer class and add it to the `previewService` registry. The bundled plugins cover Markdown (with Mermaid + PlantUML support), standalone PlantUML documents, HTML, PDFs, common image formats, and a plaintext fallback renderer.
     -   Both the Markdown renderer and the standalone PlantUML renderer share the `PlantUMLDiagram` component, which routes diagrams through either the remote plantuml.com server or the offline Java-based IPC bridge depending on the active setting.
 
+### Script Execution Pipeline
+
+DocForge treats shell and PowerShell automation as first-class workflows that span the renderer and main processes.
+
+-   **Renderer orchestration (`components/ScriptExecutionPanel.tsx`):** Presents the UI for configuring per-document environment variables, working directory, and interpreter overrides. It merges those overrides with the defaults loaded from the settings context before dispatching a run.
+-   **IPC bridge (`services/scriptService.ts`):** Normalizes renderer requests into `scriptRun`, `scriptGetNodeSettings`, and related IPC calls. In preview builds it can swap to the mock bridge exposed by `preview/createScriptPreviewBridge.ts` so web previews behave consistently.
+-   **Main-process runner (`electron/scriptRunner.ts`):** Persists run metadata, writes temporary script files, and spawns the resolved executable. Test mode leverages `scriptArgs.ts` to compute syntax-only flags (for example, Bash `-n`, or a PowerShell `ScriptBlock` parser) and gracefully fails when an interpreter cannot support syntax checks. Streams from stdout/stderr are recorded to `script_execution_logs` and broadcast back to the renderer.
+-   **Defaults management:** Global defaults live in the `settings` table (`shellDefaults`, `powershellDefaults`) and are edited through `SettingsView.tsx`. When a run starts, the runner merges these defaults with per-document overrides so teams can set organization-wide variables while allowing individual scripts to customize their environment safely.
+
 ### LLM Service (`services/llmService.ts`)
 
 This module handles all communication with the external Large Language Model. It is largely unchanged by the database migration.

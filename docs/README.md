@@ -15,6 +15,7 @@ DocForge is a desktop application designed to streamline the process of creating
 - **AI-Powered Refinement:** Use your connected local LLM to automatically refine and improve your documents with a single click.
 - **Document Templating:** Create reusable document templates with variables to quickly generate new documents for recurring tasks.
 - **Integrated Python Workflow:** Open an inline Python console tied to your documents to execute snippets, review logs, and manage isolated environments without leaving DocForge.
+- **Shell & PowerShell Execution:** Run or syntax-test scripts directly from the editor with per-document environment overrides that merge with workspace defaults configured in Settings.
 - **Version History:** Explicitly save new versions of your documents. Manage your history by viewing diffs, deleting old versions, and restoring to any point in time.
 - **Local LLM Discovery:** Automatically detects running local LLM providers like Ollama and LM Studio for easy setup.
 - **Highly Customizable:**
