@@ -3,6 +3,7 @@ import type {
   NodeScriptSettings,
   ScriptExecutionDefaults,
   ScriptExecutionLogEntry,
+  ScriptExecutionMode,
   ScriptExecutionRun,
   ScriptLanguage,
 } from '../types';
@@ -10,6 +11,7 @@ import Button from './Button';
 import { ChevronDownIcon, RefreshIcon, TerminalIcon } from './Icons';
 import { scriptService } from '../services/scriptService';
 import { useLogger } from '../hooks/useLogger';
+import IconButton from './IconButton';
 
 interface ScriptExecutionPanelProps {
   nodeId: string;
@@ -51,7 +53,8 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
   const [runHistory, setRunHistory] = useState<ScriptExecutionRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [logEntries, setLogEntries] = useState<ScriptExecutionLogEntry[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
+  const [activeRunMode, setActiveRunMode] = useState<ScriptExecutionMode | null>(null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -150,8 +153,11 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
           const message = error instanceof Error ? error.message : String(error);
           addLog('ERROR', `Failed to refresh ${language} run history: ${message}`);
         });
-        if (runId === selectedRunId) {
-          setIsRunning(false);
+        if (runId === activeRunId) {
+          setActiveRunMode(null);
+        }
+        if (runId === activeRunId) {
+          setActiveRunId(null);
         }
       }
     });
@@ -159,7 +165,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
       unsubscribeLog();
       unsubscribeStatus();
     };
-  }, [language, selectedRunId, refreshRuns, addLog]);
+  }, [language, refreshRuns, addLog, activeRunId]);
 
   const handleSaveSettings = useCallback(async () => {
     const parsed = parseEnvJson();
@@ -182,7 +188,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
     }
   }, [parseEnvJson, nodeId, language, workingDirectory, executable, addLog]);
 
-  const handleRun = useCallback(async () => {
+  const handleRun = useCallback(async (mode: ScriptExecutionMode) => {
     const parsed = parseEnvJson();
     if (!parsed) {
       setRunError('Fix environment variable errors before running.');
@@ -190,7 +196,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
     }
     setRunError(null);
     try {
-      setIsRunning(true);
+      setActiveRunMode(mode);
       const mergedEnv: Record<string, string> = { ...defaults.environmentVariables, ...parsed };
       const run = await scriptService.runScript({
         nodeId,
@@ -200,17 +206,24 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
         workingDirectory: workingDirectory.trim() ? workingDirectory.trim() : (defaults.workingDirectory ?? null),
         executable: executable.trim() ? executable.trim() : (defaults.executable ?? null),
         overrides: parsed,
+        mode,
       });
+      const isRunActive = run.status === 'running' || run.status === 'pending';
+      setActiveRunId(isRunActive ? run.runId : null);
       setSelectedRunId(run.runId);
       setLogEntries([]);
       setRunHistory((prev) => [run, ...prev]);
       setIsConfigDirty(false);
-      addLog('INFO', `${label} started.`);
+      if (!isRunActive) {
+        setActiveRunMode(null);
+      }
+      addLog('INFO', `${mode === 'test' ? `${label} test` : label} started.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setRunError(message);
-      setIsRunning(false);
-      addLog('ERROR', `${label} failed to start: ${message}`);
+      setActiveRunMode(null);
+      setActiveRunId(null);
+      addLog('ERROR', `${mode === 'test' ? `${label} test` : label} failed to start: ${message}`);
     }
   }, [parseEnvJson, defaults.environmentVariables, defaults.workingDirectory, defaults.executable, nodeId, language, code, workingDirectory, executable, addLog, label]);
 
@@ -234,27 +247,34 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
     return entries.join(', ');
   }, [defaults.environmentVariables]);
 
+  const headerContainerClasses = isCollapsed
+    ? 'flex items-center justify-between p-1'
+    : 'flex flex-wrap items-center justify-between gap-2 px-2 pt-2 pb-3 border-b border-border-color/50';
+
+  const panelContainerClasses = isCollapsed ? 'flex-shrink-0' : 'h-full min-h-0';
+
   return (
-    <div className={`flex flex-col text-sm text-text-main ${isCollapsed ? '' : 'h-full min-h-0'}`}>
-      <div
-        className={`flex flex-wrap items-center justify-between gap-2 ${isCollapsed ? 'py-2' : 'pt-2 pb-3 border-b border-border-color/50'}`}
-      >
-        <div className="flex items-center gap-2 font-semibold">
-          <button
+    <div className={`flex w-full flex-col text-sm text-text-main border-t border-border-color ${panelContainerClasses}`}>
+      <div className={headerContainerClasses}>
+        <div className="flex items-center gap-1">
+          <IconButton
             type="button"
             onClick={() => setIsCollapsed((prev) => !prev)}
-            className="flex items-center justify-center w-6 h-6 rounded-md text-text-secondary hover:text-text-main hover:bg-border-color transition-colors"
+            tooltip={isCollapsed ? `Show ${label}` : `Hide ${label}`}
+            size="sm"
             aria-expanded={!isCollapsed}
             aria-controls={`script-execution-panel-${language}`}
             aria-label={isCollapsed ? `Expand ${label} panel` : `Collapse ${label} panel`}
           >
-            <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
-          </button>
-          <TerminalIcon className="w-4 h-4" />
-          <span>{label}</span>
+            <ChevronDownIcon className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
+          </IconButton>
+          <h2 className="flex items-center gap-1 text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase">
+            <TerminalIcon className="w-4 h-4" />
+            {label}
+          </h2>
         </div>
         {!isCollapsed && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               variant="secondary"
               onClick={() => refreshRuns(selectedRunId)}
@@ -272,9 +292,18 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
               Save Config
             </Button>
             <Button
-              onClick={handleRun}
-              isLoading={isRunning}
-              disabled={!code.trim() || !!envError}
+              variant="secondary"
+              onClick={() => handleRun('test')}
+              isLoading={activeRunMode === 'test'}
+              disabled={!code.trim() || !!envError || activeRunMode !== null}
+              className="px-2.5 py-1 text-[11px]"
+            >
+              <TerminalIcon className="w-3.5 h-3.5 mr-1" /> Test Script
+            </Button>
+            <Button
+              onClick={() => handleRun('run')}
+              isLoading={activeRunMode === 'run'}
+              disabled={!code.trim() || !!envError || activeRunMode !== null}
               className="px-2.5 py-1 text-[11px]"
             >
               <TerminalIcon className="w-3.5 h-3.5 mr-1" /> Run Script
@@ -363,7 +392,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
                       onClick={() => setSelectedRunId(run.runId)}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-text-main">{run.status.toUpperCase()}</span>
+                        <span className="font-semibold text-text-main">{run.mode.toUpperCase()} • {run.status.toUpperCase()}</span>
                         <span className="text-text-secondary">{formatTimestamp(run.startedAt)}</span>
                       </div>
                       <div className="mt-1 text-text-secondary">

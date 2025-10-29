@@ -1,5 +1,6 @@
 import type {
   NodeScriptSettings,
+  ScriptExecutionBridge,
   ScriptExecutionLogEntry,
   ScriptExecutionRun,
   ScriptExecutionStatus,
@@ -8,16 +9,19 @@ import type {
   ScriptRunRequestPayload,
 } from '../types';
 
-const ensureElectron = () => {
-  if (!window.electronAPI) {
-    throw new Error('Script execution is only available in the Electron build.');
+const ensureBridge = (): ScriptExecutionBridge => {
+  if (window.electronAPI) {
+    return window.electronAPI;
   }
-  return window.electronAPI;
+  if (window.__DOCFORGE_SCRIPT_PREVIEW__) {
+    return window.__DOCFORGE_SCRIPT_PREVIEW__;
+  }
+  throw new Error('Script execution is only available in the Electron build.');
 };
 
 export const scriptService = {
   async getNodeSettings(nodeId: string, language: ScriptLanguage): Promise<NodeScriptSettings> {
-    return ensureElectron().scriptGetNodeSettings(nodeId, language);
+    return ensureBridge().scriptGetNodeSettings(nodeId, language);
   },
 
   async updateNodeSettings(
@@ -25,11 +29,11 @@ export const scriptService = {
     language: ScriptLanguage,
     updates: ScriptNodeSettingsUpdate
   ): Promise<NodeScriptSettings> {
-    return ensureElectron().scriptUpdateNodeSettings(nodeId, language, updates);
+    return ensureBridge().scriptUpdateNodeSettings(nodeId, language, updates);
   },
 
   async runScript(payload: ScriptRunRequestPayload): Promise<ScriptExecutionRun> {
-    return ensureElectron().scriptRun(payload);
+    return ensureBridge().scriptRun(payload);
   },
 
   async getRunsForNode(
@@ -37,26 +41,26 @@ export const scriptService = {
     language: ScriptLanguage,
     limit = 20
   ): Promise<ScriptExecutionRun[]> {
-    return ensureElectron().scriptGetRunsForNode(nodeId, language, limit);
+    return ensureBridge().scriptGetRunsForNode(nodeId, language, limit);
   },
 
   async getRunLogs(runId: string): Promise<ScriptExecutionLogEntry[]> {
-    return ensureElectron().scriptGetRunLogs(runId);
+    return ensureBridge().scriptGetRunLogs(runId);
   },
 
   async getRun(runId: string): Promise<ScriptExecutionRun | null> {
-    return ensureElectron().scriptGetRun(runId);
+    return ensureBridge().scriptGetRun(runId);
   },
 
   onRunLog(
     callback: (payload: { language: ScriptLanguage; runId: string; entry: ScriptExecutionLogEntry }) => void
   ): () => void {
-    return ensureElectron().onScriptRunLog(callback);
+    return ensureBridge().onScriptRunLog(callback);
   },
 
   onRunStatus(
     callback: (payload: { language: ScriptLanguage; runId: string; status: ScriptExecutionStatus }) => void
   ): () => void {
-    return ensureElectron().onScriptRunStatus(callback);
+    return ensureBridge().onScriptRunStatus(callback);
   },
 };

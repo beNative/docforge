@@ -190,6 +190,7 @@ CREATE TABLE script_execution_runs (
     run_id              TEXT PRIMARY KEY,
     node_id             TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
     language            TEXT NOT NULL,
+    mode                TEXT NOT NULL DEFAULT 'run',
     status              TEXT NOT NULL,
     started_at          TEXT NOT NULL,
     finished_at         TEXT,

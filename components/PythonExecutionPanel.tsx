@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import Button from './Button';
 import { TerminalIcon, RefreshIcon, ChevronDownIcon } from './Icons';
+import IconButton from './IconButton';
 import { pythonService } from '../services/pythonService';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
 import { useLogger } from '../hooks/useLogger';
@@ -231,24 +232,31 @@ const PythonExecutionPanel: React.FC<PythonExecutionPanelProps> = ({
     return options;
   }, [environments]);
 
+  const headerClasses = isCollapsed
+    ? 'flex items-center justify-between p-1'
+    : 'flex flex-wrap items-center justify-between gap-2 px-2 pt-2 pb-3 border-b border-border-color/50';
+
+  const panelContainerClasses = isCollapsed ? 'flex-shrink-0' : 'h-full min-h-0';
+
   return (
-    <div className={`flex flex-col text-sm text-text-main ${isCollapsed ? '' : 'h-full min-h-0'}`}>
-      <div
-        className={`flex flex-wrap items-center justify-between gap-2 ${isCollapsed ? 'py-2' : 'pt-2 pb-3 border-b border-border-color/50'}`}
-      >
-        <div className="flex items-center gap-2 font-semibold">
-          <button
+    <div className={`flex w-full flex-col text-sm text-text-main border-t border-border-color ${panelContainerClasses}`}>
+      <div className={headerClasses}>
+        <div className="flex items-center gap-1">
+          <IconButton
             type="button"
             onClick={() => setIsCollapsed((prev) => !prev)}
-            className="flex items-center justify-center w-6 h-6 rounded-md text-text-secondary hover:text-text-main hover:bg-border-color transition-colors"
+            tooltip={isCollapsed ? 'Show Python Execution' : 'Hide Python Execution'}
+            size="sm"
             aria-expanded={!isCollapsed}
             aria-controls="python-execution-panel-content"
             aria-label={isCollapsed ? 'Expand Python execution panel' : 'Collapse Python execution panel'}
           >
-            <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
-          </button>
-          <TerminalIcon className="w-4 h-4" />
-          <span>Python Execution</span>
+            <ChevronDownIcon className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
+          </IconButton>
+          <h2 className="flex items-center gap-1 text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase">
+            <TerminalIcon className="w-4 h-4" />
+            Python Execution
+          </h2>
         </div>
         {!isCollapsed && (
           <div className="flex items-center gap-2">

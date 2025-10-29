@@ -119,6 +119,16 @@ DocForge includes an embedded Python runner that integrates with the editor when
 - **Managing Histories:** Every execution is stored in the document's history list within the panel. You can rename runs, pin important ones, clear individual entries, or purge the entire history. Switching documents automatically swaps in its associated Python run history.
 - **Environment Controls:** A dropdown shows the interpreter that will be used. From here you can create a new virtual environment, switch to a detected interpreter, or open the environment folder in your system file browser.
 
+#### Shell and PowerShell Execution Panel
+
+Shell (`.sh`) and PowerShell (`.ps1`) documents expose a dedicated execution panel that mirrors the Python experience while honoring the nuances of each scripting language.
+
+- **Test vs. Run:** Choose **Test Script** to perform a syntax-only check (Bash adds `-n`; PowerShell loads the script into a `ScriptBlock` under `Set-StrictMode`). Use **Run Script** for full execution. If the selected interpreter cannot support syntax-only mode (for example, Windows `cmd.exe`), DocForge reports the limitation before any code runs.
+- **Environment Management:** Each document stores its own environment variables, working directory, and interpreter override. Values are entered as JSON and merge with the global defaults from Settings so you can combine organization-wide variables with script-specific secrets or toggles.
+- **Defaults & Overrides:** Leave fields blank to inherit the workspace defaults. Provide a custom executable path to target alternate shells (e.g., `zsh`, a portable `pwsh`).
+- **Run History & Logs:** Every invocation records the chosen mode, exit code, timestamps, and streamed stdout/stderr. Select a run from the Recent Runs list to review prior output alongside the active script.
+- **Collapsible Layout:** Collapse the panel when you want more editor space—DocForge remembers the state per language.
+
 ### Organizing with Drag and Drop
 
 You can organize your documents and folders by dragging and dropping them in the sidebar. You can select multiple items using `Ctrl+Click` (or `Cmd+Click` on macOS) and drag them all at once.
@@ -169,6 +179,7 @@ Accessed via the gear icon in the title bar. The settings are organized into cat
 - **Keyboard Shortcuts:** View and customize keyboard shortcuts for all major application actions. You can record a new key combination for any command.
 - **General:** Configure application behavior, like auto-saving logs, opting into pre-release updates, and choosing how PlantUML diagrams are rendered.
 - **Python:** Choose the interpreter used by the integrated runner. DocForge auto-detects local interpreters, can bootstrap a dedicated virtual environment per workspace, and exposes console preferences such as default working directory, automatic history retention, and whether runs open in split view.
+- **Shell & PowerShell:** Define default environment variables, working directories, and interpreter overrides for each scripting language. Document-specific panels start with these defaults and can layer additional overrides without mutating the workspace baseline.
 - **Database:** View detailed statistics about your local database file, and perform maintenance tasks such as creating a compressed backup, checking file integrity, optimizing the database size (`VACUUM`), or bootstrapping a brand new workspace database.
 - **Advanced:** View and edit the raw JSON configuration file using an interactive tree or a raw text editor, and import/export your settings.
 

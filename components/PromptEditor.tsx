@@ -493,9 +493,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const canAddEmojiToTitle = documentNode.type === 'document';
   const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
   const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const scriptBridgeAvailable =
+    typeof window !== 'undefined' && (!!window.electronAPI || !!window.__DOCFORGE_SCRIPT_PREVIEW__);
   const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
-  const isShellDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'shell');
-  const isPowerShellDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'powershell');
+  const isShellDocument = scriptBridgeAvailable && normalizedLanguage === 'shell';
+  const isPowerShellDocument = scriptBridgeAvailable && normalizedLanguage === 'powershell';
   const pythonDefaults = useMemo(() => ({
     ...settings.pythonDefaults,
     workingDirectory: settings.pythonWorkingDirectory ?? settings.pythonDefaults.workingDirectory ?? null,
