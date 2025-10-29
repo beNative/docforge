@@ -144,6 +144,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isFolder = node.type === 'folder';
   const isCodeFile = node.doc_type === 'source_code';
   const isOpenInTab = !isFolder && openDocumentIds.has(node.id);
+  const areActionsVisible = isSelected || isFocused || isHovered;
   const emojiForNode = !isFolder ? extractEmoji(node.title) : null;
   const displayTitle = React.useMemo(() => {
     if (!emojiForNode || isFolder) {
@@ -359,16 +360,22 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                 ) : (
-                    <span
-                        className={`flex-1 px-1 ${isSelected || isFocused || isHovered ? 'truncate' : 'break-words'}`}
-                    >
+                    <span className="flex-1 px-1 truncate">
                         {highlightMatches(displayTitle, searchTerm)}
                     </span>
                 )}
             </div>
 
             {!isRenaming && (
-                <div className={`transition-opacity pr-1 flex items-center ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                <div
+                    className={`transition-opacity flex items-center ${
+                        areActionsVisible ? 'opacity-100 pr-1' : 'opacity-0 pr-0 pointer-events-none'
+                    }`}
+                    style={{
+                        width: areActionsVisible ? undefined : 0,
+                        overflow: areActionsVisible ? undefined : 'hidden',
+                    }}
+                >
                     <IconButton onClick={(e) => { e.stopPropagation(); onMoveUp(node.id); }} tooltip="Move Up" size="xs" variant="ghost" disabled={!canMoveUp}>
                         <ArrowUpIcon className="w-3.5 h-3.5" />
                     </IconButton>
