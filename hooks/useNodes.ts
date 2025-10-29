@@ -88,6 +88,12 @@ export const useNodes = () => {
     [addLog, refreshNodes]
   );
 
+  const setNodeLock = useCallback(async (nodeId: string, locked: boolean) => {
+    await repository.setNodeLock(nodeId, locked);
+    addLog('DEBUG', `Set lock state for node ${nodeId} to ${locked ? 'locked' : 'unlocked'}.`);
+    await refreshNodes();
+  }, [addLog, refreshNodes]);
+
   const createDocumentFromClipboard = useCallback(async (
     payload: { parentId: string | null; content: string; title?: string | null }
   ): Promise<{ node: Node; summary: ClassificationSummary }> => {
@@ -104,5 +110,5 @@ export const useNodes = () => {
     return result;
   }, [addLog, refreshNodes]);
 
-  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, addLog };
+  return { nodes, isLoading, refreshNodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, setNodeLock, addLog };
 };

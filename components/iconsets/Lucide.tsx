@@ -129,6 +129,18 @@ export const FolderDownIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) =
     </svg>
 );
 
+export const LockClosedIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M16 10V8a4 4 0 0 0-8 0v2"/><rect width="14" height="11" x="5" y="10" rx="2" />
+    </svg>
+);
+
+export const LockOpenIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M7 10V8a5 5 0 0 1 9.584-2"/><rect width="14" height="11" x="5" y="10" rx="2" />
+    </svg>
+);
+
 export const KeyboardIcon: React.FC<IconProps> = ({ className = 'w-6 h-6' }) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
         <rect width="20" height="16" x="2" y="4" rx="2" ry="2" /><path d="M6 8h.01" /><path d="M10 8h.01" /><path d="M14 8h.01" /><path d="M18 8h.01" /><path d="M8 12h.01" /><path d="M12 12h.01" /><path d="M16 12h.01" /><path d="M7 16h10" />

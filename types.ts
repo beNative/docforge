@@ -357,6 +357,7 @@ export interface Node {
   sort_order: number;
   created_at: string;
   updated_at: string;
+  locked: boolean;
   // Client-side property
   children?: Node[];
   // For documents, this will be attached
@@ -407,6 +408,7 @@ export interface DocumentOrFolder {
   createdAt: string;
   updatedAt: string;
   parentId: string | null;
+  locked: boolean;
   // Document-specific properties for the UI adapter
   doc_type?: DocType;
   language_hint?: string | null;

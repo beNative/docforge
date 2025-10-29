@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon } from './Icons';
+import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
@@ -24,6 +24,7 @@ interface DocumentEditorProps {
   onShowHistory: () => void;
   onLanguageChange: (language: string) => void;
   onViewModeChange: (mode: ViewMode) => void;
+  onToggleLock: (locked: boolean) => Promise<void> | void;
   formatTrigger: number;
   previewScale: number;
   onPreviewScaleChange: (scale: number) => void;
@@ -91,6 +92,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onShowHistory,
   onLanguageChange,
   onViewModeChange,
+  onToggleLock,
   formatTrigger,
   previewScale,
   onPreviewScaleChange,
@@ -118,12 +120,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
   const [splitSize, setSplitSize] = useState(50);
+  const isLocked = Boolean(documentNode.locked);
+  const [isLocking, setIsLocking] = useState(false);
   const { addLog } = useLogger();
   const { skipNextAutoSave } = useDocumentAutoSave({
     documentId: documentNode.id,
     content,
     title,
-    isDirty,
+    isDirty: isLocked ? false : isDirty,
     isSaving,
     onCommitVersion,
     addLog,
@@ -169,6 +173,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const isInitialMount = useRef(true);
   const prevDocumentIdRef = useRef<string | null>(null);
   const prevDocumentContentRef = useRef<string | undefined>(undefined);
+  const prevLockedRef = useRef(isLocked);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -255,6 +260,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [content, documentNode.content]);
 
   useEffect(() => {
+    if (isLocked && !prevLockedRef.current) {
+      const nextContent = documentNode.content ?? '';
+      setContent(nextContent);
+      setBaselineContent(nextContent);
+      setIsDirty(false);
+    }
+    prevLockedRef.current = isLocked;
+  }, [isLocked, documentNode.content]);
+
+  useEffect(() => {
   }, [content]);
 
   useEffect(() => {
@@ -268,12 +283,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   // Debounced auto-save for title only
   useEffect(() => {
-    if (title === documentNode.title) return;
+    if (isLocked || title === documentNode.title) return;
     const handler = setTimeout(() => {
       onSave({ title });
     }, 500);
     return () => clearTimeout(handler);
-  }, [title, onSave, documentNode.title]);
+  }, [title, onSave, documentNode.title, isLocked]);
   
   // Triggered by command palette
   useEffect(() => {
@@ -377,6 +392,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   // --- Action Handlers ---
   const handleManualSave = () => {
+    if (isLocked) {
+      setError('Document is locked and cannot be modified.');
+      addLog('WARNING', `Manual save blocked for locked document "${title}".`);
+      return;
+    }
     if (!isDirty || isRefining || isSaving) {
       return;
     }
@@ -410,10 +430,20 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   };
   
   const handleFormatDocument = () => {
+    if (isLocked) {
+      setError('Document is locked and cannot be modified.');
+      addLog('WARNING', `Format request blocked for locked document "${title}".`);
+      return;
+    }
     editorRef.current?.format();
   };
 
   const handleRefine = async () => {
+    if (isLocked) {
+      setError('Document is locked and cannot be modified.');
+      addLog('WARNING', `AI refinement blocked for locked document "${title}".`);
+      return;
+    }
     setIsRefining(true);
     setError(null);
     addLog('INFO', `User action: Requesting AI refinement for document: "${title}"`);
@@ -428,8 +458,30 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       setIsRefining(false);
     }
   };
-  
+
+  const handleToggleLock = useCallback(async () => {
+    if (isLocking) {
+      return;
+    }
+    setError(null);
+    setIsLocking(true);
+    try {
+      await onToggleLock(!isLocked);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to change lock state.';
+      setError(message);
+      addLog('ERROR', `Failed to toggle lock for document "${title}": ${message}`);
+    } finally {
+      setIsLocking(false);
+    }
+  }, [isLocking, onToggleLock, isLocked, addLog, title]);
+
   const handleGenerateTitle = async () => {
+    if (isLocked) {
+      setError('Document is locked and cannot be modified.');
+      addLog('WARNING', `Title regeneration blocked for locked document "${title}".`);
+      return;
+    }
     if (!settings.llmProviderUrl || !settings.llmModelName || !content.trim()) return;
     setIsGeneratingTitle(true);
     setError(null);
@@ -447,6 +499,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   };
 
   const handleAddEmojiToTitle = async () => {
+    if (isLocked) {
+      setError('Document is locked and cannot be modified.');
+      addLog('WARNING', `Emoji update blocked for locked document "${title}".`);
+      return;
+    }
     if (!settings.llmProviderUrl || !settings.llmModelName || !title.trim()) return;
     setIsGeneratingEmoji(true);
     setError(null);
@@ -595,8 +652,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             newText={content}
             language={language}
             renderMode="inline"
-            readOnly={false}
-            onChange={setContent}
+            readOnly={isLocked}
+            onChange={isLocked ? undefined : setContent}
             onScroll={handleEditorScroll}
             fontFamily={settings.editorFontFamily}
             fontSize={settings.editorFontSize}
@@ -616,6 +673,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             fontSize={settings.editorFontSize}
             activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
             activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+            readOnly={isLocked}
           />
         );
     const preview = (
@@ -667,7 +725,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} className="bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate"/>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} readOnly={isLocked} className={`bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate ${isLocked ? 'cursor-default' : ''}`}/>
             {canAddEmojiToTitle && (
               <IconButton
                 onClick={handleAddEmojiToTitle}
@@ -675,7 +733,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   isGeneratingEmoji ||
                   !title.trim() ||
                   !settings.llmProviderUrl ||
-                  !settings.llmModelName
+                  !settings.llmModelName ||
+                  isLocked ||
+                  isLocking
                 }
                 tooltip="Add Emoji to Title"
                 size="xs"
@@ -686,11 +746,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
               </IconButton>
             )}
             {supportsAiTools && (
-              <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl} tooltip="Regenerate Title with AI" size="xs" variant="ghost" className="flex-shrink-0">
+              <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl || isLocked || isLocking} tooltip="Regenerate Title with AI" size="xs" variant="ghost" className="flex-shrink-0">
                 {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-4 h-4 text-primary" />}
               </IconButton>
             )}
             {isDirty && <div className="relative group flex-shrink-0"><div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div><span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-md opacity-0 group-hover:opacity-100">Unsaved changes</span></div>}
+            {isLocked && (
+              <div className="flex items-center gap-1 text-xs font-semibold text-primary flex-shrink-0">
+                <LockClosedIcon className="w-3.5 h-3.5" />
+                <span>Locked</span>
+              </div>
+            )}
         </div>
         <div className="flex items-center gap-2">
             <div className="flex items-center"><label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">Language:</label><select id="language-select" value={language} onChange={(e) => onLanguageChange(e.target.value)} className="bg-background text-text-main text-xs rounded-md py-0.5 pl-2 pr-6 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none" style={{ backgroundImage: 'var(--select-arrow-background)', backgroundPosition: 'right 0.1rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.2em 1.2em' }}>{SUPPORTED_LANGUAGES.map(lang => (<option key={lang.id} value={lang.id}>{lang.label}</option>))}</select></div>
@@ -705,10 +771,20 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             )}
             <div className="h-5 w-px bg-border-color mx-1"></div>
             {supportsFormatting && (
-              <IconButton onClick={handleFormatDocument} tooltip="Format Document" size="xs" variant="ghost">
+              <IconButton onClick={handleFormatDocument} tooltip="Format Document" size="xs" variant="ghost" disabled={isLocked || isLocking}>
                 <FormatIcon className="w-4 h-4" />
               </IconButton>
             )}
+            <IconButton
+              onClick={handleToggleLock}
+              tooltip={isLocked ? 'Unlock Document' : 'Lock Document'}
+              size="xs"
+              variant="ghost"
+              className={isLocked ? 'text-primary' : ''}
+              disabled={isLocking}
+            >
+              {isLocking ? <Spinner /> : isLocked ? <LockClosedIcon className="w-4 h-4" /> : <LockOpenIcon className="w-4 h-4" />}
+            </IconButton>
             <IconButton
               onClick={() => setIsDiffMode(prev => !prev)}
               tooltip={isDiffMode ? 'Hide Inline Diff' : 'Show Inline Diff'}
@@ -723,7 +799,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             <div className="h-5 w-px bg-border-color mx-1"></div>
             <IconButton
               onClick={handleManualSave}
-              disabled={!isDirty || isRefining || isSaving}
+              disabled={!isDirty || isRefining || isSaving || isLocked || isLocking}
               tooltip={isSaving ? 'Saving...' : 'Save Version'}
               size="xs"
               variant="ghost"
@@ -735,7 +811,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
               )}
             </IconButton>
             <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
-            {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
+            {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining || isLocked} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
             <IconButton onClick={handleDeleteDocument} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
         </div>
       </div>

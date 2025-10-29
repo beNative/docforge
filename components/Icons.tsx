@@ -226,12 +226,34 @@ export const FolderPlusIcon: React.FC<IconProps> = (props) => {
 export const FolderDownIcon: React.FC<IconProps> = (props) => {
     const { iconSet } = useIconSet();
     switch (iconSet) {
-      case 'lucide': return <LucideIcons.FolderDownIcon {...props} />;
-      case 'feather': return <FeatherIcons.FolderDownIcon {...props} />;
-      case 'tabler': return <TablerIcons.FolderDownIcon {...props} />;
-      case 'material': return <MaterialIcons.FolderDownIcon {...props} />;
-      case 'heroicons': default: return <HeroIcons.FolderDownIcon {...props} />;
+        case 'lucide': return <LucideIcons.FolderDownIcon {...props} />;
+        case 'feather': return <FeatherIcons.FolderDownIcon {...props} />;
+        case 'tabler': return <TablerIcons.FolderDownIcon {...props} />;
+        case 'material': return <MaterialIcons.FolderDownIcon {...props} />;
+        case 'heroicons': default: return <HeroIcons.FolderDownIcon {...props} />;
     }
+};
+
+export const LockClosedIcon: React.FC<IconProps> = (props) => {
+  const { iconSet } = useIconSet();
+  switch (iconSet) {
+    case 'lucide': return <LucideIcons.LockClosedIcon {...props} />;
+    case 'feather': return <FeatherIcons.LockClosedIcon {...props} />;
+    case 'tabler': return <TablerIcons.LockClosedIcon {...props} />;
+    case 'material': return <MaterialIcons.LockClosedIcon {...props} />;
+    case 'heroicons': default: return <HeroIcons.LockClosedIcon {...props} />;
+  }
+};
+
+export const LockOpenIcon: React.FC<IconProps> = (props) => {
+  const { iconSet } = useIconSet();
+  switch (iconSet) {
+    case 'lucide': return <LucideIcons.LockOpenIcon {...props} />;
+    case 'feather': return <FeatherIcons.LockOpenIcon {...props} />;
+    case 'tabler': return <TablerIcons.LockOpenIcon {...props} />;
+    case 'material': return <MaterialIcons.LockOpenIcon {...props} />;
+    case 'heroicons': default: return <HeroIcons.LockOpenIcon {...props} />;
+  }
 };
 
 export const KeyboardIcon: React.FC<IconProps> = (props) => {

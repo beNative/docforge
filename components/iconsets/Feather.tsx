@@ -76,6 +76,14 @@ export const FolderPlusIcon: React.FC<IconProps> = ({ className }) => (
 export const FolderDownIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><polyline points="15 14 12 17 9 14"></polyline></svg>
 );
+
+export const LockClosedIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><rect x="5" y="11" width="14" height="11" rx="2" ry="2"></rect><path d="M7 11V8a5 5 0 0 1 10 0v3"></path></svg>
+);
+
+export const LockOpenIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><rect x="5" y="11" width="14" height="11" rx="2" ry="2"></rect><path d="M7 11V8a5 5 0 0 1 9.584-2"></path></svg>
+);
 export const KeyboardIcon: React.FC<IconProps> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path d="M20 17H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2z"></path><line x1="8" y1="11" x2="8" y2="11"></line><line x1="12" y1="11" x2="12" y2="11"></line><line x1="16" y1="11" x2="16" y2="11"></line><line x1="12" y1="14" x2="12" y2="14"></line></svg>
 );

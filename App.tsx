@@ -22,7 +22,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -173,7 +173,7 @@ interface UpdateToastState {
 
 export const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, isLoading: areDocumentsLoading } = useDocuments();
+    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, setItemLock, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
 
@@ -819,6 +819,24 @@ export const MainApp: React.FC = () => {
             addLog('ERROR', `Failed to save document "${item.title}" to a file: ${message}`);
         }
     }, [items, addLog]);
+
+    const handleSetNodeLockState = useCallback(async (nodeId: string, locked: boolean) => {
+        const item = items.find(p => p.id === nodeId);
+        if (!item || item.type !== 'document') {
+            addLog('WARNING', 'Locking is only supported for known documents.');
+            return;
+        }
+        await setItemLock(nodeId, locked);
+        addLog('INFO', `Document "${item.title}" ${locked ? 'locked' : 'unlocked'}.`);
+    }, [items, setItemLock, addLog]);
+
+    const handleToggleActiveDocumentLock = useCallback(async () => {
+        if (!activeDocument) {
+            addLog('WARNING', 'No active document is selected to toggle its lock state.');
+            return;
+        }
+        await handleSetNodeLockState(activeDocument.id, !activeDocument.locked);
+    }, [activeDocument, handleSetNodeLockState, addLog]);
 
     const handleSaveSelectionToFile = useCallback(() => {
         const doc = items.find(item => selectedIds.has(item.id) && item.type === 'document');
@@ -2496,13 +2514,14 @@ export const MainApp: React.FC = () => {
         { id: 'document-tree-copy-content', name: 'Copy Document Content', action: handleCopySelectionContent, category: 'Document Tree', icon: CopyIcon, shortcut: ['Control', 'Shift', 'C'], keywords: 'copy clipboard tree content' },
         { id: 'document-tree-save-to-file', name: 'Save Document to File', action: handleSaveSelectionToFile, category: 'Document Tree', icon: SaveIcon, keywords: 'save export download file tree document' },
         { id: 'format-document', name: 'Format Document', action: handleFormatDocument, category: 'Editor', icon: FormatIcon, shortcut: ['Control', 'Shift', 'F'], keywords: 'beautify pretty print clean code' },
+        { id: 'toggle-document-lock', name: activeDocument?.locked ? 'Unlock Active Document' : 'Lock Active Document', action: () => { void handleToggleActiveDocumentLock(); }, category: 'Editor', icon: activeDocument?.locked ? LockOpenIcon : LockClosedIcon, keywords: 'lock unlock read-only protect document' },
         { id: 'toggle-command-palette', name: 'Toggle Command Palette', action: handleToggleCommandPalette, category: 'View', icon: CommandIcon, shortcut: ['Control', 'Shift', 'P'], keywords: 'find action go to' },
         { id: 'toggle-editor', name: 'Switch to Editor View', action: () => { addLog('INFO', 'Command: Switch to Editor View.'); setView('editor'); }, category: 'View', icon: PencilIcon, keywords: 'main document' },
         { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -2555,6 +2574,7 @@ export const MainApp: React.FC = () => {
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Format', icon: FormatIcon, action: handleFormatDocument, disabled: !isFormattable || currentSelection.size !== 1, shortcut: getCommand('format-document')?.shortcutString },
+                { label: firstSelectedNode?.locked ? 'Unlock Document' : 'Lock Document', icon: firstSelectedNode?.locked ? LockOpenIcon : LockClosedIcon, action: () => { if (firstSelectedNode && firstSelectedNode.type === 'document') { void handleSetNodeLockState(firstSelectedNode.id, !firstSelectedNode.locked); } }, disabled: !isDocument || currentSelection.size !== 1, shortcut: getCommand('toggle-document-lock')?.shortcutString },
                 { label: 'Rename', icon: PencilIcon, action: () => handleStartRenamingNode(nodeId), disabled: currentSelection.size !== 1, shortcut: getCommand('rename-item')?.shortcutString },
                 { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0, shortcut: getCommand('duplicate-item')?.shortcutString },
                 { type: 'separator' },
@@ -2578,7 +2598,7 @@ export const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile, handleSetNodeLockState]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -2752,6 +2772,7 @@ export const MainApp: React.FC = () => {
                         onShowHistory={() => setDocumentView('history')}
                         onLanguageChange={handleLanguageChange}
                         onViewModeChange={handleViewModeChange}
+                        onToggleLock={(locked) => handleSetNodeLockState(activeNode.id, locked)}
                         formatTrigger={formatTrigger}
                         previewScale={previewScale}
                         onPreviewScaleChange={handlePreviewScaleChange}
@@ -2865,6 +2886,7 @@ export const MainApp: React.FC = () => {
                                         onNewCodeFile={handleOpenNewCodeFileModal}
                                         onNewFromClipboard={() => { void handleNewDocumentFromClipboard(); }}
                                         onDuplicateSelection={handleDuplicateSelection}
+                                        onToggleActiveDocumentLock={() => { void handleToggleActiveDocumentLock(); }}
                                         onCopyNodeContent={handleCopyNodeContent}
                                         onSaveNodeToFile={handleSaveNodeToFile}
                                         expandedFolderIds={expandedFolderIds}
@@ -2880,6 +2902,7 @@ export const MainApp: React.FC = () => {
                                         customShortcuts={settings.customShortcuts}
                                         pendingRevealId={pendingRevealId}
                                         onRevealHandled={() => setPendingRevealId(null)}
+                                        activeDocumentLocked={Boolean(activeDocument?.locked)}
                                         templates={templates}
                                         activeTemplateId={activeTemplateId}
                                         onSelectTemplate={handleSelectTemplate}

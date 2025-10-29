@@ -11,6 +11,7 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Full Context Menu & Keyboard Navigation:** Navigate and manage items using a complete right-click context menu or use only the keyboard for a faster workflow.
 - **Universal Monaco Editor:** A powerful, VS Code-like editor is used for all document types, including Markdown, HTML, and various source code files, with syntax highlighting and code folding.
 - **One-Click Formatting:** Clean up Markdown, JSON, JavaScript, and TypeScript documents directly from the editor toolbar.
+- **Document Locking:** Protect sensitive drafts by toggling a padlock button that flips the editor into a read-only mode until you intentionally unlock it.
 - **Multi-Document Tabs:** Keep several documents open at once, pin important files, and quickly jump between them using the tab strip and overflow picker.
 - **Multi-Format Live Preview:** Get a real-time, rendered preview for Markdown, HTML, PDFs, and common image formats. The preview can be displayed side-by-side (vertically or horizontally) with the editor, and binary formats open straight into preview mode with zoom and pan controls tailored to each viewer.
 - **AI-Powered Refinement:** Use your connected local LLM to automatically refine and improve your documents with a single click.
