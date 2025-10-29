@@ -218,10 +218,14 @@ const PlantUMLOfflineDiagram: React.FC<{ code: string }> = ({ code }) => {
   );
 };
 
-export const PlantUMLDiagram: React.FC<PlantUMLDiagramProps> = ({ code, mode }) => {
+const PlantUMLDiagramComponent: React.FC<PlantUMLDiagramProps> = ({ code, mode }) => {
   if (mode === 'offline') {
     return <PlantUMLOfflineDiagram code={code} />;
   }
   return <PlantUMLRemoteDiagram code={code} />;
 };
+
+export const PlantUMLDiagram = React.memo(PlantUMLDiagramComponent);
+
+PlantUMLDiagram.displayName = 'PlantUMLDiagram';
 
