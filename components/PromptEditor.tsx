@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon } from './Icons';
+import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
@@ -418,6 +418,22 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       });
   };
 
+  const handleCancelChanges = useCallback(() => {
+    if (!isDirty || isSaving) {
+      return;
+    }
+
+    const originalContent = documentNode.content ?? '';
+    addLog('INFO', `User action: Canceled changes for document "${documentNode.title}".`);
+    skipNextAutoSave();
+    setError(null);
+    setRefinedContent(null);
+    setContent(originalContent);
+    setBaselineContent(originalContent);
+    setTitle(documentNode.title);
+    setIsDirty(false);
+  }, [isDirty, isSaving, documentNode.content, documentNode.title, addLog, skipNextAutoSave]);
+
   const handleDeleteDocument = () => {
     skipNextAutoSave();
     addLog('INFO', `User action: Delete document "${title}".`);
@@ -797,6 +813,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             </IconButton>
             <IconButton onClick={onShowHistory} tooltip="View Version History" size="xs" variant="ghost"><HistoryIcon className="w-4 h-4" /></IconButton>
             <div className="h-5 w-px bg-border-color mx-1"></div>
+            <IconButton
+              onClick={handleCancelChanges}
+              disabled={!isDirty || isRefining || isSaving}
+              tooltip="Cancel Changes"
+              size="xs"
+              variant="ghost"
+            >
+              <UndoIcon className={`w-4 h-4 ${isDirty ? 'text-destructive-text' : ''}`} />
+            </IconButton>
             <IconButton
               onClick={handleManualSave}
               disabled={!isDirty || isRefining || isSaving || isLocked || isLocking}
