@@ -85,6 +85,7 @@ The bar at the bottom of the window provides at-a-glance information about the a
 
 - **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut. New documents default to Markdown.
 - **New Code File:** Click the code icon. A dialog will appear asking you to provide a filename with an extension (e.g., `script.js`) for automatic language detection.
+- **New from Clipboard:** Use the command palette entry or sidebar menu item to create a document from the current clipboard contents. DocForge will import the text verbatim, detect the document type automatically, and report the classification in the activity log. If clipboard access is denied, the app shows guidance for restoring permissions.
 - **New Root Folder:** Click the folder icon with a `+` to create a new folder at the root of your document list.
 - **New Subfolder:** Select an existing folder and click the "New Subfolder" icon to create a folder inside it.
 - **Duplicate Selection:** Select one or more items and click the "Duplicate" icon to create a deep copy.
@@ -121,6 +122,14 @@ The document editor is powered by Monaco, the same editor core used in VS Code, 
     - **Copy:** Copy the document's content to the clipboard.
     - **Refine with AI:** Send the document's content to your configured LLM to get an improved version (only for Markdown and plaintext files).
     - **Delete:** Delete the current document. A confirmation is required, where pressing `Enter` will confirm the action.
+
+#### PDF Documents
+
+Import PDFs by dragging `.pdf` files from your operating system into the sidebar, using the "Import" options in context menus, or converting clipboard data through **New from Clipboard** when it contains PDF bytes or data URLs. Opening a PDF switches the editor to **Preview Only** mode automatically so you can focus on the embedded viewer. The preview displays the document in an inline reader with Chromium's native toolbar (page navigation, zoom, and print controls) and honors keyboard shortcuts exposed by the viewer. DocForge synchronizes the viewer with the global preview zoom so the zoom buttons, scroll wheel shortcuts, and reset commands behave consistently across file types. Because PDFs are stored as binary data, editing is disabled by default; switching to the editor view will show the raw payload, and changing it can corrupt the file.
+
+#### Image Documents
+
+PNG, JPEG, GIF, BMP, WEBP, and SVG assets are detected when you import them from disk, drop them into the sidebar, or pipe image data through **New from Clipboard**. Image documents also open directly in **Preview Only** mode. The preview uses DocForge's zoom and pan surface so you can scroll, drag to reposition, double-click to zoom, or press the on-screen controls to reset the view. Image metadata—such as pixel dimensions and MIME type—appears in the status bar while the preview is active, and the renderer clamps the image inside the workspace with padding so large assets remain manageable. Editing the underlying binary/text data is optional but discouraged unless you are intentionally replacing the encoded image contents.
 
 #### Python Execution Panel
 
@@ -190,7 +199,7 @@ Accessed via the gear icon in the title bar. The settings are organized into cat
 - **LLM Provider:** Configure your connection to a local AI service. You can detect running services and select a model.
 - **Appearance:** Change the UI scale and choose from different icon sets.
 - **Keyboard Shortcuts:** View and customize keyboard shortcuts for all major application actions. You can record a new key combination for any command.
-- **General:** Configure application behavior, like auto-saving logs, opting into pre-release updates, and choosing how PlantUML diagrams are rendered.
+- **General:** Configure application behavior, like auto-saving logs, opting into pre-release updates, and choosing how PlantUML diagrams are rendered. This section includes an **Automatic Update Checks** toggle that determines whether DocForge contacts the update service on launch, a **Pre-release Updates** toggle that opts into beta builds, and a **Check for Updates** button for running a manual scan on demand. Manual checks report their status inline—showing a spinner and "Checking…" label during the request, a success message when you're current or when a download starts, and an error message with troubleshooting details if the update service is unreachable or disabled in the web preview.
 - **Python:** Choose the interpreter used by the integrated runner. DocForge auto-detects local interpreters, can bootstrap a dedicated virtual environment per workspace, and exposes console preferences such as default working directory, automatic history retention, and whether runs open in split view.
 - **Shell & PowerShell:** Define default environment variables, working directories, and interpreter overrides for each scripting language. Document-specific panels start with these defaults and can layer additional overrides without mutating the workspace baseline.
 - **Database:** View detailed statistics about your local database file, and perform maintenance tasks such as creating a compressed backup, checking file integrity, optimizing the database size (`VACUUM`), or bootstrapping a brand new workspace database.
