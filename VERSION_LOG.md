@@ -1,5 +1,15 @@
 # Version Log
 
+## v0.6.9 - The Release Prep Maintenance
+
+### 🐛 Fixes
+
+-   Updated the release workflow fixtures to validate the `v0.6.9` tag and installers, keeping the automated publishing checks aligned with the shipped binaries.
+
+### 📝 Documentation
+
+-   Refreshed the release preparation guides so every README and manual references the `v0.6.9` tagging flow and synchronized documentation updates.
+
 ## Unreleased - The Document Export Primer
 
 ### ✨ New

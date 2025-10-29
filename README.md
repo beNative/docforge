@@ -87,7 +87,7 @@ To create a new public build of DocForge:
 3. Review the Markdown documentation (README, manuals, and release notes) so the written guidance matches the current workflow.
 4. Sync the documentation copies under `docs/` (README, manuals, version log) with any updates made at the project root.
 5. Commit the changes and push them to the default branch so the release tag points at the finalized documentation.
-6. Create and push a tag that matches the new version (for example, `git tag v0.6.8` followed by `git push origin v0.6.8`) to trigger the automated release workflow.
+6. Create and push a tag that matches the new version (for example, `git tag v0.6.9` followed by `git push origin v0.6.9`) to trigger the automated release workflow.
 7. Monitor the "Release" workflow run, then confirm that the published GitHub release lists the correct notes and includes installers for every platform before announcing availability.
 
 ## Application Icon Workflow
