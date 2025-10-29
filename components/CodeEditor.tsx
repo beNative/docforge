@@ -20,6 +20,7 @@ interface CodeEditorProps {
   fontSize?: number;
   activeLineHighlightColorLight?: string;
   activeLineHighlightColorDark?: string;
+  readOnly?: boolean;
 }
 
 export interface CodeEditorHandle {
@@ -117,7 +118,7 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
     return keybinding | primaryKey;
 };
 
-const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark }, ref) => {
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark, readOnly = false }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -288,6 +289,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     bracketPairColorization: {
                         enabled: true,
                     },
+                    readOnly,
                 });
 
                 editorInstance.onDidChangeModelContent(() => {
@@ -326,7 +328,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
             }
             monacoApiRef.current = null;
         };
-    }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, computedFontFamily, computedFontSize]);
+    }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, computedFontFamily, computedFontSize, readOnly]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {
@@ -353,6 +355,12 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
             monacoInstanceRef.current.updateOptions({ fontFamily: computedFontFamily, fontSize: computedFontSize });
         }
     }, [computedFontFamily, computedFontSize]);
+
+    useEffect(() => {
+        if (monacoInstanceRef.current) {
+            monacoInstanceRef.current.updateOptions({ readOnly });
+        }
+    }, [readOnly]);
 
     // Effect to update language
     useEffect(() => {

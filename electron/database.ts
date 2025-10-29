@@ -248,7 +248,7 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
     console.log('Database does not exist, creating new one...');
     connection.exec(INITIAL_SCHEMA);
     // Set PRAGMAs for a new database
-    connection.pragma('user_version = 6');
+    connection.pragma('user_version = 7');
     connection.exec('PRAGMA journal_mode = WAL;');
     connection.exec('PRAGMA foreign_keys = ON;');
     console.log('Database created and schema applied.');
@@ -454,6 +454,24 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
       console.error('Fatal: Failed to migrate database to version 6:', e);
     }
   }
+
+  if (currentVersion < 7) {
+    try {
+      const transaction = connection.transaction(() => {
+        const columns = connection.prepare("PRAGMA table_info(nodes)").all() as { name: string }[];
+        const hasIsLocked = columns.some(column => column.name === 'is_locked');
+        if (!hasIsLocked) {
+          connection.exec('ALTER TABLE nodes ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0;');
+        }
+        connection.exec('UPDATE nodes SET is_locked = COALESCE(is_locked, 0);');
+        connection.pragma('user_version = 7');
+      });
+      transaction();
+      console.log('Migration to version 7 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 7:', e);
+    }
+  }
 };
 
 export const databaseService = {
@@ -625,9 +643,21 @@ export const databaseService = {
         }
 
         // Insert Nodes
-        const nodeStmt = db.prepare('INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        const nodeStmt = db.prepare('INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
         for (const node of data.nodes) {
-            nodeStmt.run(node.node_id, node.parent_id, node.node_type, node.title, node.sort_order, node.created_at, node.updated_at);
+            const locked = typeof node.locked === 'boolean'
+              ? node.locked
+              : Boolean((node as { is_locked?: number | boolean }).is_locked);
+            nodeStmt.run(
+              node.node_id,
+              node.parent_id,
+              node.node_type,
+              node.title,
+              node.sort_order,
+              node.created_at,
+              node.updated_at,
+              locked ? 1 : 0,
+            );
         }
 
         // Insert Documents and Versions
@@ -719,10 +749,14 @@ export const databaseService = {
         const newNodeId = uuidv4();
         const now = new Date().toISOString();
   
+        const locked = typeof originalNode.locked === 'boolean'
+          ? originalNode.locked
+          : Boolean((originalNode as { is_locked?: number | boolean }).is_locked);
+
         db.prepare(`
-          INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?)
-        `).run(newNodeId, newParentId, originalNode.node_type, `Copy of ${originalNode.title}`, sortOrder, now, now);
+          INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(newNodeId, newParentId, originalNode.node_type, `Copy of ${originalNode.title}`, sortOrder, now, now, locked ? 1 : 0);
   
         if (originalNode.node_type === 'document') {
           // Fix: Cast the result to the Document type.
@@ -875,10 +909,12 @@ export const databaseService = {
         const nodeType = node.type === 'folder' ? 'folder' : 'document';
         const title = node.title ?? 'Untitled';
 
+        const locked = Boolean(node.locked);
+
         db.prepare(
-          `INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
-        ).run(newNodeId, currentParentId, nodeType, title, sortOrder, now, now);
+          `INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).run(newNodeId, currentParentId, nodeType, title, sortOrder, now, now, locked ? 1 : 0);
 
         if (isRoot) {
           createdNodeIds.push(newNodeId);
@@ -1063,7 +1099,7 @@ export const databaseService = {
                         const maxSortOrderResult = db.prepare(`SELECT MAX(sort_order) as max_order FROM nodes WHERE parent_id ${currentParentId ? '= ?' : 'IS NULL'}`).get(currentParentId) as { max_order: number | null };
                         const sortOrder = (maxSortOrderResult?.max_order ?? -1) + 1;
 
-                        db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, 'folder', ?, ?, ?, ?)`).run(newFolderId, currentParentId, part, sortOrder, now, now);
+                        db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked) VALUES (?, ?, 'folder', ?, ?, ?, ?, 0)`).run(newFolderId, currentParentId, part, sortOrder, now, now);
                         console.log(`Created folder "${part}" with id ${newFolderId}`);
                         currentParentId = newFolderId;
                     }
@@ -1084,7 +1120,7 @@ export const databaseService = {
             const defaultViewMode: ViewMode | null = classification.defaultViewMode ?? (docType === 'pdf' || docType === 'image' ? 'preview' : null);
             const classificationTimestamp = new Date().toISOString();
 
-            db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at) VALUES (?, ?, 'document', ?, ?, ?, ?)`).run(newNodeId, currentParentId, file.name, sortOrder, now, now);
+            db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked) VALUES (?, ?, 'document', ?, ?, ?, ?, 0)`).run(newNodeId, currentParentId, file.name, sortOrder, now, now);
 
             const docResult = db.prepare(`INSERT INTO documents (node_id, doc_type, language_hint, language_source, doc_type_source, classification_updated_at, default_view_mode) VALUES (?, ?, ?, ?, ?, ?, ?)`)
               .run(newNodeId, docType, languageHint, languageSource, docTypeSource, classificationTimestamp, defaultViewMode);

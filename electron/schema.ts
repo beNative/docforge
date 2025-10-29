@@ -2,7 +2,7 @@
 // removing the need for external .sql files which can complicate the build process.
 
 export const INITIAL_SCHEMA = `
--- PRAGMA user_version is set to 3 by the database service for this schema.
+-- PRAGMA user_version is set to 7 by the database service for this schema.
 
 -- =================================================================
 --  CORE HIERARCHY & METADATA
@@ -15,6 +15,7 @@ CREATE TABLE nodes (
     sort_order          INTEGER NOT NULL,
     created_at          TEXT NOT NULL,
     updated_at          TEXT NOT NULL,
+    is_locked           INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (parent_id) REFERENCES nodes(node_id) ON DELETE CASCADE
 );
 CREATE INDEX idx_nodes_parent_id ON nodes (parent_id);

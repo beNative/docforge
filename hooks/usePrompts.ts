@@ -15,6 +15,7 @@ const nodeToDocumentOrFolder = (node: Node): DocumentOrFolder => ({
   createdAt: node.created_at,
   updatedAt: node.updated_at,
   parentId: node.parent_id,
+  locked: node.locked,
   doc_type: node.document?.doc_type,
   language_hint: node.document?.language_hint,
   default_view_mode: node.document?.default_view_mode,
@@ -55,7 +56,7 @@ const getDescendantIdsRecursive = (nodeId: string, allNodes: Node[]): Set<string
  * This allows the UI to function without a full refactor of all components.
  */
 export const useDocuments = () => {
-  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, addLog, isLoading } = useNodes();
+  const { nodes, addNode, updateNode, deleteNode, deleteNodes, moveNodes, updateDocumentContent, refreshNodes, duplicateNodes, importFiles, importNodesFromTransfer, createDocumentFromClipboard, setNodeLock, addLog, isLoading } = useNodes();
 
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
@@ -69,6 +70,7 @@ export const useDocuments = () => {
       parent_id: parentId,
       node_type: 'document',
       title,
+      locked: false,
       document: {
         content,
         doc_type,
@@ -101,6 +103,7 @@ export const useDocuments = () => {
       parent_id: parentId,
       node_type: 'folder',
       title,
+      locked: false,
     });
     return nodeToDocumentOrFolder(newNode);
   }, [addNode]);
@@ -188,5 +191,9 @@ export const useDocuments = () => {
       return getDescendantIdsRecursive(nodeId, allNodesFlat);
   }, [allNodesFlat]);
 
-  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard: createDocumentFromClipboardAdapter, isLoading };
+  const setItemLock = useCallback(async (id: string, locked: boolean) => {
+    await setNodeLock(id, locked);
+  }, [setNodeLock]);
+
+  return { items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard: createDocumentFromClipboardAdapter, setItemLock, isLoading };
 };

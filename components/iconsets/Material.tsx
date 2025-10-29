@@ -70,6 +70,14 @@ export const FolderPlusIcon: React.FC<IconProps> = ({ className }) => (
 export const FolderDownIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path d="M20 6h-8l-2-2H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-4 8h-2v4h-4v-4H8l4-4 4 4z"/></svg>
 );
+
+export const LockClosedIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path d="M18 11h-1V8a5 5 0 0 0-10 0v3H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zm-5 6.73V20h-2v-2.27a1.5 1.5 0 1 1 2 0zM9 11V8a3 3 0 0 1 6 0v3H9z"/></svg>
+);
+
+export const LockOpenIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path d="M18 11h-1V8a5 5 0 0 0-9.9-1l1.9.6A3 3 0 0 1 15 8v3H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zm-5 6.73V20h-2v-2.27a1.5 1.5 0 1 1 2 0z"/></svg>
+);
 export const KeyboardIcon: React.FC<IconProps> = ({ className }) => (
   <svg xmlns="http://www.w3.org/2000/svg" {...iconProps(className)}><path d="M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 2H5v-2h2v2zm0-3H5V8h2v2zm9 7H8v-2h8v2zm0-4h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg>
 );

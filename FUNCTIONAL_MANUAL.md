@@ -27,7 +27,7 @@ The resizable left panel is your main navigation and organization area.
 
 - **Search:** A search bar at the top lets you filter your documents and folders. It instantly checks titles while also running a background full-text search across document bodies, returning contextual snippets with the matched terms highlighted so you can quickly confirm relevance.
 - **Documents List:** A hierarchical tree view of all your documents and folders.
-    - **Action Toolbar:** A toolbar at the top of the list provides icon buttons to quickly create a new document, create a new root folder, create a new document from a template, and expand/collapse all folders.
+    - **Action Toolbar:** A toolbar at the top of the list provides icon buttons to quickly create a new document, create a new root folder, create a new document from a template, expand/collapse all folders, and toggle the active document's lock state.
     - **Folders:** Can be expanded or collapsed.
     - **Documents:** Individual document files. Selecting a document opens it in the Main Content Area.
 - **Templates List:** A separate panel below your documents for managing reusable templates. This panel is resizable; you can drag its top border to adjust its height.
@@ -119,6 +119,7 @@ The document editor is powered by Monaco, the same editor core used in VS Code, 
     - **Save Version:** Manually save the current content as a new version in the document's history. The button icon will be highlighted when there are unsaved changes.
     - **Version History:** Open a view to see all saved versions of the document.
     - **Format:** Automatically tidy up supported languages—Markdown, JSON, JavaScript, and TypeScript—using DocForge's integrated formatter.
+    - **Lock/Unlock:** Click the padlock icon to switch the document between editable and read-only modes. Locked documents disable title regeneration, formatting, AI refinement, and manual saves until you unlock them.
     - **Copy:** Copy the document's content to the clipboard.
     - **Refine with AI:** Send the document's content to your configured LLM to get an improved version (only for Markdown and plaintext files).
     - **Delete:** Delete the current document. A confirmation is required, where pressing `Enter` will confirm the action.
