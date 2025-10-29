@@ -79,7 +79,28 @@ declare global {
       pythonGetRun: (runId: string) => Promise<PythonExecutionRun | null>;
       onPythonRunLog: (callback: (payload: { runId: string; entry: PythonExecutionLogEntry }) => void) => () => void;
       onPythonRunStatus: (callback: (payload: { runId: string; status: PythonExecutionStatus }) => void) => () => void;
+      scriptGetNodeSettings: (nodeId: string, language: ScriptLanguage) => Promise<NodeScriptSettings>;
+      scriptUpdateNodeSettings: (
+        nodeId: string,
+        language: ScriptLanguage,
+        updates: ScriptNodeSettingsUpdate
+      ) => Promise<NodeScriptSettings>;
+      scriptRun: (payload: ScriptRunRequestPayload) => Promise<ScriptExecutionRun>;
+      scriptGetRunsForNode: (
+        nodeId: string,
+        language: ScriptLanguage,
+        limit?: number
+      ) => Promise<ScriptExecutionRun[]>;
+      scriptGetRunLogs: (runId: string) => Promise<ScriptExecutionLogEntry[]>;
+      scriptGetRun: (runId: string) => Promise<ScriptExecutionRun | null>;
+      onScriptRunLog: (
+        callback: (payload: { language: ScriptLanguage; runId: string; entry: ScriptExecutionLogEntry }) => void
+      ) => () => void;
+      onScriptRunStatus: (
+        callback: (payload: { language: ScriptLanguage; runId: string; status: ScriptExecutionStatus }) => void
+      ) => () => void;
     };
+    __DOCFORGE_SCRIPT_PREVIEW__?: ScriptExecutionBridge;
   }
   // This is for the Electron main process, to add properties attached by Electron.
   namespace NodeJS {
@@ -246,6 +267,88 @@ export interface PythonRunRequestPayload {
   consoleBehavior: PythonConsoleBehavior;
 }
 
+export type ScriptLanguage = 'shell' | 'powershell';
+
+export type ScriptExecutionMode = 'run' | 'test';
+
+export interface ScriptExecutionDefaults {
+  environmentVariables: Record<string, string>;
+  workingDirectory: string | null;
+  executable: string | null;
+}
+
+export interface ScriptRunRequestPayload {
+  nodeId: string;
+  language: ScriptLanguage;
+  code: string;
+  environmentVariables: Record<string, string>;
+  workingDirectory: string | null;
+  executable: string | null;
+  overrides: Record<string, string>;
+  mode: ScriptExecutionMode;
+}
+
+export type ScriptExecutionStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
+
+export interface ScriptExecutionRun {
+  runId: string;
+  nodeId: string;
+  language: ScriptLanguage;
+  mode: ScriptExecutionMode;
+  status: ScriptExecutionStatus;
+  startedAt: string;
+  finishedAt: string | null;
+  exitCode: number | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+}
+
+export interface ScriptExecutionLogEntry {
+  runId: string;
+  timestamp: string;
+  level: 'INFO' | 'ERROR';
+  message: string;
+}
+
+export interface ScriptExecutionBridge {
+  scriptGetNodeSettings(nodeId: string, language: ScriptLanguage): Promise<NodeScriptSettings>;
+  scriptUpdateNodeSettings(
+    nodeId: string,
+    language: ScriptLanguage,
+    updates: ScriptNodeSettingsUpdate
+  ): Promise<NodeScriptSettings>;
+  scriptRun(payload: ScriptRunRequestPayload): Promise<ScriptExecutionRun>;
+  scriptGetRunsForNode(
+    nodeId: string,
+    language: ScriptLanguage,
+    limit?: number
+  ): Promise<ScriptExecutionRun[]>;
+  scriptGetRunLogs(runId: string): Promise<ScriptExecutionLogEntry[]>;
+  scriptGetRun(runId: string): Promise<ScriptExecutionRun | null>;
+  onScriptRunLog(
+    callback: (payload: { language: ScriptLanguage; runId: string; entry: ScriptExecutionLogEntry }) => void
+  ): () => void;
+  onScriptRunStatus(
+    callback: (payload: { language: ScriptLanguage; runId: string; status: ScriptExecutionStatus }) => void
+  ): () => void;
+}
+
+export interface NodeScriptSettings {
+  nodeId: string;
+  language: ScriptLanguage;
+  environmentVariables: Record<string, string>;
+  workingDirectory: string | null;
+  executable: string | null;
+  lastRunId: string | null;
+  updatedAt: string;
+}
+
+export interface ScriptNodeSettingsUpdate {
+  environmentVariables: Record<string, string>;
+  workingDirectory: string | null;
+  executable: string | null;
+}
+
 export interface Node {
   node_id: string;
   parent_id: string | null;
@@ -407,6 +510,8 @@ export interface Settings {
   pythonDefaults: PythonEnvironmentDefaults;
   pythonWorkingDirectory: string | null;
   pythonConsoleTheme: 'light' | 'dark';
+  shellDefaults: ScriptExecutionDefaults;
+  powershellDefaults: ScriptExecutionDefaults;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';

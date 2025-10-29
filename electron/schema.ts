@@ -185,4 +185,39 @@ CREATE TABLE node_python_settings (
 CREATE INDEX idx_python_runs_node ON python_execution_runs(node_id);
 CREATE INDEX idx_python_runs_env ON python_execution_runs(env_id);
 CREATE INDEX idx_python_logs_run ON python_execution_logs(run_id);
+
+CREATE TABLE script_execution_runs (
+    run_id              TEXT PRIMARY KEY,
+    node_id             TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
+    language            TEXT NOT NULL,
+    mode                TEXT NOT NULL DEFAULT 'run',
+    status              TEXT NOT NULL,
+    started_at          TEXT NOT NULL,
+    finished_at         TEXT,
+    exit_code           INTEGER,
+    error_message       TEXT,
+    duration_ms         INTEGER
+);
+
+CREATE TABLE script_execution_logs (
+    log_id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id              TEXT NOT NULL REFERENCES script_execution_runs(run_id) ON DELETE CASCADE,
+    timestamp           TEXT NOT NULL,
+    level               TEXT NOT NULL,
+    message             TEXT NOT NULL
+);
+
+CREATE TABLE node_script_settings (
+    node_id             TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
+    language            TEXT NOT NULL,
+    env_vars_json       TEXT NOT NULL,
+    working_directory   TEXT,
+    executable          TEXT,
+    last_run_id         TEXT REFERENCES script_execution_runs(run_id) ON DELETE SET NULL,
+    updated_at          TEXT NOT NULL,
+    PRIMARY KEY (node_id, language)
+);
+
+CREATE INDEX idx_script_runs_node_lang ON script_execution_runs(node_id, language);
+CREATE INDEX idx_script_logs_run ON script_execution_logs(run_id);
 `;

@@ -105,6 +105,14 @@ The export service centralizes all logic for saving documents to disk.
 -   **Payload Preparation:** Text documents are serialized with UTF-8 defaults, while PDFs and images are decoded from data URLs or base64 strings into `Uint8Array` buffers before saving.
 -   **Renderer Integration:** Renderer components call `handleSaveNodeToFile()` which delegates to the export service. In Electron builds the payload is sent over IPC to `electron/main.ts`, which opens a native save dialog and streams the bytes. Browser builds fall back to programmatically triggering a download with the correct MIME type.
 -   **Cancellation Handling:** If a user dismisses the save dialog, the service returns a `canceled` result that callers treat as a no-op so logs and notifications stay quiet.
+### Script Execution Pipeline
+
+DocForge treats shell and PowerShell automation as first-class workflows that span the renderer and main processes.
+
+-   **Renderer orchestration (`components/ScriptExecutionPanel.tsx`):** Presents the UI for configuring per-document environment variables, working directory, and interpreter overrides. It merges those overrides with the defaults loaded from the settings context before dispatching a run.
+-   **IPC bridge (`services/scriptService.ts`):** Normalizes renderer requests into `scriptRun`, `scriptGetNodeSettings`, and related IPC calls. In preview builds it can swap to the mock bridge exposed by `preview/createScriptPreviewBridge.ts` so web previews behave consistently.
+-   **Main-process runner (`electron/scriptRunner.ts`):** Persists run metadata, writes temporary script files, and spawns the resolved executable. Test mode leverages `scriptArgs.ts` to compute syntax-only flags (for example, Bash `-n`, or a PowerShell `ScriptBlock` parser) and gracefully fails when an interpreter cannot support syntax checks. Streams from stdout/stderr are recorded to `script_execution_logs` and broadcast back to the renderer.
+-   **Defaults management:** Global defaults live in the `settings` table (`shellDefaults`, `powershellDefaults`) and are edited through `SettingsView.tsx`. When a run starts, the runner merges these defaults with per-document overrides so teams can set organization-wide variables while allowing individual scripts to customize their environment safely.
 
 ### LLM Service (`services/llmService.ts`)
 

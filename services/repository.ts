@@ -65,8 +65,14 @@ const createSampleBrowserState = (): BrowserState => {
     const rootId = 'sample-root';
     const documentNodeId = 'sample-doc';
     const documentId = 1;
+    const shellDocumentId = 2;
+    const powershellDocumentId = 3;
     const versionId = 1;
+    const shellVersionId = 2;
+    const powershellVersionId = 3;
     const sampleContent = '# Welcome to DocForge\n\nThis is a static dataset provided for browser preview mode.';
+    const shellContent = '#!/bin/bash\n\necho "DocForge shell quickstart"\nls -la';
+    const powershellContent = 'Write-Host "DocForge PowerShell quickstart"\nGet-ChildItem';
 
     const document: Document = {
         document_id: documentId,
@@ -82,51 +88,117 @@ const createSampleBrowserState = (): BrowserState => {
     };
 
     const documentNode: Node = {
-        node_id: documentNodeId,
-        parent_id: rootId,
-        node_type: 'document',
-        title: 'Getting Started',
-        sort_order: 0,
-        created_at: now,
-        updated_at: now,
-        document,
+      node_id: documentNodeId,
+      parent_id: rootId,
+      node_type: 'document',
+      title: 'Getting Started',
+      sort_order: 0,
+      created_at: now,
+      updated_at: now,
+      document,
+    };
+
+    const shellDocument: Document = {
+      document_id: shellDocumentId,
+      node_id: 'sample-shell',
+      doc_type: 'source_code',
+      language_hint: 'shell',
+      default_view_mode: 'split-vertical',
+      language_source: 'user',
+      doc_type_source: 'user',
+      classification_updated_at: now,
+      current_version_id: shellVersionId,
+      content: shellContent,
+    };
+
+    const shellNode: Node = {
+      node_id: 'sample-shell',
+      parent_id: rootId,
+      node_type: 'document',
+      title: 'Shell Quickstart',
+      sort_order: 1,
+      created_at: now,
+      updated_at: now,
+      document: shellDocument,
+    };
+
+    const powershellDocument: Document = {
+      document_id: powershellDocumentId,
+      node_id: 'sample-powershell',
+      doc_type: 'source_code',
+      language_hint: 'powershell',
+      default_view_mode: 'split-vertical',
+      language_source: 'user',
+      doc_type_source: 'user',
+      classification_updated_at: now,
+      current_version_id: powershellVersionId,
+      content: powershellContent,
+    };
+
+    const powershellNode: Node = {
+      node_id: 'sample-powershell',
+      parent_id: rootId,
+      node_type: 'document',
+      title: 'PowerShell Quickstart',
+      sort_order: 2,
+      created_at: now,
+      updated_at: now,
+      document: powershellDocument,
     };
 
     const rootNode: Node = {
-        node_id: rootId,
-        parent_id: null,
-        node_type: 'folder',
-        title: 'Sample Workspace',
-        sort_order: 0,
-        created_at: now,
-        updated_at: now,
-        children: [documentNode],
+      node_id: rootId,
+      parent_id: null,
+      node_type: 'folder',
+      title: 'Sample Workspace',
+      sort_order: 0,
+      created_at: now,
+      updated_at: now,
+      children: [documentNode, shellNode, powershellNode],
     };
 
     return {
-        nodes: [rootNode],
-        templates: EXAMPLE_TEMPLATES.map((template, index) => ({
-            ...template,
-            template_id: `sample-template-${index}`,
+      nodes: [rootNode],
+      templates: EXAMPLE_TEMPLATES.map((template, index) => ({
+        ...template,
+        template_id: `sample-template-${index}`,
+        created_at: now,
+        updated_at: now,
+      })),
+      settings: { ...DEFAULT_SETTINGS },
+      docVersions: {
+        [documentId]: [
+          {
+            version_id: versionId,
+            document_id: documentId,
             created_at: now,
-            updated_at: now,
-        })),
-        settings: { ...DEFAULT_SETTINGS },
-        docVersions: {
-            [documentId]: [
-                {
-                    version_id: versionId,
-                    document_id: documentId,
-                    created_at: now,
-                    content_id: versionId,
-                    content: sampleContent,
-                },
-            ],
-        },
-        nextDocumentId: documentId + 1,
-        nextVersionId: versionId + 1,
+            content_id: versionId,
+            content: sampleContent,
+          },
+        ],
+        [shellDocumentId]: [
+          {
+            version_id: shellVersionId,
+            document_id: shellDocumentId,
+            created_at: now,
+            content_id: shellVersionId,
+            content: shellContent,
+          },
+        ],
+        [powershellDocumentId]: [
+          {
+            version_id: powershellVersionId,
+            document_id: powershellDocumentId,
+            created_at: now,
+            content_id: powershellVersionId,
+            content: powershellContent,
+          },
+        ],
+      },
+      nextDocumentId: powershellDocumentId + 1,
+      nextVersionId: powershellVersionId + 1,
     };
-};
+  };
 
 const loadBrowserState = (): BrowserState => {
     if (typeof window === 'undefined' || !window.localStorage) {
