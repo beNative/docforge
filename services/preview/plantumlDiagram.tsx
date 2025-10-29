@@ -88,6 +88,7 @@ const PlantUMLRemoteDiagram: React.FC<{ code: string }> = ({ code }) => {
       <img
         src={`${PLANTUML_SERVER}/${encoded}`}
         alt="PlantUML diagram"
+        title=""
         loading="lazy"
         draggable={false}
         onError={() => {
@@ -125,6 +126,11 @@ const PlantUMLOfflineDiagram: React.FC<{ code: string }> = ({ code }) => {
       svg.setAttribute('draggable', 'false');
       svg.style.userSelect = 'none';
       (svg.style as any).webkitUserDrag = 'none';
+      const svgTitle = svg.querySelector('title');
+      if (svgTitle) {
+        svgTitle.remove();
+      }
+      svg.removeAttribute('title');
     }
   }, [state.status]);
 
