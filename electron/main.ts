@@ -806,11 +806,23 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
                 errorOutput += chunk.toString();
             });
 
+            const logPlantumlFailure = (reason: string, context?: Record<string, unknown>) => {
+                const payload = {
+                    reason,
+                    ...(context ?? {}),
+                };
+                log.error('[PlantUML] Rendering failed', payload);
+            };
+
             child.on('error', (err) => {
                 const message =
                     err instanceof Error
                         ? err.message
                         : 'Failed to start the local PlantUML renderer process.';
+                logPlantumlFailure('spawn-error', {
+                    message,
+                    stderr: errorOutput.trim() || undefined,
+                });
                 finalize({
                     success: false,
                     error: message,
@@ -825,6 +837,10 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
                 }
 
                 const exitDetails = errorOutput.trim();
+                logPlantumlFailure('non-zero-exit', {
+                    exitCode: code ?? null,
+                    stderr: exitDetails || undefined,
+                });
                 finalize({
                     success: false,
                     error: derivePlantumlFriendlyError(exitDetails, code ?? undefined),
@@ -834,6 +850,9 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
 
             child.stdin.on('error', (err) => {
                 const message = err instanceof Error ? err.message : String(err);
+                logPlantumlFailure('stdin-error', {
+                    message,
+                });
                 finalize({
                     success: false,
                     error: 'Failed to send diagram to the PlantUML renderer.',
@@ -845,7 +864,10 @@ ipcMain.handle('plantuml:render-svg', async (_, diagram: string, format: 'svg' =
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.error('PlantUML rendering failed:', error);
+        log.error('[PlantUML] Rendering failed before invoking renderer', {
+            message,
+            error,
+        });
         return { success: false, error: message };
     }
 });
