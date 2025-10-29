@@ -238,15 +238,13 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
   }, [defaults.environmentVariables]);
 
   const headerContainerClasses = isCollapsed
-    ? 'flex items-center justify-between flex-shrink-0 p-1'
+    ? 'flex items-center justify-between p-1'
     : 'flex flex-wrap items-center justify-between gap-2 px-2 pt-2 pb-3 border-b border-border-color/50';
 
+  const panelContainerClasses = isCollapsed ? 'flex-shrink-0' : 'h-full min-h-0';
+
   return (
-    <div
-      className={`flex flex-col text-sm text-text-main border-t border-border-color ${
-        isCollapsed ? '' : 'h-full min-h-0'
-      }`}
-    >
+    <div className={`flex w-full flex-col text-sm text-text-main border-t border-border-color ${panelContainerClasses}`}>
       <div className={headerContainerClasses}>
         <div className="flex items-center gap-1">
           <IconButton
@@ -260,7 +258,7 @@ const ScriptExecutionPanel: React.FC<ScriptExecutionPanelProps> = ({
           >
             <ChevronDownIcon className={`w-4 h-4 transition-transform ${isCollapsed ? '-rotate-90' : 'rotate-0'}`} />
           </IconButton>
-          <h2 className="flex items-center gap-1 text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase leading-none">
+          <h2 className="flex items-center gap-1 text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase">
             <TerminalIcon className="w-4 h-4" />
             {label}
           </h2>
