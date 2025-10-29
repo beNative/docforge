@@ -7,11 +7,12 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Modern, Draggable Title Bar:** A sleek, VS Code-style custom title bar maximizes screen space and integrates essential functions (Electron version only).
 - **Integrated Command Palette:** Quickly access all core functions from a central search bar.
 - **Hierarchical Document Organization:** Organize your documents in a familiar folder structure. Create nested subfolders, duplicate items, and use drag-and-drop to rearrange your workspace or import files from your computer.
+- **Clipboard Capture:** Turn whatever is on your system clipboard into a document in one step—DocForge classifies the contents automatically and prompts you to restore permissions if clipboard access is blocked.
 - **Full Context Menu & Keyboard Navigation:** Navigate and manage items using a complete right-click context menu or use only the keyboard for a faster workflow.
 - **Universal Monaco Editor:** A powerful, VS Code-like editor is used for all document types, including Markdown, HTML, and various source code files, with syntax highlighting and code folding.
 - **One-Click Formatting:** Clean up Markdown, JSON, JavaScript, and TypeScript documents directly from the editor toolbar.
 - **Multi-Document Tabs:** Keep several documents open at once, pin important files, and quickly jump between them using the tab strip and overflow picker.
-- **Multi-Format Live Preview:** Get a real-time, rendered preview for multiple document types (including Markdown and HTML). The preview can be displayed side-by-side (vertically or horizontally) with the editor.
+- **Multi-Format Live Preview:** Get a real-time, rendered preview for Markdown, HTML, PDFs, and common image formats. The preview can be displayed side-by-side (vertically or horizontally) with the editor, and binary formats open straight into preview mode with zoom and pan controls tailored to each viewer.
 - **AI-Powered Refinement:** Use your connected local LLM to automatically refine and improve your documents with a single click.
 - **Document Templating:** Create reusable document templates with variables to quickly generate new documents for recurring tasks.
 - **Document Export:** Save any document to your filesystem with a suggested filename and the correct extension for its detected type, whether you're running the Electron app or using the browser build.
@@ -27,7 +28,7 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Configurable Data Storage:** Choose a custom SQLite database location or reopen an existing workspace file from the settings panel.
 - **Comprehensive Action Logging**: Every user action is logged, providing a clear audit trail and making debugging easier.
 - **Offline First:** All your data is stored locally on your machine.
-- **Auto-Update:** The application can automatically check for and install updates (pre-release versions are opt-in).
+- **Auto-Update:** Control automatic startup checks, opt into pre-release builds, and trigger manual "Check for Updates" scans that report success or errors inline.
 - **Resizable Layout:** The sidebar, templates panel, and logger panel are all fully resizable to customize your workspace.
 
 ## Getting Started
