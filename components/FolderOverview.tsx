@@ -367,6 +367,8 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                                                             borderLeftWidth: '3px',
                                                                             borderLeftStyle: 'solid',
                                                                             borderLeftColor: 'rgb(var(--color-accent) / 0.45)',
+                                                                            backgroundColor: 'rgb(var(--color-border) / 0.26)',
+                                                                            borderRadius: '4px',
                                                                         }}
                                                                     >
                                                                         {highlightMatches(result.searchSnippet, folderSearchTerm)}

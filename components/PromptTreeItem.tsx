@@ -356,6 +356,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const snippetAccentWidth = 3;
   const snippetMarginLeft = Math.max(snippetPaddingLeft - snippetAccentPadding, 0);
   const snippetAccentColor = 'rgb(var(--color-accent) / 0.45)';
+  const snippetBackgroundColor = 'rgb(var(--color-border) / 0.26)';
 
   return (
     <li
@@ -523,6 +524,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                     borderLeftWidth: `${snippetAccentWidth}px`,
                     borderLeftStyle: 'solid',
                     borderLeftColor: snippetAccentColor,
+                    backgroundColor: snippetBackgroundColor,
+                    borderRadius: '4px',
                 }}
             >
                 {highlightMatches(node.searchSnippet, searchTerm)}
