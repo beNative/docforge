@@ -86,7 +86,7 @@ const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: Document
 };
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, onNewFromClipboard, customShortcuts } = props;
+  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, onNewFromClipboard, customShortcuts, onSelectTemplate, onSelectNode } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
@@ -104,6 +104,38 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
 
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const handleSearchKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== 'ArrowDown') {
+        return;
+      }
+
+      const firstNavigableItem = navigableItems[0];
+      if (!firstNavigableItem) {
+        return;
+      }
+
+      event.preventDefault();
+      event.currentTarget.blur();
+      setFocusedItemId(firstNavigableItem.id);
+      setSelectedIds(new Set([firstNavigableItem.id]));
+      setLastClickedId(firstNavigableItem.id);
+
+      if (firstNavigableItem.type === 'template') {
+        onSelectTemplate(firstNavigableItem.id);
+      } else {
+        const syntheticEvent = {
+          shiftKey: false,
+          ctrlKey: false,
+          metaKey: false,
+        } as React.MouseEvent;
+        onSelectNode(firstNavigableItem.id, syntheticEvent);
+      }
+
+      sidebarRef.current?.focus();
+    },
+    [navigableItems, onSelectNode, onSelectTemplate, setLastClickedId, setSelectedIds]
+  );
   const isResizingTemplates = useRef(false);
 
   // Effect to manage focus state
@@ -432,6 +464,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
                 className="w-full bg-background border border-border-color rounded-md pl-9 pr-9 py-1 text-xs text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
             />
             {searchTerm.trim() && (
