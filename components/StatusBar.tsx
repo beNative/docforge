@@ -34,6 +34,7 @@ interface StatusBarProps {
   previewMaxScale: number;
   previewInitialScale: number;
   previewMetadata?: PreviewMetadata | null;
+  zoomTarget: 'preview' | 'editor';
 }
 
 const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: string }> = {
@@ -133,6 +134,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
     previewMaxScale,
     previewInitialScale,
     previewMetadata,
+    zoomTarget,
 }) => {
   const { text, color, tooltip } = statusConfig[status];
   const selectedService = discoveredServices.find(s => s.generateUrl === llmProviderUrl);
@@ -214,6 +216,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const isAtInitialZoom = Math.abs(previewScale - previewInitialScale) < 0.001;
   const zoomLabelClass = `min-w-[3rem] text-center font-semibold ${isZoomDisabled ? 'text-text-secondary' : 'text-text-main'}`;
   const zoomPercentage = Math.round(previewScale * 100);
+  const zoomTargetLabel = zoomTarget === 'preview' ? 'Preview' : 'Editor';
 
   const previewMetadataDisplay = React.useMemo(() => {
     if (!previewMetadata) {
@@ -355,7 +358,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
       </div>
       <div className="flex items-center gap-3 whitespace-nowrap min-w-0">
         <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1.5" role="group" aria-label="Preview zoom controls">
+          <div className="flex items-center gap-1.5" role="group" aria-label={`Workspace zoom controls (${zoomTargetLabel})`}>
             <ZoomButton
               className={zoomButtonClass}
               onClick={onPreviewZoomOut}
@@ -381,6 +384,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
               hint="Reset zoom"
               icon={<RefreshIcon className="w-3.5 h-3.5" />}
             />
+            <span className="text-[10px] uppercase tracking-wide text-text-secondary ml-1">{zoomTargetLabel}</span>
           </div>
         </div>
         {previewMetadataDisplay && (

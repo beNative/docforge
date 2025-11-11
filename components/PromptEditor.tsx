@@ -27,6 +27,7 @@ interface DocumentEditorProps {
   onToggleLock: (locked: boolean) => Promise<void> | void;
   formatTrigger: number;
   previewScale: number;
+  editorScale: number;
   onPreviewScaleChange: (scale: number) => void;
   previewMinScale: number;
   previewMaxScale: number;
@@ -36,6 +37,7 @@ interface DocumentEditorProps {
   onPreviewVisibilityChange?: (isVisible: boolean) => void;
   onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
   onPreviewMetadataChange?: (metadata: PreviewMetadata | null) => void;
+  onZoomTargetChange?: (target: 'preview' | 'editor') => void;
 }
 
 const PREVIEWABLE_LANGUAGES = new Set<string>([
@@ -95,6 +97,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onToggleLock,
   formatTrigger,
   previewScale,
+  editorScale,
   onPreviewScaleChange,
   previewMinScale,
   previewMaxScale,
@@ -104,6 +107,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onPreviewVisibilityChange,
   onPreviewZoomAvailabilityChange,
   onPreviewMetadataChange,
+  onZoomTargetChange,
 }) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
@@ -592,6 +596,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     initialScale: previewInitialScale,
   }), [previewInitialScale, previewMaxScale, previewMinScale, previewZoomStep]);
 
+  const scaledEditorFontSize = useMemo(() => {
+    const baseSize = settings.editorFontSize;
+    const scaledSize = baseSize * editorScale;
+    if (!Number.isFinite(scaledSize) || scaledSize <= 0) {
+      return baseSize;
+    }
+    return scaledSize;
+  }, [editorScale, settings.editorFontSize]);
+
   useEffect(() => {
     const isPreviewVisible = supportsPreview && (viewMode === 'preview' || viewMode.startsWith('split-'));
     onPreviewVisibilityChange?.(isPreviewVisible);
@@ -608,6 +621,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       onPreviewMetadataChange?.(null);
     };
   }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange, onPreviewMetadataChange]);
+
+  useEffect(() => {
+    if (viewMode === 'preview') {
+      onZoomTargetChange?.('preview');
+    } else if (viewMode === 'edit' || viewMode.startsWith('split-')) {
+      onZoomTargetChange?.('editor');
+    }
+  }, [onZoomTargetChange, viewMode]);
 
   useEffect(() => {
     if (!supportsPreview) {
@@ -660,6 +681,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     target.addEventListener('pointercancel', handlePointerCancel);
   }, [scriptPanelHeight, scriptPanelMinHeight]);
   
+  const handlePreviewFocus = useCallback(() => {
+    onZoomTargetChange?.('preview');
+  }, [onZoomTargetChange]);
+
+  const handleEditorFocusChange = useCallback((hasFocus: boolean) => {
+    if (hasFocus) {
+      onZoomTargetChange?.('editor');
+    }
+  }, [onZoomTargetChange]);
+
   const renderContent = () => {
     const editor = isDiffMode
       ? (
@@ -672,9 +703,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             onChange={isLocked ? undefined : setContent}
             onScroll={handleEditorScroll}
             fontFamily={settings.editorFontFamily}
-            fontSize={settings.editorFontSize}
+            fontSize={scaledEditorFontSize}
             activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
             activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+            onFocusChange={handleEditorFocusChange}
           />
         )
       : (
@@ -686,27 +718,34 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             onScroll={handleEditorScroll}
             customShortcuts={settings.customShortcuts}
             fontFamily={settings.editorFontFamily}
-            fontSize={settings.editorFontSize}
+            fontSize={scaledEditorFontSize}
             activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
             activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
             readOnly={isLocked}
+            onFocusChange={handleEditorFocusChange}
           />
         );
     const preview = (
-      <PreviewPane
-        ref={previewScrollRef}
-        content={content}
-        language={language}
-        onScroll={handlePreviewScroll}
-        addLog={addLog}
-        settings={settings}
-        previewScale={previewScale}
-        onPreviewScaleChange={onPreviewScaleChange}
-        previewZoomOptions={previewZoomOptions}
-        previewResetSignal={previewResetSignal}
-        onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
-        onMetadataChange={onPreviewMetadataChange}
-      />
+      <div
+        className="h-full w-full"
+        onPointerDown={handlePreviewFocus}
+        onFocusCapture={handlePreviewFocus}
+      >
+        <PreviewPane
+          ref={previewScrollRef}
+          content={content}
+          language={language}
+          onScroll={handlePreviewScroll}
+          addLog={addLog}
+          settings={settings}
+          previewScale={previewScale}
+          onPreviewScaleChange={onPreviewScaleChange}
+          previewZoomOptions={previewZoomOptions}
+          previewResetSignal={previewResetSignal}
+          onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
+          onMetadataChange={onPreviewMetadataChange}
+        />
+      </div>
     );
     
     switch(viewMode) {

@@ -43,7 +43,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     minScale = 0.25,
     maxScale = 5,
     initialScale = 1,
-    zoomStep = 0.25,
+    zoomStep = 0.05,
     disableControls = false,
     disablePan = false,
     disableZoom = false,
@@ -119,10 +119,11 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
       }
       const direction = deltaY > 0 ? -1 : 1;
       const magnitude = Math.min(Math.abs(deltaY) / 300, 1.5);
-      const factor = 1 + effectiveZoomStep * magnitude;
+      const stepCount = Math.max(1, Math.round(magnitude));
+      const deltaScale = effectiveZoomStep * stepCount;
       const nextScale = direction > 0
-        ? scaleRef.current * factor
-        : scaleRef.current / factor;
+        ? scaleRef.current + deltaScale
+        : scaleRef.current - deltaScale;
       setScale(nextScale);
       return;
     }
@@ -193,8 +194,8 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     }
     event.preventDefault();
     const isZoomOut = event.shiftKey || event.altKey || event.button === 1;
-    const factor = 1 + effectiveZoomStep;
-    setScale(isZoomOut ? scaleRef.current / factor : scaleRef.current * factor);
+    const deltaScale = effectiveZoomStep;
+    setScale(isZoomOut ? scaleRef.current - deltaScale : scaleRef.current + deltaScale);
   }, [disableZoom, effectiveZoomStep, setScale]);
 
   const handleResetView = useCallback(() => {
@@ -296,7 +297,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
             tooltip="Zoom out"
             variant="ghost"
             size="sm"
-            onClick={() => setScale(scaleRef.current / (1 + zoomStep))}
+            onClick={() => setScale(scaleRef.current - zoomStep)}
             className="text-text-secondary"
           >
             <MinusIcon className="w-4 h-4" />
@@ -308,7 +309,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
             tooltip="Zoom in"
             variant="ghost"
             size="sm"
-            onClick={() => setScale(scaleRef.current * (1 + zoomStep))}
+            onClick={() => setScale(scaleRef.current + zoomStep)}
             className="text-text-secondary"
           >
             <PlusIcon className="w-4 h-4" />

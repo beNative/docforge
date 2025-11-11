@@ -36,7 +36,7 @@ export const PreviewZoomProvider: React.FC<PreviewZoomProviderProps> = ({
   onScaleChange,
   minScale = 0.25,
   maxScale = 5,
-  zoomStep = 0.25,
+  zoomStep = 0.05,
   initialScale = 1,
   resetSignal,
   onAvailabilityChange,
@@ -52,11 +52,11 @@ export const PreviewZoomProvider: React.FC<PreviewZoomProviderProps> = ({
   }, [maxScale, minScale, onScaleChange]);
 
   const zoomIn = useCallback(() => {
-    setScale(clampedScale * (1 + zoomStep));
+    setScale(clampedScale + zoomStep);
   }, [clampedScale, setScale, zoomStep]);
 
   const zoomOut = useCallback(() => {
-    setScale(clampedScale / (1 + zoomStep));
+    setScale(clampedScale - zoomStep);
   }, [clampedScale, setScale, zoomStep]);
 
   const reset = useCallback(() => {

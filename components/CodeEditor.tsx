@@ -21,6 +21,7 @@ interface CodeEditorProps {
   activeLineHighlightColorLight?: string;
   activeLineHighlightColorDark?: string;
   readOnly?: boolean;
+  onFocusChange?: (hasFocus: boolean) => void;
 }
 
 export interface CodeEditorHandle {
@@ -118,7 +119,7 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
     return keybinding | primaryKey;
 };
 
-const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark, readOnly = false }, ref) => {
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark, readOnly = false, onFocusChange }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -126,6 +127,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     const contentRef = useRef(content);
     const customShortcutsRef = useRef<Record<string, string[]>>({});
     const actionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
+    const focusDisposableRef = useRef<{ dispose: () => void } | null>(null);
+    const blurDisposableRef = useRef<{ dispose: () => void } | null>(null);
     const computedFontFamily = useMemo(() => {
         const candidate = (fontFamily ?? '').trim();
         return candidate || DEFAULT_SETTINGS.editorFontFamily;
@@ -202,6 +205,13 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
         actionDisposablesRef.current = [];
     }, []);
 
+    const disposeFocusListeners = useCallback(() => {
+        focusDisposableRef.current?.dispose();
+        focusDisposableRef.current = null;
+        blurDisposableRef.current?.dispose();
+        blurDisposableRef.current = null;
+    }, []);
+
     const applyEditorShortcuts = useCallback(() => {
         const monacoApi = monacoApiRef.current;
         if (!monacoInstanceRef.current || !monacoApi) {
@@ -267,6 +277,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
 
                 if (monacoInstanceRef.current) {
                     disposeEditorShortcuts();
+                    disposeFocusListeners();
                     monacoInstanceRef.current.dispose();
                 }
 
@@ -309,6 +320,16 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     }
                 });
 
+                disposeFocusListeners();
+                if (onFocusChange) {
+                    focusDisposableRef.current = editorInstance.onDidFocusEditorWidget(() => {
+                        onFocusChange(true);
+                    });
+                    blurDisposableRef.current = editorInstance.onDidBlurEditorWidget(() => {
+                        onFocusChange(false);
+                    });
+                }
+
                 monacoInstanceRef.current = editorInstance;
                 applyEditorShortcuts();
             } catch (error) {
@@ -322,13 +343,14 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
         return () => {
             isCancelled = true;
             disposeEditorShortcuts();
+            disposeFocusListeners();
             if (monacoInstanceRef.current) {
                 monacoInstanceRef.current.dispose();
                 monacoInstanceRef.current = null;
             }
             monacoApiRef.current = null;
         };
-    }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, computedFontFamily, computedFontSize, readOnly]);
+    }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, disposeFocusListeners, computedFontFamily, computedFontSize, readOnly, onFocusChange]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {
