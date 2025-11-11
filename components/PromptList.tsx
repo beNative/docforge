@@ -19,11 +19,7 @@ interface DocumentListProps {
   onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void | Promise<void>;
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onCopyNodeContent: (id: string) => void;
-  copyContentTooltip: string;
-  onSaveNodeToFile: (id: string) => void;
-  saveToFileTooltip: string;
   onToggleLock: (id: string, locked: boolean) => void | Promise<void>;
-  getToggleLockTooltip: (locked: boolean) => string;
   searchTerm: string;
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
@@ -50,11 +46,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
   onImportNodes,
   onDropFiles,
   onCopyNodeContent,
-  copyContentTooltip,
-  onSaveNodeToFile,
-  saveToFileTooltip,
   onToggleLock,
-  getToggleLockTooltip,
   searchTerm,
   expandedIds,
   onToggleExpand,
@@ -264,11 +256,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onDropFiles={onDropFiles}
                 onToggleExpand={onToggleExpand}
                 onCopyNodeContent={onCopyNodeContent}
-                copyContentTooltip={copyContentTooltip}
                 onToggleLock={onToggleLock}
-                getToggleLockTooltip={getToggleLockTooltip}
-                onSaveNodeToFile={onSaveNodeToFile}
-                saveToFileTooltip={saveToFileTooltip}
                 searchTerm={searchTerm}
                 onMoveUp={onMoveUp}
                 onMoveDown={onMoveDown}
