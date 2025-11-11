@@ -27,6 +27,7 @@ import Modal from './Modal';
 import { repository } from '../services/repository';
 import ToggleSwitch from './ToggleSwitch';
 import SettingRow from './SettingRow';
+import ColorPicker from './ColorPicker';
 import SettingsTreeEditor from './SettingsTreeEditor';
 import { useLogger } from '../hooks/useLogger';
 import KeyboardShortcutsSection from './KeyboardShortcutsSection';
@@ -804,12 +805,10 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                     return (
                         <div key={`${mode}-${token}`} className="space-y-3 rounded-lg border border-border-color bg-secondary/60 p-3">
                             <div className="flex items-center gap-3">
-                                <input
-                                    type="color"
-                                    value={colorPickerValue}
-                                    onChange={(event) => handleColorOverrideChange(mode, token, event.target.value)}
-                                    className="h-10 w-12 cursor-pointer rounded-md border border-border-color bg-background"
-                                    aria-label={`${THEME_MODE_LABELS[mode]} ${COLOR_TOKEN_METADATA[token].label} color`}
+                                <ColorPicker
+                                    color={colorPickerValue}
+                                    onChange={(next) => handleColorOverrideChange(mode, token, next)}
+                                    ariaLabel={`${THEME_MODE_LABELS[mode]} ${COLOR_TOKEN_METADATA[token].label} color`}
                                 />
                                 <div>
                                     <h4 className="text-sm font-semibold text-text-main">{COLOR_TOKEN_METADATA[token].label}</h4>
@@ -1117,12 +1116,11 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                 >
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-3">
-                      <input
+                      <ColorPicker
                         id="editorActiveLineHighlightColor"
-                        type="color"
-                        value={highlightColorPickerValueLight}
-                        onChange={(event) => setCurrentSettings((prev) => ({ ...prev, editorActiveLineHighlightColor: event.target.value }))}
-                        className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
+                        color={highlightColorPickerValueLight}
+                        onChange={(next) => setCurrentSettings((prev) => ({ ...prev, editorActiveLineHighlightColor: next }))}
+                        ariaLabel="Select active line highlight color for light theme"
                       />
                       <span className="font-mono text-xs text-text-secondary break-all">
                         {highlightColorDisplayLight}
@@ -1155,12 +1153,11 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                 >
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-3">
-                      <input
+                      <ColorPicker
                         id="editorActiveLineHighlightColorDark"
-                        type="color"
-                        value={highlightColorPickerValueDark}
-                        onChange={(event) => setCurrentSettings((prev) => ({ ...prev, editorActiveLineHighlightColorDark: event.target.value }))}
-                        className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
+                        color={highlightColorPickerValueDark}
+                        onChange={(next) => setCurrentSettings((prev) => ({ ...prev, editorActiveLineHighlightColorDark: next }))}
+                        ariaLabel="Select active line highlight color for dark theme"
                       />
                       <span className="font-mono text-xs text-text-secondary break-all">
                         {highlightColorDisplayDark}
@@ -1192,12 +1189,11 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                   htmlFor="markdownCodeBlockBackgroundLight"
                 >
                   <div className="flex items-center gap-3">
-                    <input
+                    <ColorPicker
                       id="markdownCodeBlockBackgroundLight"
-                      type="color"
-                      value={lightCodeBlockBackground}
-                      onChange={(event) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundLight: event.target.value }))}
-                      className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
+                      color={lightCodeBlockBackground}
+                      onChange={(next) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundLight: next }))}
+                      ariaLabel="Select code block background color for light theme"
                     />
                     <span className="font-mono text-xs text-text-secondary">
                       {lightCodeBlockBackground.toUpperCase()}
@@ -1218,12 +1214,11 @@ const AppearanceSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCu
                   htmlFor="markdownCodeBlockBackgroundDark"
                 >
                   <div className="flex items-center gap-3">
-                    <input
+                    <ColorPicker
                       id="markdownCodeBlockBackgroundDark"
-                      type="color"
-                      value={darkCodeBlockBackground}
-                      onChange={(event) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundDark: event.target.value }))}
-                      className="h-10 w-14 rounded-md border border-border-color bg-background cursor-pointer"
+                      color={darkCodeBlockBackground}
+                      onChange={(next) => setCurrentSettings((prev) => ({ ...prev, markdownCodeBlockBackgroundDark: next }))}
+                      ariaLabel="Select code block background color for dark theme"
                     />
                     <span className="font-mono text-xs text-text-secondary">
                       {darkCodeBlockBackground.toUpperCase()}
