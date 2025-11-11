@@ -536,7 +536,6 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         activeDocumentId={activeDocumentId}
                         canMoveUp={index > 0}
                         canMoveDown={index < node.children.length - 1}
-                        copyContentTooltip={copyContentTooltip}
                     />
                 ))}
             </ul>
