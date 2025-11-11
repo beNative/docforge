@@ -99,6 +99,12 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const {
     node,
     level,
+    canMoveUp,
+    canMoveDown,
+    ...baseChildProps
+  } = props;
+
+  const {
     selectedIds,
     focusedItemId,
     expandedIds,
@@ -116,8 +122,6 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onToggleLock,
     onMoveUp,
     onMoveDown,
-    canMoveUp,
-    canMoveDown,
     onContextMenu,
     renamingNodeId,
     onRenameComplete,
@@ -125,7 +129,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     verticalSpacing,
     searchTerm,
     isKnownNodeId,
-  } = props;
+  } = baseChildProps;
   
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(node.title);
@@ -527,13 +531,9 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                 {node.children.map((childNode, index) => (
                     <DocumentTreeItem
                         key={childNode.id}
-                        {...props}
+                        {...baseChildProps}
                         node={childNode}
                         level={level + 1}
-                        indentPerLevel={indentPerLevel}
-                        verticalSpacing={verticalSpacing}
-                        openDocumentIds={openDocumentIds}
-                        activeDocumentId={activeDocumentId}
                         canMoveUp={index > 0}
                         canMoveDown={index < node.children.length - 1}
                     />
