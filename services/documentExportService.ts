@@ -21,6 +21,7 @@ const DEFAULT_DOC_TYPE_EXTENSION: Record<DocType, string> = {
   source_code: 'txt',
   pdf: 'pdf',
   image: 'png',
+  rich_text: 'html',
 };
 
 const DOC_TYPE_FILTER_LABELS: Partial<Record<DocType, string>> = {
@@ -28,6 +29,7 @@ const DOC_TYPE_FILTER_LABELS: Partial<Record<DocType, string>> = {
   source_code: 'Code Files',
   pdf: 'PDF Documents',
   image: 'Image Files',
+  rich_text: 'Rich Text (HTML)',
 };
 
 const LANGUAGE_EXTENSION_MAP: Record<string, string> = {
@@ -223,6 +225,7 @@ const inferMimeFromExtension = (extension: string | null, docType?: DocType): st
   if (docType) {
     if (docType === 'pdf') return 'application/pdf';
     if (docType === 'image') return 'image/png';
+    if (docType === 'rich_text') return 'text/html';
   }
   return TEXT_MIME_DEFAULT;
 };

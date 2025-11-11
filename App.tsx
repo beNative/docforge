@@ -22,7 +22,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon, SearchIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon, SearchIcon, FileIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -1773,6 +1773,26 @@ export const MainApp: React.FC = () => {
         setRenamingNodeId(newDoc.id);
     }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog, activateDocumentTab]);
 
+    const handleNewRichTextDocument = useCallback(async (parentId?: string | null) => {
+        addLog('INFO', 'User action: Create New Rich Document.');
+        const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
+        const newDoc = await addDocument({
+            parentId: effectiveParentId,
+            title: 'New Rich Document',
+            content: '',
+            doc_type: 'rich_text',
+            language_hint: 'html',
+        });
+        ensureNodeVisible(newDoc);
+        activateDocumentTab(newDoc.id);
+        setSelectedIds(new Set([newDoc.id]));
+        setLastClickedId(newDoc.id);
+        setActiveTemplateId(null);
+        setDocumentView('editor');
+        setView('editor');
+        setRenamingNodeId(newDoc.id);
+    }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog, activateDocumentTab]);
+
     const handleNewDocumentFromClipboard = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document from Clipboard.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
@@ -2647,6 +2667,7 @@ export const MainApp: React.FC = () => {
 
     const commands: Command[] = useMemo(() => [
         { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Control', 'N'], keywords: 'add create file' },
+        { id: 'new-rich-document', name: 'Create New Rich Document', action: () => handleNewRichTextDocument(), category: 'File', icon: FileIcon, keywords: 'add create html rich wysiwyg' },
         { id: 'new-from-clipboard', name: 'New from Clipboard', action: () => { addLog('INFO', 'Command: New document from clipboard.'); void handleNewDocumentFromClipboard(); }, category: 'File', icon: CopyIcon, shortcut: ['Control', 'Alt', 'V'], keywords: 'clipboard import paste new' },
         { id: 'new-code-file', name: 'Create New Code File', action: handleOpenNewCodeFileModal, category: 'File', icon: CodeIcon, shortcut: ['Control', 'Shift', 'N'], keywords: 'add create script' },
         { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, shortcut: ['Control', 'Alt', 'N'], keywords: 'add create directory' },
@@ -2672,7 +2693,7 @@ export const MainApp: React.FC = () => {
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleFocusDocumentTreeSearch, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock]);
+    ], [handleNewDocument, handleNewRichTextDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleFocusDocumentTreeSearch, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -2719,6 +2740,7 @@ export const MainApp: React.FC = () => {
 
             menuItems.push(
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem), shortcut: getCommand('new-document')?.shortcutString },
+                { label: 'New Rich Document', icon: FileIcon, action: () => handleNewRichTextDocument(parentIdForNewItem), shortcut: getCommand('new-rich-document')?.shortcutString },
                 { label: 'New from Clipboard', icon: CopyIcon, action: () => { void handleNewDocumentFromClipboard(parentIdForNewItem); }, shortcut: getCommand('new-from-clipboard')?.shortcutString },
                 { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem), shortcut: getCommand('new-folder')?.shortcutString },
@@ -2737,6 +2759,7 @@ export const MainApp: React.FC = () => {
         } else { // Clicked on empty space
              menuItems.push(
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null), shortcut: getCommand('new-document')?.shortcutString },
+                { label: 'New Rich Document', icon: FileIcon, action: () => handleNewRichTextDocument(null), shortcut: getCommand('new-rich-document')?.shortcutString },
                 { label: 'New from Clipboard', icon: CopyIcon, action: () => { void handleNewDocumentFromClipboard(null); }, shortcut: getCommand('new-from-clipboard')?.shortcutString },
                 { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null), shortcut: getCommand('new-folder')?.shortcutString },
@@ -2749,7 +2772,7 @@ export const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile, handleSetNodeLockState]);
+    }, [selectedIds, items, handleNewDocument, handleNewRichTextDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile, handleSetNodeLockState]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -2959,6 +2982,7 @@ export const MainApp: React.FC = () => {
                             folder={activeNode}
                             metrics={activeFolderMetrics ?? fallbackMetrics}
                             onNewDocument={(parentId) => handleNewDocument(parentId)}
+                            onNewRichDocument={(parentId) => handleNewRichTextDocument(parentId)}
                             onNewFromClipboard={(parentId) => { void handleNewDocumentFromClipboard(parentId); }}
                             onNewSubfolder={(parentId) => handleNewFolder(parentId)}
                             onImportFiles={handleImportFilesIntoFolder}
@@ -2972,7 +2996,7 @@ export const MainApp: React.FC = () => {
                 );
             }
         }
-        return <WelcomeScreen onNewDocument={() => handleNewDocument()} />;
+        return <WelcomeScreen onNewDocument={() => handleNewDocument()} onNewRichDocument={() => handleNewRichTextDocument()} />;
     };
 
     const headerProps = {
@@ -3035,6 +3059,7 @@ export const MainApp: React.FC = () => {
                                         onImportNodes={handleImportNodesFromTransfer}
                                         onDropFiles={handleDropFiles}
                                         onNewDocument={() => handleNewDocument()}
+                                        onNewRichDocument={() => handleNewRichTextDocument()}
                                         onNewRootFolder={handleNewRootFolder}
                                         onNewSubfolder={handleNewSubfolder}
                                         onNewCodeFile={handleOpenNewCodeFileModal}

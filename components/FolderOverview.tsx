@@ -43,6 +43,7 @@ interface FolderOverviewProps {
     folder: DocumentOrFolder;
     metrics: FolderOverviewMetrics;
     onNewDocument: (parentId: string) => void;
+    onNewRichDocument: (parentId: string) => void;
     onNewFromClipboard: (parentId: string) => void;
     onNewSubfolder: (parentId: string) => void;
     onImportFiles: (files: FileList, parentId: string) => void;
@@ -91,6 +92,7 @@ const DOC_TYPE_LABELS: Record<DocType, string> = {
     source_code: 'Source code',
     pdf: 'PDFs',
     image: 'Images',
+    rich_text: 'Rich text',
 };
 
 const formatDocTypeLabel = (docType: DocType) => DOC_TYPE_LABELS[docType] ?? docType.replace(/_/g, ' ');
@@ -99,6 +101,7 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
     folder,
     metrics,
     onNewDocument,
+    onNewRichDocument,
     onNewFromClipboard,
     onNewSubfolder,
     onImportFiles,
@@ -260,6 +263,15 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                             >
                                 <PlusIcon className="h-4 w-4" />
                                 New document
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="gap-1 px-2.5"
+                                onClick={() => onNewRichDocument(folder.id)}
+                            >
+                                <FileIcon className="h-4 w-4" />
+                                New rich document
                             </Button>
                             <Button
                                 type="button"

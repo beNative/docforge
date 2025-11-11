@@ -10,6 +10,7 @@ import IconButton from './IconButton';
 import Button from './Button';
 import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
 import MonacoDiffEditor from './MonacoDiffEditor';
+import RichTextEditor from './RichTextEditor';
 import PreviewPane from './PreviewPane';
 import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
@@ -300,10 +301,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         isInitialMount.current = false;
         return;
     }
-    if (formatTrigger > 0) {
+    if (!isRichTextDocument && formatTrigger > 0) {
         editorRef.current?.format();
     }
-  }, [formatTrigger]);
+  }, [formatTrigger, isRichTextDocument]);
 
   // --- Resizable Splitter Logic ---
   const handleSplitterMouseDown = (e: React.MouseEvent) => {
@@ -455,6 +456,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       addLog('WARNING', `Format request blocked for locked document "${title}".`);
       return;
     }
+    if (isRichTextDocument) {
+      addLog('INFO', 'Format command is unavailable for rich text documents.');
+      return;
+    }
     editorRef.current?.format();
   };
 
@@ -564,12 +569,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const language = documentNode.language_hint || 'plaintext';
+  const isRichTextDocument = documentNode.doc_type === 'rich_text';
+  const language = documentNode.language_hint || (isRichTextDocument ? 'html' : 'plaintext');
   const normalizedLanguage = language.toLowerCase();
-  const supportsAiTools = ['markdown', 'plaintext'].includes(normalizedLanguage);
+  const supportsAiTools = ['markdown', 'plaintext', 'html'].includes(normalizedLanguage);
   const canAddEmojiToTitle = documentNode.type === 'document';
   const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
-  const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const supportsFormatting = !isRichTextDocument && ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
   const scriptBridgeAvailable =
     typeof window !== 'undefined' && (!!window.electronAPI || !!window.__DOCFORGE_SCRIPT_PREVIEW__);
   const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
@@ -692,8 +698,27 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [onZoomTargetChange]);
 
   const renderContent = () => {
-    const editor = isDiffMode
-      ? (
+    let editor: React.ReactNode;
+
+    if (isDiffMode) {
+      if (isRichTextDocument) {
+        editor = (
+          <MonacoDiffEditor
+            oldText={baselineContent}
+            newText={content}
+            language="html"
+            renderMode="inline"
+            readOnly
+            onScroll={handleEditorScroll}
+            fontFamily={settings.editorFontFamily}
+            fontSize={scaledEditorFontSize}
+            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+            onFocusChange={handleEditorFocusChange}
+          />
+        );
+      } else {
+        editor = (
           <MonacoDiffEditor
             oldText={baselineContent}
             newText={content}
@@ -708,23 +733,36 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
             onFocusChange={handleEditorFocusChange}
           />
-        )
-      : (
-          <MonacoEditor
-            ref={editorRef}
-            content={content}
-            language={language}
-            onChange={setContent}
-            onScroll={handleEditorScroll}
-            customShortcuts={settings.customShortcuts}
-            fontFamily={settings.editorFontFamily}
-            fontSize={scaledEditorFontSize}
-            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
-            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
-            readOnly={isLocked}
-            onFocusChange={handleEditorFocusChange}
-          />
         );
+      }
+    } else if (isRichTextDocument) {
+      editor = (
+        <RichTextEditor
+          content={content}
+          onChange={setContent}
+          readOnly={isLocked}
+          onScroll={handleEditorScroll}
+          onFocusChange={handleEditorFocusChange}
+        />
+      );
+    } else {
+      editor = (
+        <MonacoEditor
+          ref={editorRef}
+          content={content}
+          language={language}
+          onChange={setContent}
+          onScroll={handleEditorScroll}
+          customShortcuts={settings.customShortcuts}
+          fontFamily={settings.editorFontFamily}
+          fontSize={scaledEditorFontSize}
+          activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+          activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+          readOnly={isLocked}
+          onFocusChange={handleEditorFocusChange}
+        />
+      );
+    }
     const preview = (
       <div
         className="h-full w-full"

@@ -64,7 +64,7 @@ export const useDocuments = () => {
   const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '', doc_type = 'prompt', language_hint = 'markdown' }: { parentId: string | null, title?: string, content?: string, doc_type?: DocType, language_hint?: string | null }) => {
     const resolvedLanguage = mapExtensionToLanguageId(language_hint);
     const shouldPreviewByDefault = doc_type === 'pdf' || doc_type === 'image' || resolvedLanguage === 'pdf' || resolvedLanguage === 'image';
-    const defaultViewMode = shouldPreviewByDefault ? 'preview' : undefined;
+    const defaultViewMode = doc_type === 'rich_text' ? 'edit' : shouldPreviewByDefault ? 'preview' : undefined;
     const now = new Date().toISOString();
     const newNode = await addNode({
       parent_id: parentId,

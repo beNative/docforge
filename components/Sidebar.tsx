@@ -4,7 +4,7 @@ import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
 import type { DocumentOrFolder, DocumentTemplate, Command, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon, XIcon, FolderDownIcon, CopyIcon, LockClosedIcon, LockOpenIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon, XIcon, FolderDownIcon, CopyIcon, LockClosedIcon, LockOpenIcon, FileIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
@@ -32,6 +32,7 @@ interface SidebarProps {
   onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void | Promise<void>;
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onNewDocument: () => void;
+  onNewRichDocument: () => void;
   onNewRootFolder: () => void;
   onNewSubfolder: () => void;
   onNewCodeFile: () => void;
@@ -541,8 +542,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     <IconButton onClick={onNewFromClipboard} tooltip={getTooltip('new-from-clipboard', 'New from Clipboard')} size="xs" tooltipPosition="bottom">
                         <CopyIcon className="w-4 h-4" />
                     </IconButton>
-                     <IconButton onClick={props.onNewFromTemplate} tooltip={getTooltip('new-from-template', 'New from Template')} size="xs" tooltipPosition="bottom">
+                    <IconButton onClick={props.onNewFromTemplate} tooltip={getTooltip('new-from-template', 'New from Template')} size="xs" tooltipPosition="bottom">
                         <DocumentDuplicateIcon className="w-4 h-4" />
+                    </IconButton>
+                    <IconButton onClick={props.onNewRichDocument} tooltip={getTooltip('new-rich-document', 'New Rich Document')} size="xs" tooltipPosition="bottom">
+                        <FileIcon className="w-4 h-4" />
                     </IconButton>
                     <IconButton onClick={props.onNewDocument} tooltip={getTooltip('new-document', 'New Document')} size="xs" tooltipPosition="bottom">
                         <PlusIcon className="w-4 h-4" />

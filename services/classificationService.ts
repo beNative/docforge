@@ -208,6 +208,9 @@ export const classifyDocumentContent = (options: ClassificationOptions): Classif
     if (langFromExtension === 'markdown') {
       return classifyWith('markdown', 'prompt', null, 0.65, 'Extension indicates Markdown');
     }
+    if (langFromExtension === 'html') {
+      return classifyWith('html', 'rich_text', 'edit', 0.7, 'Extension indicates HTML');
+    }
     if (langFromExtension === 'plantuml') {
       return classifyWith('plantuml', 'source_code', 'split-vertical', 0.8, 'Extension indicates PlantUML');
     }
@@ -233,7 +236,7 @@ export const classifyDocumentContent = (options: ClassificationOptions): Classif
   }
 
   if (looksLikeHtml(trimmed)) {
-    return classifyWith('html', 'source_code', null, 0.75, 'HTML tag heuristics matched');
+    return classifyWith('html', 'rich_text', 'edit', 0.75, 'HTML tag heuristics matched');
   }
 
   if (looksLikeYaml(trimmed)) {
@@ -247,8 +250,8 @@ export const classifyDocumentContent = (options: ClassificationOptions): Classif
 
   const inferredLang = detectProgrammingLanguage(trimmed);
   if (inferredLang) {
-    const defaultViewMode = inferredLang === 'plantuml' ? 'split-vertical' : null;
-    const docType: DocType = inferredLang === 'plantuml' ? 'source_code' : 'source_code';
+    const defaultViewMode = inferredLang === 'plantuml' ? 'split-vertical' : inferredLang === 'html' ? 'edit' : null;
+    const docType: DocType = inferredLang === 'plantuml' ? 'source_code' : inferredLang === 'html' ? 'rich_text' : 'source_code';
     return classifyWith(inferredLang, docType, defaultViewMode, 0.7, `Content heuristics matched ${inferredLang}`);
   }
 
