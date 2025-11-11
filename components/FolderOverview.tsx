@@ -367,7 +367,7 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                                                             borderLeftWidth: '3px',
                                                                             borderLeftStyle: 'solid',
                                                                             borderLeftColor: 'rgb(var(--color-accent) / 0.45)',
-                                                                            background: 'color-mix(in srgb, rgb(var(--color-background)) 82%, rgb(var(--color-text-main)) 18%)',
+                                                                            background: 'rgb(var(--color-background))',
                                                                             borderRadius: '4px',
                                                                         }}
                                                                     >
