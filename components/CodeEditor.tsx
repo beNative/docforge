@@ -187,12 +187,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
             column: selection.endColumn,
         };
 
-        let scrolled = editor.getScrolledVisiblePosition(endPosition);
-        if (!scrolled) {
-            editor.revealPositionInCenter(endPosition);
-            scrolled = editor.getScrolledVisiblePosition(endPosition);
-        }
-
+        const scrolled = editor.getScrolledVisiblePosition(endPosition);
         if (!scrolled) {
             return null;
         }
@@ -211,8 +206,9 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
         }
 
         let anchor = preferredCoords ?? null;
+
         if (!anchor) {
-            anchor = calculateAnchorFromSelection(state.selection);
+            anchor = calculateAnchorFromSelection(state.selection) ?? state.anchor ?? null;
         }
 
         if (!anchor && editorRef.current) {
@@ -228,7 +224,17 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
         }
 
         emojiPickerStateRef.current = { ...state, anchor };
-        setEmojiPickerState((previous) => (previous ? { ...previous, anchor } : previous));
+        setEmojiPickerState((previous) => {
+            if (!previous) {
+                return previous;
+            }
+
+            if (previous.anchor && previous.anchor.x === anchor?.x && previous.anchor.y === anchor?.y) {
+                return previous;
+            }
+
+            return { ...previous, anchor };
+        });
     }, [calculateAnchorFromSelection]);
 
     const captureCurrentSelection = useCallback((): StoredSelection | null => {
