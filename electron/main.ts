@@ -1,5 +1,5 @@
 // Fix: This file was previously a placeholder. This is the full implementation for the Electron main process.
-import { app, BrowserWindow, ipcMain, dialog, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, clipboard, shell } from 'electron';
 // Fix: Import 'platform' from 'process' for type-safe access to the current OS identifier.
 import { platform } from 'process';
 import path from 'path';
@@ -656,6 +656,21 @@ ipcMain.handle('app:get-version', () => app.getVersion());
 // Fix: Error on line 145 is resolved by importing 'platform' from 'process'.
 ipcMain.handle('app:get-platform', () => platform);
 ipcMain.handle('app:get-log-path', () => log.transports.file.getFile().path);
+ipcMain.handle('app:open-executable-folder', async () => {
+    const execDir = path.dirname(process.execPath);
+    try {
+        const error = await shell.openPath(execDir);
+        if (error) {
+            console.error('Failed to open executable folder:', error);
+            return { success: false, error };
+        }
+        return { success: true, path: execDir };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('Failed to open executable folder:', error);
+        return { success: false, error: message };
+    }
+});
 
 ipcMain.on('updater:set-allow-prerelease', (_, allow: boolean) => {
     autoUpdater.allowPrerelease = allow;

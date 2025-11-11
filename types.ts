@@ -36,6 +36,7 @@ declare global {
       getAppVersion: () => Promise<string>;
       getPlatform: () => Promise<string>;
       getLogPath: () => Promise<string>;
+      openExecutableFolder: () => Promise<{ success: boolean; path?: string; error?: string }>;
       renderPlantUML: (
         diagram: string,
         format?: 'svg'
