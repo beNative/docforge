@@ -352,6 +352,12 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const basePaddingLeft = 4; // matches Tailwind px-1 for consistent baseline spacing
   const rowPaddingLeft = basePaddingLeft + Math.max(level, 0) * safeIndent;
   const snippetPaddingLeft = rowPaddingLeft + 28;
+  const snippetAccentPadding = 8;
+  const snippetAccentWidth = 3;
+  const snippetMarginLeft = Math.max(snippetPaddingLeft - snippetAccentPadding, 0);
+  const snippetAccentColor = 'rgb(var(--color-accent) / 0.45)';
+  const snippetBackgroundColor =
+    'color-mix(in srgb, rgb(var(--color-background)) 82%, rgb(var(--color-text-main)) 18%)';
 
   return (
     <li
@@ -513,7 +519,15 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         {!isFolder && searchTerm.trim() && node.searchSnippet && (
             <div
                 className="text-[11px] text-text-secondary leading-snug whitespace-pre-wrap break-words pr-3"
-                style={{ paddingLeft: `${snippetPaddingLeft}px` }}
+                style={{
+                    marginLeft: `${snippetMarginLeft}px`,
+                    paddingLeft: `${snippetAccentPadding}px`,
+                    borderLeftWidth: `${snippetAccentWidth}px`,
+                    borderLeftStyle: 'solid',
+                    borderLeftColor: snippetAccentColor,
+                    backgroundColor: snippetBackgroundColor,
+                    borderRadius: '4px',
+                }}
             >
                 {highlightMatches(node.searchSnippet, searchTerm)}
             </div>
