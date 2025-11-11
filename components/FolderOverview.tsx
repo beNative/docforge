@@ -360,7 +360,17 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                                                     {highlightMatches(formattedTitle, folderSearchTerm)}
                                                                 </p>
                                                                 {result.searchSnippet && (
-                                                                    <p className="mt-0.5 text-[11px] leading-snug text-text-secondary">
+                                                                    <p
+                                                                        className="mt-0.5 -ml-2 text-[11px] leading-snug text-text-secondary"
+                                                                        style={{
+                                                                            paddingLeft: '0.75rem',
+                                                                            borderLeftWidth: '3px',
+                                                                            borderLeftStyle: 'solid',
+                                                                            borderLeftColor: 'rgb(var(--color-accent) / 0.45)',
+                                                                            backgroundColor: 'rgb(var(--color-border) / 0.26)',
+                                                                            borderRadius: '4px',
+                                                                        }}
+                                                                    >
                                                                         {highlightMatches(result.searchSnippet, folderSearchTerm)}
                                                                     </p>
                                                                 )}
