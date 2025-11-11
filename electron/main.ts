@@ -59,6 +59,15 @@ if (process.platform === 'win32') {
 let mainWindow: BrowserWindow | null;
 let autoCheckEnabled = true;
 let pendingAutoUpdateCheck: NodeJS.Timeout | null = null;
+let autoInstallOnQuit = true;
+
+const applyAutoInstallPreference = (enabled: boolean) => {
+  autoInstallOnQuit = enabled;
+  autoUpdater.autoInstallOnAppQuit = enabled;
+  console.log(`Automatic update installation on quit ${enabled ? 'enabled' : 'disabled'}.`);
+};
+
+applyAutoInstallPreference(autoInstallOnQuit);
 
 const cancelScheduledAutoUpdateCheck = () => {
   if (pendingAutoUpdateCheck) {
@@ -385,6 +394,17 @@ app.on('ready', () => {
     console.error('Failed to read auto-update preference from settings:', error);
   }
 
+  try {
+    const storedAutoInstall = databaseService.getSetting('autoInstallUpdates');
+    if (typeof storedAutoInstall === 'boolean') {
+      applyAutoInstallPreference(storedAutoInstall);
+    } else if (typeof storedAutoInstall !== 'undefined') {
+      applyAutoInstallPreference(Boolean(storedAutoInstall));
+    }
+  } catch (error) {
+    console.error('Failed to read auto-install preference from settings:', error);
+  }
+
   if (autoCheckEnabled) {
     scheduleAutoUpdateCheck();
   } else {
@@ -647,6 +667,9 @@ ipcMain.on('updater:set-auto-check-enabled', (_, enabled: boolean) => {
     } else {
         cancelScheduledAutoUpdateCheck();
     }
+});
+ipcMain.on('updater:set-auto-install-enabled', (_, enabled: boolean) => {
+    applyAutoInstallPreference(enabled);
 });
 ipcMain.on('updater:quit-and-install', () => {
     autoUpdater.quitAndInstall();

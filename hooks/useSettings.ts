@@ -88,6 +88,13 @@ export const useSettings = () => {
     }
   }, [settings.autoCheckForUpdates, loaded, addLog]);
 
+  useEffect(() => {
+    if (loaded && isElectron && window.electronAPI?.updaterSetAutoInstallEnabled) {
+      addLog('DEBUG', `Notifying main process: autoInstallUpdates is ${settings.autoInstallUpdates}`);
+      window.electronAPI.updaterSetAutoInstallEnabled(settings.autoInstallUpdates);
+    }
+  }, [settings.autoInstallUpdates, loaded, addLog]);
+
   const saveSettings = useCallback(async (newSettings: Settings) => {
     setSettings(newSettings);
     await repository.saveAllSettings(newSettings);

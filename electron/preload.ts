@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   renderPlantUML: (diagram: string, format: 'svg' = 'svg') => ipcRenderer.invoke('plantuml:render-svg', diagram, format),
   updaterSetAllowPrerelease: (allow: boolean) => ipcRenderer.send('updater:set-allow-prerelease', allow),
   updaterSetAutoCheckEnabled: (enabled: boolean) => ipcRenderer.send('updater:set-auto-check-enabled', enabled),
+  updaterSetAutoInstallEnabled: (enabled: boolean) => ipcRenderer.send('updater:set-auto-install-enabled', enabled),
   updaterCheckForUpdates: () => ipcRenderer.invoke('updater:check-now') as Promise<ManualUpdateCheckResult>,
   onUpdateAvailable: (callback: (info: UpdateAvailableInfo) => void) => {
     const handler = (_: IpcRendererEvent, info: UpdateAvailableInfo) => callback(info);

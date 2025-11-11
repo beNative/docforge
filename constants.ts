@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoSaveLogs: false,
   allowPrerelease: false,
   autoCheckForUpdates: true,
+  autoInstallUpdates: true,
   plantumlRendererMode: 'remote',
   uiScale: 100,
   documentTreeIndent: 16,

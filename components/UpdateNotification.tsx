@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import Button from './Button';
 import { DownloadIcon, XIcon, CheckIcon, InfoIcon } from './Icons';
 import IconButton from './IconButton';
+import ToggleSwitch from './ToggleSwitch';
 import { useLogger } from '../hooks/useLogger';
 
 type UpdateNotificationStatus = 'downloading' | 'downloaded' | 'error';
@@ -16,6 +17,9 @@ interface UpdateNotificationProps {
   errorMessage?: string | null;
   errorDetails?: string | null;
   onInstall?: () => void;
+  autoInstallEnabled?: boolean;
+  autoInstallSupported?: boolean;
+  onAutoInstallChange?: (enabled: boolean) => void;
   onClose: () => void;
 }
 
@@ -46,6 +50,9 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
   errorMessage,
   errorDetails,
   onInstall,
+  autoInstallEnabled,
+  autoInstallSupported = true,
+  onAutoInstallChange,
   onClose,
 }) => {
   const { addLog } = useLogger();
@@ -95,6 +102,14 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
     }
   };
 
+  const handleAutoInstallToggle = (value: boolean) => {
+    if (!onAutoInstallChange) {
+      return;
+    }
+    addLog('INFO', `User action: ${value ? 'Enabled' : 'Disabled'} automatic update installation from toast.`);
+    onAutoInstallChange(value);
+  };
+
   const renderContent = () => {
     if (status === 'downloaded') {
       return (
@@ -103,6 +118,36 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
           <p className="text-sm text-text-secondary mt-1">
             DocForge version <span className="font-semibold text-text-main">{versionLabel}</span> has been downloaded and is ready to go.
           </p>
+          {typeof autoInstallEnabled === 'boolean' && (
+            <div className="mt-4 space-y-3 rounded-lg border border-border-color/70 bg-background/40 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-text-main">Install updates automatically</p>
+                  <p className="text-xs text-text-secondary">
+                    {autoInstallSupported
+                      ? 'DocForge will apply the update the next time you quit if this switch stays on.'
+                      : 'Automatic installation is only available in the desktop app.'}
+                  </p>
+                </div>
+                <ToggleSwitch
+                  id="update-auto-install"
+                  checked={autoInstallSupported ? autoInstallEnabled : false}
+                  disabled={!autoInstallSupported}
+                  onChange={handleAutoInstallToggle}
+                />
+              </div>
+              {autoInstallSupported && !autoInstallEnabled && (
+                <p className="text-xs text-warning">
+                  Auto-install is off. You&apos;ll need to restart DocForge manually to finish this update.
+                </p>
+              )}
+              {!autoInstallSupported && (
+                <p className="text-xs text-text-secondary">
+                  Switch to the desktop application to control automatic installation.
+                </p>
+              )}
+            </div>
+          )}
           <div className="mt-4 flex gap-3">
             {onInstall && (
               <Button onClick={handleInstall} variant="primary" className="flex-1">
