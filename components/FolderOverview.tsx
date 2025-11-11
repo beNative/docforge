@@ -281,7 +281,7 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                             </Button>
                             <Button
                                 type="button"
-                                variant="ghost"
+                                variant="secondary"
                                 className="gap-1 px-2.5"
                                 onClick={handleStartEditingTitle}
                             >
