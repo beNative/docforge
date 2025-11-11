@@ -1,6 +1,5 @@
 import React from 'react';
 import Tooltip from './Tooltip';
-import Hint from './Hint';
 import type { LLMStatus, DiscoveredLLMModel, DiscoveredLLMService, PreviewMetadata } from '../types';
 import { DatabaseIcon, ChevronDownIcon, MinusIcon, PlusIcon, RefreshIcon } from './Icons';
 
@@ -55,8 +54,6 @@ const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: st
   },
 };
 
-const zoomButtonTooltipClass = '!bg-transparent !shadow-none !p-0 text-inherit';
-
 interface ZoomButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   hint: string;
   icon: React.ReactNode;
@@ -99,11 +96,7 @@ const ZoomButton: React.FC<ZoomButtonProps> = ({ hint, icon, className = '', dis
         </button>
       </span>
       {hasHint && showTooltip && wrapperRef.current && (
-        <Tooltip
-          targetRef={wrapperRef}
-          content={<Hint role="note">{hint}</Hint>}
-          className={zoomButtonTooltipClass}
-        />
+        <Tooltip targetRef={wrapperRef} content={hint} />
       )}
     </>
   );

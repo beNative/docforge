@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
 import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, SaveIcon, LockClosedIcon, LockOpenIcon } from './Icons';
+import Tooltip from './Tooltip';
 
 export interface DocumentNode extends DocumentOrFolder {
   children: DocumentNode[];
@@ -139,10 +140,12 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside' | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [lockedRowHeight, setLockedRowHeight] = useState<number | null>(null);
+  const [isTitleTruncated, setIsTitleTruncated] = useState(false);
 
   const renameInputRef = useRef<HTMLInputElement>(null);
   const itemRef = useRef<HTMLLIElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLSpanElement>(null);
 
   const isSelected = selectedIds.has(node.id);
   const isFocused = focusedItemId === node.id;
@@ -189,6 +192,51 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       setIsRenaming(false);
     }
   }, [isSelected, isRenaming]);
+
+  useLayoutEffect(() => {
+    if (!isHovered || !areActionsVisible || isRenaming) {
+      setIsTitleTruncated(false);
+      return;
+    }
+
+    const titleElement = titleRef.current;
+
+    if (!titleElement) {
+      setIsTitleTruncated(false);
+      return;
+    }
+
+    const checkTruncation = () => {
+      const truncated = titleElement.scrollWidth > titleElement.clientWidth + 0.5;
+      setIsTitleTruncated(truncated);
+    };
+
+    checkTruncation();
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    let frame: number | null = window.requestAnimationFrame(checkTruncation);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(checkTruncation);
+      resizeObserver.observe(titleElement);
+    }
+
+    window.addEventListener('resize', checkTruncation);
+
+    return () => {
+      if (frame !== null) {
+        window.cancelAnimationFrame(frame);
+      }
+      window.removeEventListener('resize', checkTruncation);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [areActionsVisible, displayTitle, isHovered, isRenaming, searchTerm]);
 
   const handleRenameStart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -381,6 +429,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                     />
                 ) : (
                     <span
+                        ref={titleRef}
                         className={`flex-1 px-1 ${
                             areActionsVisible ? 'truncate' : 'whitespace-normal break-words'
                         }`}
@@ -389,6 +438,20 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                     </span>
                 )}
             </div>
+
+            {isHovered && isTitleTruncated && titleRef.current && (
+                <Tooltip
+                    targetRef={titleRef}
+                    content={(
+                        <span className="inline-flex max-w-xs whitespace-pre-wrap break-words text-left leading-snug gap-1">
+                            {emojiForNode && !isFolder && (
+                                <span aria-hidden="true">{emojiForNode}</span>
+                            )}
+                            <span>{highlightMatches(displayTitle, searchTerm)}</span>
+                        </span>
+                    )}
+                />
+            )}
 
             {!isRenaming && (
                 <div
