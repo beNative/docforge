@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
+import type { DocumentOrFolder, DocType, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
 import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon } from './Icons';
 import Spinner from './Spinner';
@@ -10,6 +10,7 @@ import IconButton from './IconButton';
 import Button from './Button';
 import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
 import MonacoDiffEditor from './MonacoDiffEditor';
+import RichTextEditor from './RichTextEditor';
 import PreviewPane from './PreviewPane';
 import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
@@ -250,6 +251,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [viewMode, isDiffMode]);
 
   useEffect(() => {
+    if (!supportsDiff && isDiffMode) {
+      setIsDiffMode(false);
+    }
+  }, [supportsDiff, isDiffMode]);
+
+  useEffect(() => {
     const normalizedHint = documentNode.language_hint?.toLowerCase();
     if ((normalizedHint === 'pdf' || normalizedHint === 'application/pdf') && !documentNode.default_view_mode && viewMode === 'edit') {
       setViewMode('preview');
@@ -300,10 +307,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         isInitialMount.current = false;
         return;
     }
-    if (formatTrigger > 0) {
+    if (!isRichTextDocument && formatTrigger > 0) {
         editorRef.current?.format();
     }
-  }, [formatTrigger]);
+  }, [formatTrigger, isRichTextDocument]);
 
   // --- Resizable Splitter Logic ---
   const handleSplitterMouseDown = (e: React.MouseEvent) => {
@@ -450,6 +457,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   };
   
   const handleFormatDocument = () => {
+    if (isRichTextDocument) {
+      return;
+    }
     if (isLocked) {
       setError('Document is locked and cannot be modified.');
       addLog('WARNING', `Format request blocked for locked document "${title}".`);
@@ -564,12 +574,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const language = documentNode.language_hint || 'plaintext';
+  const docType = (documentNode.doc_type ?? 'prompt') as DocType;
+  const isRichTextDocument = docType === 'rich_text';
+  const language = isRichTextDocument ? 'html' : (documentNode.language_hint || 'plaintext');
   const normalizedLanguage = language.toLowerCase();
-  const supportsAiTools = ['markdown', 'plaintext'].includes(normalizedLanguage);
+  const supportsAiTools = !isRichTextDocument && ['markdown', 'plaintext'].includes(normalizedLanguage);
   const canAddEmojiToTitle = documentNode.type === 'document';
-  const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
-  const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const supportsPreview = isRichTextDocument || PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
+  const supportsFormatting = !isRichTextDocument && ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const supportsDiff = !isRichTextDocument;
   const scriptBridgeAvailable =
     typeof window !== 'undefined' && (!!window.electronAPI || !!window.__DOCFORGE_SCRIPT_PREVIEW__);
   const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
@@ -692,7 +705,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [onZoomTargetChange]);
 
   const renderContent = () => {
-    const editor = isDiffMode
+    const editor = supportsDiff && isDiffMode
       ? (
           <MonacoDiffEditor
             oldText={baselineContent}
@@ -709,22 +722,32 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             onFocusChange={handleEditorFocusChange}
           />
         )
-      : (
-          <MonacoEditor
-            ref={editorRef}
-            content={content}
-            language={language}
-            onChange={setContent}
-            onScroll={handleEditorScroll}
-            customShortcuts={settings.customShortcuts}
-            fontFamily={settings.editorFontFamily}
-            fontSize={scaledEditorFontSize}
-            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
-            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
-            readOnly={isLocked}
-            onFocusChange={handleEditorFocusChange}
-          />
-        );
+      : isRichTextDocument
+        ? (
+            <RichTextEditor
+              content={content}
+              onChange={setContent}
+              readOnly={isLocked}
+              onScroll={handleEditorScroll}
+              onFocusChange={handleEditorFocusChange}
+            />
+          )
+        : (
+            <MonacoEditor
+              ref={editorRef}
+              content={content}
+              language={language}
+              onChange={setContent}
+              onScroll={handleEditorScroll}
+              customShortcuts={settings.customShortcuts}
+              fontFamily={settings.editorFontFamily}
+              fontSize={scaledEditorFontSize}
+              activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+              activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+              readOnly={isLocked}
+              onFocusChange={handleEditorFocusChange}
+            />
+          );
     const preview = (
       <div
         className="h-full w-full"
@@ -818,7 +841,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
               <label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">
                 Language:
               </label>
-              <LanguageDropdown id="language-select" value={language} onChange={onLanguageChange} />
+              <LanguageDropdown id="language-select" value={language} onChange={onLanguageChange} disabled={isRichTextDocument} />
             </div>
             <div className="h-5 w-px bg-border-color mx-1"></div>
             {supportsPreview && (
@@ -845,16 +868,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             >
               {isLocking ? <Spinner /> : isLocked ? <LockClosedIcon className="w-4 h-4" /> : <LockOpenIcon className="w-4 h-4" />}
             </IconButton>
-            <IconButton
-              onClick={() => setIsDiffMode(prev => !prev)}
-              tooltip={isDiffMode ? 'Hide Inline Diff' : 'Show Inline Diff'}
-              size="xs"
-              variant="ghost"
-              disabled={viewMode === 'preview'}
-              className={isDiffMode ? 'bg-secondary text-primary' : ''}
-            >
-              <span className="font-semibold text-[11px] leading-none tracking-wide">Diff</span>
-            </IconButton>
+            {supportsDiff && (
+              <IconButton
+                onClick={() => setIsDiffMode(prev => !prev)}
+                tooltip={isDiffMode ? 'Hide Inline Diff' : 'Show Inline Diff'}
+                size="xs"
+                variant="ghost"
+                disabled={viewMode === 'preview'}
+                className={isDiffMode ? 'bg-secondary text-primary' : ''}
+              >
+                <span className="font-semibold text-[11px] leading-none tracking-wide">Diff</span>
+              </IconButton>
+            )}
             <IconButton onClick={onShowHistory} tooltip="View Version History" size="xs" variant="ghost"><HistoryIcon className="w-4 h-4" /></IconButton>
             <div className="h-5 w-px bg-border-color mx-1"></div>
             <IconButton

@@ -6,9 +6,10 @@ interface LanguageDropdownProps {
   id?: string;
   value: string;
   onChange: (languageId: string) => void;
+  disabled?: boolean;
 }
 
-const LanguageDropdown: React.FC<LanguageDropdownProps> = ({ id, value, onChange }) => {
+const LanguageDropdown: React.FC<LanguageDropdownProps> = ({ id, value, onChange, disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -19,12 +20,19 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({ id, value, onChange
   const activeOptionId = useMemo(() => `language-option-${selectedLanguage.id}`, [selectedLanguage.id]);
 
   const toggleOpen = useCallback(() => {
+    if (disabled) return;
     setIsOpen((previous) => !previous);
-  }, []);
+  }, [disabled]);
 
   const close = useCallback(() => {
     setIsOpen(false);
   }, []);
+
+  useEffect(() => {
+    if (disabled) {
+      setIsOpen(false);
+    }
+  }, [disabled]);
 
   useEffect(() => {
     if (!isOpen || typeof document === 'undefined') return;
@@ -53,10 +61,11 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({ id, value, onChange
 
   const handleSelect = useCallback(
     (languageId: string) => {
+      if (disabled) return;
       onChange(languageId);
       close();
     },
-    [close, onChange],
+    [close, onChange, disabled],
   );
 
   return (
@@ -65,16 +74,18 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({ id, value, onChange
         id={id}
         type="button"
         onClick={toggleOpen}
-        className="flex items-center gap-2 bg-background text-text-main text-xs rounded-md py-1 pl-2 pr-2 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
+        className={`flex items-center gap-2 bg-background text-text-main text-xs rounded-md py-1 pl-2 pr-2 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        aria-disabled={disabled}
+        disabled={disabled}
       >
         <span className="truncate max-w-[8rem]" title={selectedLanguage.label}>
           {selectedLanguage.label}
         </span>
         <ChevronDownIcon className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : 'rotate-0'}`} />
       </button>
-      {isOpen && (
+      {isOpen && !disabled && (
         <div
           className="absolute right-0 mt-1 z-50 w-72 rounded-md border border-border-color bg-background shadow-lg"
           role="listbox"
