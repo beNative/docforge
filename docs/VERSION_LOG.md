@@ -1,5 +1,20 @@
 # Version Log
 
+## v0.6.10 - The Auto-Install Controls Update
+
+### ✨ Features
+
+-   Added an **Automatic Installation** toggle to Settings → General so administrators can decide whether DocForge installs downloaded updates the next time they quit.
+-   Mirrored the automatic-install switch inside the in-app update toast (desktop builds) alongside progress indicators and restart controls, letting you adjust the preference without leaving your workflow.
+
+### 🐛 Fixes
+
+-   Ensured the desktop updater honors the saved automatic-install preference across sessions so downloads no longer revert to installing on quit unexpectedly.
+
+### 📝 Documentation
+
+-   Documented the automatic-install controls and refreshed the release guides for the v0.6.10 tagging workflow.
+
 ## v0.6.9 - The Workflow & Execution Update
 
 ### ✨ Features

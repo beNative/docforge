@@ -145,7 +145,7 @@ Electron Builder manages the packaging and publishing workflow for DocForge. The
 3. Review and update the Markdown documentation (README, manuals, release notes) so the written guidance reflects the final state of the build.
 4. Sync the Markdown files under `docs/` with the copies at the project root.
 5. Commit and push the changes so the release tag points at the finished documentation.
-6. Create and push a matching version tag (for example, `git tag v0.6.9` followed by `git push origin v0.6.9`) to trigger the automated release pipeline.
+6. Create and push a matching version tag (for example, `git tag v0.6.10` followed by `git push origin v0.6.10`) to trigger the automated release pipeline.
 7. Monitor the "Release" workflow run and verify the published GitHub release lists the correct notes and includes the installers for every supported platform before announcing availability.
 
 ### Automated Release Workflow
