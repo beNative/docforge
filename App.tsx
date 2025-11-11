@@ -50,7 +50,7 @@ const MIN_LOGGER_HEIGHT = 100;
 const PREVIEW_INITIAL_SCALE = 1;
 const PREVIEW_MIN_SCALE = 0.25;
 const PREVIEW_MAX_SCALE = 5;
-const PREVIEW_ZOOM_STEP = 0.25;
+const PREVIEW_ZOOM_STEP = 0.05;
 
 const isElectron = !!window.electronAPI;
 
@@ -263,17 +263,17 @@ export const MainApp: React.FC = () => {
 
     const handlePreviewZoomIn = useCallback(() => {
         if (workspaceZoomTarget === 'preview') {
-            setPreviewScale(prev => clampZoomScale(prev * (1 + PREVIEW_ZOOM_STEP)));
+            setPreviewScale(prev => clampZoomScale(prev + PREVIEW_ZOOM_STEP));
         } else {
-            setEditorScale(prev => clampZoomScale(prev * (1 + PREVIEW_ZOOM_STEP)));
+            setEditorScale(prev => clampZoomScale(prev + PREVIEW_ZOOM_STEP));
         }
     }, [clampZoomScale, workspaceZoomTarget]);
 
     const handlePreviewZoomOut = useCallback(() => {
         if (workspaceZoomTarget === 'preview') {
-            setPreviewScale(prev => clampZoomScale(prev / (1 + PREVIEW_ZOOM_STEP)));
+            setPreviewScale(prev => clampZoomScale(prev - PREVIEW_ZOOM_STEP));
         } else {
-            setEditorScale(prev => clampZoomScale(prev / (1 + PREVIEW_ZOOM_STEP)));
+            setEditorScale(prev => clampZoomScale(prev - PREVIEW_ZOOM_STEP));
         }
     }, [clampZoomScale, workspaceZoomTarget]);
 
