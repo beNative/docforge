@@ -1,5 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import Modal from './Modal';
+import Button from './Button';
 
 const appIconUrl = new URL('../assets/icon.svg', import.meta.url).href;
 
@@ -9,6 +10,16 @@ interface AboutModalProps {
 
 const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
   const githubLinkRef = useRef<HTMLAnchorElement>(null);
+  const handleOpenExecutableFolder = useCallback(async () => {
+    try {
+      const result = await window.electronAPI?.openExecutableFolder?.();
+      if (result && !result.success && result.error) {
+        console.error('Failed to open executable folder:', result.error);
+      }
+    } catch (error) {
+      console.error('Failed to open executable folder:', error);
+    }
+  }, []);
 
   return (
     <Modal title="About DocForge" onClose={onClose} initialFocusRef={githubLinkRef}>
@@ -22,15 +33,27 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
             <p className="text-sm text-text-secondary">© 2025 Tim Sinaeve. All rights reserved.</p>
           </div>
         </div>
-        <a
-          ref={githubLinkRef}
-          href="https://github.com/beNative/docforge"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold rounded-md border border-transparent bg-primary text-primary-text hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors duration-150"
-        >
-          View source on GitHub
-        </a>
+        <div className="flex flex-col items-center space-y-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <a
+              ref={githubLinkRef}
+              href="https://github.com/beNative/docforge"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold rounded-md border border-transparent bg-primary text-primary-text hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background transition-colors duration-150"
+            >
+              View source on GitHub
+            </a>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleOpenExecutableFolder}
+              className="text-xs"
+            >
+              Open installation folder
+            </Button>
+          </div>
+        </div>
       </div>
     </Modal>
   );
