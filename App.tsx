@@ -22,7 +22,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon, SearchIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -367,6 +367,7 @@ export const MainApp: React.FC = () => {
     const isLoggerResizing = useRef(false);
     const commandPaletteTargetRef = useRef<HTMLDivElement>(null);
     const commandPaletteInputRef = useRef<HTMLInputElement>(null);
+    const documentTreeSearchInputRef = useRef<HTMLInputElement>(null);
     const dragCounter = useRef(0);
     const ensureNodeVisibleRef = useRef<(node: Pick<DocumentOrFolder, 'id' | 'type' | 'parentId'>) => void>();
 
@@ -767,6 +768,14 @@ export const MainApp: React.FC = () => {
     const handleDocumentTreeSelectAll = useCallback(() => {
         setSelectedIds(new Set(navigableItems.map(item => item.id)));
     }, [navigableItems, setSelectedIds]);
+
+    const handleFocusDocumentTreeSearch = useCallback(() => {
+        const input = documentTreeSearchInputRef.current;
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    }, [documentTreeSearchInputRef]);
 
     const handleMoveSelectionUp = useCallback(() => {
         const primaryId = getPrimarySelectionId();
@@ -2630,6 +2639,7 @@ export const MainApp: React.FC = () => {
         { id: 'rename-item', name: 'Rename Selected Item', action: handleRenameSelection, category: 'File', icon: PencilIcon, shortcut: ['F2'], keywords: 'rename edit title' },
         { id: 'delete-item', name: 'Delete Selection', action: () => handleDeleteSelection(selectedIds), category: 'File', icon: TrashIcon, shortcut: ['Delete'], keywords: 'remove discard' },
         { id: 'document-tree-select-all', name: 'Select All Tree Items', action: handleDocumentTreeSelectAll, category: 'Document Tree', icon: CheckIcon, shortcut: ['Control', 'A'], keywords: 'select highlight all tree' },
+        { id: 'document-tree-focus-search', name: 'Focus Document Tree Search', action: handleFocusDocumentTreeSearch, category: 'Document Tree', icon: SearchIcon, shortcut: ['Control', 'F'], keywords: 'focus search tree find' },
         { id: 'document-tree-expand-all', name: 'Expand All Tree Folders', action: handleExpandAll, category: 'Document Tree', icon: ExpandAllIcon, shortcut: ['Control', 'Alt', 'ArrowRight'], keywords: 'open folders tree expand' },
         { id: 'document-tree-collapse-all', name: 'Collapse All Tree Folders', action: handleCollapseAll, category: 'Document Tree', icon: CollapseAllIcon, shortcut: ['Control', 'Alt', 'ArrowLeft'], keywords: 'close folders tree collapse' },
         { id: 'document-tree-move-selection-up', name: 'Move Selection Up', action: handleMoveSelectionUp, category: 'Document Tree', icon: ArrowUpIcon, shortcut: ['Alt', 'ArrowUp'], keywords: 'reorder move up tree' },
@@ -2644,7 +2654,7 @@ export const MainApp: React.FC = () => {
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleFocusDocumentTreeSearch, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -2800,7 +2810,7 @@ export const MainApp: React.FC = () => {
                 return;
             }
 
-            if (command?.category === 'Document Tree') {
+            if (command?.category === 'Document Tree' && command.id !== 'document-tree-focus-search') {
                 const target = e.target as HTMLElement | null;
                 const isWithinSidebar = target?.closest('[data-component="document-tree-sidebar"]');
                 if (!isWithinSidebar) {
@@ -3022,6 +3032,7 @@ export const MainApp: React.FC = () => {
                                         onCollapseAll={handleCollapseAll}
                                         searchTerm={searchTerm}
                                         setSearchTerm={setSearchTerm}
+                                        searchInputRef={documentTreeSearchInputRef}
                                         onContextMenu={handleContextMenu}
                                         renamingNodeId={renamingNodeId}
                                         onRenameComplete={() => setRenamingNodeId(null)}
