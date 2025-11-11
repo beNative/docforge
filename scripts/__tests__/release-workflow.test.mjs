@@ -604,15 +604,15 @@ test('remote auto-update check fails when Windows release metadata is absent', a
       runRemoteCheck({
         owner: 'beNative',
         repo: 'docforge',
-        tag: 'v0.6.9',
+        tag: 'v0.6.10',
         skipHttp: true,
         skipDownload: true,
         http: {
           fetchJson: async () => ({
             assets: [
               {
-                name: 'DocForge-Setup-0.6.9.exe',
-                browser_download_url: 'https://example.invalid/DocForge-Setup-0.6.9.exe',
+                name: 'DocForge-Setup-0.6.10.exe',
+                browser_download_url: 'https://example.invalid/DocForge-Setup-0.6.10.exe',
               },
             ],
           }),
@@ -647,7 +647,7 @@ test('remote auto-update check falls back to latest release when requested tag i
   const headUrls = [];
   const http = {
     fetchJson: async (url) => {
-      if (url.endsWith('/releases/tags/v0.6.9')) {
+      if (url.endsWith('/releases/tags/v0.6.10')) {
         const error = new Error('Not Found');
         error.status = 404;
         throw error;
@@ -689,7 +689,7 @@ test('remote auto-update check falls back to latest release when requested tag i
     runRemoteCheck({
       owner: 'beNative',
       repo: 'docforge',
-      tag: 'v0.6.9',
+      tag: 'v0.6.10',
       skipHttp: false,
       skipDownload: true,
       http,
@@ -704,24 +704,24 @@ test('remote auto-update check falls back to latest release when requested tag i
 
 test('auto-update analysis reports unreachable assets when GitHub returns 404', async () => {
   const metadataSource = YAML.stringify({
-    version: '0.6.9',
+    version: '0.6.10',
     files: [
       {
-        url: 'DocForge-Setup-0.6.9.exe',
+        url: 'DocForge-Setup-0.6.10.exe',
         sha512: 'placeholder',
         size: 100,
       },
     ],
-    path: 'DocForge-Setup-0.6.9.exe',
+    path: 'DocForge-Setup-0.6.10.exe',
     sha512: 'placeholder',
   });
 
   const assets = new Map([
     [
-      'DocForge-Setup-0.6.9.exe',
+      'DocForge-Setup-0.6.10.exe',
       {
-        name: 'DocForge-Setup-0.6.9.exe',
-        browser_download_url: 'https://example.invalid/DocForge-Setup-0.6.9.exe',
+        name: 'DocForge-Setup-0.6.10.exe',
+        browser_download_url: 'https://example.invalid/DocForge-Setup-0.6.10.exe',
       },
     ],
   ]);
@@ -731,7 +731,7 @@ test('auto-update analysis reports unreachable assets when GitHub returns 404', 
     metadataSource,
     owner: 'beNative',
     repo: 'docforge',
-    tag: 'v0.6.9',
+    tag: 'v0.6.10',
     assets,
     skipHttp: false,
     skipDownload: true,
@@ -741,7 +741,7 @@ test('auto-update analysis reports unreachable assets when GitHub returns 404', 
     },
   });
 
-  assert(result.unreachable.some((entry) => entry.includes('DocForge-Setup-0.6.9.exe') && entry.includes('404 (Not Found)')));
+  assert(result.unreachable.some((entry) => entry.includes('DocForge-Setup-0.6.10.exe') && entry.includes('404 (Not Found)')));
 });
 
 test('metadata updates compute digests for non-release assets referenced locally', async (t) => {
