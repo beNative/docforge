@@ -1193,6 +1193,54 @@ export const MainApp: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        if (window.electronAPI) {
+            return;
+        }
+        const params = new URLSearchParams(window.location.search);
+        const demoToast = params.get('demoUpdateToast');
+        if (!demoToast) {
+            return;
+        }
+
+        if (demoToast === 'downloading') {
+            const demoProgress = Number(params.get('demoProgress') ?? '68');
+            setUpdateToast(prev => ({
+                ...prev,
+                status: 'downloading',
+                version: prev.version ?? '0.7.0',
+                releaseName: prev.releaseName ?? 'Aurora',
+                progress: Number.isFinite(demoProgress) ? Math.max(0, Math.min(100, demoProgress)) : 68,
+                bytesTransferred: 45 * 1024 * 1024,
+                bytesTotal: 80 * 1024 * 1024,
+                visible: true,
+                snoozed: false,
+                errorMessage: null,
+                errorDetails: null,
+            }));
+            return;
+        }
+
+        if (demoToast === 'downloaded') {
+            setUpdateToast(prev => ({
+                ...prev,
+                status: 'downloaded',
+                version: prev.version ?? '0.7.0',
+                releaseName: prev.releaseName ?? 'Aurora',
+                progress: 100,
+                bytesTransferred: prev.bytesTotal ?? 80 * 1024 * 1024,
+                bytesTotal: prev.bytesTotal ?? 80 * 1024 * 1024,
+                visible: true,
+                snoozed: false,
+                errorMessage: null,
+                errorDetails: null,
+            }));
+        }
+    }, []);
+
+    useEffect(() => {
         if (!window.electronAPI) {
             return;
         }
@@ -2251,6 +2299,12 @@ export const MainApp: React.FC = () => {
         });
     }, []);
 
+    const handleAutoInstallPreferenceChange = useCallback((enabled: boolean) => {
+        addLog('INFO', `User action: ${enabled ? 'Enabled' : 'Disabled'} automatic installation via toast.`);
+        const nextSettings = { ...settings, autoInstallUpdates: enabled };
+        void saveSettings(nextSettings);
+    }, [addLog, saveSettings, settings]);
+
     const handleFormatDocument = useCallback(() => {
         const activeDoc = items.find(p => p.id === activeNodeId);
         if (activeDoc && activeDoc.type === 'document' && view === 'editor') {
@@ -3031,6 +3085,9 @@ export const MainApp: React.FC = () => {
                     onInstall={updateToast.status === 'downloaded' && window.electronAPI?.quitAndInstallUpdate
                         ? () => window.electronAPI!.quitAndInstallUpdate!()
                         : undefined}
+                    autoInstallEnabled={settings.autoInstallUpdates}
+                    autoInstallSupported={isElectron && !!window.electronAPI?.quitAndInstallUpdate}
+                    onAutoInstallChange={handleAutoInstallPreferenceChange}
                     onClose={handleUpdateToastClose}
                 />
             )}

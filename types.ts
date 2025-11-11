@@ -42,6 +42,7 @@ declare global {
       ) => Promise<{ success: boolean; svg?: string; error?: string; details?: string }>;
       updaterSetAllowPrerelease: (allow: boolean) => void;
       updaterSetAutoCheckEnabled?: (enabled: boolean) => void;
+      updaterSetAutoInstallEnabled?: (enabled: boolean) => void;
       updaterCheckForUpdates?: () => Promise<ManualUpdateCheckResult>;
       onUpdateAvailable?: (callback: (info: UpdateAvailableInfo) => void) => () => void;
       onUpdateDownloadProgress?: (callback: (progress: UpdateDownloadProgress) => void) => () => void;
@@ -485,6 +486,7 @@ export interface Settings {
   autoSaveLogs: boolean;
   allowPrerelease: boolean;
   autoCheckForUpdates: boolean;
+  autoInstallUpdates: boolean;
   plantumlRendererMode: 'remote' | 'offline';
   uiScale: number;
   documentTreeIndent: number;

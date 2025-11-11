@@ -1929,6 +1929,17 @@ const GeneralSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurre
                 <SettingRow htmlFor="autoCheckForUpdates" label="Automatic Update Checks" description="Check for new releases whenever DocForge starts.">
                     <ToggleSwitch id="autoCheckForUpdates" checked={settings.autoCheckForUpdates} onChange={(val) => setCurrentSettings(s => ({...s, autoCheckForUpdates: val}))} />
                 </SettingRow>
+                <SettingRow
+                    htmlFor="autoInstallUpdates"
+                    label="Automatic Installation"
+                    description="When enabled, DocForge installs downloaded updates automatically the next time you restart."
+                >
+                    <ToggleSwitch
+                        id="autoInstallUpdates"
+                        checked={settings.autoInstallUpdates}
+                        onChange={(val) => setCurrentSettings(s => ({ ...s, autoInstallUpdates: val }))}
+                    />
+                </SettingRow>
                 <SettingRow label="Check for Updates" description="Run an update check immediately.">
                     <div className="flex flex-col items-start md:items-end gap-2 w-full">
                         <Button variant="secondary" onClick={handleManualUpdateCheck} isLoading={isManualCheckRunning} disabled={isManualCheckRunning || !canManuallyCheckForUpdates}>
