@@ -19,9 +19,10 @@ interface MonacoDiffEditorProps {
   fontSize?: number;
   activeLineHighlightColorLight?: string;
   activeLineHighlightColorDark?: string;
+  onFocusChange?: (hasFocus: boolean) => void;
 }
 
-const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark }) => {
+const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark, onFocusChange }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const editorInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -29,6 +30,8 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
     const modelsRef = useRef<{ original: any; modified: any } | null>(null);
     const changeListenerRef = useRef<{ dispose: () => void } | null>(null);
     const scrollListenerRef = useRef<{ dispose: () => void } | null>(null);
+    const focusListenerRef = useRef<{ dispose: () => void } | null>(null);
+    const blurListenerRef = useRef<{ dispose: () => void } | null>(null);
     const computedFontFamily = useMemo(() => {
         const candidate = (fontFamily ?? '').trim();
         return candidate || DEFAULT_SETTINGS.editorFontFamily;
@@ -73,6 +76,10 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
             scrollListenerRef.current.dispose();
             scrollListenerRef.current = null;
         }
+        focusListenerRef.current?.dispose();
+        focusListenerRef.current = null;
+        blurListenerRef.current?.dispose();
+        blurListenerRef.current = null;
     }, []);
 
     useEffect(() => {
@@ -151,6 +158,15 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
                             scrollHeight: modifiedEditor.getScrollHeight(),
                             clientHeight: modifiedEditor.getLayoutInfo().height,
                         });
+                    });
+                }
+
+                if (onFocusChange) {
+                    focusListenerRef.current = modifiedEditor.onDidFocusEditorWidget(() => {
+                        onFocusChange(true);
+                    });
+                    blurListenerRef.current = modifiedEditor.onDidBlurEditorWidget(() => {
+                        onFocusChange(false);
                     });
                 }
             } catch (error) {

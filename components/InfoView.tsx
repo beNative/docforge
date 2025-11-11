@@ -26,6 +26,7 @@ interface InfoViewProps {
   previewResetSignal?: number;
   onPreviewVisibilityChange?: (isVisible: boolean) => void;
   onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
+  onZoomTargetChange?: (target: 'preview' | 'editor') => void;
 }
 
 const PreviewZoomAvailabilityReset: React.FC<{
@@ -46,6 +47,7 @@ const InfoView: React.FC<InfoViewProps> = ({
   previewResetSignal,
   onPreviewVisibilityChange,
   onPreviewZoomAvailabilityChange,
+  onZoomTargetChange,
 }) => {
   const [activeTab, setActiveTab] = useState<DocTab>('Readme');
   const [documents, setDocuments] = useState<Record<DocTab, string>>({
@@ -109,11 +111,12 @@ const InfoView: React.FC<InfoViewProps> = ({
 
   useEffect(() => {
     onPreviewVisibilityChange?.(true);
+    onZoomTargetChange?.('preview');
     return () => {
       onPreviewVisibilityChange?.(false);
       onPreviewZoomAvailabilityChange?.(false);
     };
-  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange]);
+  }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange, onZoomTargetChange]);
 
   const activeTabContent = documents[activeTab];
   const isLoadingActiveTab = activeTabContent === 'Loading...';

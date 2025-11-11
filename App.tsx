@@ -230,10 +230,12 @@ export const MainApp: React.FC = () => {
     const [isRestoringActiveDocument, setIsRestoringActiveDocument] = useState(true);
     const [hasRestoredActiveDocument, setHasRestoredActiveDocument] = useState(false);
     const [previewScale, setPreviewScale] = useState(PREVIEW_INITIAL_SCALE);
+    const [editorScale, setEditorScale] = useState(PREVIEW_INITIAL_SCALE);
     const [previewResetSignal, setPreviewResetSignal] = useState(0);
     const [isPreviewVisible, setIsPreviewVisible] = useState(false);
     const [isPreviewZoomReady, setIsPreviewZoomReady] = useState(false);
     const [previewMetadata, setPreviewMetadata] = useState<PreviewMetadata | null>(null);
+    const [workspaceZoomTarget, setWorkspaceZoomTarget] = useState<'preview' | 'editor'>('editor');
 
     useEffect(() => {
         if (!isPreviewVisible) {
@@ -251,25 +253,41 @@ export const MainApp: React.FC = () => {
     const openDocumentIds = tabState.order;
     const storedActiveDocumentIdRef = useRef<string | null>(null);
 
-    const clampPreviewScale = useCallback((value: number) => {
+    const clampZoomScale = useCallback((value: number) => {
         return Math.min(Math.max(value, PREVIEW_MIN_SCALE), PREVIEW_MAX_SCALE);
     }, []);
 
     const handlePreviewScaleChange = useCallback((value: number) => {
-        setPreviewScale(clampPreviewScale(value));
-    }, [clampPreviewScale]);
+        setPreviewScale(clampZoomScale(value));
+    }, [clampZoomScale]);
 
     const handlePreviewZoomIn = useCallback(() => {
-        setPreviewScale(prev => clampPreviewScale(prev * (1 + PREVIEW_ZOOM_STEP)));
-    }, [clampPreviewScale]);
+        if (workspaceZoomTarget === 'preview') {
+            setPreviewScale(prev => clampZoomScale(prev * (1 + PREVIEW_ZOOM_STEP)));
+        } else {
+            setEditorScale(prev => clampZoomScale(prev * (1 + PREVIEW_ZOOM_STEP)));
+        }
+    }, [clampZoomScale, workspaceZoomTarget]);
 
     const handlePreviewZoomOut = useCallback(() => {
-        setPreviewScale(prev => clampPreviewScale(prev / (1 + PREVIEW_ZOOM_STEP)));
-    }, [clampPreviewScale]);
+        if (workspaceZoomTarget === 'preview') {
+            setPreviewScale(prev => clampZoomScale(prev / (1 + PREVIEW_ZOOM_STEP)));
+        } else {
+            setEditorScale(prev => clampZoomScale(prev / (1 + PREVIEW_ZOOM_STEP)));
+        }
+    }, [clampZoomScale, workspaceZoomTarget]);
 
     const handlePreviewReset = useCallback(() => {
-        setPreviewScale(PREVIEW_INITIAL_SCALE);
-        setPreviewResetSignal(prev => prev + 1);
+        if (workspaceZoomTarget === 'preview') {
+            setPreviewScale(PREVIEW_INITIAL_SCALE);
+            setPreviewResetSignal(prev => prev + 1);
+        } else {
+            setEditorScale(PREVIEW_INITIAL_SCALE);
+        }
+    }, [workspaceZoomTarget]);
+
+    const handleWorkspaceZoomTargetChange = useCallback((target: 'preview' | 'editor') => {
+        setWorkspaceZoomTarget(target);
     }, []);
 
     const activateDocumentTab = useCallback((documentId: string) => {
@@ -482,11 +500,39 @@ export const MainApp: React.FC = () => {
         }
     }, [activeDocument]);
 
+    const previewZoomAvailable = useMemo(() => {
+        if (view === 'info') {
+            return true;
+        }
+        return isPreviewVisible && isPreviewZoomReady;
+    }, [isPreviewVisible, isPreviewZoomReady, view]);
+
+    const editorZoomAvailable = useMemo(() => {
+        return view === 'editor' && documentView === 'editor' && Boolean(activeDocument);
+    }, [activeDocument, documentView, view]);
+
+    useEffect(() => {
+        if (workspaceZoomTarget === 'preview' && !previewZoomAvailable && editorZoomAvailable) {
+            setWorkspaceZoomTarget('editor');
+        } else if (workspaceZoomTarget === 'editor' && !editorZoomAvailable && previewZoomAvailable) {
+            setWorkspaceZoomTarget('preview');
+        }
+    }, [editorZoomAvailable, previewZoomAvailable, workspaceZoomTarget]);
+
+    const isWorkspaceZoomAvailable = useMemo(() => {
+        return workspaceZoomTarget === 'preview' ? previewZoomAvailable : editorZoomAvailable;
+    }, [editorZoomAvailable, previewZoomAvailable, workspaceZoomTarget]);
+
+    const workspaceZoomScale = useMemo(() => {
+        return workspaceZoomTarget === 'preview' ? previewScale : editorScale;
+    }, [editorScale, previewScale, workspaceZoomTarget]);
+
     const documentItems = useMemo(() => items.filter(item => item.type === 'document'), [items]);
     const activeDocumentId = activeDocument?.id ?? null;
 
     useEffect(() => {
         setPreviewScale(PREVIEW_INITIAL_SCALE);
+        setEditorScale(PREVIEW_INITIAL_SCALE);
         setPreviewResetSignal(prev => prev + 1);
     }, [activeNode?.id, activeNode?.type]);
 
@@ -2779,7 +2825,7 @@ export const MainApp: React.FC = () => {
             return (
                 <InfoView
                     settings={settings}
-                    previewScale={previewScale}
+                    previewScale={workspaceZoomScale}
                     onPreviewScaleChange={handlePreviewScaleChange}
                     previewZoomOptions={{
                         minScale: PREVIEW_MIN_SCALE,
@@ -2790,6 +2836,7 @@ export const MainApp: React.FC = () => {
                     previewResetSignal={previewResetSignal}
                     onPreviewVisibilityChange={setIsPreviewVisible}
                     onPreviewZoomAvailabilityChange={setIsPreviewZoomReady}
+                    onZoomTargetChange={handleWorkspaceZoomTargetChange}
                 />
             );
         }
@@ -2829,6 +2876,7 @@ export const MainApp: React.FC = () => {
                         onToggleLock={(locked) => handleSetNodeLockState(activeNode.id, locked)}
                         formatTrigger={formatTrigger}
                         previewScale={previewScale}
+                        editorScale={editorScale}
                         onPreviewScaleChange={handlePreviewScaleChange}
                         previewMinScale={PREVIEW_MIN_SCALE}
                         previewMaxScale={PREVIEW_MAX_SCALE}
@@ -2838,6 +2886,7 @@ export const MainApp: React.FC = () => {
                         onPreviewVisibilityChange={setIsPreviewVisible}
                         onPreviewZoomAvailabilityChange={setIsPreviewZoomReady}
                         onPreviewMetadataChange={setPreviewMetadata}
+                        onZoomTargetChange={handleWorkspaceZoomTargetChange}
                     />
                 );
             }
@@ -3022,15 +3071,16 @@ export const MainApp: React.FC = () => {
                     databaseStatus={databaseStatus}
                     onDatabaseMenu={handleDatabaseMenu}
                     onOpenAbout={handleOpenAbout}
-                    previewScale={previewScale}
+                    previewScale={workspaceZoomScale}
                     onPreviewZoomIn={handlePreviewZoomIn}
                     onPreviewZoomOut={handlePreviewZoomOut}
                     onPreviewReset={handlePreviewReset}
-                    isPreviewZoomAvailable={isPreviewVisible && isPreviewZoomReady}
+                    isPreviewZoomAvailable={isWorkspaceZoomAvailable}
                     previewMinScale={PREVIEW_MIN_SCALE}
                     previewMaxScale={PREVIEW_MAX_SCALE}
                     previewInitialScale={PREVIEW_INITIAL_SCALE}
                     previewMetadata={previewMetadata}
+                    zoomTarget={workspaceZoomTarget}
                 />
             </div>
             
