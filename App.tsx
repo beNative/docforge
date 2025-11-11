@@ -35,6 +35,7 @@ import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { exportDocumentToFile } from './services/documentExportService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
+import { llmService } from './services/llmService';
 import { LOCAL_STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
 import { repository, type RepositoryStartupTiming } from './services/repository';
 import { DocumentNode } from './components/PromptTreeItem';
@@ -1725,6 +1726,28 @@ export const MainApp: React.FC = () => {
             setDocumentView('editor');
             setView('editor');
 
+            const shouldAutoGenerateTitle =
+                Boolean(settings.llmProviderUrl && settings.llmModelName) &&
+                settings.apiType !== 'unknown' &&
+                llmStatus === 'connected';
+
+            if (shouldAutoGenerateTitle) {
+                void (async () => {
+                    try {
+                        addLog('INFO', 'Auto-generating clipboard document title using local LLM.');
+                        const generatedTitle = await llmService.generateTitle(text, settings, addLog);
+                        const cleanedTitle = generatedTitle.trim();
+                        if (cleanedTitle.length > 0) {
+                            await updateItem(newDoc.id, { title: cleanedTitle });
+                            addLog('INFO', `Applied AI-generated title "${cleanedTitle}" to clipboard document.`);
+                        }
+                    } catch (err) {
+                        const message = err instanceof Error ? err.message : 'Unknown error';
+                        addLog('ERROR', `Automatic title generation failed: ${message}`);
+                    }
+                })();
+            }
+
             const detectedLanguage = summary.languageHint ?? 'unknown';
             const mimeDescriptor = mimeType ?? 'text/plain';
             addLog(
@@ -1764,7 +1787,7 @@ export const MainApp: React.FC = () => {
                 message: `Something went wrong while importing from the clipboard: ${message}`,
             });
         }
-    }, [createDocumentFromClipboard, getParentIdForNewItem, ensureNodeVisible, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, addLog]);
+    }, [createDocumentFromClipboard, getParentIdForNewItem, ensureNodeVisible, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, addLog, settings, llmStatus, updateItem]);
 
     const handleNewCodeFile = useCallback(async (filename: string) => {
         addLog('INFO', `User action: Create New Code File with name "${filename}".`);
