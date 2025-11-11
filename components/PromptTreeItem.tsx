@@ -41,6 +41,8 @@ interface DocumentTreeItemProps {
   onContextMenu: (e: React.MouseEvent, nodeId: string | null) => void;
   renamingNodeId: string | null;
   onRenameComplete: () => void;
+  pendingEmojiInsertion: { nodeId: string; anchor: { x: number; y: number } } | null;
+  onEmojiInsertionComplete: (nodeId: string) => void;
 }
 
 // Helper function to determine drop position based on mouse coordinates within an element
@@ -126,6 +128,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onContextMenu,
     renamingNodeId,
     onRenameComplete,
+    pendingEmojiInsertion,
+    onEmojiInsertionComplete,
     indentPerLevel,
     verticalSpacing,
     searchTerm,
@@ -144,6 +148,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const rowRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
   const { openEmojiPicker } = useEmojiPicker();
+  const renameSelectionRef = useRef<{ start: number; end: number }>({ start: renameValue.length, end: renameValue.length });
 
   const isSelected = selectedIds.has(node.id);
   const isFocused = focusedItemId === node.id;
@@ -181,10 +186,14 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
 
   useEffect(() => {
     if (isRenaming) {
-      renameInputRef.current?.focus();
-      renameInputRef.current?.select();
+      const input = renameInputRef.current;
+      input?.focus();
+      input?.select();
+      const length = input?.value.length ?? renameValue.length;
+      renameSelectionRef.current = { start: 0, end: length };
+      updateRenameSelection();
     }
-  }, [isRenaming]);
+  }, [isRenaming, renameValue, updateRenameSelection]);
   
   useEffect(() => {
     if (isRenaming && !isSelected) {
@@ -254,40 +263,90 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     else if (e.key === 'Escape') setIsRenaming(false);
   };
 
-  const handleRenameContextMenu = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
-    if (event.shiftKey) {
+  const updateRenameSelection = useCallback(() => {
+    const input = renameInputRef.current;
+    if (!input) {
+      return;
+    }
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    renameSelectionRef.current = { start, end };
+  }, []);
+
+  const openEmojiForRename = useCallback(
+    (anchor: { x: number; y: number }) => {
+      const input = renameInputRef.current;
+      if (!input) {
+        return;
+      }
+
+      const { start, end } = renameSelectionRef.current;
+      openEmojiPicker({
+        anchor,
+        onSelect: (emoji) => {
+          const activeInput = renameInputRef.current ?? input;
+          const baseValue = activeInput.value;
+          const before = baseValue.slice(0, start);
+          const after = baseValue.slice(end);
+          const nextValue = `${before}${emoji}${after}`;
+          setRenameValue(nextValue);
+          requestAnimationFrame(() => {
+            const target = renameInputRef.current ?? input;
+            const cursorPosition = start + emoji.length;
+            target.focus();
+            target.setSelectionRange(cursorPosition, cursorPosition);
+            renameSelectionRef.current = { start: cursorPosition, end: cursorPosition };
+          });
+        },
+        onClose: () => {
+          requestAnimationFrame(() => {
+            const target = renameInputRef.current ?? input;
+            target.focus();
+          });
+        },
+      });
+    },
+    [openEmojiPicker, setRenameValue]
+  );
+
+  useEffect(() => {
+    if (!pendingEmojiInsertion || pendingEmojiInsertion.nodeId !== node.id) {
       return;
     }
 
-    const input = event.currentTarget;
-    const selectionStart = input.selectionStart ?? input.value.length;
-    const selectionEnd = input.selectionEnd ?? selectionStart;
-    const anchor = { x: event.clientX, y: event.clientY };
+    let cancelled = false;
 
-    event.preventDefault();
-    openEmojiPicker({
-      anchor,
-      onSelect: (emoji) => {
-        const activeInput = renameInputRef.current ?? input;
-        const baseValue = activeInput.value;
-        const before = baseValue.slice(0, selectionStart);
-        const after = baseValue.slice(selectionEnd);
-        const nextValue = `${before}${emoji}${after}`;
-        setRenameValue(nextValue);
-        requestAnimationFrame(() => {
-          const target = renameInputRef.current ?? input;
-          const cursorPosition = selectionStart + emoji.length;
-          target.focus();
-          target.setSelectionRange(cursorPosition, cursorPosition);
-        });
-      },
-      onClose: () => {
-        requestAnimationFrame(() => {
-          renameInputRef.current?.focus();
-        });
-      },
-    });
-  }, [openEmojiPicker, setRenameValue]);
+    const attemptOpen = () => {
+      if (cancelled) {
+        return;
+      }
+
+      if (!isRenaming) {
+        setIsRenaming(true);
+      }
+
+      const input = renameInputRef.current;
+      if (!input) {
+        requestAnimationFrame(attemptOpen);
+        return;
+      }
+
+      if (document.activeElement !== input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+      }
+
+      updateRenameSelection();
+      openEmojiForRename(pendingEmojiInsertion.anchor);
+      onEmojiInsertionComplete(node.id);
+    };
+
+    attemptOpen();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isRenaming, node.id, onEmojiInsertionComplete, openEmojiForRename, pendingEmojiInsertion, updateRenameSelection]);
 
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation();
@@ -453,17 +512,43 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                 )}
 
                 {isRenaming ? (
-                    <input
-                        ref={renameInputRef}
-                        type="text"
-                        value={renameValue}
-                        onContextMenu={handleRenameContextMenu}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onBlur={handleRenameSubmit}
-                        onKeyDown={handleRenameKeyDown}
-                        className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
+                    <div className="flex w-full items-center gap-1.5">
+                        <input
+                            ref={renameInputRef}
+                            type="text"
+                            value={renameValue}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                updateRenameSelection();
+                            }}
+                            onChange={(e) => {
+                                setRenameValue(e.target.value);
+                                requestAnimationFrame(updateRenameSelection);
+                            }}
+                            onBlur={handleRenameSubmit}
+                            onKeyDown={(e) => {
+                                handleRenameKeyDown(e);
+                                requestAnimationFrame(updateRenameSelection);
+                            }}
+                            onKeyUp={updateRenameSelection}
+                            onSelect={updateRenameSelection}
+                            onMouseUp={updateRenameSelection}
+                            className="flex-1 text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                const rect = event.currentTarget.getBoundingClientRect();
+                                const anchor = { x: rect.left + rect.width / 2, y: rect.bottom + 4 };
+                                openEmojiForRename(anchor);
+                            }}
+                            className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-md border border-border-color bg-background text-sm text-text-secondary transition-colors hover:bg-primary/10 hover:text-text-main focus:outline-none focus:ring-2 focus:ring-primary/40"
+                            aria-label="Insert emoji"
+                        >
+                            <span aria-hidden="true">😀</span>
+                        </button>
+                    </div>
                 ) : (
                     <span
                         ref={titleRef}

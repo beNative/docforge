@@ -6,6 +6,7 @@ import { ensureMonaco } from '../services/editor/monacoLoader';
 import { applyDocforgeTheme } from '../services/editor/monacoTheme';
 import { registerTomlLanguage } from '../services/editor/registerTomlLanguage';
 import { registerPlantumlLanguage } from '../services/editor/registerPlantumlLanguage';
+import { useEmojiPicker } from '../hooks/useEmojiPicker';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -132,6 +133,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     const actionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const focusDisposableRef = useRef<{ dispose: () => void } | null>(null);
     const blurDisposableRef = useRef<{ dispose: () => void } | null>(null);
+    const contextMenuAnchorRef = useRef<{ x: number; y: number } | null>(null);
+    const contextMenuDisposableRef = useRef<{ dispose: () => void } | null>(null);
     const computedFontFamily = useMemo(() => {
         const candidate = (fontFamily ?? '').trim();
         return candidate || DEFAULT_SETTINGS.editorFontFamily;
@@ -158,6 +161,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     }, [theme, computedActiveLineHighlightColorDark, computedActiveLineHighlightColorLight]);
     const themeRef = useRef(theme);
     const highlightColorRef = useRef(computedActiveLineHighlightColor);
+
+    const { openEmojiPicker } = useEmojiPicker();
 
     useEffect(() => {
         themeRef.current = theme;
@@ -306,7 +311,60 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 actionDisposablesRef.current.push(disposable);
             }
         });
-    }, [disposeEditorShortcuts]);
+
+        const emojiAction = monacoInstanceRef.current.addAction({
+            id: 'docforge.insertEmoji',
+            label: 'Insert Emoji…',
+            contextMenuGroupId: 'navigation',
+            contextMenuOrder: 1.5,
+            run: () => {
+                const editor = monacoInstanceRef.current;
+                if (!editor) {
+                    return;
+                }
+
+                const domNode = editor.getDomNode?.();
+                const fallbackAnchor = (): { x: number; y: number } => {
+                    if (domNode) {
+                        const rect = domNode.getBoundingClientRect();
+                        const selection = editor.getSelection?.();
+                        if (selection && typeof editor.getScrolledVisiblePosition === 'function') {
+                            const visible = editor.getScrolledVisiblePosition(selection.getEndPosition());
+                            if (visible) {
+                                return {
+                                    x: rect.left + visible.left,
+                                    y: rect.top + visible.top + visible.height,
+                                };
+                            }
+                        }
+                        return {
+                            x: rect.left + rect.width / 2,
+                            y: rect.top + rect.height / 2,
+                        };
+                    }
+                    return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+                };
+
+                const anchor = contextMenuAnchorRef.current ?? fallbackAnchor();
+                contextMenuAnchorRef.current = null;
+
+                openEmojiPicker({
+                    anchor,
+                    onSelect: (emoji) => {
+                        editor.focus();
+                        editor.trigger('emoji-picker', 'type', { text: emoji });
+                    },
+                    onClose: () => {
+                        requestAnimationFrame(() => editor.focus());
+                    },
+                });
+            },
+        });
+
+        if (emojiAction) {
+            actionDisposablesRef.current.push(emojiAction);
+        }
+    }, [disposeEditorShortcuts, openEmojiPicker]);
 
     useEffect(() => {
         customShortcutsRef.current = customShortcuts ?? {};
@@ -340,6 +398,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 if (monacoInstanceRef.current) {
                     disposeEditorShortcuts();
                     disposeFocusListeners();
+                    contextMenuDisposableRef.current?.dispose();
+                    contextMenuDisposableRef.current = null;
                     monacoInstanceRef.current.dispose();
                 }
 
@@ -392,6 +452,18 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     });
                 }
 
+                contextMenuDisposableRef.current?.dispose();
+                contextMenuDisposableRef.current = editorInstance.onContextMenu((event: any) => {
+                    const browserEvent = event?.event?.browserEvent ?? event?.event;
+                    const clientX = typeof browserEvent?.clientX === 'number' ? browserEvent.clientX : browserEvent?.posx ?? browserEvent?.posX;
+                    const clientY = typeof browserEvent?.clientY === 'number' ? browserEvent.clientY : browserEvent?.posy ?? browserEvent?.posY;
+                    if (typeof clientX === 'number' && typeof clientY === 'number') {
+                        contextMenuAnchorRef.current = { x: clientX, y: clientY };
+                    } else {
+                        contextMenuAnchorRef.current = null;
+                    }
+                });
+
                 monacoInstanceRef.current = editorInstance;
                 applyEditorShortcuts();
             } catch (error) {
@@ -406,6 +478,9 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
             isCancelled = true;
             disposeEditorShortcuts();
             disposeFocusListeners();
+            contextMenuDisposableRef.current?.dispose();
+            contextMenuDisposableRef.current = null;
+            contextMenuAnchorRef.current = null;
             if (monacoInstanceRef.current) {
                 monacoInstanceRef.current.dispose();
                 monacoInstanceRef.current = null;

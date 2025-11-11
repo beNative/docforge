@@ -174,6 +174,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const isContentInitialized = useRef(false);
   const editorRef = useRef<CodeEditorHandle>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleSelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const isSyncing = useRef(false);
   const syncTimeout = useRef<number | null>(null);
@@ -397,64 +398,61 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
 
 
-  const handleTitleContextMenu = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
-    if (isLocked || event.shiftKey) {
+  const updateTitleSelection = useCallback(() => {
+    const input = titleInputRef.current;
+    if (!input) {
       return;
     }
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    titleSelectionRef.current = { start, end };
+  }, []);
 
-    const input = event.currentTarget;
-    const selectionStart = input.selectionStart ?? input.value.length;
-    const selectionEnd = input.selectionEnd ?? selectionStart;
-    const anchor = { x: event.clientX, y: event.clientY };
+  const handleTitleEmojiClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (isLocked) {
+        return;
+      }
 
-    event.preventDefault();
-    openEmojiPicker({
-      anchor,
-      onSelect: (emoji) => {
-        const activeInput = titleInputRef.current ?? input;
-        const baseValue = activeInput.value;
-        const before = baseValue.slice(0, selectionStart);
-        const after = baseValue.slice(selectionEnd);
-        const nextValue = `${before}${emoji}${after}`;
-        setTitle(nextValue);
-        requestAnimationFrame(() => {
-          const target = titleInputRef.current ?? input;
-          const cursorPosition = selectionStart + emoji.length;
-          target.focus();
-          target.setSelectionRange(cursorPosition, cursorPosition);
-        });
-      },
-      onClose: () => {
-        requestAnimationFrame(() => {
-          titleInputRef.current?.focus();
-        });
-      },
-    });
-  }, [isLocked, openEmojiPicker, setTitle]);
+      const input = titleInputRef.current;
+      if (!input) {
+        return;
+      }
 
-  const handleEditorContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    if (isLocked || event.shiftKey) {
-      return;
-    }
+      event.preventDefault();
+      event.stopPropagation();
+      updateTitleSelection();
+      const { start, end } = titleSelectionRef.current;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const anchor = { x: rect.left + rect.width / 2, y: rect.bottom + 4 };
 
-    const editorHandle = editorRef.current;
-    if (!editorHandle) {
-      return;
-    }
-
-    event.preventDefault();
-    editorHandle.setCursorAtPoint(event.clientX, event.clientY);
-    openEmojiPicker({
-      anchor: { x: event.clientX, y: event.clientY },
-      onSelect: (emoji) => {
-        editorHandle.insertTextAtCursor(emoji);
-        requestAnimationFrame(() => editorHandle.focus());
-      },
-      onClose: () => {
-        requestAnimationFrame(() => editorHandle.focus());
-      },
-    });
-  }, [isLocked, openEmojiPicker]);
+      openEmojiPicker({
+        anchor,
+        onSelect: (emoji) => {
+          const activeInput = titleInputRef.current ?? input;
+          const baseValue = activeInput.value;
+          const before = baseValue.slice(0, start);
+          const after = baseValue.slice(end);
+          const nextValue = `${before}${emoji}${after}`;
+          setTitle(nextValue);
+          requestAnimationFrame(() => {
+            const target = titleInputRef.current ?? input;
+            const cursor = start + emoji.length;
+            target.focus();
+            target.setSelectionRange(cursor, cursor);
+            titleSelectionRef.current = { start: cursor, end: cursor };
+          });
+        },
+        onClose: () => {
+          requestAnimationFrame(() => {
+            const target = titleInputRef.current ?? input;
+            target.focus();
+          });
+        },
+      });
+    },
+    [isLocked, openEmojiPicker, setTitle, updateTitleSelection]
+  );
 
   // --- Action Handlers ---
   const handleManualSave = () => {
@@ -772,7 +770,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           />
         )
       : (
-          <div className="h-full" onContextMenu={handleEditorContextMenu}>
+          <div className="h-full">
             <MonacoEditor
               ref={editorRef}
               content={content}
@@ -844,17 +842,37 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onContextMenu={handleTitleContextMenu}
-              placeholder="Document Title"
-              disabled={isGeneratingTitle}
-              readOnly={isLocked}
-              className={`bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate ${isLocked ? 'cursor-default' : ''}`}
-            />
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  requestAnimationFrame(updateTitleSelection);
+                }}
+                onClick={updateTitleSelection}
+                onKeyDown={() => {
+                  requestAnimationFrame(updateTitleSelection);
+                }}
+                onKeyUp={updateTitleSelection}
+                onSelect={updateTitleSelection}
+                onMouseUp={updateTitleSelection}
+                placeholder="Document Title"
+                disabled={isGeneratingTitle}
+                readOnly={isLocked}
+                className={`bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate ${isLocked ? 'cursor-default' : ''}`}
+              />
+              <button
+                type="button"
+                onClick={handleTitleEmojiClick}
+                disabled={isLocked}
+                className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md border border-border-color bg-background/80 text-base text-text-secondary transition-colors hover:bg-primary/10 hover:text-text-main focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Insert emoji into title"
+              >
+                <span aria-hidden="true">😀</span>
+              </button>
+            </div>
             {canAddEmojiToTitle && (
               <IconButton
                 onClick={handleAddEmojiToTitle}

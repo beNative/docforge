@@ -172,7 +172,7 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ anchor, onSelect, onClose }) 
     return (
       <section key={title} className="mb-4">
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-secondary">{title}</h3>
-        <div className="grid grid-cols-8 gap-1.5">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] gap-1.5">
           {emojis.map(renderEmojiButton)}
         </div>
       </section>
@@ -191,12 +191,12 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ anchor, onSelect, onClose }) 
   return ReactDOM.createPortal(
     <div
       ref={containerRef}
-      className="fixed z-[60] w-[28rem] max-w-[95vw] rounded-xl border border-border-color bg-secondary shadow-2xl"
+      className="fixed z-[60] w-[30rem] max-w-[95vw] rounded-xl border border-border-color bg-secondary shadow-2xl"
       style={{ top: position.top, left: position.left }}
       onContextMenu={(event) => event.preventDefault()}
     >
       <div className="flex h-full max-h-[26rem]">
-        <nav className="w-40 flex-shrink-0 border-r border-border-color bg-secondary/80 p-2 pr-0">
+        <nav className="w-44 flex-shrink-0 border-r border-border-color bg-secondary/80 p-2 pr-0">
           <p className="px-2 pb-1 text-xs font-semibold uppercase tracking-widest text-text-secondary">Categories</p>
           <ul className="space-y-1 overflow-y-auto pr-2">
             {EMOJI_CATEGORIES.map((category) => {
@@ -237,7 +237,7 @@ const EmojiPicker: React.FC<EmojiPickerProps> = ({ anchor, onSelect, onClose }) 
               className="w-full rounded-lg border border-border-color bg-background px-3 py-2 text-sm text-text-main shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
-          <div className="max-h-[19rem] overflow-y-auto pr-1">
+          <div className="max-h-[19rem] overflow-y-auto overflow-x-hidden pr-1">
             {normalizedSearch && searchResults.length === 0 ? (
               <p className="text-sm text-text-secondary">No emoji found for "{searchTerm}".</p>
             ) : (

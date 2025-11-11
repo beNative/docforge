@@ -188,6 +188,7 @@ export const MainApp: React.FC = () => {
     const [hasLoadedExpandedFolders, setHasLoadedExpandedFolders] = useState(false);
     const [pendingRevealId, setPendingRevealId] = useState<string | null>(null);
     const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
+    const [pendingEmojiInsertion, setPendingEmojiInsertion] = useState<{ nodeId: string; anchor: { x: number; y: number } } | null>(null);
 
     const [view, setView] = useState<'editor' | 'info' | 'settings'>('editor');
     const [documentView, setDocumentView] = useState<'editor' | 'history'>('editor');
@@ -2116,6 +2117,10 @@ export const MainApp: React.FC = () => {
         updateItem(id, { title });
     };
 
+    const handleEmojiInsertionComplete = useCallback((nodeId: string) => {
+        setPendingEmojiInsertion(current => (current && current.nodeId === nodeId ? null : current));
+    }, []);
+
     const handleStartRenamingNode = useCallback((id: string) => {
         const target = items.find(item => item.id === id) ?? null;
         if (target) {
@@ -2159,6 +2164,11 @@ export const MainApp: React.FC = () => {
 
         handleStartRenamingNode(targetId);
     }, [selectedIds, lastClickedId, activeNodeId, items, handleStartRenamingNode]);
+
+    const handleRenameComplete = useCallback(() => {
+        setRenamingNodeId(null);
+        setPendingEmojiInsertion(null);
+    }, []);
     
     const handleModelChange = (modelId: string) => {
         addLog('INFO', `User action: Set LLM model to "${modelId}".`);
@@ -2690,6 +2700,7 @@ export const MainApp: React.FC = () => {
         e.stopPropagation();
         addLog('DEBUG', `User action: Opened context menu on ${nodeId ? `node ${nodeId}`: 'root'}.`);
 
+        const anchor = { x: e.clientX, y: e.clientY };
         let currentSelection = selectedIds;
         if (nodeId && !selectedIds.has(nodeId)) {
             const newSelection = new Set([nodeId]);
@@ -2727,6 +2738,13 @@ export const MainApp: React.FC = () => {
                 { label: 'Format', icon: FormatIcon, action: handleFormatDocument, disabled: !isFormattable || currentSelection.size !== 1, shortcut: getCommand('format-document')?.shortcutString },
                 { label: firstSelectedNode?.locked ? 'Unlock Document' : 'Lock Document', icon: firstSelectedNode?.locked ? LockOpenIcon : LockClosedIcon, action: () => { if (firstSelectedNode && firstSelectedNode.type === 'document') { void handleSetNodeLockState(firstSelectedNode.id, !firstSelectedNode.locked); } }, disabled: !isDocument || currentSelection.size !== 1, shortcut: getCommand('toggle-document-lock')?.shortcutString },
                 { label: 'Rename', icon: PencilIcon, action: () => handleStartRenamingNode(nodeId), disabled: currentSelection.size !== 1, shortcut: getCommand('rename-item')?.shortcutString },
+                { label: 'Insert Emoji…', icon: SparklesIcon, action: () => {
+                    if (nodeId && currentSelection.size === 1) {
+                        addLog('INFO', `Context Menu: Insert emoji for ${firstSelectedNode?.title ?? 'selected item'}.`);
+                        setPendingEmojiInsertion({ nodeId, anchor });
+                        handleStartRenamingNode(nodeId);
+                    }
+                }, disabled: currentSelection.size !== 1 },
                 { label: 'Duplicate', icon: DocumentDuplicateIcon, action: handleDuplicateSelection, disabled: currentSelection.size === 0, shortcut: getCommand('duplicate-item')?.shortcutString },
                 { type: 'separator' },
                 { label: 'Copy Content', icon: CopyIcon, action: () => primaryDocument && handleCopyNodeContent(primaryDocument.id), disabled: !primaryDocument},
@@ -2746,10 +2764,10 @@ export const MainApp: React.FC = () => {
 
         setContextMenu({
             isOpen: true,
-            position: { x: e.clientX, y: e.clientY },
+            position: anchor,
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile, handleSetNodeLockState]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile, handleSetNodeLockState, setPendingEmojiInsertion]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -3053,7 +3071,9 @@ export const MainApp: React.FC = () => {
                                         searchInputRef={documentTreeSearchInputRef}
                                         onContextMenu={handleContextMenu}
                                         renamingNodeId={renamingNodeId}
-                                        onRenameComplete={() => setRenamingNodeId(null)}
+                                        onRenameComplete={handleRenameComplete}
+                                        pendingEmojiInsertion={pendingEmojiInsertion}
+                                        onEmojiInsertionComplete={handleEmojiInsertionComplete}
                                         commands={enrichedCommands}
                                         customShortcuts={settings.customShortcuts}
                                         pendingRevealId={pendingRevealId}

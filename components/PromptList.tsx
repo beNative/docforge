@@ -28,6 +28,8 @@ interface DocumentListProps {
   onContextMenu: (e: React.MouseEvent, nodeId: string | null) => void;
   renamingNodeId: string | null;
   onRenameComplete: () => void;
+  pendingEmojiInsertion: { nodeId: string; anchor: { x: number; y: number } } | null;
+  onEmojiInsertionComplete: (nodeId: string) => void;
 }
 
 const DocumentList: React.FC<DocumentListProps> = ({
@@ -54,7 +56,9 @@ const DocumentList: React.FC<DocumentListProps> = ({
   onMoveDown,
   onContextMenu,
   renamingNodeId,
-  onRenameComplete
+  onRenameComplete,
+  pendingEmojiInsertion,
+  onEmojiInsertionComplete
 }) => {
   // Fix: Corrected useState declaration syntax from `=>` to `=`. This resolves all subsequent "cannot find name" errors.
   const [isRootDropping, setIsRootDropping] = useState(false);
@@ -265,6 +269,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onContextMenu={onContextMenu}
                 renamingNodeId={renamingNodeId}
                 onRenameComplete={onRenameComplete}
+                pendingEmojiInsertion={pendingEmojiInsertion}
+                onEmojiInsertionComplete={onEmojiInsertionComplete}
                 isKnownNodeId={isKnownNodeId}
             />
         ))}

@@ -50,6 +50,8 @@ interface SidebarProps {
   onContextMenu: (e: React.MouseEvent, nodeId: string | null) => void;
   renamingNodeId: string | null;
   onRenameComplete: () => void;
+  pendingEmojiInsertion: { nodeId: string; anchor: { x: number; y: number } } | null;
+  onEmojiInsertionComplete: (nodeId: string) => void;
   commands: Command[];
   customShortcuts: Record<string, string[]>;
   pendingRevealId: string | null;
@@ -98,6 +100,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     onContextMenu,
     renamingNodeId,
     onRenameComplete,
+    pendingEmojiInsertion,
+    onEmojiInsertionComplete,
     onExpandAll,
     onCollapseAll,
     commands,
@@ -601,6 +605,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onContextMenu={onContextMenu}
                     renamingNodeId={renamingNodeId}
                     onRenameComplete={onRenameComplete}
+                    pendingEmojiInsertion={pendingEmojiInsertion}
+                    onEmojiInsertionComplete={onEmojiInsertionComplete}
                 />
                 </div>
             </div>

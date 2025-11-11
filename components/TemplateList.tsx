@@ -18,6 +18,7 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, activeTemplateId
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
   const { openEmojiPicker } = useEmojiPicker();
+  const renameSelectionRef = useRef<{ start: number; end: number }>({ start: 0, end: 0 });
 
   const handleRenameStart = (e: React.MouseEvent, template: DocumentTemplate) => {
     e.stopPropagation();
@@ -38,46 +39,59 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, activeTemplateId
     else if (e.key === 'Escape') setRenamingId(null);
   };
 
-  const handleRenameContextMenu = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
-    if (event.shiftKey) {
+  const updateRenameSelection = useCallback(() => {
+    const input = renameInputRef.current;
+    if (!input) {
       return;
     }
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    renameSelectionRef.current = { start, end };
+  }, []);
 
-    const input = event.currentTarget;
-    const selectionStart = input.selectionStart ?? input.value.length;
-    const selectionEnd = input.selectionEnd ?? selectionStart;
+  const openEmojiForRename = useCallback(
+    (anchor: { x: number; y: number }) => {
+      const input = renameInputRef.current;
+      if (!input) {
+        return;
+      }
 
-    event.preventDefault();
-    openEmojiPicker({
-      anchor: { x: event.clientX, y: event.clientY },
-      onSelect: (emoji) => {
-        const activeInput = renameInputRef.current ?? input;
-        const baseValue = activeInput.value;
-        const before = baseValue.slice(0, selectionStart);
-        const after = baseValue.slice(selectionEnd);
-        const nextValue = `${before}${emoji}${after}`;
-        setRenameValue(nextValue);
-        requestAnimationFrame(() => {
-          const target = renameInputRef.current ?? input;
-          const cursor = selectionStart + emoji.length;
-          target.focus();
-          target.setSelectionRange(cursor, cursor);
-        });
-      },
-      onClose: () => {
-        requestAnimationFrame(() => {
-          renameInputRef.current?.focus();
-        });
-      },
-    });
-  }, [openEmojiPicker, setRenameValue]);
+      const { start, end } = renameSelectionRef.current;
+      openEmojiPicker({
+        anchor,
+        onSelect: (emoji) => {
+          const activeInput = renameInputRef.current ?? input;
+          const baseValue = activeInput.value;
+          const before = baseValue.slice(0, start);
+          const after = baseValue.slice(end);
+          const nextValue = `${before}${emoji}${after}`;
+          setRenameValue(nextValue);
+          requestAnimationFrame(() => {
+            const target = renameInputRef.current ?? input;
+            const cursor = start + emoji.length;
+            target.focus();
+            target.setSelectionRange(cursor, cursor);
+            renameSelectionRef.current = { start: cursor, end: cursor };
+          });
+        },
+        onClose: () => {
+          requestAnimationFrame(() => {
+            const target = renameInputRef.current ?? input;
+            target.focus();
+          });
+        },
+      });
+    },
+    [openEmojiPicker, setRenameValue]
+  );
 
   useEffect(() => {
     if (renamingId) {
       renameInputRef.current?.focus();
       renameInputRef.current?.select();
+      updateRenameSelection();
     }
-  }, [renamingId]);
+  }, [renamingId, updateRenameSelection]);
   
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -95,18 +109,41 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, activeTemplateId
             {renamingId === template.template_id ? (
                 <div className="p-1 flex items-center gap-2">
                 <DocumentDuplicateIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                <div className="flex w-full items-center gap-1.5">
                 <input
                     ref={renameInputRef}
                     type="text"
                     value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onContextMenu={handleRenameContextMenu}
+                    onChange={(e) => {
+                      setRenameValue(e.target.value);
+                      requestAnimationFrame(updateRenameSelection);
+                    }}
+                    onClick={updateRenameSelection}
+                    onKeyDown={(event) => {
+                      handleRenameKeyDown(event);
+                      requestAnimationFrame(updateRenameSelection);
+                    }}
+                    onKeyUp={updateRenameSelection}
+                    onSelect={updateRenameSelection}
+                    onMouseUp={updateRenameSelection}
                     onBlur={handleRenameSubmit}
-                    onKeyDown={handleRenameKeyDown}
-                    className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="flex-1 text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                 />
+                <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      openEmojiForRename({ x: rect.left + rect.width / 2, y: rect.bottom + 4 });
+                    }}
+                    className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-md border border-border-color bg-background text-sm text-text-secondary transition-colors hover:bg-primary/10 hover:text-text-main focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    aria-label="Insert emoji"
+                >
+                    <span aria-hidden="true">😀</span>
+                </button>
                 </div>
-            ) : (
+            </div>
+        ) : (
                 <button
                 // Fix: Use template_id
                 onClick={() => onSelectTemplate(template.template_id)}
