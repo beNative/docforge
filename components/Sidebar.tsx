@@ -54,6 +54,7 @@ interface SidebarProps {
   customShortcuts: Record<string, string[]>;
   pendingRevealId: string | null;
   onRevealHandled: () => void;
+  searchInputRef: React.RefObject<HTMLInputElement>;
 
   activeDocumentLocked: boolean;
 
@@ -87,6 +88,7 @@ const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: Document
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
   const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, onNewFromClipboard, customShortcuts, onSelectTemplate, onSelectNode } = props;
+  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, onNewFromClipboard, customShortcuts, searchInputRef } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
@@ -354,6 +356,18 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       return;
     }
 
+    const focusSearchShortcut = getEffectiveShortcut('document-tree-focus-search');
+    if (matchesShortcut(e, focusSearchShortcut)) {
+      e.preventDefault();
+      e.stopPropagation();
+      const input = searchInputRef.current;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+      return;
+    }
+
     const copyShortcut = getEffectiveShortcut('document-tree-copy-content');
     if (matchesShortcut(e, copyShortcut)) {
       e.preventDefault();
@@ -460,6 +474,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         <div className="relative w-full">
             <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary pointer-events-none" />
             <input
+                ref={searchInputRef}
                 type="text"
                 placeholder="Search..."
                 value={searchTerm}
