@@ -356,7 +356,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const snippetAccentWidth = 3;
   const snippetMarginLeft = Math.max(snippetPaddingLeft - snippetAccentPadding, 0);
   const snippetAccentColor = 'rgb(var(--color-accent) / 0.45)';
-  const snippetBackgroundColor = 'rgb(var(--color-border) / 0.26)';
+  const snippetBackgroundColor =
+    'color-mix(in srgb, rgb(var(--color-background)) 82%, rgb(var(--color-text-main)) 18%)';
 
   return (
     <li
