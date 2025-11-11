@@ -2794,19 +2794,31 @@ export const MainApp: React.FC = () => {
         };
     }, [handleGlobalMouseMove, handleGlobalMouseUp]);
     
-     useEffect(() => {
+    useEffect(() => {
         const shortcutMap = getShortcutMap(commands, settings.customShortcuts);
-        
+
         const handleKeyDown = (e: KeyboardEvent) => {
             const shortcut = formatShortcut(e);
             const command = shortcutMap.get(shortcut);
 
             const activeEl = document.activeElement;
-            const isFormElement = activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
+            const isHtmlElement = activeEl instanceof HTMLElement;
+            const isFormElement = isHtmlElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
             const isPaletteInput = activeEl === commandPaletteInputRef.current;
             const isCommandPaletteToggle = command?.id === 'toggle-command-palette';
+            let isEditableContext = false;
+
+            if (isHtmlElement) {
+                isEditableContext = activeEl.isContentEditable
+                    || !!activeEl.closest('[contenteditable="true"]')
+                    || !!activeEl.closest('.monaco-editor, .monaco-diff-editor');
+            }
 
             if (isFormElement && !isPaletteInput && !isCommandPaletteToggle) {
+                return;
+            }
+
+            if (command?.id === 'document-tree-focus-search' && isEditableContext) {
                 return;
             }
 
