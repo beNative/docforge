@@ -218,6 +218,7 @@ export const MainApp: React.FC = () => {
     const [confirmAction, setConfirmAction] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; } | null>(null);
     const [clipboardNotice, setClipboardNotice] = useState<{ title: string; message: React.ReactNode; helpUrl?: string } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const previousSearchTermRef = useRef('');
     const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; position: { x: number, y: number }, items: MenuItem[] }>({ isOpen: false, position: { x: 0, y: 0 }, items: [] });
     const [isDraggingFile, setIsDraggingFile] = useState(false);
     const [formatTrigger, setFormatTrigger] = useState(0);
@@ -764,6 +765,23 @@ export const MainApp: React.FC = () => {
         const iterator = selectedIds.values().next();
         return iterator.done ? null : iterator.value;
     }, [lastClickedId, selectedIds]);
+
+    useEffect(() => {
+        const previousTrimmed = previousSearchTermRef.current.trim();
+        const currentTrimmed = searchTerm.trim();
+
+        if (previousTrimmed && !currentTrimmed) {
+            const primaryId = getPrimarySelectionId();
+            if (primaryId) {
+                const node = items.find(item => item.id === primaryId);
+                if (node) {
+                    ensureNodeVisible(node);
+                }
+            }
+        }
+
+        previousSearchTermRef.current = searchTerm;
+    }, [searchTerm, getPrimarySelectionId, items, ensureNodeVisible]);
 
     const handleDocumentTreeSelectAll = useCallback(() => {
         setSelectedIds(new Set(navigableItems.map(item => item.id)));
