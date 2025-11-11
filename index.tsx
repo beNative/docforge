@@ -5,6 +5,7 @@ import PythonConsoleApp from './components/PythonConsoleApp';
 import { LoggerProvider } from './contexts/LoggerContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { IconProvider } from './contexts/IconContext';
+import { EmojiPickerProvider } from './contexts/EmojiPickerContext';
 import { createScriptPreviewBridge } from './preview/createScriptPreviewBridge';
 
 const params = new URLSearchParams(window.location.search);
@@ -25,11 +26,13 @@ if (container) {
       <LoggerProvider>
         <ThemeProvider>
           <IconProvider value={{ iconSet: 'heroicons' }}>
-            {isPythonConsole ? (
-              <PythonConsoleApp runId={runIdParam} theme={consoleThemeParam} />
-            ) : (
-              <App />
-            )}
+            <EmojiPickerProvider>
+              {isPythonConsole ? (
+                <PythonConsoleApp runId={runIdParam} theme={consoleThemeParam} />
+              ) : (
+                <App />
+              )}
+            </EmojiPickerProvider>
           </IconProvider>
         </ThemeProvider>
       </LoggerProvider>

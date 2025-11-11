@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { DocumentTemplate } from '../types';
 import IconButton from './IconButton';
 import { TrashIcon, DocumentDuplicateIcon } from './Icons';
+import { useEmojiPicker } from '../hooks/useEmojiPicker';
 
 interface TemplateListProps {
   templates: DocumentTemplate[];
@@ -16,6 +17,7 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, activeTemplateId
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const { openEmojiPicker } = useEmojiPicker();
 
   const handleRenameStart = (e: React.MouseEvent, template: DocumentTemplate) => {
     e.stopPropagation();
@@ -35,6 +37,40 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, activeTemplateId
     if (e.key === 'Enter') handleRenameSubmit();
     else if (e.key === 'Escape') setRenamingId(null);
   };
+
+  const handleRenameContextMenu = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
+    if (event.shiftKey) {
+      return;
+    }
+
+    const input = event.currentTarget;
+    const selectionStart = input.selectionStart ?? input.value.length;
+    const selectionEnd = input.selectionEnd ?? selectionStart;
+
+    event.preventDefault();
+    openEmojiPicker({
+      anchor: { x: event.clientX, y: event.clientY },
+      onSelect: (emoji) => {
+        const activeInput = renameInputRef.current ?? input;
+        const baseValue = activeInput.value;
+        const before = baseValue.slice(0, selectionStart);
+        const after = baseValue.slice(selectionEnd);
+        const nextValue = `${before}${emoji}${after}`;
+        setRenameValue(nextValue);
+        requestAnimationFrame(() => {
+          const target = renameInputRef.current ?? input;
+          const cursor = selectionStart + emoji.length;
+          target.focus();
+          target.setSelectionRange(cursor, cursor);
+        });
+      },
+      onClose: () => {
+        requestAnimationFrame(() => {
+          renameInputRef.current?.focus();
+        });
+      },
+    });
+  }, [openEmojiPicker, setRenameValue]);
 
   useEffect(() => {
     if (renamingId) {
@@ -64,6 +100,7 @@ const TemplateList: React.FC<TemplateListProps> = ({ templates, activeTemplateId
                     type="text"
                     value={renameValue}
                     onChange={(e) => setRenameValue(e.target.value)}
+                    onContextMenu={handleRenameContextMenu}
                     onBlur={handleRenameSubmit}
                     onKeyDown={handleRenameKeyDown}
                     className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"

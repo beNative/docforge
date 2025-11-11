@@ -28,6 +28,9 @@ export interface CodeEditorHandle {
   format: () => void;
   setScrollTop: (scrollTop: number) => void;
   getScrollInfo: () => Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number; }>;
+  insertTextAtCursor: (text: string) => void;
+  setCursorAtPoint: (clientX: number, clientY: number) => void;
+  focus: () => void;
 }
 
 const LETTER_REGEX = /^[A-Z]$/;
@@ -189,6 +192,65 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     resolve({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
                 }
             });
+        },
+        insertTextAtCursor(text: string) {
+            const editor = monacoInstanceRef.current;
+            const monacoApi = monacoApiRef.current;
+            if (!editor || !monacoApi) {
+                return;
+            }
+            const model = editor.getModel?.();
+            const selection = editor.getSelection?.();
+            if (!model || !selection) {
+                return;
+            }
+
+            const range = new monacoApi.Range(
+                selection.startLineNumber,
+                selection.startColumn,
+                selection.endLineNumber,
+                selection.endColumn,
+            );
+            const startOffset = model.getOffsetAt(range.getStartPosition());
+
+            editor.pushUndoStop();
+            editor.executeEdits('emoji-picker', [{
+                range,
+                text,
+                forceMoveMarkers: true,
+            }]);
+            editor.pushUndoStop();
+
+            const newOffset = startOffset + text.length;
+            const newPosition = model.getPositionAt(newOffset);
+            const Selection = monacoApi.Selection ?? monacoApi.selection ?? monacoApi.editor?.Selection;
+            if (Selection) {
+                editor.setSelection(new Selection(newPosition.lineNumber, newPosition.column, newPosition.lineNumber, newPosition.column));
+            } else {
+                editor.setPosition(newPosition);
+            }
+            if (typeof editor.revealPositionInCenterIfOutsideViewport === 'function') {
+                editor.revealPositionInCenterIfOutsideViewport(newPosition);
+            } else {
+                editor.revealPositionInCenter(newPosition);
+            }
+            editor.focus();
+        },
+        setCursorAtPoint(clientX: number, clientY: number) {
+            const editor = monacoInstanceRef.current;
+            if (!editor) {
+                return;
+            }
+            const target = typeof editor.getTargetAtClientPoint === 'function'
+                ? editor.getTargetAtClientPoint(clientX, clientY)
+                : null;
+            if (target?.position) {
+                editor.setPosition(target.position);
+            }
+            editor.focus();
+        },
+        focus() {
+            monacoInstanceRef.current?.focus();
         }
     }));
 

@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
 import { FileIcon, FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, LockClosedIcon, LockOpenIcon } from './Icons';
 import Tooltip from './Tooltip';
+import { useEmojiPicker } from '../hooks/useEmojiPicker';
 
 export interface DocumentNode extends DocumentOrFolder {
   children: DocumentNode[];
@@ -142,6 +143,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const itemRef = useRef<HTMLLIElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
+  const { openEmojiPicker } = useEmojiPicker();
 
   const isSelected = selectedIds.has(node.id);
   const isFocused = focusedItemId === node.id;
@@ -251,6 +253,41 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     if (e.key === 'Enter') handleRenameSubmit();
     else if (e.key === 'Escape') setIsRenaming(false);
   };
+
+  const handleRenameContextMenu = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
+    if (event.shiftKey) {
+      return;
+    }
+
+    const input = event.currentTarget;
+    const selectionStart = input.selectionStart ?? input.value.length;
+    const selectionEnd = input.selectionEnd ?? selectionStart;
+    const anchor = { x: event.clientX, y: event.clientY };
+
+    event.preventDefault();
+    openEmojiPicker({
+      anchor,
+      onSelect: (emoji) => {
+        const activeInput = renameInputRef.current ?? input;
+        const baseValue = activeInput.value;
+        const before = baseValue.slice(0, selectionStart);
+        const after = baseValue.slice(selectionEnd);
+        const nextValue = `${before}${emoji}${after}`;
+        setRenameValue(nextValue);
+        requestAnimationFrame(() => {
+          const target = renameInputRef.current ?? input;
+          const cursorPosition = selectionStart + emoji.length;
+          target.focus();
+          target.setSelectionRange(cursorPosition, cursorPosition);
+        });
+      },
+      onClose: () => {
+        requestAnimationFrame(() => {
+          renameInputRef.current?.focus();
+        });
+      },
+    });
+  }, [openEmojiPicker, setRenameValue]);
 
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation();
@@ -420,6 +457,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         ref={renameInputRef}
                         type="text"
                         value={renameValue}
+                        onContextMenu={handleRenameContextMenu}
                         onClick={(e) => e.stopPropagation()}
                         onChange={(e) => setRenameValue(e.target.value)}
                         onBlur={handleRenameSubmit}

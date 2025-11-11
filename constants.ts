@@ -8,6 +8,7 @@ export const LOCAL_STORAGE_KEYS = {
   SIDEBAR_TEMPLATES_COLLAPSED: 'docforge_sidebar_templates_collapsed',
   SIDEBAR_TEMPLATES_PANEL_HEIGHT: 'docforge_sidebar_templates_panel_height',
   ACTIVE_DOCUMENT_ID: 'docforge_active_document_id',
+  EMOJI_FREQUENT: 'docforge_emoji_frequent',
 
   // Legacy keys used for migration check:
   LEGACY_PROMPTS: 'promptforge_prompts',

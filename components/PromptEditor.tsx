@@ -14,6 +14,7 @@ import PreviewPane from './PreviewPane';
 import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
 import ScriptExecutionPanel from './ScriptExecutionPanel';
+import { useEmojiPicker } from '../hooks/useEmojiPicker';
 
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
@@ -127,6 +128,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const isLocked = Boolean(documentNode.locked);
   const [isLocking, setIsLocking] = useState(false);
   const { addLog } = useLogger();
+  const { openEmojiPicker } = useEmojiPicker();
   const { skipNextAutoSave } = useDocumentAutoSave({
     documentId: documentNode.id,
     content,
@@ -171,6 +173,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
   const isContentInitialized = useRef(false);
   const editorRef = useRef<CodeEditorHandle>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const isSyncing = useRef(false);
   const syncTimeout = useRef<number | null>(null);
@@ -393,6 +396,65 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
 
 
+
+  const handleTitleContextMenu = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
+    if (isLocked || event.shiftKey) {
+      return;
+    }
+
+    const input = event.currentTarget;
+    const selectionStart = input.selectionStart ?? input.value.length;
+    const selectionEnd = input.selectionEnd ?? selectionStart;
+    const anchor = { x: event.clientX, y: event.clientY };
+
+    event.preventDefault();
+    openEmojiPicker({
+      anchor,
+      onSelect: (emoji) => {
+        const activeInput = titleInputRef.current ?? input;
+        const baseValue = activeInput.value;
+        const before = baseValue.slice(0, selectionStart);
+        const after = baseValue.slice(selectionEnd);
+        const nextValue = `${before}${emoji}${after}`;
+        setTitle(nextValue);
+        requestAnimationFrame(() => {
+          const target = titleInputRef.current ?? input;
+          const cursorPosition = selectionStart + emoji.length;
+          target.focus();
+          target.setSelectionRange(cursorPosition, cursorPosition);
+        });
+      },
+      onClose: () => {
+        requestAnimationFrame(() => {
+          titleInputRef.current?.focus();
+        });
+      },
+    });
+  }, [isLocked, openEmojiPicker, setTitle]);
+
+  const handleEditorContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (isLocked || event.shiftKey) {
+      return;
+    }
+
+    const editorHandle = editorRef.current;
+    if (!editorHandle) {
+      return;
+    }
+
+    event.preventDefault();
+    editorHandle.setCursorAtPoint(event.clientX, event.clientY);
+    openEmojiPicker({
+      anchor: { x: event.clientX, y: event.clientY },
+      onSelect: (emoji) => {
+        editorHandle.insertTextAtCursor(emoji);
+        requestAnimationFrame(() => editorHandle.focus());
+      },
+      onClose: () => {
+        requestAnimationFrame(() => editorHandle.focus());
+      },
+    });
+  }, [isLocked, openEmojiPicker]);
 
   // --- Action Handlers ---
   const handleManualSave = () => {
@@ -710,20 +772,22 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           />
         )
       : (
-          <MonacoEditor
-            ref={editorRef}
-            content={content}
-            language={language}
-            onChange={setContent}
-            onScroll={handleEditorScroll}
-            customShortcuts={settings.customShortcuts}
-            fontFamily={settings.editorFontFamily}
-            fontSize={scaledEditorFontSize}
-            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
-            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
-            readOnly={isLocked}
-            onFocusChange={handleEditorFocusChange}
-          />
+          <div className="h-full" onContextMenu={handleEditorContextMenu}>
+            <MonacoEditor
+              ref={editorRef}
+              content={content}
+              language={language}
+              onChange={setContent}
+              onScroll={handleEditorScroll}
+              customShortcuts={settings.customShortcuts}
+              fontFamily={settings.editorFontFamily}
+              fontSize={scaledEditorFontSize}
+              activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+              activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+              readOnly={isLocked}
+              onFocusChange={handleEditorFocusChange}
+            />
+          </div>
         );
     const preview = (
       <div
@@ -780,7 +844,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} readOnly={isLocked} className={`bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate ${isLocked ? 'cursor-default' : ''}`}/>
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onContextMenu={handleTitleContextMenu}
+              placeholder="Document Title"
+              disabled={isGeneratingTitle}
+              readOnly={isLocked}
+              className={`bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate ${isLocked ? 'cursor-default' : ''}`}
+            />
             {canAddEmojiToTitle && (
               <IconButton
                 onClick={handleAddEmojiToTitle}
