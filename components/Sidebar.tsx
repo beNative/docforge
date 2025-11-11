@@ -291,6 +291,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     return map;
   }, [commands]);
 
+  const focusSearchShortcutString = useMemo(() => {
+    const command = commandMap.get('document-tree-focus-search');
+    return command?.shortcutString ?? null;
+  }, [commandMap]);
+
   const getEffectiveShortcut = useCallback((commandId: string): string[] | null => {
     const custom = customShortcuts[commandId];
     if (custom && custom.length > 0) {
@@ -500,8 +505,13 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                className="w-full bg-background border border-border-color rounded-md pl-9 pr-9 py-1 text-xs text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary"
+                className={`w-full bg-background border border-border-color rounded-md pl-9 py-1 text-xs text-text-main focus:ring-2 focus:ring-primary focus:outline-none placeholder:text-text-secondary ${focusSearchShortcutString && !searchTerm.trim() ? 'pr-24' : 'pr-9'}`}
             />
+            {focusSearchShortcutString && !searchTerm.trim() && (
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-medium uppercase tracking-wide text-text-tertiary">
+                    {focusSearchShortcutString}
+                </span>
+            )}
             {searchTerm.trim() && (
                 <button
                     type="button"
