@@ -87,8 +87,28 @@ const findNodeAndSiblings = (nodes: DocumentNode[], id: string): {node: Document
 };
 
 const Sidebar: React.FC<SidebarProps> = (props) => {
-  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, onNewFromClipboard, customShortcuts, onSelectTemplate, onSelectNode } = props;
-  const { documentTree, navigableItems, searchTerm, setSearchTerm, setSelectedIds, lastClickedId, setLastClickedId, onContextMenu, renamingNodeId, onRenameComplete, onExpandAll, onCollapseAll, commands, pendingRevealId, onRevealHandled, onNewFromClipboard, customShortcuts, searchInputRef } = props;
+  const {
+    documentTree,
+    navigableItems,
+    searchTerm,
+    setSearchTerm,
+    setSelectedIds,
+    lastClickedId,
+    setLastClickedId,
+    onContextMenu,
+    renamingNodeId,
+    onRenameComplete,
+    onExpandAll,
+    onCollapseAll,
+    commands,
+    pendingRevealId,
+    onRevealHandled,
+    onNewFromClipboard,
+    customShortcuts,
+    onSelectTemplate,
+    onSelectNode,
+    searchInputRef,
+  } = props;
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [isTemplatesCollapsed, setIsTemplatesCollapsed] = useState(false);
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
