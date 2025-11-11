@@ -243,6 +243,10 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
       if (isTextSelectionTarget(target) && hasActiveTextSelection()) {
         return;
       }
+
+      if (event.nativeEvent instanceof MouseEvent && (shiftKey || isMetaKey)) {
+        event.preventDefault();
+      }
     }
 
     let nextSelection: Set<number>;
@@ -300,18 +304,25 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
     }
 
     const { shiftKey, metaKey, ctrlKey } = event;
+    const hasModifier = shiftKey || metaKey || ctrlKey;
 
     if (isTextSelectionTarget(event.target)) {
+      if (hasModifier) {
+        event.preventDefault();
+      }
       return;
     }
 
-    if (!(shiftKey || metaKey || ctrlKey)) {
-      handleLogSelection(event, filteredLogs[index].id, index);
+    if (hasModifier) {
       event.preventDefault();
-      setIsDragging(true);
-      setDragStartIndex(index);
-      setSelectionAnchor(index);
+      return;
     }
+
+    handleLogSelection(event, filteredLogs[index].id, index);
+    event.preventDefault();
+    setIsDragging(true);
+    setDragStartIndex(index);
+    setSelectionAnchor(index);
   }, [filteredLogs, handleLogSelection, isTextSelectionTarget]);
 
   const handleLogMouseEnter = useCallback((index: number) => {
