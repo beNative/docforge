@@ -59,6 +59,7 @@ The main process is responsible for managing the application lifecycle, database
     -   `db:duplicate-nodes`: A handler to perform a deep, transactional copy of selected nodes.
     -   `db:migrate-from-json`: A special handler for the one-time migration of data from old JSON files.
     -   Window Controls: Handlers for `window:minimize`, `window:maximize`, etc.
+    -   Application Integrations: `app:open-executable-folder` resolves the on-disk location of the running binary and opens it via the host OS shell so support teams can quickly reach the installation directory.
 -   **Security:** The `preload.ts` script uses Electron's `contextBridge` to securely expose specific IPC functions to the renderer process under the `window.electronAPI` object, maintaining context isolation.
 
 ### Renderer Process (React)
@@ -119,6 +120,7 @@ DocForge treats shell and PowerShell automation as first-class workflows that sp
 This module handles all communication with the external Large Language Model. It is largely unchanged by the database migration.
 -   It constructs the appropriate API request body based on the configured API type (Ollama or OpenAI-compatible).
 -   It includes robust error handling to manage connection failures or non-OK responses from the provider.
+-   Clipboard imports invoke `llmService.generateTitle()` when a provider is online, allowing the renderer to assign meaningful titles to new documents automatically.
 
 ### Component Breakdown
 
@@ -141,11 +143,11 @@ Electron Builder manages the packaging and publishing workflow for DocForge. The
 ### Publishing a Release
 
 1. Run `npm version <new-version> --no-git-tag-version` to bump the version in both `package.json` and `package-lock.json` without creating a Git tag.
-2. Update `VERSION_LOG.md` with a new section that captures the highlights of the release—the automated workflow copies the top entry into the GitHub release body.
+2. Update `VERSION_LOG.md` with a new section that captures the highlights of the release—the automated workflow copies the top entry into the GitHub release body—and record detailed notes under `docs/releases/<version>.md` for long-form context.
 3. Review and update the Markdown documentation (README, manuals, release notes) so the written guidance reflects the final state of the build.
 4. Sync the Markdown files under `docs/` with the copies at the project root.
 5. Commit and push the changes so the release tag points at the finished documentation.
-6. Create and push a matching version tag (for example, `git tag v0.6.10` followed by `git push origin v0.6.10`) to trigger the automated release pipeline.
+6. Create and push a matching version tag (for example, `git tag v0.7.0` followed by `git push origin v0.7.0`) to trigger the automated release pipeline.
 7. Monitor the "Release" workflow run and verify the published GitHub release lists the correct notes and includes the installers for every supported platform before announcing availability.
 
 ### Automated Release Workflow

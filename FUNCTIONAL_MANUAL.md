@@ -16,6 +16,7 @@ The top-most bar of the application provides global controls and information.
 - **Command Palette Search:** The central search box is your primary way to access the **Command Palette**. Clicking it or using the `Ctrl+Shift+P` shortcut opens a dropdown list of all available actions.
 - **Global Actions (Right Side):**
     - **Info:** Toggles the Info View, where you can read application documentation.
+    - **About:** Opens the About DocForge modal with project links and an "Open installation folder" button that jumps straight to the directory containing the running executable.
     - **Logs:** Toggles the Logger Panel at the bottom of the screen.
     - **Theme Toggle:** Switches the application between light and dark modes.
     - **Settings:** Toggles the Settings View.
@@ -76,6 +77,7 @@ The bar at the bottom of the window provides at-a-glance information about the a
 - **LLM Connection Status:** A colored dot (green for connected, red for error) and text indicating the connection status to your local AI provider.
 - **Provider & Model Selection:** Dropdown menus to see the currently configured LLM provider and model, and to quickly switch between other detected services and their available models.
 - **Statistics:** Shows the total number of documents and the last save time for the active document.
+- **Workspace Zoom:** A single cluster of zoom buttons, percentage readout, and reset control that automatically targets the preview or editor depending on which pane has focus. Zoom adjustments now move in 5% increments for precise scaling.
 - **App Version:** Displays the current version of DocForge.
 
 ---
@@ -86,7 +88,7 @@ The bar at the bottom of the window provides at-a-glance information about the a
 
 - **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut. New documents default to Markdown.
 - **New Code File:** Click the code icon. A dialog will appear asking you to provide a filename with an extension (e.g., `script.js`) for automatic language detection.
-- **New from Clipboard:** Use the command palette entry or sidebar menu item to create a document from the current clipboard contents. DocForge will import the text verbatim, detect the document type automatically, and report the classification in the activity log. If clipboard access is denied, the app shows guidance for restoring permissions.
+- **New from Clipboard:** Use the command palette entry or sidebar menu item to create a document from the current clipboard contents. DocForge will import the text verbatim, detect the document type automatically, generate a title with your connected LLM when it's online, and report the classification in the activity log. If clipboard access is denied, the app shows guidance for restoring permissions.
 - **New Root Folder:** Click the folder icon with a `+` to create a new folder at the root of your document list.
 - **New Subfolder:** Select an existing folder and click the "New Subfolder" icon to create a folder inside it.
 - **Duplicate Selection:** Select one or more items and click the "Duplicate" icon to create a deep copy.
@@ -231,4 +233,5 @@ Accessed via the terminal icon in the title bar, this panel is your primary tool
 - **Integrated Layout:** The panel is part of the main application layout. When opened, it pushes the content above it upwards, rather than covering it. This ensures the main screen remains fully interactive. The panel's height is resizable by dragging its top border.
 - **Action Logging:** The logger automatically records every significant action you take in the application, such as creating a document, changing a setting, or using a command. This provides a clear history of operations.
 - **Filtering:** You can filter logs by level (DEBUG, INFO, WARNING, ERROR).
+- **Selection & Copy Tools:** Click, Shift-click, or drag with modifier keys to select individual log entries or ranges. Use the Copy Selected button to export the chosen entries with configurable toggles for timestamps, log levels, and line breaks.
 - **Actions:** You can clear the logs or save the current session's log to a file.
