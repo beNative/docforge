@@ -361,7 +361,13 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                                                 </p>
                                                                 {result.searchSnippet && (
                                                                     <p
-                                                                        className="mt-0.5 -ml-2 border-l border-primary/30 pl-2 text-[11px] leading-snug text-text-secondary"
+                                                                        className="mt-0.5 -ml-2 text-[11px] leading-snug text-text-secondary"
+                                                                        style={{
+                                                                            paddingLeft: '0.75rem',
+                                                                            borderLeftWidth: '3px',
+                                                                            borderLeftStyle: 'solid',
+                                                                            borderLeftColor: 'rgb(var(--color-accent) / 0.45)',
+                                                                        }}
                                                                     >
                                                                         {highlightMatches(result.searchSnippet, folderSearchTerm)}
                                                                     </p>
