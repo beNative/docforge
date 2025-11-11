@@ -216,9 +216,34 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
     }
   }, [formatLogForCopy, selectedCount, selectedLogs]);
 
+  const isTextSelectionTarget = useCallback((target: EventTarget | null) => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    const element = target as HTMLElement | null;
+    return Boolean(element?.closest('[data-text-selectable="true"]'));
+  }, []);
+
+  const hasActiveTextSelection = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    const selection = window.getSelection();
+    return Boolean(selection && selection.rangeCount > 0 && !selection.getRangeAt(0).collapsed);
+  }, []);
+
   const handleLogSelection = useCallback((event: React.MouseEvent<HTMLDivElement> | React.KeyboardEvent<HTMLDivElement>, logId: number, index: number) => {
     const { shiftKey, metaKey, ctrlKey } = event;
     const isMetaKey = metaKey || ctrlKey;
+
+    if ('nativeEvent' in event) {
+      const target = event.nativeEvent.target as EventTarget | null;
+      if (isTextSelectionTarget(target) && hasActiveTextSelection()) {
+        return;
+      }
+    }
 
     let nextSelection: Set<number>;
     if (shiftKey && selectionAnchor !== null) {
@@ -244,7 +269,7 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
     if (!shiftKey || selectionAnchor === null) {
       setSelectionAnchor(index);
     }
-  }, [filteredLogs, selectedIds, selectionAnchor]);
+  }, [filteredLogs, hasActiveTextSelection, isTextSelectionTarget, selectedIds, selectionAnchor]);
 
   const handleLogKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>, logId: number, index: number) => {
     if (event.key === ' ' || event.key === 'Enter') {
@@ -276,6 +301,10 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
 
     const { shiftKey, metaKey, ctrlKey } = event;
 
+    if (isTextSelectionTarget(event.target)) {
+      return;
+    }
+
     if (!(shiftKey || metaKey || ctrlKey)) {
       handleLogSelection(event, filteredLogs[index].id, index);
       event.preventDefault();
@@ -283,7 +312,7 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
       setDragStartIndex(index);
       setSelectionAnchor(index);
     }
-  }, [filteredLogs, handleLogSelection]);
+  }, [filteredLogs, handleLogSelection, isTextSelectionTarget]);
 
   const handleLogMouseEnter = useCallback((index: number) => {
     if (!isDragging || dragStartIndex === null) {
@@ -434,11 +463,16 @@ const LoggerPanel: React.FC<LoggerPanelProps> = ({ isVisible, onToggleVisibility
               onKeyDown={(event) => handleLogKeyDown(event, log.id, index)}
               onMouseDown={(event) => handleLogMouseDown(event, index)}
               onMouseEnter={() => handleLogMouseEnter(index)}
-              className={`flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors cursor-pointer select-none border focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary ${isSelected ? 'bg-primary/15 border-primary/60 ring-1 ring-primary/50' : 'border-transparent hover:bg-border-color/40 focus-visible:bg-border-color/40'}`}
+              className={`flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors cursor-pointer border focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary ${isSelected ? 'bg-primary/15 border-primary/60 ring-1 ring-primary/50' : 'border-transparent hover:bg-border-color/40 focus-visible:bg-border-color/40'}`}
             >
               <span className={`${logLevelClasses[log.level].text} text-[10px] opacity-80`}>{renderHighlighted(log.timestamp)}</span>
               <span className={`px-1 py-0.5 rounded-full text-[10px] font-semibold border ${logLevelClasses[log.level].bg} ${logLevelClasses[log.level].border} ${logLevelClasses[log.level].text}`}>{log.level}</span>
-              <span className={`flex-1 ${logLevelClasses[log.level].text} whitespace-pre-wrap break-words leading-relaxed`}>{renderHighlighted(log.message)}</span>
+              <span
+                data-text-selectable="true"
+                className={`flex-1 ${logLevelClasses[log.level].text} whitespace-pre-wrap break-words leading-relaxed`}
+              >
+                {renderHighlighted(log.message)}
+              </span>
             </div>
           );
         })}
