@@ -1,5 +1,26 @@
 # Version Log
 
+## v0.7.0 - The Focused Zoom & Clipboard Intelligence Update
+
+### ✨ Features
+
+-   Automatically generate titles for clipboard imports whenever a local LLM is connected, so captured snippets arrive with meaningful names without extra typing. [#218](https://github.com/beNative/docforge/pull/218)
+-   Added an "Open installation folder" action to the About dialog via a new Electron bridge, making it easy to locate the running binaries during support sessions. [#216](https://github.com/beNative/docforge/pull/216)
+
+### 🛠 Improvements
+
+-   Gave the workspace zoom controls their own focus target so buttons, shortcuts, and 5% increments follow whichever pane (editor or preview) you're working in, and clarified the status bar label. [#217](https://github.com/beNative/docforge/pull/217)
+-   Expanded the logger panel with range selection, drag multi-select, and configurable clipboard exports for timestamps, levels, and line breaks. [#215](https://github.com/beNative/docforge/pull/215)
+-   Matched the Folder Overview rename button styling to its neighboring controls for a consistent affordance. [#214](https://github.com/beNative/docforge/pull/214)
+
+### 🐛 Fixes
+
+-   Restored the default tooltip styling for truncated sidebar titles so hover hints stay legible. [#219](https://github.com/beNative/docforge/pull/219)
+
+### 📝 Documentation
+
+-   Documented the focused zoom workflow, clipboard title generation, logger export tools, and the new About dialog shortcut while preparing the v0.7.0 release package.
+
 ## v0.6.10 - The Auto-Install Controls Update
 
 ### ✨ Features
