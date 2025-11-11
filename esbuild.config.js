@@ -49,6 +49,7 @@ const buildOrWatch = async (name, config) => {
         entryPoints: ['index.tsx'],
         outfile: 'dist/renderer.js',
         format: 'esm',
+        external: ['emoji-picker-react'],
         // external: ['uuid', 'react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'], // REMOVED
       }),
     ]);
