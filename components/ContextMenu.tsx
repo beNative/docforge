@@ -155,7 +155,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
         maxHeight: menuStyle.maxHeight ? menuStyle.maxHeight : undefined,
         overflowY: menuStyle.overflowY,
       }}
-      className="fixed z-50 w-56 rounded-md bg-secondary p-1.5 shadow-2xl border border-border-color animate-fade-in-fast"
+      className="fixed z-50 w-[16.8rem] rounded-md bg-secondary p-1.5 shadow-2xl border border-border-color animate-fade-in-fast"
     >
       <ul className="space-y-1">
         {/* Fix: Restructured the type guard to check for a property on the desired object type directly, which ensures proper type narrowing for the MenuItem union. */}
