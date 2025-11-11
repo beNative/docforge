@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FileIcon, FolderIcon, FolderOpenIcon, TrashIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, SaveIcon, LockClosedIcon, LockOpenIcon } from './Icons';
+import { FileIcon, FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, LockClosedIcon, LockOpenIcon } from './Icons';
 import Tooltip from './Tooltip';
 
 export interface DocumentNode extends DocumentOrFolder {
@@ -30,11 +30,7 @@ interface DocumentTreeItemProps {
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onToggleExpand: (id: string) => void;
   onCopyNodeContent: (id: string) => void;
-  copyContentTooltip: string;
-  onSaveNodeToFile: (id: string) => void;
-  saveToFileTooltip: string;
   onToggleLock: (id: string, locked: boolean) => void | Promise<void>;
-  getToggleLockTooltip: (locked: boolean) => string;
   isKnownNodeId: (id: string) => boolean;
   searchTerm: string;
   onMoveUp: (id: string) => void;
@@ -103,6 +99,12 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const {
     node,
     level,
+    canMoveUp,
+    canMoveDown,
+    ...baseChildProps
+  } = props;
+
+  const {
     selectedIds,
     focusedItemId,
     expandedIds,
@@ -117,15 +119,9 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onDropFiles,
     onToggleExpand,
     onCopyNodeContent,
-    copyContentTooltip,
-    onSaveNodeToFile,
-    saveToFileTooltip,
     onToggleLock,
-    getToggleLockTooltip,
     onMoveUp,
     onMoveDown,
-    canMoveUp,
-    canMoveDown,
     onContextMenu,
     renamingNodeId,
     onRenameComplete,
@@ -133,7 +129,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     verticalSpacing,
     searchTerm,
     isKnownNodeId,
-  } = props;
+  } = baseChildProps;
   
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(node.title);
@@ -155,6 +151,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const isOpenInTab = !isFolder && openDocumentIds.has(node.id);
   const areActionsVisible = isSelected || isFocused || isHovered;
   const emojiForNode = !isFolder ? extractEmoji(node.title) : null;
+  const lockAriaLabel = node.locked ? 'Unlock Document' : 'Lock Document';
   const displayTitle = React.useMemo(() => {
     if (!emojiForNode || isFolder) {
       return node.title;
@@ -463,23 +460,40 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         overflow: areActionsVisible ? undefined : 'hidden',
                     }}
                 >
-                    <IconButton onClick={(e) => { e.stopPropagation(); onMoveUp(node.id); }} tooltip="Move Up" size="xs" variant="ghost" disabled={!canMoveUp}>
+                    <IconButton
+                        aria-label="Move Up"
+                        onClick={(e) => { e.stopPropagation(); onMoveUp(node.id); }}
+                        size="xs"
+                        variant="ghost"
+                        disabled={!canMoveUp}
+                    >
                         <ArrowUpIcon className="w-3.5 h-3.5" />
                     </IconButton>
-                    <IconButton onClick={(e) => { e.stopPropagation(); onMoveDown(node.id); }} tooltip="Move Down" size="xs" variant="ghost" disabled={!canMoveDown}>
+                    <IconButton
+                        aria-label="Move Down"
+                        onClick={(e) => { e.stopPropagation(); onMoveDown(node.id); }}
+                        size="xs"
+                        variant="ghost"
+                        disabled={!canMoveDown}
+                    >
                         <ArrowDownIcon className="w-3.5 h-3.5" />
                     </IconButton>
                     {!isFolder && (
                       <>
-                        <IconButton onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }} tooltip={copyContentTooltip} size="xs" variant="ghost">
+                        <IconButton
+                            aria-label="Copy Content"
+                            onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }}
+                            size="xs"
+                            variant="ghost"
+                        >
                           <CopyIcon className="w-3.5 h-3.5" />
                         </IconButton>
                         <IconButton
+                          aria-label={lockAriaLabel}
                           onClick={(e) => {
                             e.stopPropagation();
                             void onToggleLock(node.id, !node.locked);
                           }}
-                          tooltip={getToggleLockTooltip(node.locked)}
                           size="xs"
                           variant="ghost"
                           className={node.locked ? 'text-primary' : ''}
@@ -490,14 +504,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                             <LockOpenIcon className="w-3.5 h-3.5" />
                           )}
                         </IconButton>
-                        <IconButton onClick={(e) => { e.stopPropagation(); onSaveNodeToFile(node.id); }} tooltip={saveToFileTooltip} size="xs" variant="ghost">
-                          <SaveIcon className="w-3.5 h-3.5" />
-                        </IconButton>
                       </>
                     )}
-                    <IconButton onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id, e.shiftKey); }} tooltip="Delete" size="xs" variant="destructive">
-                        <TrashIcon className="w-3.5 h-3.5" />
-                    </IconButton>
                 </div>
             )}
         </div>
@@ -523,16 +531,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                 {node.children.map((childNode, index) => (
                     <DocumentTreeItem
                         key={childNode.id}
-                        {...props}
+                        {...baseChildProps}
                         node={childNode}
                         level={level + 1}
-                        indentPerLevel={indentPerLevel}
-                        verticalSpacing={verticalSpacing}
-                        openDocumentIds={openDocumentIds}
-                        activeDocumentId={activeDocumentId}
                         canMoveUp={index > 0}
                         canMoveDown={index < node.children.length - 1}
-                        copyContentTooltip={copyContentTooltip}
                     />
                 ))}
             </ul>

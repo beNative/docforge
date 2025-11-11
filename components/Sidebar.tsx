@@ -588,15 +588,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     onSelectNode={props.onSelectNode}
                     onDeleteNode={props.onDeleteNode}
                     onRenameNode={props.onRenameNode}
-                                        onMoveNode={props.onMoveNode}
+                    onMoveNode={props.onMoveNode}
                     onImportNodes={props.onImportNodes}
                     onDropFiles={props.onDropFiles}
-                onCopyNodeContent={props.onCopyNodeContent}
-                onToggleLock={props.onToggleNodeLock}
-                getToggleLockTooltip={(locked) => getTooltip('toggle-document-lock', locked ? 'Unlock Document' : 'Lock Document')}
-                copyContentTooltip={getTooltip('document-tree-copy-content', 'Copy Content')}
-                onSaveNodeToFile={props.onSaveNodeToFile}
-                    saveToFileTooltip={getTooltip('document-tree-save-to-file', 'Save to File')}
+                    onCopyNodeContent={props.onCopyNodeContent}
+                    onToggleLock={props.onToggleNodeLock}
                     searchTerm={searchTerm}
                     expandedIds={props.expandedFolderIds}
                     onToggleExpand={props.onToggleExpand}

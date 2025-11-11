@@ -3,7 +3,7 @@ import Tooltip from './Tooltip';
 
 interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
-  tooltip: string;
+  tooltip?: string;
   variant?: 'primary' | 'ghost' | 'destructive';
   size?: 'xs' | 'sm' | 'md';
   tooltipPosition?: 'top' | 'bottom';
