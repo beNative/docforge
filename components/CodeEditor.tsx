@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo, useState } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { MONACO_KEYBINDING_DEFINITIONS } from '../services/editor/monacoKeybindings';
 import { DEFAULT_SETTINGS } from '../constants';
@@ -6,6 +6,7 @@ import { ensureMonaco } from '../services/editor/monacoLoader';
 import { applyDocforgeTheme } from '../services/editor/monacoTheme';
 import { registerTomlLanguage } from '../services/editor/registerTomlLanguage';
 import { registerPlantumlLanguage } from '../services/editor/registerPlantumlLanguage';
+import EmojiPickerOverlay from './EmojiPickerOverlay';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
@@ -33,6 +34,13 @@ export interface CodeEditorHandle {
 const LETTER_REGEX = /^[A-Z]$/;
 const DIGIT_REGEX = /^[0-9]$/;
 const FUNCTION_KEY_REGEX = /^F([1-9]|1[0-2])$/;
+
+type StoredSelection = {
+    startLineNumber: number;
+    startColumn: number;
+    endLineNumber: number;
+    endColumn: number;
+};
 
 const toMonacoKeyCode = (monacoApi: any, key: string): number | null => {
     const normalized = key.length === 1 ? key.toUpperCase() : key;
@@ -123,12 +131,16 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
+    const emojiPickerStateRef = useRef<{ selection: StoredSelection | null; anchor: { x: number; y: number } | null } | null>(null);
     const { theme } = useTheme();
     const contentRef = useRef(content);
     const customShortcutsRef = useRef<Record<string, string[]>>({});
     const actionDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const focusDisposableRef = useRef<{ dispose: () => void } | null>(null);
     const blurDisposableRef = useRef<{ dispose: () => void } | null>(null);
+    const emojiActionDisposableRef = useRef<{ dispose: () => void } | null>(null);
+    const lastContextMenuCoordsRef = useRef<{ x: number; y: number } | null>(null);
+    const [emojiPickerState, setEmojiPickerState] = useState<{ selection: StoredSelection | null; anchor: { x: number; y: number } | null } | null>(null);
     const computedFontFamily = useMemo(() => {
         const candidate = (fontFamily ?? '').trim();
         return candidate || DEFAULT_SETTINGS.editorFontFamily;
@@ -163,6 +175,176 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     useEffect(() => {
         highlightColorRef.current = computedActiveLineHighlightColor;
     }, [computedActiveLineHighlightColor]);
+
+    const calculateAnchorFromSelection = useCallback((selection: StoredSelection | null): { x: number; y: number } | null => {
+        if (!selection || !editorRef.current || !monacoInstanceRef.current) {
+            return null;
+        }
+
+        const editor = monacoInstanceRef.current;
+        const endPosition = {
+            lineNumber: selection.endLineNumber,
+            column: selection.endColumn,
+        };
+
+        let scrolled = editor.getScrolledVisiblePosition(endPosition);
+        if (!scrolled) {
+            editor.revealPositionInCenter(endPosition);
+            scrolled = editor.getScrolledVisiblePosition(endPosition);
+        }
+
+        if (!scrolled) {
+            return null;
+        }
+
+        const containerRect = editorRef.current.getBoundingClientRect();
+        return {
+            x: containerRect.left + scrolled.left,
+            y: containerRect.top + scrolled.top + scrolled.height,
+        };
+    }, []);
+
+    const updateEmojiPickerAnchor = useCallback((preferredCoords?: { x: number; y: number } | null) => {
+        const state = emojiPickerStateRef.current;
+        if (!state) {
+            return;
+        }
+
+        let anchor = preferredCoords ?? null;
+        if (!anchor) {
+            anchor = calculateAnchorFromSelection(state.selection);
+        }
+
+        if (!anchor && editorRef.current) {
+            const rect = editorRef.current.getBoundingClientRect();
+            anchor = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2,
+            };
+        }
+
+        if (!anchor) {
+            return;
+        }
+
+        emojiPickerStateRef.current = { ...state, anchor };
+        setEmojiPickerState((previous) => (previous ? { ...previous, anchor } : previous));
+    }, [calculateAnchorFromSelection]);
+
+    const captureCurrentSelection = useCallback((): StoredSelection | null => {
+        const editor = monacoInstanceRef.current;
+        if (!editor) {
+            return null;
+        }
+
+        const selection = editor.getSelection();
+        if (selection) {
+            return {
+                startLineNumber: selection.startLineNumber,
+                startColumn: selection.startColumn,
+                endLineNumber: selection.endLineNumber,
+                endColumn: selection.endColumn,
+            };
+        }
+
+        const position = editor.getPosition();
+        if (!position) {
+            return null;
+        }
+
+        return {
+            startLineNumber: position.lineNumber,
+            startColumn: position.column,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+        };
+    }, []);
+
+    const openEmojiPicker = useCallback((selection: StoredSelection | null, coords: { x: number; y: number } | null) => {
+        const effectiveSelection = selection ?? captureCurrentSelection();
+        const anchor = coords ?? calculateAnchorFromSelection(effectiveSelection);
+
+        let resolvedAnchor = anchor;
+        if (!resolvedAnchor && editorRef.current) {
+            const rect = editorRef.current.getBoundingClientRect();
+            resolvedAnchor = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2,
+            };
+        }
+
+        const nextState = {
+            selection: effectiveSelection,
+            anchor: resolvedAnchor,
+        };
+
+        emojiPickerStateRef.current = nextState;
+        setEmojiPickerState(nextState);
+
+        requestAnimationFrame(() => {
+            updateEmojiPickerAnchor(coords ?? null);
+        });
+    }, [captureCurrentSelection, calculateAnchorFromSelection, updateEmojiPickerAnchor]);
+
+    const insertEmoji = useCallback((emoji: string) => {
+        const editor = monacoInstanceRef.current;
+        const monacoApi = monacoApiRef.current;
+        if (!editor || !monacoApi) {
+            return;
+        }
+
+        const selection = emojiPickerStateRef.current?.selection ?? captureCurrentSelection();
+        if (!selection) {
+            editor.trigger('emoji-picker', 'type', { text: emoji });
+            return;
+        }
+
+        const range = new monacoApi.Range(
+            selection.startLineNumber,
+            selection.startColumn,
+            selection.endLineNumber,
+            selection.endColumn,
+        );
+
+        editor.executeEdits('emoji-picker', [
+            {
+                range,
+                text: emoji,
+                forceMoveMarkers: true,
+            },
+        ]);
+
+        const newColumn = selection.startColumn + emoji.length;
+        const newSelection = new monacoApi.Selection(
+            selection.startLineNumber,
+            newColumn,
+            selection.startLineNumber,
+            newColumn,
+        );
+        editor.setSelection(newSelection);
+        editor.focus();
+        contentRef.current = editor.getValue();
+    }, [captureCurrentSelection]);
+
+    useEffect(() => {
+        emojiPickerStateRef.current = emojiPickerState;
+    }, [emojiPickerState]);
+
+    useEffect(() => {
+        if (!emojiPickerState) {
+            return;
+        }
+        updateEmojiPickerAnchor(emojiPickerState.anchor ?? null);
+
+        const handleResize = () => {
+            updateEmojiPickerAnchor(emojiPickerState.anchor ?? null);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [emojiPickerState, updateEmojiPickerAnchor]);
 
     useImperativeHandle(ref, () => ({
         format() {
@@ -203,6 +385,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
             }
         });
         actionDisposablesRef.current = [];
+        emojiActionDisposableRef.current?.dispose();
+        emojiActionDisposableRef.current = null;
     }, []);
 
     const disposeFocusListeners = useCallback(() => {
@@ -303,6 +487,29 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                     readOnly,
                 });
 
+                const storeSelection = () => {
+                    const selection = editorInstance.getSelection();
+                    if (!selection) {
+                        if (emojiPickerStateRef.current) {
+                            const next = { ...emojiPickerStateRef.current, selection: null };
+                            emojiPickerStateRef.current = next;
+                            setEmojiPickerState(prev => (prev ? { ...prev, selection: null } : prev));
+                        }
+                        return;
+                    }
+                    const storedSelection: StoredSelection = {
+                        startLineNumber: selection.startLineNumber,
+                        startColumn: selection.startColumn,
+                        endLineNumber: selection.endLineNumber,
+                        endColumn: selection.endColumn,
+                    };
+                    if (emojiPickerStateRef.current) {
+                        const next = { ...emojiPickerStateRef.current, selection: storedSelection };
+                        emojiPickerStateRef.current = next;
+                        setEmojiPickerState(prev => (prev ? { ...prev, selection: storedSelection } : prev));
+                    }
+                };
+
                 editorInstance.onDidChangeModelContent(() => {
                     const currentValue = editorInstance.getValue();
                     if (currentValue !== contentRef.current) {
@@ -318,6 +525,17 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                             clientHeight: editorInstance.getLayoutInfo().height
                         });
                     }
+                    updateEmojiPickerAnchor();
+                });
+
+                editorInstance.onContextMenu((event: any) => {
+                    const contextEvent = event?.event;
+                    const posx = contextEvent?.posx ?? contextEvent?.browserEvent?.clientX;
+                    const posy = contextEvent?.posy ?? contextEvent?.browserEvent?.clientY;
+                    if (typeof posx === 'number' && typeof posy === 'number') {
+                        lastContextMenuCoordsRef.current = { x: posx, y: posy };
+                    }
+                    storeSelection();
                 });
 
                 disposeFocusListeners();
@@ -332,6 +550,19 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
 
                 monacoInstanceRef.current = editorInstance;
                 applyEditorShortcuts();
+                emojiActionDisposableRef.current?.dispose();
+                emojiActionDisposableRef.current = editorInstance.addAction({
+                    id: 'docforge.insertEmoji',
+                    label: 'Insert Emoji…',
+                    contextMenuGroupId: 'navigation',
+                    contextMenuOrder: 0.5,
+                    run: () => {
+                        const state = captureCurrentSelection();
+                        const coords = lastContextMenuCoordsRef.current;
+                        openEmojiPicker(state, coords ?? null);
+                        lastContextMenuCoordsRef.current = null;
+                    },
+                });
             } catch (error) {
                 // eslint-disable-next-line no-console
                 console.error('Failed to initialize Monaco editor', error);
@@ -348,6 +579,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                 monacoInstanceRef.current.dispose();
                 monacoInstanceRef.current = null;
             }
+            emojiActionDisposableRef.current?.dispose();
+            emojiActionDisposableRef.current = null;
             monacoApiRef.current = null;
         };
     }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, disposeFocusListeners, computedFontFamily, computedFontSize, readOnly, onFocusChange]);
@@ -392,7 +625,23 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
     }, [language]);
 
 
-    return <div ref={editorRef} className="w-full h-full" />;
+    return (
+        <>
+            <div ref={editorRef} className="w-full h-full" />
+            <EmojiPickerOverlay
+                isOpen={Boolean(emojiPickerState)}
+                anchor={emojiPickerState?.anchor ?? null}
+                onClose={() => {
+                    setEmojiPickerState(null);
+                    monacoInstanceRef.current?.focus();
+                }}
+                onSelectEmoji={(emoji) => {
+                    insertEmoji(emoji);
+                }}
+                ariaLabel="Insert emoji into editor"
+            />
+        </>
+    );
 });
 
 export default CodeEditor;

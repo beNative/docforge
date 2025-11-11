@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
 import { FileIcon, FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, LockClosedIcon, LockOpenIcon } from './Icons';
 import Tooltip from './Tooltip';
+import EmojiPickerOverlay from './EmojiPickerOverlay';
 
 export interface DocumentNode extends DocumentOrFolder {
   children: DocumentNode[];
@@ -137,11 +138,14 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   const [isHovered, setIsHovered] = useState(false);
   const [lockedRowHeight, setLockedRowHeight] = useState<number | null>(null);
   const [isTitleTruncated, setIsTitleTruncated] = useState(false);
+  const [isRenameEmojiPickerOpen, setIsRenameEmojiPickerOpen] = useState(false);
+  const [renameEmojiAnchor, setRenameEmojiAnchor] = useState<{ x: number; y: number } | null>(null);
 
   const renameInputRef = useRef<HTMLInputElement>(null);
   const itemRef = useRef<HTMLLIElement>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
+  const renameSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
   const isSelected = selectedIds.has(node.id);
   const isFocused = focusedItemId === node.id;
@@ -179,8 +183,17 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
 
   useEffect(() => {
     if (isRenaming) {
-      renameInputRef.current?.focus();
-      renameInputRef.current?.select();
+      const input = renameInputRef.current;
+      input?.focus();
+      input?.select();
+      if (input) {
+        const start = input.selectionStart ?? 0;
+        const end = input.selectionEnd ?? input.value.length;
+        renameSelectionRef.current = { start, end };
+      }
+    } else {
+      setIsRenameEmojiPickerOpen(false);
+      setRenameEmojiAnchor(null);
     }
   }, [isRenaming]);
   
@@ -189,6 +202,10 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       setIsRenaming(false);
     }
   }, [isSelected, isRenaming]);
+
+  useEffect(() => {
+    setRenameValue(node.title);
+  }, [node.title]);
 
   useLayoutEffect(() => {
     if (!isHovered || !areActionsVisible || isRenaming) {
@@ -235,22 +252,93 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     };
   }, [areActionsVisible, displayTitle, isHovered, isRenaming, searchTerm]);
 
+  const updateRenameSelection = useCallback(() => {
+    const input = renameInputRef.current;
+    if (!input) {
+      return;
+    }
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    renameSelectionRef.current = { start, end };
+  }, []);
+
+  const closeRenameEmojiPicker = useCallback(() => {
+    setIsRenameEmojiPickerOpen(false);
+    setRenameEmojiAnchor(null);
+    if (!isRenaming) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      const input = renameInputRef.current;
+      const selection = renameSelectionRef.current;
+      if (input) {
+        input.focus();
+        if (selection) {
+          input.setSelectionRange(selection.start, selection.end);
+        }
+      }
+    });
+  }, [isRenaming]);
+
+  const handleRenameEmojiSelect = useCallback((emoji: string) => {
+    const input = renameInputRef.current;
+    if (!input) {
+      return;
+    }
+
+    const selection = renameSelectionRef.current ?? {
+      start: input.selectionStart ?? input.value.length,
+      end: input.selectionEnd ?? input.value.length,
+    };
+
+    const caretPosition = selection.start + emoji.length;
+    setRenameValue((previous) => {
+      const before = previous.slice(0, selection.start);
+      const after = previous.slice(selection.end);
+      return `${before}${emoji}${after}`;
+    });
+    renameSelectionRef.current = { start: caretPosition, end: caretPosition };
+    closeRenameEmojiPicker();
+  }, [closeRenameEmojiPicker]);
+
+  const handleRenameContextMenu = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    updateRenameSelection();
+    setRenameEmojiAnchor({ x: event.clientX, y: event.clientY });
+    setIsRenameEmojiPickerOpen(true);
+  }, [updateRenameSelection]);
+
   const handleRenameStart = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsRenaming(true);
   };
 
-  const handleRenameSubmit = () => {
+  const handleRenameSubmit = useCallback(() => {
+    if (isRenameEmojiPickerOpen) {
+      return;
+    }
     if (renameValue.trim() && renameValue.trim() !== node.title) {
       onRenameNode(node.id, renameValue.trim());
     }
     setIsRenaming(false);
-  };
+  }, [isRenameEmojiPickerOpen, renameValue, node.title, onRenameNode, node.id]);
 
-  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleRenameSubmit();
-    else if (e.key === 'Escape') setIsRenaming(false);
-  };
+  const handleRenameKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleRenameSubmit();
+    } else if (e.key === 'Escape') {
+      setIsRenaming(false);
+    }
+  }, [handleRenameSubmit]);
+
+  const handleRenameBlur = useCallback(() => {
+    if (isRenameEmojiPickerOpen) {
+      return;
+    }
+    handleRenameSubmit();
+  }, [handleRenameSubmit, isRenameEmojiPickerOpen]);
 
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation();
@@ -423,10 +511,14 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                         ref={renameInputRef}
                         type="text"
                         value={renameValue}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); updateRenameSelection(); }}
                         onChange={(e) => setRenameValue(e.target.value)}
-                        onBlur={handleRenameSubmit}
+                        onBlur={handleRenameBlur}
                         onKeyDown={handleRenameKeyDown}
+                        onContextMenu={handleRenameContextMenu}
+                        onSelect={updateRenameSelection}
+                        onKeyUp={updateRenameSelection}
+                        onMouseUp={updateRenameSelection}
                         className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
                     />
                 ) : (
@@ -553,6 +645,13 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                 ))}
             </ul>
         )}
+        <EmojiPickerOverlay
+          isOpen={isRenaming && isRenameEmojiPickerOpen}
+          anchor={renameEmojiAnchor}
+          onClose={closeRenameEmojiPicker}
+          onSelectEmoji={handleRenameEmojiSelect}
+          ariaLabel="Insert emoji into node name"
+        />
     </li>
   );
 };

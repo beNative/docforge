@@ -14,6 +14,7 @@ import PreviewPane from './PreviewPane';
 import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
 import ScriptExecutionPanel from './ScriptExecutionPanel';
+import EmojiPickerOverlay from './EmojiPickerOverlay';
 
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
@@ -121,6 +122,8 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isGeneratingEmoji, setIsGeneratingEmoji] = useState(false);
+  const [isTitleEmojiPickerOpen, setIsTitleEmojiPickerOpen] = useState(false);
+  const [titleEmojiAnchor, setTitleEmojiAnchor] = useState<{ x: number; y: number } | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
   const [splitSize, setSplitSize] = useState(50);
@@ -169,6 +172,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const isResizing = useRef(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const isContentInitialized = useRef(false);
   const editorRef = useRef<CodeEditorHandle>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
@@ -178,6 +182,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const prevDocumentIdRef = useRef<string | null>(null);
   const prevDocumentContentRef = useRef<string | undefined>(undefined);
   const prevLockedRef = useRef(isLocked);
+  const titleSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -548,6 +553,71 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
   };
 
+  const updateTitleSelection = useCallback(() => {
+    const input = titleInputRef.current;
+    if (!input) {
+      return;
+    }
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+    titleSelectionRef.current = { start, end };
+  }, []);
+
+  const closeTitleEmojiPicker = useCallback(() => {
+    setIsTitleEmojiPickerOpen(false);
+    setTitleEmojiAnchor(null);
+    requestAnimationFrame(() => {
+      const input = titleInputRef.current;
+      const selection = titleSelectionRef.current;
+      if (input) {
+        input.focus();
+        if (selection) {
+          input.setSelectionRange(selection.start, selection.end);
+        }
+      }
+    });
+  }, []);
+
+  const handleTitleEmojiSelect = useCallback((emoji: string) => {
+    const input = titleInputRef.current;
+    let selection = titleSelectionRef.current;
+
+    if (!selection) {
+      if (input) {
+        selection = {
+          start: input.selectionStart ?? input.value.length,
+          end: input.selectionEnd ?? input.value.length,
+        };
+      } else {
+        const fallback = title.length;
+        selection = { start: fallback, end: fallback };
+      }
+    }
+
+    const { start, end } = selection;
+
+    setTitle((previous) => {
+      const before = previous.slice(0, start);
+      const after = previous.slice(end);
+      return `${before}${emoji}${after}`;
+    });
+
+    const caretPosition = start + emoji.length;
+    titleSelectionRef.current = { start: caretPosition, end: caretPosition };
+    closeTitleEmojiPicker();
+  }, [closeTitleEmojiPicker, title.length]);
+
+  const handleTitleContextMenu = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
+    if (isLocked) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    updateTitleSelection();
+    setTitleEmojiAnchor({ x: event.clientX, y: event.clientY });
+    setIsTitleEmojiPickerOpen(true);
+  }, [isLocked, updateTitleSelection]);
+
   const acceptRefinement = () => {
     if (refinedContent) {
       setContent(refinedContent);
@@ -780,7 +850,20 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Document Title" disabled={isGeneratingTitle} readOnly={isLocked} className={`bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate ${isLocked ? 'cursor-default' : ''}`}/>
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onContextMenu={handleTitleContextMenu}
+              onSelect={updateTitleSelection}
+              onKeyUp={updateTitleSelection}
+              onMouseUp={updateTitleSelection}
+              placeholder="Document Title"
+              disabled={isGeneratingTitle}
+              readOnly={isLocked}
+              className={`bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate ${isLocked ? 'cursor-default' : ''}`}
+            />
             {canAddEmojiToTitle && (
               <IconButton
                 onClick={handleAddEmojiToTitle}
@@ -946,6 +1029,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           </form>
         </Modal>
       )}
+      <EmojiPickerOverlay
+        isOpen={isTitleEmojiPickerOpen}
+        anchor={titleEmojiAnchor}
+        onClose={closeTitleEmojiPicker}
+        onSelectEmoji={handleTitleEmojiSelect}
+        ariaLabel="Insert emoji into document title"
+      />
     </div>
   );
 };

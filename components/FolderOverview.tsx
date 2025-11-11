@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { DocType, DocumentOrFolder } from '../types';
 import Button from './Button';
 import { FolderIcon, FileIcon, InfoIcon, PlusIcon, FolderPlusIcon, FolderDownIcon, PencilIcon, SearchIcon, XIcon, CopyIcon } from './Icons';
+import EmojiPickerOverlay from './EmojiPickerOverlay';
 
 export interface DocTypeCount {
     type: DocType;
@@ -126,12 +127,15 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
     const hasLanguageSummary = languageCounts.some(({ count }) => count > 0);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const titleInputRef = useRef<HTMLInputElement | null>(null);
+    const titleSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
     const normalizedTitle = folder.title?.trim() ?? '';
     const displayTitle = normalizedTitle.length > 0 ? normalizedTitle : 'Untitled Folder';
 
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [titleDraft, setTitleDraft] = useState(displayTitle);
+    const [isTitleEmojiPickerOpen, setIsTitleEmojiPickerOpen] = useState(false);
+    const [titleEmojiAnchor, setTitleEmojiAnchor] = useState<{ x: number; y: number } | null>(null);
 
     useEffect(() => {
         setTitleDraft(displayTitle);
@@ -143,7 +147,16 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
             requestAnimationFrame(() => {
                 titleInputRef.current?.focus();
                 titleInputRef.current?.select();
+                const value = titleInputRef.current?.value ?? titleDraft;
+                titleSelectionRef.current = { start: 0, end: value.length };
             });
+        }
+    }, [isEditingTitle, titleDraft]);
+
+    useEffect(() => {
+        if (!isEditingTitle) {
+            setIsTitleEmojiPickerOpen(false);
+            setTitleEmojiAnchor(null);
         }
     }, [isEditingTitle]);
 
@@ -175,6 +188,71 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
         setTitleDraft(event.target.value);
     };
 
+    const updateTitleSelection = useCallback(() => {
+        const input = titleInputRef.current;
+        if (!input) {
+            return;
+        }
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? input.value.length;
+        titleSelectionRef.current = { start, end };
+    }, []);
+
+    const closeTitleEmojiPicker = useCallback(() => {
+        setIsTitleEmojiPickerOpen(false);
+        setTitleEmojiAnchor(null);
+        if (!isEditingTitle) {
+            return;
+        }
+        requestAnimationFrame(() => {
+            const input = titleInputRef.current;
+            const selection = titleSelectionRef.current;
+            if (input) {
+                input.focus();
+                if (selection) {
+                    input.setSelectionRange(selection.start, selection.end);
+                }
+            }
+        });
+    }, [isEditingTitle]);
+
+    const handleTitleEmojiSelect = useCallback((emoji: string) => {
+        const input = titleInputRef.current;
+        let selection = titleSelectionRef.current;
+
+        if (!selection) {
+            if (input) {
+                selection = {
+                    start: input.selectionStart ?? input.value.length,
+                    end: input.selectionEnd ?? input.value.length,
+                };
+            } else {
+                const fallback = titleDraft.length;
+                selection = { start: fallback, end: fallback };
+            }
+        }
+
+        const { start, end } = selection;
+
+        setTitleDraft((previous) => {
+            const before = previous.slice(0, start);
+            const after = previous.slice(end);
+            return `${before}${emoji}${after}`;
+        });
+
+        const caretPosition = start + emoji.length;
+        titleSelectionRef.current = { start: caretPosition, end: caretPosition };
+        closeTitleEmojiPicker();
+    }, [closeTitleEmojiPicker, titleDraft.length]);
+
+    const handleTitleContextMenu = useCallback((event: React.MouseEvent<HTMLInputElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        updateTitleSelection();
+        setTitleEmojiAnchor({ x: event.clientX, y: event.clientY });
+        setIsTitleEmojiPickerOpen(true);
+    }, [updateTitleSelection]);
+
     const handleTitleCancel = () => {
         setTitleDraft(displayTitle);
         setIsEditingTitle(false);
@@ -193,6 +271,9 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
     };
 
     const handleTitleBlur: React.FocusEventHandler<HTMLInputElement> = () => {
+        if (isTitleEmojiPickerOpen) {
+            return;
+        }
         commitTitleChange();
     };
 
@@ -225,6 +306,10 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                                     onChange={handleTitleChange}
                                     onBlur={handleTitleBlur}
                                     onKeyDown={handleTitleKeyDown}
+                                    onContextMenu={handleTitleContextMenu}
+                                    onSelect={updateTitleSelection}
+                                    onKeyUp={updateTitleSelection}
+                                    onMouseUp={updateTitleSelection}
                                     className="max-w-full rounded-sm border border-border-color bg-transparent px-1 py-1 text-xl font-semibold leading-tight text-text-main focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                                     aria-label="Edit folder name"
                                 />
@@ -548,6 +633,13 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
                     </section>
                 </div>
             </div>
+            <EmojiPickerOverlay
+                isOpen={isEditingTitle && isTitleEmojiPickerOpen}
+                anchor={titleEmojiAnchor}
+                onClose={closeTitleEmojiPicker}
+                onSelectEmoji={handleTitleEmojiSelect}
+                ariaLabel="Insert emoji into folder name"
+            />
         </div>
     );
 };
