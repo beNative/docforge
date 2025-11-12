@@ -144,7 +144,7 @@ export interface UpdateErrorPayload {
 }
 
 export type NodeType = 'folder' | 'document';
-export type DocType = 'prompt' | 'source_code' | 'pdf' | 'image';
+export type DocType = 'prompt' | 'source_code' | 'pdf' | 'image' | 'rich_text';
 export type ClassificationSource = 'auto' | 'user' | 'imported' | 'unknown';
 
 export type SaveFilePayload =

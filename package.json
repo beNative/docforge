@@ -34,8 +34,13 @@
     "url": "https://github.com/beNative/docforge.git"
   },
   "dependencies": {
+    "@tiptap/extension-image": "^2.6.6",
+    "@tiptap/extension-link": "^2.6.6",
+    "@tiptap/react": "^2.6.6",
+    "@tiptap/starter-kit": "^2.6.6",
     "@uiw/react-color-compact": "^2.9.2",
     "better-sqlite3": "^11.1.2",
+    "diff": "^5.2.0",
     "electron-log": "^5.1.5",
     "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.2.1",
