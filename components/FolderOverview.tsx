@@ -92,6 +92,7 @@ const DOC_TYPE_LABELS: Record<DocType, string> = {
     source_code: 'Source code',
     pdf: 'PDFs',
     image: 'Images',
+    rich_text: 'Rich documents',
 };
 
 const formatDocTypeLabel = (docType: DocType) => DOC_TYPE_LABELS[docType] ?? docType.replace(/_/g, ' ');

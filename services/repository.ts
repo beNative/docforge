@@ -67,12 +67,15 @@ const createSampleBrowserState = (): BrowserState => {
     const documentId = 1;
     const shellDocumentId = 2;
     const powershellDocumentId = 3;
+    const richDocumentId = 4;
     const versionId = 1;
     const shellVersionId = 2;
     const powershellVersionId = 3;
+    const richVersionId = 4;
     const sampleContent = '# Welcome to DocForge\n\nThis is a static dataset provided for browser preview mode.';
     const shellContent = '#!/bin/bash\n\necho "DocForge shell quickstart"\nls -la';
     const powershellContent = 'Write-Host "DocForge PowerShell quickstart"\nGet-ChildItem';
+    const richContent = '<h1>Rich Text Demo</h1><p>This document opens with the new visual editor. Use the toolbar to apply <strong>bold</strong>, <em>italic</em>, and other formatting.</p>';
 
     const document: Document = {
         document_id: documentId,
@@ -149,6 +152,31 @@ const createSampleBrowserState = (): BrowserState => {
       document: powershellDocument,
     };
 
+    const richDocument: Document = {
+      document_id: richDocumentId,
+      node_id: 'sample-rich',
+      doc_type: 'rich_text',
+      language_hint: 'html',
+      default_view_mode: 'edit',
+      language_source: 'user',
+      doc_type_source: 'user',
+      classification_updated_at: now,
+      current_version_id: richVersionId,
+      content: richContent,
+    };
+
+    const richNode: Node = {
+      node_id: 'sample-rich',
+      parent_id: rootId,
+      node_type: 'document',
+      title: 'Rich Document Demo',
+      sort_order: 3,
+      created_at: now,
+      updated_at: now,
+      locked: false,
+      document: richDocument,
+    };
+
     const rootNode: Node = {
       node_id: rootId,
       parent_id: null,
@@ -158,7 +186,7 @@ const createSampleBrowserState = (): BrowserState => {
       created_at: now,
       updated_at: now,
       locked: false,
-      children: [documentNode, shellNode, powershellNode],
+      children: [documentNode, shellNode, powershellNode, richNode],
     };
 
     return {
@@ -198,9 +226,18 @@ const createSampleBrowserState = (): BrowserState => {
             content: powershellContent,
           },
         ],
+        [richDocumentId]: [
+          {
+            version_id: richVersionId,
+            document_id: richDocumentId,
+            created_at: now,
+            content_id: richVersionId,
+            content: richContent,
+          },
+        ],
       },
-      nextDocumentId: powershellDocumentId + 1,
-      nextVersionId: powershellVersionId + 1,
+      nextDocumentId: richDocumentId + 1,
+      nextVersionId: richVersionId + 1,
     };
   };
 
@@ -1317,7 +1354,7 @@ export const repository = {
 
             const { collection, parentId, insertIndex } = resolveTarget();
 
-            const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image'];
+            const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image', 'rich_text'];
             const allowedViewModes: ViewMode[] = ['edit', 'preview', 'split-vertical', 'split-horizontal'];
 
             const createdIds: string[] = [];

@@ -61,9 +61,12 @@ export const useDocuments = () => {
   const allNodesFlat = useMemo(() => flattenNodes(nodes), [nodes]);
   const items: DocumentOrFolder[] = useMemo(() => allNodesFlat.map(nodeToDocumentOrFolder), [allNodesFlat]);
 
-  const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '', doc_type = 'prompt', language_hint = 'markdown' }: { parentId: string | null, title?: string, content?: string, doc_type?: DocType, language_hint?: string | null }) => {
-    const resolvedLanguage = mapExtensionToLanguageId(language_hint);
-    const shouldPreviewByDefault = doc_type === 'pdf' || doc_type === 'image' || resolvedLanguage === 'pdf' || resolvedLanguage === 'image';
+  const addDocument = useCallback(async ({ parentId, title = 'New Document', content = '', doc_type = 'prompt', language_hint }: { parentId: string | null, title?: string, content?: string, doc_type?: DocType, language_hint?: string | null }) => {
+    const resolvedDocType = doc_type ?? 'prompt';
+    const defaultLanguageHint = resolvedDocType === 'rich_text' ? 'html' : 'markdown';
+    const languageHintToUse = language_hint ?? defaultLanguageHint;
+    const resolvedLanguage = mapExtensionToLanguageId(languageHintToUse);
+    const shouldPreviewByDefault = resolvedDocType === 'pdf' || resolvedDocType === 'image' || resolvedLanguage === 'pdf' || resolvedLanguage === 'image';
     const defaultViewMode = shouldPreviewByDefault ? 'preview' : undefined;
     const now = new Date().toISOString();
     const newNode = await addNode({
@@ -73,7 +76,7 @@ export const useDocuments = () => {
       locked: false,
       document: {
         content,
-        doc_type,
+        doc_type: resolvedDocType,
         language_hint: resolvedLanguage,
         language_source: 'user',
         doc_type_source: 'user',
