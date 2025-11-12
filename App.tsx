@@ -1791,7 +1791,7 @@ export const MainApp: React.FC = () => {
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
-        const newDoc = await addDocument({ parentId: effectiveParentId });
+        const newDoc = await addDocument({ parentId: effectiveParentId, doc_type: 'rich_text', language_hint: 'html' });
         ensureNodeVisible(newDoc);
         activateDocumentTab(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
