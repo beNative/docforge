@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
+import type { DocType, DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon } from './Icons';
+import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon, CodeIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
@@ -10,6 +10,7 @@ import IconButton from './IconButton';
 import Button from './Button';
 import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
 import MonacoDiffEditor from './MonacoDiffEditor';
+import RichTextEditor, { RichTextEditorHandle } from './RichTextEditor';
 import PreviewPane from './PreviewPane';
 import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
@@ -67,6 +68,8 @@ const PREVIEWABLE_LANGUAGES = new Set<string>([
   'image/svg',
   'image/svg+xml',
 ]);
+
+type EditorEngine = 'visual' | 'source';
 
 const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint: string | null | undefined): ViewMode => {
   if (mode) return mode;
@@ -129,6 +132,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [splitSize, setSplitSize] = useState(50);
   const isLocked = Boolean(documentNode.locked);
   const [isLocking, setIsLocking] = useState(false);
+  const docType = (documentNode.doc_type ?? 'prompt') as DocType;
+  const isRichDocument = docType === 'rich_text';
+  const enginePreferencesRef = useRef<Record<string, EditorEngine>>({});
+  const [editorEngine, setEditorEngineState] = useState<EditorEngine>(() => {
+    const stored = enginePreferencesRef.current[documentNode.id];
+    if (stored) {
+      return stored;
+    }
+    const defaultEngine: EditorEngine = isRichDocument ? 'visual' : 'source';
+    enginePreferencesRef.current[documentNode.id] = defaultEngine;
+    return defaultEngine;
+  });
   const { addLog } = useLogger();
   const { skipNextAutoSave } = useDocumentAutoSave({
     documentId: documentNode.id,
@@ -175,6 +190,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const isContentInitialized = useRef(false);
   const editorRef = useRef<CodeEditorHandle>(null);
+  const richEditorRef = useRef<RichTextEditorHandle>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const isSyncing = useRef(false);
   const syncTimeout = useRef<number | null>(null);
@@ -232,6 +248,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         setIsDiffMode(false);
         prevDocumentIdRef.current = documentNode.id;
         prevDocumentContentRef.current = documentNode.content;
+        const defaultEngine: EditorEngine = isRichDocument ? 'visual' : 'source';
+        enginePreferencesRef.current[documentNode.id] = enginePreferencesRef.current[documentNode.id] ?? defaultEngine;
+        setEditorEngineState(enginePreferencesRef.current[documentNode.id]);
         return;
     }
 
@@ -243,6 +262,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         }
     }
   }, [documentNode.id, documentNode.content, documentNode.default_view_mode, documentNode.language_hint, documentNode.title, isDirty]);
+
+  useEffect(() => {
+    const storedEngine = enginePreferencesRef.current[documentNode.id];
+    if (storedEngine) {
+      setEditorEngineState(storedEngine);
+    } else {
+      const defaultEngine: EditorEngine = isRichDocument ? 'visual' : 'source';
+      enginePreferencesRef.current[documentNode.id] = defaultEngine;
+      setEditorEngineState(defaultEngine);
+    }
+  }, [documentNode.id, isRichDocument]);
 
   useEffect(() => {
     setTitle(documentNode.title);
@@ -306,9 +336,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         return;
     }
     if (formatTrigger > 0) {
-        editorRef.current?.format();
+        if (isRichDocument && editorEngine === 'visual') {
+            richEditorRef.current?.format();
+        } else {
+            editorRef.current?.format();
+        }
     }
-  }, [formatTrigger]);
+  }, [editorEngine, formatTrigger, isRichDocument]);
 
   // --- Resizable Splitter Logic ---
   const handleSplitterMouseDown = (e: React.MouseEvent) => {
@@ -371,7 +405,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [viewMode]);
 
   const handlePreviewScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (!viewMode.startsWith('split-') || isSyncing.current || !editorRef.current) return;
+    if (!viewMode.startsWith('split-') || isSyncing.current) return;
 
     const previewEl = e.currentTarget;
     const { scrollTop, scrollHeight, clientHeight } = previewEl;
@@ -379,22 +413,26 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     if (scrollHeight <= clientHeight) return;
 
     const percentage = scrollTop / (scrollHeight - clientHeight);
-    
-    const editor = editorRef.current;
-    editor.getScrollInfo().then(editorInfo => {
-        if (!isSyncing.current && editorInfo.scrollHeight > editorInfo.clientHeight) {
-            const newEditorScrollTop = percentage * (editorInfo.scrollHeight - editorInfo.clientHeight);
-            
-            isSyncing.current = true;
-            editor.setScrollTop(newEditorScrollTop);
 
-            if (syncTimeout.current) clearTimeout(syncTimeout.current);
-            syncTimeout.current = window.setTimeout(() => {
-                isSyncing.current = false;
-            }, 100);
+    const activeEditor = (isRichDocument && editorEngine === 'visual') ? richEditorRef.current : editorRef.current;
+    if (!activeEditor) return;
+
+    activeEditor.getScrollInfo().then((editorInfo) => {
+        if (!editorInfo || isSyncing.current || editorInfo.scrollHeight <= editorInfo.clientHeight) {
+            return;
         }
+
+        const newEditorScrollTop = percentage * (editorInfo.scrollHeight - editorInfo.clientHeight);
+
+        isSyncing.current = true;
+        activeEditor.setScrollTop(newEditorScrollTop);
+
+        if (syncTimeout.current) clearTimeout(syncTimeout.current);
+        syncTimeout.current = window.setTimeout(() => {
+            isSyncing.current = false;
+        }, 100);
     });
-  }, [viewMode]);
+  }, [editorEngine, isRichDocument, viewMode]);
 
 
 
@@ -453,11 +491,23 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setViewMode(newMode);
     onViewModeChange(newMode);
   };
-  
+
+  const handleEditorEngineChange = useCallback((nextEngine: EditorEngine) => {
+    if (!isRichDocument) {
+      return;
+    }
+    enginePreferencesRef.current[documentNode.id] = nextEngine;
+    setEditorEngineState(nextEngine);
+  }, [documentNode.id, isRichDocument]);
+
   const handleFormatDocument = () => {
     if (isLocked) {
       setError('Document is locked and cannot be modified.');
       addLog('WARNING', `Format request blocked for locked document "${title}".`);
+      return;
+    }
+    if (isRichDocument && editorEngine === 'visual') {
+      richEditorRef.current?.format();
       return;
     }
     editorRef.current?.format();
@@ -635,11 +685,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   };
 
   const language = documentNode.language_hint || 'plaintext';
-  const normalizedLanguage = language.toLowerCase();
-  const supportsAiTools = ['markdown', 'plaintext'].includes(normalizedLanguage);
+  const effectiveLanguage = isRichDocument ? 'html' : language;
+  const normalizedLanguage = effectiveLanguage.toLowerCase();
+  const isVisualEngine = isRichDocument && editorEngine === 'visual';
+  const supportsAiTools = ['markdown', 'plaintext', 'html'].includes(normalizedLanguage);
   const canAddEmojiToTitle = documentNode.type === 'document';
   const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
-  const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const supportsMonacoFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const canFormatDocument = isRichDocument ? true : supportsMonacoFormatting;
   const scriptBridgeAvailable =
     typeof window !== 'undefined' && (!!window.electronAPI || !!window.__DOCFORGE_SCRIPT_PREVIEW__);
   const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
@@ -767,9 +820,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           <MonacoDiffEditor
             oldText={baselineContent}
             newText={content}
-            language={language}
+            language={effectiveLanguage}
             renderMode="inline"
-            readOnly={isLocked}
+            readOnly={isLocked || (isRichDocument && editorEngine === 'visual')}
             onChange={isLocked ? undefined : setContent}
             onScroll={handleEditorScroll}
             fontFamily={settings.editorFontFamily}
@@ -779,22 +832,33 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             onFocusChange={handleEditorFocusChange}
           />
         )
-      : (
-          <MonacoEditor
-            ref={editorRef}
-            content={content}
-            language={language}
-            onChange={setContent}
-            onScroll={handleEditorScroll}
-            customShortcuts={settings.customShortcuts}
-            fontFamily={settings.editorFontFamily}
-            fontSize={scaledEditorFontSize}
-            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
-            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
-            readOnly={isLocked}
-            onFocusChange={handleEditorFocusChange}
-          />
-        );
+      : isVisualEngine
+        ? (
+            <RichTextEditor
+              ref={richEditorRef}
+              content={content}
+              onChange={setContent}
+              readOnly={isLocked}
+              onScroll={handleEditorScroll}
+              onFocusChange={handleEditorFocusChange}
+            />
+          )
+        : (
+            <MonacoEditor
+              ref={editorRef}
+              content={content}
+              language={effectiveLanguage}
+              onChange={setContent}
+              onScroll={handleEditorScroll}
+              customShortcuts={settings.customShortcuts}
+              fontFamily={settings.editorFontFamily}
+              fontSize={scaledEditorFontSize}
+              activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+              activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+              readOnly={isLocked}
+              onFocusChange={handleEditorFocusChange}
+            />
+          );
     const preview = (
       <div
         className="h-full w-full"
@@ -804,7 +868,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         <PreviewPane
           ref={previewScrollRef}
           content={content}
-          language={language}
+          language={effectiveLanguage}
           onScroll={handlePreviewScroll}
           addLog={addLog}
           settings={settings}
@@ -901,7 +965,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
               <label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">
                 Language:
               </label>
-              <LanguageDropdown id="language-select" value={language} onChange={onLanguageChange} />
+              <LanguageDropdown id="language-select" value={effectiveLanguage} onChange={onLanguageChange} />
             </div>
             <div className="h-5 w-px bg-border-color mx-1"></div>
             {supportsPreview && (
@@ -912,8 +976,30 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   <IconButton onClick={() => handleViewModeButton('split-horizontal')} tooltip="Split Horizontal" size="xs" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-4 h-4" /></IconButton>
               </div>
             )}
+            {isRichDocument && (
+              <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
+                <button
+                  type="button"
+                  onClick={() => handleEditorEngineChange('visual')}
+                  aria-pressed={isVisualEngine}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md transition-colors ${isVisualEngine ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color hover:text-text-main'}`}
+                >
+                  <SparklesIcon className="w-3.5 h-3.5" />
+                  <span>Visual</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleEditorEngineChange('source')}
+                  aria-pressed={!isVisualEngine}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md transition-colors ${!isVisualEngine ? 'bg-secondary text-primary' : 'text-text-secondary hover:bg-border-color hover:text-text-main'}`}
+                >
+                  <CodeIcon className="w-3.5 h-3.5" />
+                  <span>Source</span>
+                </button>
+              </div>
+            )}
             <div className="h-5 w-px bg-border-color mx-1"></div>
-            {supportsFormatting && (
+            {canFormatDocument && (
               <IconButton onClick={handleFormatDocument} tooltip="Format Document" size="xs" variant="ghost" disabled={isLocked || isLocking}>
                 <FormatIcon className="w-4 h-4" />
               </IconButton>

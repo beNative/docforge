@@ -20,3 +20,14 @@
   background: transparent !important;
   border: none !important;
 }
+
+.ck-editor,
+.ck-editor__main {
+  height: 100%;
+}
+
+.ck-editor__editable_inline {
+  min-height: 100%;
+  padding: 1rem;
+  overflow-y: auto;
+}

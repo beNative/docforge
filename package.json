@@ -34,6 +34,8 @@
     "url": "https://github.com/beNative/docforge.git"
   },
   "dependencies": {
+    "@ckeditor/ckeditor5-build-classic": "^44.3.0",
+    "@ckeditor/ckeditor5-react": "^11.0.0",
     "@uiw/react-color-compact": "^2.9.2",
     "better-sqlite3": "^11.1.2",
     "electron-log": "^5.1.5",

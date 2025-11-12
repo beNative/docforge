@@ -45,4 +45,16 @@ describe('classificationService', () => {
     expect(result.docType).toBe('source_code');
     expect(result.summary.primaryMatch).toContain('Dockerfile instruction heuristics matched');
   });
+
+  it('classifies HTML content as rich text', () => {
+    const result = classifyDocumentContent({
+      content: '<!doctype html>\n<html><head><title>Test</title></head><body><h1>Hello</h1></body></html>',
+      title: 'index.html',
+    });
+
+    expect(result.languageHint).toBe('html');
+    expect(result.docType).toBe('rich_text');
+    expect(result.defaultViewMode).toBe('edit');
+    expect(result.summary.primaryMatch).toContain('Extension indicates HTML');
+  });
 });
