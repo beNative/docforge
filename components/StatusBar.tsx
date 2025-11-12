@@ -238,15 +238,15 @@ const StatusBar: React.FC<StatusBarProps> = ({
       <div className="flex flex-1 items-center gap-2 whitespace-nowrap min-w-0">
         <div
           ref={statusTriggerRef}
-          className="flex items-center gap-1.5 cursor-default focus:outline-none"
+          className="flex items-center cursor-default focus:outline-none"
           onMouseEnter={() => setShowStatusTooltip(true)}
           onMouseLeave={() => setShowStatusTooltip(false)}
           onFocus={() => setShowStatusTooltip(true)}
           onBlur={() => setShowStatusTooltip(false)}
           tabIndex={0}
+          aria-label={text}
         >
           <div className={`w-2 h-2 rounded-full ${color}`}></div>
-          <span className="font-medium">{text}</span>
         </div>
         {showStatusTooltip && statusTriggerRef.current && (
           <Tooltip
