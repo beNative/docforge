@@ -43,6 +43,8 @@ import {
   $getRoot,
   $getSelection,
   $isRangeSelection,
+  CAN_REDO_COMMAND,
+  CAN_UNDO_COMMAND,
   COMMAND_PRIORITY_CRITICAL,
   FORMAT_ELEMENT_COMMAND,
   FORMAT_TEXT_COMMAND,
@@ -52,7 +54,6 @@ import {
   type EditorState,
   type LexicalEditor,
 } from 'lexical';
-import { CAN_REDO_COMMAND, CAN_UNDO_COMMAND } from '@lexical/history';
 
 export interface RichTextEditorHandle {
   focus: () => void;
