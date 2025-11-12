@@ -10,6 +10,7 @@ import IconButton from './IconButton';
 import Button from './Button';
 import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
 import MonacoDiffEditor from './MonacoDiffEditor';
+import RichTextEditor, { type RichTextEditorHandle } from './RichTextEditor';
 import PreviewPane from './PreviewPane';
 import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
@@ -41,6 +42,12 @@ interface DocumentEditorProps {
   onZoomTargetChange?: (target: 'preview' | 'editor') => void;
   commandTriggers: DocumentCommandTriggers;
 }
+
+type EditorBridgeHandle = {
+  format: () => void;
+  setScrollTop: (scrollTop: number) => void;
+  getScrollInfo: () => Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number }>;
+};
 
 const useCommandTrigger = (trigger: number, callback: () => void | Promise<void>) => {
   const previousRef = useRef<number | null>(null);
@@ -88,6 +95,8 @@ const PREVIEWABLE_LANGUAGES = new Set<string>([
   'image/svg',
   'image/svg+xml',
 ]);
+
+type EditorEngine = 'monaco' | 'plate';
 
 const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint: string | null | undefined): ViewMode => {
   if (mode) return mode;
@@ -151,6 +160,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [splitSize, setSplitSize] = useState(50);
   const isLocked = Boolean(documentNode.locked);
   const [isLocking, setIsLocking] = useState(false);
+  const editorEnginePreferencesRef = useRef<Record<string, EditorEngine>>({});
+  const defaultEngineForDocument: EditorEngine = documentNode.doc_type === 'rich_text' ? 'plate' : 'monaco';
+  const [editorEngine, setEditorEngine] = useState<EditorEngine>(
+    editorEnginePreferencesRef.current[documentNode.id] ?? defaultEngineForDocument,
+  );
   const { addLog } = useLogger();
   const { skipNextAutoSave } = useDocumentAutoSave({
     documentId: documentNode.id,
@@ -197,7 +211,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const languageButtonRef = useRef<HTMLButtonElement | null>(null);
   const isContentInitialized = useRef(false);
-  const editorRef = useRef<CodeEditorHandle>(null);
+  const editorRef = useRef<EditorBridgeHandle | null>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const isSyncing = useRef(false);
   const syncTimeout = useRef<number | null>(null);
@@ -253,6 +267,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         setIsDirty(false);
         setIsSaving(false);
         setIsDiffMode(false);
+        const storedEngine = editorEnginePreferencesRef.current[documentNode.id];
+        const resolvedEngine: EditorEngine = storedEngine ?? (documentNode.doc_type === 'rich_text' ? 'plate' : 'monaco');
+        setEditorEngine(resolvedEngine);
         prevDocumentIdRef.current = documentNode.id;
         prevDocumentContentRef.current = documentNode.content;
         return;
@@ -300,6 +317,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
     prevLockedRef.current = isLocked;
   }, [isLocked, documentNode.content]);
+
+  useEffect(() => {
+    const stored = editorEnginePreferencesRef.current[documentNode.id];
+    if (stored) {
+      setEditorEngine(stored);
+      return;
+    }
+    setEditorEngine(documentNode.doc_type === 'rich_text' ? 'plate' : 'monaco');
+  }, [documentNode.doc_type, documentNode.id]);
 
   useEffect(() => {
   }, [content]);
@@ -476,6 +502,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setViewMode(newMode);
     onViewModeChange(newMode);
   }, [onViewModeChange]);
+
+  const handleEditorEngineChange = useCallback((engine: EditorEngine) => {
+    if (editorEngine === engine) {
+      return;
+    }
+    editorEnginePreferencesRef.current[documentNode.id] = engine;
+    setEditorEngine(engine);
+    if (engine === 'plate') {
+      setIsDiffMode(false);
+    }
+  }, [documentNode.id, editorEngine]);
   
   const handleFormatDocument = () => {
     if (isLocked) {
@@ -659,10 +696,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   const language = documentNode.language_hint || 'plaintext';
   const normalizedLanguage = language.toLowerCase();
-  const supportsAiTools = ['markdown', 'plaintext'].includes(normalizedLanguage);
+  const isRichTextDocument = documentNode.doc_type === 'rich_text';
+  const supportsAiTools = ['markdown', 'plaintext', 'html'].includes(normalizedLanguage);
   const canAddEmojiToTitle = documentNode.type === 'document';
   const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
-  const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const supportsFormatting = editorEngine === 'monaco' && ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
   const scriptBridgeAvailable =
     typeof window !== 'undefined' && (!!window.electronAPI || !!window.__DOCFORGE_SCRIPT_PREVIEW__);
   const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
@@ -820,6 +858,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [onZoomTargetChange]);
 
   const renderContent = () => {
+    const showRichEditor = isRichTextDocument && editorEngine === 'plate' && !isDiffMode;
     const editor = isDiffMode
       ? (
           <MonacoDiffEditor
@@ -827,7 +866,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             newText={content}
             language={language}
             renderMode="inline"
-            readOnly={isLocked}
+            readOnly={isLocked || (isRichTextDocument && editorEngine === 'plate')}
             onChange={isLocked ? undefined : setContent}
             onScroll={handleEditorScroll}
             fontFamily={settings.editorFontFamily}
@@ -837,22 +876,35 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             onFocusChange={handleEditorFocusChange}
           />
         )
-      : (
-          <MonacoEditor
-            ref={editorRef}
-            content={content}
-            language={language}
-            onChange={setContent}
-            onScroll={handleEditorScroll}
-            customShortcuts={settings.customShortcuts}
-            fontFamily={settings.editorFontFamily}
-            fontSize={scaledEditorFontSize}
-            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
-            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
-            readOnly={isLocked}
-            onFocusChange={handleEditorFocusChange}
-          />
-        );
+      : showRichEditor
+        ? (
+            <RichTextEditor
+              ref={editorRef as unknown as React.Ref<RichTextEditorHandle>}
+              content={content}
+              onChange={setContent}
+              onScroll={handleEditorScroll}
+              readOnly={isLocked}
+              onFocusChange={handleEditorFocusChange}
+              fontFamily={settings.editorFontFamily}
+              fontSize={scaledEditorFontSize}
+            />
+          )
+        : (
+            <MonacoEditor
+              ref={editorRef as unknown as React.Ref<CodeEditorHandle>}
+              content={content}
+              language={language}
+              onChange={setContent}
+              onScroll={handleEditorScroll}
+              customShortcuts={settings.customShortcuts}
+              fontFamily={settings.editorFontFamily}
+              fontSize={scaledEditorFontSize}
+              activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+              activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+              readOnly={isLocked}
+              onFocusChange={handleEditorFocusChange}
+            />
+          );
     const preview = (
       <div
         className="h-full w-full"
@@ -975,6 +1027,29 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   <IconButton onClick={() => handleViewModeButton('split-vertical')} tooltip="Split Vertical" size="xs" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : ''}`}><LayoutVerticalIcon className="w-4 h-4" /></IconButton>
                   <IconButton onClick={() => handleViewModeButton('split-horizontal')} tooltip="Split Horizontal" size="xs" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-4 h-4" /></IconButton>
               </div>
+            )}
+            {isRichTextDocument && (
+              <>
+                <div className="h-5 w-px bg-border-color mx-1"></div>
+                <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
+                  <IconButton
+                    onClick={() => handleEditorEngineChange('plate')}
+                    tooltip="Visual Editor"
+                    size="xs"
+                    className={`rounded-md px-2 ${editorEngine === 'plate' ? 'bg-secondary text-primary' : ''}`}
+                  >
+                    Visual
+                  </IconButton>
+                  <IconButton
+                    onClick={() => handleEditorEngineChange('monaco')}
+                    tooltip="Source Editor"
+                    size="xs"
+                    className={`rounded-md px-2 ${editorEngine === 'monaco' ? 'bg-secondary text-primary' : ''}`}
+                  >
+                    Source
+                  </IconButton>
+                </div>
+              </>
             )}
             <div className="h-5 w-px bg-border-color mx-1"></div>
             {supportsFormatting && (
