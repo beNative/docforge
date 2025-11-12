@@ -205,6 +205,9 @@ export const classifyDocumentContent = (options: ClassificationOptions): Classif
     if (langFromExtension === 'image') {
       return classifyWith('image', 'image', 'preview', 1, 'Extension indicates image');
     }
+    if (langFromExtension === 'html') {
+      return classifyWith('html', 'rich_text', null, 0.7, 'Extension indicates HTML document');
+    }
     if (langFromExtension === 'markdown') {
       return classifyWith('markdown', 'prompt', null, 0.65, 'Extension indicates Markdown');
     }
@@ -233,7 +236,7 @@ export const classifyDocumentContent = (options: ClassificationOptions): Classif
   }
 
   if (looksLikeHtml(trimmed)) {
-    return classifyWith('html', 'source_code', null, 0.75, 'HTML tag heuristics matched');
+    return classifyWith('html', 'rich_text', null, 0.75, 'HTML tag heuristics matched');
   }
 
   if (looksLikeYaml(trimmed)) {

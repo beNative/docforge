@@ -15,6 +15,8 @@ import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
 import ScriptExecutionPanel from './ScriptExecutionPanel';
 import EmojiPickerOverlay from './EmojiPickerOverlay';
+import RichTextEditor, { type RichTextEditorHandle } from './RichTextEditor';
+import RichTextDiffView from './RichTextDiffView';
 
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
@@ -149,6 +151,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
   const [splitSize, setSplitSize] = useState(50);
+  const [editorEngine, setEditorEngine] = useState<'tiptap' | 'monaco'>(documentNode.doc_type === 'rich_text' ? 'tiptap' : 'monaco');
   const isLocked = Boolean(documentNode.locked);
   const [isLocking, setIsLocking] = useState(false);
   const { addLog } = useLogger();
@@ -197,7 +200,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const languageButtonRef = useRef<HTMLButtonElement | null>(null);
   const isContentInitialized = useRef(false);
-  const editorRef = useRef<CodeEditorHandle>(null);
+  const editorRef = useRef<CodeEditorHandle | RichTextEditorHandle | null>(null);
+  const codeEditorRef = useRef<CodeEditorHandle | null>(null);
+  const richTextEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const editorEnginePreferenceRef = useRef<Map<string, 'tiptap' | 'monaco'>>(new Map());
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const isSyncing = useRef(false);
   const syncTimeout = useRef<number | null>(null);
@@ -239,6 +245,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     return () => window.removeEventListener('resize', handleWindowResize);
   }, [scriptPanelMinHeight]);
 
+  useEffect(() => {
+    const defaultEngine = documentNode.doc_type === 'rich_text' ? 'tiptap' : 'monaco';
+    const storedPreference = editorEnginePreferenceRef.current.get(documentNode.id);
+    setEditorEngine(storedPreference ?? defaultEngine);
+  }, [documentNode.id, documentNode.doc_type]);
+
   // Keep local editor state in sync with document updates without clobbering unsaved edits.
   useEffect(() => {
     const nextContent = documentNode.content ?? '';
@@ -276,6 +288,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         setIsDiffMode(false);
     }
   }, [viewMode, isDiffMode]);
+
+  useEffect(() => {
+    if (isDiffMode) {
+      editorRef.current = null;
+    }
+  }, [isDiffMode]);
 
   useEffect(() => {
     const normalizedHint = documentNode.language_hint?.toLowerCase();
@@ -472,10 +490,44 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     onDelete(documentNode.id);
   };
 
+  const isRichDocument = documentNode.doc_type === 'rich_text';
+  const language = isRichDocument ? 'html' : (documentNode.language_hint || 'plaintext');
+  const normalizedLanguage = language.toLowerCase();
+  const supportsAiTools = ['markdown', 'plaintext', 'html'].includes(normalizedLanguage);
+  const canAddEmojiToTitle = documentNode.type === 'document';
+  const supportsPreview = isRichDocument || PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
+  const supportsFormatting = isRichDocument || ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const isUsingTiptapEngine = isRichDocument && editorEngine === 'tiptap';
+  const handleMonacoRef = useCallback((instance: CodeEditorHandle | null) => {
+    codeEditorRef.current = instance;
+    editorRef.current = instance;
+  }, []);
+  const handleRichTextRef = useCallback((instance: RichTextEditorHandle | null) => {
+    richTextEditorRef.current = instance;
+    editorRef.current = instance;
+  }, []);
+
   const handleViewModeButton = useCallback((newMode: ViewMode) => {
     setViewMode(newMode);
     onViewModeChange(newMode);
   }, [onViewModeChange]);
+
+  const handleEditorEngineChange = useCallback((engine: 'tiptap' | 'monaco') => {
+    if (!isRichDocument) {
+      return;
+    }
+    if (engine === editorEngine) {
+      return;
+    }
+    if (engine === 'monaco' && richTextEditorRef.current) {
+      const html = richTextEditorRef.current.getHTML();
+      if (html !== content) {
+        setContent(html);
+      }
+    }
+    editorEnginePreferenceRef.current.set(documentNode.id, engine);
+    setEditorEngine(engine);
+  }, [content, documentNode.id, editorEngine, isRichDocument]);
   
   const handleFormatDocument = () => {
     if (isLocked) {
@@ -483,7 +535,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       addLog('WARNING', `Format request blocked for locked document "${title}".`);
       return;
     }
-    editorRef.current?.format();
+    const editor = editorRef.current;
+    if (!editor) {
+      return;
+    }
+    if ('getHTML' in editor) {
+      (editor as RichTextEditorHandle).format();
+    } else {
+      (editor as CodeEditorHandle).format();
+    }
   };
 
   const handleRefine = useCallback(async () => {
@@ -657,12 +717,6 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   }, [content, addLog]);
 
-  const language = documentNode.language_hint || 'plaintext';
-  const normalizedLanguage = language.toLowerCase();
-  const supportsAiTools = ['markdown', 'plaintext'].includes(normalizedLanguage);
-  const canAddEmojiToTitle = documentNode.type === 'document';
-  const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
-  const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
   const scriptBridgeAvailable =
     typeof window !== 'undefined' && (!!window.electronAPI || !!window.__DOCFORGE_SCRIPT_PREVIEW__);
   const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
@@ -820,8 +874,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [onZoomTargetChange]);
 
   const renderContent = () => {
-    const editor = isDiffMode
-      ? (
+    let editorElement: React.ReactNode;
+
+    if (isDiffMode) {
+      if (isRichDocument && editorEngine === 'tiptap') {
+        editorElement = <RichTextDiffView baseline={baselineContent} current={content} />;
+      } else {
+        editorElement = (
           <MonacoDiffEditor
             oldText={baselineContent}
             newText={content}
@@ -836,23 +895,37 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
             onFocusChange={handleEditorFocusChange}
           />
-        )
-      : (
-          <MonacoEditor
-            ref={editorRef}
-            content={content}
-            language={language}
-            onChange={setContent}
-            onScroll={handleEditorScroll}
-            customShortcuts={settings.customShortcuts}
-            fontFamily={settings.editorFontFamily}
-            fontSize={scaledEditorFontSize}
-            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
-            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
-            readOnly={isLocked}
-            onFocusChange={handleEditorFocusChange}
-          />
         );
+      }
+    } else if (isUsingTiptapEngine) {
+      editorElement = (
+        <RichTextEditor
+          ref={handleRichTextRef}
+          content={content}
+          onChange={setContent}
+          readOnly={isLocked}
+          onScroll={handleEditorScroll}
+          onFocusChange={handleEditorFocusChange}
+        />
+      );
+    } else {
+      editorElement = (
+        <MonacoEditor
+          ref={handleMonacoRef}
+          content={content}
+          language={language}
+          onChange={setContent}
+          onScroll={handleEditorScroll}
+          customShortcuts={settings.customShortcuts}
+          fontFamily={settings.editorFontFamily}
+          fontSize={scaledEditorFontSize}
+          activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+          activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+          readOnly={isLocked}
+          onFocusChange={handleEditorFocusChange}
+        />
+      );
+    }
     const preview = (
       <div
         className="h-full w-full"
@@ -877,28 +950,28 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     );
     
     switch(viewMode) {
-        case 'edit': return editor;
-        case 'preview': return supportsPreview ? preview : editor;
+        case 'edit': return editorElement;
+        case 'preview': return supportsPreview ? preview : editorElement;
         case 'split-vertical':
             return (
                 <div ref={splitContainerRef} className="grid h-full" style={{ gridTemplateColumns: `${splitSize}% auto minmax(0, 1fr)` }}>
-                    <div className="h-full overflow-hidden min-w-0">{editor}</div>
+                    <div className="h-full overflow-hidden min-w-0">{editorElement}</div>
                     <div
                       onMouseDown={handleSplitterMouseDown}
                       className="w-1.5 h-full cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
                     />
-                    <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
+                    <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editorElement}</div>
                 </div>
             );
         case 'split-horizontal':
             return (
                 <div ref={splitContainerRef} className="grid w-full h-full" style={{ gridTemplateRows: `${splitSize}% auto minmax(0, 1fr)` }}>
-                    <div className="w-full overflow-hidden min-h-0">{editor}</div>
+                    <div className="w-full overflow-hidden min-h-0">{editorElement}</div>
                     <div
                       onMouseDown={handleSplitterMouseDown}
                       className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
                     />
-                    <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
+                    <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editorElement}</div>
                 </div>
             );
     }
@@ -974,6 +1047,24 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   <IconButton onClick={() => handleViewModeButton('preview')} tooltip="Preview Only" size="xs" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : ''}`}><EyeIcon className="w-4 h-4" /></IconButton>
                   <IconButton onClick={() => handleViewModeButton('split-vertical')} tooltip="Split Vertical" size="xs" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : ''}`}><LayoutVerticalIcon className="w-4 h-4" /></IconButton>
                   <IconButton onClick={() => handleViewModeButton('split-horizontal')} tooltip="Split Horizontal" size="xs" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-4 h-4" /></IconButton>
+              </div>
+            )}
+            {isRichDocument && (
+              <div className="flex items-center p-1 bg-background rounded-lg border border-border-color ml-2">
+                <button
+                  type="button"
+                  className={`px-2 py-1 text-xs font-semibold rounded-md transition-colors ${isUsingTiptapEngine ? 'bg-secondary text-primary' : 'text-text-secondary hover:text-text-main'}`}
+                  onClick={() => handleEditorEngineChange('tiptap')}
+                >
+                  Visual
+                </button>
+                <button
+                  type="button"
+                  className={`px-2 py-1 text-xs font-semibold rounded-md transition-colors ${!isUsingTiptapEngine ? 'bg-secondary text-primary' : 'text-text-secondary hover:text-text-main'}`}
+                  onClick={() => handleEditorEngineChange('monaco')}
+                >
+                  Source
+                </button>
               </div>
             )}
             <div className="h-5 w-px bg-border-color mx-1"></div>

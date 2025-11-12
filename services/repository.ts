@@ -70,15 +70,15 @@ const createSampleBrowserState = (): BrowserState => {
     const versionId = 1;
     const shellVersionId = 2;
     const powershellVersionId = 3;
-    const sampleContent = '# Welcome to DocForge\n\nThis is a static dataset provided for browser preview mode.';
+    const sampleContent = '<h1>Welcome to DocForge</h1><p>This is a static dataset provided for browser preview mode.</p>';
     const shellContent = '#!/bin/bash\n\necho "DocForge shell quickstart"\nls -la';
     const powershellContent = 'Write-Host "DocForge PowerShell quickstart"\nGet-ChildItem';
 
     const document: Document = {
         document_id: documentId,
         node_id: documentNodeId,
-        doc_type: 'prompt',
-        language_hint: 'markdown',
+        doc_type: 'rich_text',
+        language_hint: 'html',
         default_view_mode: 'split-vertical',
         language_source: 'user',
         doc_type_source: 'user',
@@ -1317,7 +1317,7 @@ export const repository = {
 
             const { collection, parentId, insertIndex } = resolveTarget();
 
-            const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image'];
+            const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image', 'rich_text'];
             const allowedViewModes: ViewMode[] = ['edit', 'preview', 'split-vertical', 'split-horizontal'];
 
             const createdIds: string[] = [];
