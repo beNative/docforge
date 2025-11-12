@@ -4,7 +4,7 @@ import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
 import type { DocumentOrFolder, DocumentTemplate, Command, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, DocumentDuplicateIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, CodeIcon, XIcon, FolderDownIcon, CopyIcon, LockClosedIcon, LockOpenIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, XIcon, FolderDownIcon, CopyIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
@@ -34,10 +34,8 @@ interface SidebarProps {
   onNewDocument: () => void;
   onNewRootFolder: () => void;
   onNewSubfolder: () => void;
-  onNewCodeFile: () => void;
   onNewFromClipboard: () => void;
   onDuplicateSelection: () => void;
-  onToggleActiveDocumentLock: () => void;
   onToggleNodeLock: (id: string, locked: boolean) => void | Promise<void>;
   onCopyNodeContent: (id: string) => void;
   onSaveNodeToFile: (id: string) => void;
@@ -56,15 +54,12 @@ interface SidebarProps {
   onRevealHandled: () => void;
   searchInputRef: React.RefObject<HTMLInputElement>;
 
-  activeDocumentLocked: boolean;
-
   templates: DocumentTemplate[];
   activeTemplateId: string | null;
   onSelectTemplate: (id: string) => void;
   onDeleteTemplate: (id: string, shiftKey?: boolean) => void;
   onRenameTemplate: (id: string, newTitle: string) => void;
   onNewTemplate: () => void;
-  onNewFromTemplate: () => void;
   documentTreeIndent: number;
   documentTreeVerticalSpacing: number;
 }
@@ -541,24 +536,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
                     <IconButton onClick={onNewFromClipboard} tooltip={getTooltip('new-from-clipboard', 'New from Clipboard')} size="xs" tooltipPosition="bottom">
                         <CopyIcon className="w-4 h-4" />
                     </IconButton>
-                     <IconButton onClick={props.onNewFromTemplate} tooltip={getTooltip('new-from-template', 'New from Template')} size="xs" tooltipPosition="bottom">
-                        <DocumentDuplicateIcon className="w-4 h-4" />
-                    </IconButton>
                     <IconButton onClick={props.onNewDocument} tooltip={getTooltip('new-document', 'New Document')} size="xs" tooltipPosition="bottom">
                         <PlusIcon className="w-4 h-4" />
-                    </IconButton>
-                    <IconButton onClick={props.onNewCodeFile} tooltip={getTooltip('new-code-file', 'New Code File')} size="xs" tooltipPosition="bottom">
-                        <CodeIcon className="w-4 h-4" />
-                    </IconButton>
-                    <IconButton
-                        onClick={props.onToggleActiveDocumentLock}
-                        tooltip={props.activeDocumentId ? getTooltip('toggle-document-lock', props.activeDocumentLocked ? 'Unlock Document' : 'Lock Document') : 'Select a document to lock or unlock'}
-                        size="xs"
-                        tooltipPosition="bottom"
-                        disabled={!props.activeDocumentId}
-                        className={!props.activeDocumentId ? 'opacity-40 cursor-not-allowed' : props.activeDocumentLocked ? 'text-primary' : ''}
-                    >
-                        {props.activeDocumentLocked ? <LockClosedIcon className="w-4 h-4" /> : <LockOpenIcon className="w-4 h-4" />}
                     </IconButton>
                     <IconButton
                         onClick={props.onNewSubfolder}
