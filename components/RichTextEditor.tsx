@@ -10,6 +10,8 @@ type EditorBundle = {
   ClassicEditor: ClassicEditorConstructor;
 };
 
+type ClassicEditorInstance = InstanceType<ClassicEditorConstructor> | null;
+
 interface RichTextEditorProps {
   content: string;
   onChange: (value: string) => void;
@@ -33,6 +35,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const onScrollRef = useRef(onScroll);
   const onFocusChangeRef = useRef(onFocusChange);
   const lastDataRef = useRef(content);
+  const editorRef = useRef<ClassicEditorInstance>(null);
 
   useEffect(() => {
     onScrollRef.current = onScroll;
@@ -77,6 +80,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       if (editableElementRef.current && scrollHandlerRef.current) {
         editableElementRef.current.removeEventListener('scroll', scrollHandlerRef.current);
       }
+      editorRef.current = null;
     };
   }, []);
 
@@ -139,7 +143,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         };
       };
       on?: (event: string, callback: () => void) => void;
+      setData?: (value: string) => void;
+      getData?: () => string;
     };
+
+    editorRef.current = editor as ClassicEditorInstance;
 
     const editable = anyEditor.ui?.getEditableElement?.() ?? anyEditor.ui?.view?.editable?.element ?? null;
 
@@ -182,6 +190,31 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleBlur = useCallback(() => {
     onFocusChangeRef.current?.(false);
   }, []);
+
+  useEffect(() => {
+    if (!editorRef.current || !isEditorReady) {
+      return;
+    }
+
+    if (content === lastDataRef.current) {
+      return;
+    }
+
+    try {
+      if (typeof editorRef.current.getData === 'function') {
+        const currentData = editorRef.current.getData();
+        if (currentData === content) {
+          lastDataRef.current = currentData;
+          return;
+        }
+      }
+
+      editorRef.current.setData?.(content);
+      lastDataRef.current = content;
+    } catch (error) {
+      console.warn('Failed to synchronize CKEditor content with upstream state.', error);
+    }
+  }, [content, isEditorReady]);
 
   if (loadError) {
     return (
