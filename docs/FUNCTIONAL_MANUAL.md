@@ -13,7 +13,7 @@ The DocForge interface is designed to be clean and efficient, composed of four m
 The top-most bar of the application provides global controls and information.
 
 - **Application Title:** Displays the application name, "DocForge". The entire bar is draggable, allowing you to move the window.
-- **Command Palette Search:** The central search box is your primary way to access the **Command Palette**. Clicking it or using the `Ctrl+Shift+P` shortcut opens a dropdown list of all available actions.
+- **Command Palette Search:** The central search box is your primary way to access the **Command Palette**. Clicking it or using the `Ctrl+Shift+P` shortcut opens a dropdown list of all available actions, including editor-focused commands for formatting, locking, AI tools, and emoji generation.
 - **Global Actions (Right Side):**
     - **Info:** Toggles the Info View, where you can read application documentation.
     - **About:** Opens the About DocForge modal with project links and an "Open installation folder" button that jumps straight to the directory containing the running executable.
@@ -31,7 +31,8 @@ The resizable left panel is your main navigation and organization area.
     - **Action Toolbar:** A toolbar at the top of the list provides icon buttons to quickly create a new document, create a new root folder, create a new document from a template, expand/collapse all folders, and toggle the active document's lock state.
     - **Row Quick Actions:** Hover or focus any row to reveal a compact strip of icons for frequent tasks—duplicate, export, rename, lock/unlock (for editable repositories), and more. The controls float on the right edge so the row height stays consistent and labels retain their full width.
     - **Folders:** Can be expanded or collapsed.
-    - **Documents:** Individual document files. Selecting a document opens it in the Main Content Area.
+- **Documents:** Individual document files. Selecting a document opens it in the Main Content Area.
+- **Emoji Titles:** Document rows display emoji prefixes when present, and the rename input includes an emoji picker you can open from the context menu.
 - **Templates List:** A separate panel below your documents for managing reusable templates. This panel is resizable; you can drag its top border to adjust its height.
     - **Action Toolbar:** The templates panel has its own toolbar for creating new templates.
 
@@ -51,6 +52,7 @@ This is the largest part of the application and displays the active content.
 - **Welcome Screen:** Shown when no document is selected.
 - **Folder Overview:** Selecting a folder opens the Folder Overview, providing a summary of its contents and quick actions.
 - **Document Editor:** The primary interface for writing and editing a document's content and title.
+  - Right-click the title input to open an emoji picker that inserts characters at the current cursor position, or use the "Add AI Emoji" toolbar command to request a single-character suggestion from your configured LLM.
 - **Template Editor:** A similar editor for creating and modifying document templates.
 - **Settings View:** A dedicated screen for configuring the application.
 - **Info View:** Displays documentation like the README and this manual.
@@ -198,12 +200,13 @@ DocForge allows you to maintain a complete history of your document's content.
 The Command Palette is the fastest way to access most of DocForge's features.
 - **Open:** Click the search box in the center of the title bar or press `Ctrl+Shift+P`.
 - **Use:** Type to filter commands. Use the arrow keys to navigate and `Enter` to execute an action.
+- **Editor Commands:** Search for terms like "format", "lock", "emoji", "save", or "refine" to run document-specific commands (including the new AI emoji prefix) directly from the palette.
 
 ### Settings View
 
 Accessed via the gear icon in the title bar. The settings are organized into categories:
 - **LLM Provider:** Configure your connection to a local AI service. You can detect running services and select a model.
-- **Appearance:** Change the UI scale and choose from different icon sets.
+- **Appearance:** Change the UI scale, choose from different icon sets, and adjust accent colors with the compact palette.
 - **Keyboard Shortcuts:** View and customize keyboard shortcuts for all major application actions. You can record a new key combination for any command.
 - **General:** Configure application behavior, like auto-saving logs, opting into pre-release updates, and choosing how PlantUML diagrams are rendered. This section includes an **Automatic Update Checks** toggle that determines whether DocForge contacts the update service on launch, an **Automatic Installation** toggle that decides if downloaded updates install themselves the next time you quit, a **Pre-release Updates** toggle that opts into beta builds, and a **Check for Updates** button for running a manual scan on demand. Manual checks report their status inline—showing a spinner and "Checking…" label during the request, a success message when you're current or when a download starts, and an error message with troubleshooting details if the update service is unreachable or disabled in the web preview. When an update finishes downloading, DocForge surfaces a toast with progress details, a **Restart & Install** button, and the same automatic-install switch (desktop builds only) so you can adjust your preference without opening Settings.
 - **Python:** Choose the interpreter used by the integrated runner. DocForge auto-detects local interpreters, can bootstrap a dedicated virtual environment per workspace, and exposes console preferences such as default working directory, automatic history retention, and whether runs open in split view.

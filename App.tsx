@@ -1313,7 +1313,7 @@ export const MainApp: React.FC = () => {
             setUpdateToast(prev => ({
                 ...prev,
                 status: 'downloading',
-                version: prev.version ?? '0.7.0',
+                version: prev.version ?? '0.8.0',
                 releaseName: prev.releaseName ?? 'Aurora',
                 progress: Number.isFinite(demoProgress) ? Math.max(0, Math.min(100, demoProgress)) : 68,
                 bytesTransferred: 45 * 1024 * 1024,
@@ -1330,7 +1330,7 @@ export const MainApp: React.FC = () => {
             setUpdateToast(prev => ({
                 ...prev,
                 status: 'downloaded',
-                version: prev.version ?? '0.7.0',
+                version: prev.version ?? '0.8.0',
                 releaseName: prev.releaseName ?? 'Aurora',
                 progress: 100,
                 bytesTransferred: prev.bytesTotal ?? 80 * 1024 * 1024,
