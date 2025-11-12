@@ -6,11 +6,23 @@ interface LanguageDropdownProps {
   id?: string;
   value: string;
   onChange: (languageId: string) => void;
+  openTrigger?: number;
 }
 
-const LanguageDropdown: React.FC<LanguageDropdownProps> = ({ id, value, onChange }) => {
+const LanguageDropdown = React.forwardRef<HTMLButtonElement, LanguageDropdownProps>(({ id, value, onChange, openTrigger }, forwardedRef) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const previousTriggerRef = useRef(openTrigger);
+
+  const setButtonRef = useCallback((node: HTMLButtonElement | null) => {
+    buttonRef.current = node;
+    if (typeof forwardedRef === 'function') {
+      forwardedRef(node);
+    } else if (forwardedRef) {
+      forwardedRef.current = node;
+    }
+  }, [forwardedRef]);
 
   const selectedLanguage = useMemo(() => {
     return SUPPORTED_LANGUAGES.find((lang) => lang.id === value) ?? SUPPORTED_LANGUAGES[0];
@@ -59,11 +71,29 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({ id, value, onChange
     [close, onChange],
   );
 
+  useEffect(() => {
+    if (openTrigger === undefined) {
+      return;
+    }
+    if (previousTriggerRef.current === openTrigger) {
+      return;
+    }
+    previousTriggerRef.current = openTrigger;
+    if (!openTrigger) {
+      return;
+    }
+    setIsOpen(true);
+    requestAnimationFrame(() => {
+      buttonRef.current?.focus();
+    });
+  }, [openTrigger]);
+
   return (
     <div ref={containerRef} className="relative text-xs">
       <button
         id={id}
         type="button"
+        ref={setButtonRef}
         onClick={toggleOpen}
         className="flex items-center gap-2 bg-background text-text-main text-xs rounded-md py-1 pl-2 pr-2 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
         aria-haspopup="listbox"
@@ -103,6 +133,8 @@ const LanguageDropdown: React.FC<LanguageDropdownProps> = ({ id, value, onChange
       )}
     </div>
   );
-};
+});
+
+LanguageDropdown.displayName = 'LanguageDropdown';
 
 export default LanguageDropdown;

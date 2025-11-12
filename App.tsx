@@ -22,7 +22,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon, SearchIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon, SearchIcon, RefreshIcon, HistoryIcon, UndoIcon, LayoutVerticalIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
@@ -30,7 +30,7 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
-import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer, UpdateAvailableInfo, PreviewMetadata } from './types';
+import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer, UpdateAvailableInfo, PreviewMetadata, DocumentCommandTriggers } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { exportDocumentToFile } from './services/documentExportService';
@@ -222,6 +222,17 @@ export const MainApp: React.FC = () => {
     const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; position: { x: number, y: number }, items: MenuItem[] }>({ isOpen: false, position: { x: 0, y: 0 }, items: [] });
     const [isDraggingFile, setIsDraggingFile] = useState(false);
     const [formatTrigger, setFormatTrigger] = useState(0);
+    const [documentCommandTriggers, setDocumentCommandTriggers] = useState<DocumentCommandTriggers>({
+        addEmojiToTitle: 0,
+        regenerateTitle: 0,
+        openLanguageSelector: 0,
+        cycleViewMode: 0,
+        toggleInlineDiff: 0,
+        cancelChanges: 0,
+        manualSave: 0,
+        copyContent: 0,
+        refineWithAI: 0,
+    });
     const [bodySearchMatches, setBodySearchMatches] = useState<Map<string, string>>(new Map());
     const [folderSearchTerm, setFolderSearchTerm] = useState('');
     const [folderBodySearchMatches, setFolderBodySearchMatches] = useState<Map<string, string>>(new Map());
@@ -496,6 +507,24 @@ export const MainApp: React.FC = () => {
     const activeDocument = useMemo(() => {
         return activeNode?.type === 'document' ? activeNode : null;
     }, [activeNode]);
+
+    const triggerDocumentCommand = useCallback((key: keyof DocumentCommandTriggers, logMessage: string, unavailableMessage: string) => {
+        if (!activeDocument) {
+            addLog('WARNING', unavailableMessage);
+            return;
+        }
+        addLog('INFO', logMessage);
+        if (view !== 'editor') {
+            setView('editor');
+        }
+        if (documentView !== 'editor') {
+            setDocumentView('editor');
+        }
+        setDocumentCommandTriggers(prev => ({
+            ...prev,
+            [key]: prev[key] + 1,
+        }));
+    }, [activeDocument, addLog, view, documentView]);
 
     useEffect(() => {
         if (!activeDocument) {
@@ -2666,13 +2695,33 @@ export const MainApp: React.FC = () => {
         { id: 'document-tree-save-to-file', name: 'Save Document to File', action: handleSaveSelectionToFile, category: 'Document Tree', icon: SaveIcon, keywords: 'save export download file tree document' },
         { id: 'format-document', name: 'Format Document', action: handleFormatDocument, category: 'Editor', icon: FormatIcon, shortcut: ['Control', 'Shift', 'F'], keywords: 'beautify pretty print clean code' },
         { id: 'toggle-document-lock', name: activeDocument?.locked ? 'Unlock Active Document' : 'Lock Active Document', action: () => { void handleToggleActiveDocumentLock(); }, category: 'Editor', icon: activeDocument?.locked ? LockOpenIcon : LockClosedIcon, keywords: 'lock unlock read-only protect document' },
+        { id: 'document-add-ai-emoji', name: 'Add AI Emoji Prefix to Title', action: () => triggerDocumentCommand('addEmojiToTitle', 'Command: Add AI-generated emoji prefix to the document title.', 'Add AI emoji prefix is only available when a document is open.'), category: 'Editor', icon: SparklesIcon, keywords: 'emoji ai title prefix' },
+        { id: 'document-regenerate-title', name: 'Regenerate Title with AI', action: () => triggerDocumentCommand('regenerateTitle', 'Command: Regenerate document title with AI.', 'Title regeneration is only available when a document is open.'), category: 'Editor', icon: RefreshIcon, keywords: 'title rename ai regenerate' },
+        { id: 'document-open-language-selector', name: 'Open Document Language Selector', action: () => triggerDocumentCommand('openLanguageSelector', 'Command: Open document language selector.', 'Language selection is only available when a document is open.'), category: 'Editor', icon: CommandIcon, keywords: 'language change selector locale' },
+        { id: 'document-cycle-layout', name: 'Cycle Editor Layout Modes', action: () => triggerDocumentCommand('cycleViewMode', 'Command: Switch editor layout mode.', 'Layout switching is only available when a document is open.'), category: 'View', icon: LayoutVerticalIcon, keywords: 'layout switch editor preview split' },
+        { id: 'document-toggle-inline-diff', name: 'Toggle Inline Diff Mode', action: () => triggerDocumentCommand('toggleInlineDiff', 'Command: Toggle inline diff mode.', 'Inline diff mode is only available when a document is open.'), category: 'View', icon: DocumentDuplicateIcon, keywords: 'diff compare changes inline' },
+        { id: 'document-open-history', name: 'Open Document History Panel', action: () => {
+            if (!activeDocument) {
+                addLog('WARNING', 'Document history is only available when a document is open.');
+                return;
+            }
+            addLog('INFO', 'Command: Open document history panel.');
+            if (view !== 'editor') {
+                setView('editor');
+            }
+            setDocumentView('history');
+        }, category: 'View', icon: HistoryIcon, keywords: 'history versions timeline restore' },
+        { id: 'document-cancel-unsaved', name: 'Cancel Unsaved Changes', action: () => triggerDocumentCommand('cancelChanges', 'Command: Cancel unsaved document changes.', 'Canceling unsaved changes is only available when a document is open.'), category: 'Editor', icon: UndoIcon, keywords: 'cancel undo revert discard' },
+        { id: 'document-manual-save', name: 'Save Document Version', action: () => triggerDocumentCommand('manualSave', 'Command: Manually save a document version.', 'Manual saves are only available when a document is open.'), category: 'Editor', icon: SaveIcon, keywords: 'save version commit manual' },
+        { id: 'document-copy-active-content', name: 'Copy Active Document Content', action: () => triggerDocumentCommand('copyContent', 'Command: Copy active document content.', 'Copying document content is only available when a document is open.'), category: 'Editor', icon: CopyIcon, keywords: 'copy clipboard content editor' },
+        { id: 'document-ai-refine', name: 'Refine Document with AI', action: () => triggerDocumentCommand('refineWithAI', 'Command: Request AI refinement of the document content.', 'AI refinement is only available when a document is open.'), category: 'Editor', icon: SparklesIcon, keywords: 'ai refine improve suggestions' },
         { id: 'toggle-command-palette', name: 'Toggle Command Palette', action: handleToggleCommandPalette, category: 'View', icon: CommandIcon, shortcut: ['Control', 'Shift', 'P'], keywords: 'find action go to' },
         { id: 'toggle-editor', name: 'Switch to Editor View', action: () => { addLog('INFO', 'Command: Switch to Editor View.'); setView('editor'); }, category: 'View', icon: PencilIcon, keywords: 'main document' },
         { id: 'toggle-settings', name: 'Toggle Settings View', action: toggleSettingsView, category: 'View', icon: GearIcon, keywords: 'configure options' },
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleFocusDocumentTreeSearch, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleFocusDocumentTreeSearch, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock, triggerDocumentCommand, view, setDocumentView]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -2938,6 +2987,7 @@ export const MainApp: React.FC = () => {
                         onPreviewZoomAvailabilityChange={setIsPreviewZoomReady}
                         onPreviewMetadataChange={setPreviewMetadata}
                         onZoomTargetChange={handleWorkspaceZoomTargetChange}
+                        commandTriggers={documentCommandTriggers}
                     />
                 );
             }
