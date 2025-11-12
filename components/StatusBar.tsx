@@ -54,6 +54,18 @@ const statusConfig: Record<LLMStatus, { text: string; color: string; tooltip: st
   },
 };
 
+type TimestampResult = { relative: string; absolute: string } | { fallback: string };
+
+const RELATIVE_TIME_DIVISIONS: { amount: number; unit: Intl.RelativeTimeFormatUnit }[] = [
+  { amount: 60, unit: 'second' },
+  { amount: 60, unit: 'minute' },
+  { amount: 24, unit: 'hour' },
+  { amount: 7, unit: 'day' },
+  { amount: 4.34524, unit: 'week' },
+  { amount: 12, unit: 'month' },
+  { amount: Number.POSITIVE_INFINITY, unit: 'year' },
+];
+
 interface ZoomButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   hint: string;
   icon: React.ReactNode;
@@ -185,14 +197,71 @@ const StatusBar: React.FC<StatusBarProps> = ({
     onDatabaseMenu(event);
   };
 
-  const formatTimestamp = (isoString?: string) => {
-    if (!isoString) return 'Not saved yet';
-    try {
-      return new Date(isoString).toLocaleTimeString();
-    } catch {
-      return 'Invalid date';
+  const formatTimestamp = React.useCallback((isoString?: string): TimestampResult => {
+    if (!isoString) {
+      return { fallback: 'Not saved yet' };
     }
-  };
+
+    const date = new Date(isoString);
+
+    if (Number.isNaN(date.getTime())) {
+      return { fallback: 'Invalid date' };
+    }
+
+    const absolute = date.toLocaleString();
+    const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    let duration = Math.round((date.getTime() - Date.now()) / 1000);
+
+    for (const division of RELATIVE_TIME_DIVISIONS) {
+      if (Math.abs(duration) < division.amount) {
+        return { relative: formatter.format(duration, division.unit), absolute };
+      }
+      duration = Math.round(duration / division.amount);
+    }
+
+    return { fallback: 'Invalid date' };
+  }, []);
+
+  const [lastSavedDisplay, setLastSavedDisplay] = React.useState<{ relative: string; absolute: string } | null>(() => {
+    const result = formatTimestamp(lastSaved);
+    return 'fallback' in result ? null : result;
+  });
+  const [lastSavedFallback, setLastSavedFallback] = React.useState<string | null>(() => {
+    const result = formatTimestamp(lastSaved);
+    return 'fallback' in result ? result.fallback : null;
+  });
+  const lastSavedTriggerRef = React.useRef<HTMLSpanElement>(null);
+  const [showLastSavedTooltip, setShowLastSavedTooltip] = React.useState(false);
+
+  React.useEffect(() => {
+    let intervalId: number | undefined;
+
+    const updateTimestamp = () => {
+      const result = formatTimestamp(lastSaved);
+      if ('fallback' in result) {
+        setLastSavedDisplay(null);
+        setLastSavedFallback(result.fallback);
+        setShowLastSavedTooltip(false);
+        return false;
+      }
+
+      setLastSavedFallback(null);
+      setLastSavedDisplay(result);
+      return true;
+    };
+
+    const hasValidTimestamp = updateTimestamp();
+
+    if (hasValidTimestamp && typeof window !== 'undefined') {
+      intervalId = window.setInterval(updateTimestamp, 60000);
+    }
+
+    return () => {
+      if (intervalId !== undefined && typeof window !== 'undefined') {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, [lastSaved, formatTimestamp]);
 
   const selectStyles: React.CSSProperties = {
     maxWidth: '160px',
@@ -392,7 +461,30 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <div className="h-4 w-px bg-border-color"></div>
         <span>Documents: <span className="font-semibold text-text-main">{documentCount}</span></span>
         <div className="h-4 w-px bg-border-color"></div>
-        <span>Last Saved: <span className="font-semibold text-text-main">{formatTimestamp(lastSaved)}</span></span>
+        <span className="flex items-center gap-1">
+          Last Saved:
+          <span
+            ref={lastSavedTriggerRef}
+            className="font-semibold text-text-main"
+            onMouseEnter={() => lastSavedDisplay && setShowLastSavedTooltip(true)}
+            onMouseLeave={() => setShowLastSavedTooltip(false)}
+            onFocus={() => lastSavedDisplay && setShowLastSavedTooltip(true)}
+            onBlur={() => setShowLastSavedTooltip(false)}
+            tabIndex={lastSavedDisplay ? 0 : undefined}
+          >
+            {lastSavedFallback ?? lastSavedDisplay?.relative ?? 'Not saved yet'}
+          </span>
+        </span>
+        {lastSavedDisplay && showLastSavedTooltip && lastSavedTriggerRef.current && (
+          <Tooltip
+            targetRef={lastSavedTriggerRef}
+            content={(
+              <span className="block whitespace-pre-line break-words leading-snug text-left">
+                {lastSavedDisplay.absolute}
+              </span>
+            )}
+          />
+        )}
         {appVersion && <div className="h-4 w-px bg-border-color"></div>}
         {appVersion && (
           onOpenAbout ? (
