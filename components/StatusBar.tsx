@@ -446,7 +446,6 @@ const StatusBar: React.FC<StatusBarProps> = ({
               hint="Reset zoom"
               icon={<RefreshIcon className="w-3.5 h-3.5" />}
             />
-            <span className="text-[10px] uppercase tracking-wide text-text-secondary ml-1">{zoomTargetLabel}</span>
           </div>
         </div>
         {previewMetadataDisplay && (
