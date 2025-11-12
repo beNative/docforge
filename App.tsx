@@ -3037,10 +3037,8 @@ export const MainApp: React.FC = () => {
                                         onNewDocument={() => handleNewDocument()}
                                         onNewRootFolder={handleNewRootFolder}
                                         onNewSubfolder={handleNewSubfolder}
-                                        onNewCodeFile={handleOpenNewCodeFileModal}
                                         onNewFromClipboard={() => { void handleNewDocumentFromClipboard(); }}
                                         onDuplicateSelection={handleDuplicateSelection}
-                                        onToggleActiveDocumentLock={() => { void handleToggleActiveDocumentLock(); }}
                                         onToggleNodeLock={(id, locked) => { void handleSetNodeLockState(id, locked); }}
                                         onCopyNodeContent={handleCopyNodeContent}
                                         onSaveNodeToFile={handleSaveNodeToFile}
@@ -3058,14 +3056,12 @@ export const MainApp: React.FC = () => {
                                         customShortcuts={settings.customShortcuts}
                                         pendingRevealId={pendingRevealId}
                                         onRevealHandled={() => setPendingRevealId(null)}
-                                        activeDocumentLocked={Boolean(activeDocument?.locked)}
                                         templates={templates}
                                         activeTemplateId={activeTemplateId}
                                         onSelectTemplate={handleSelectTemplate}
                                         onDeleteTemplate={handleDeleteTemplate}
                                         onRenameTemplate={handleRenameTemplate}
                                         onNewTemplate={handleNewTemplate}
-                                        onNewFromTemplate={() => setCreateFromTemplateOpen(true)}
                                         documentTreeIndent={settings.documentTreeIndent}
                                         documentTreeVerticalSpacing={settings.documentTreeVerticalSpacing}
                                     />
