@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
+import type { DocumentCommandTriggers, DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
 import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon } from './Icons';
 import Spinner from './Spinner';
@@ -39,7 +39,28 @@ interface DocumentEditorProps {
   onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
   onPreviewMetadataChange?: (metadata: PreviewMetadata | null) => void;
   onZoomTargetChange?: (target: 'preview' | 'editor') => void;
+  commandTriggers: DocumentCommandTriggers;
 }
+
+const useCommandTrigger = (trigger: number, callback: () => void | Promise<void>) => {
+  const previousRef = useRef(trigger);
+  const callbackRef = useRef(callback);
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    if (previousRef.current === trigger) {
+      return;
+    }
+    previousRef.current = trigger;
+    if (!trigger) {
+      return;
+    }
+    void callbackRef.current();
+  }, [trigger]);
+};
 
 const PREVIEWABLE_LANGUAGES = new Set<string>([
   'markdown',
@@ -109,6 +130,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onPreviewZoomAvailabilityChange,
   onPreviewMetadataChange,
   onZoomTargetChange,
+  commandTriggers,
 }) => {
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(documentNode.content || '');
@@ -173,6 +195,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const splitContainerRef = useRef<HTMLDivElement>(null);
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const languageButtonRef = useRef<HTMLButtonElement | null>(null);
   const isContentInitialized = useRef(false);
   const editorRef = useRef<CodeEditorHandle>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
@@ -400,7 +423,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
 
   // --- Action Handlers ---
-  const handleManualSave = () => {
+  const handleManualSave = useCallback(() => {
     if (isLocked) {
       setError('Document is locked and cannot be modified.');
       addLog('WARNING', `Manual save blocked for locked document "${title}".`);
@@ -425,7 +448,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       .finally(() => {
         setIsSaving(false);
       });
-  };
+  }, [isLocked, isDirty, isRefining, isSaving, addLog, title, onCommitVersion, content]);
 
   const handleCancelChanges = useCallback(() => {
     if (!isDirty || isSaving) {
@@ -449,10 +472,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     onDelete(documentNode.id);
   };
 
-  const handleViewModeButton = (newMode: ViewMode) => {
+  const handleViewModeButton = useCallback((newMode: ViewMode) => {
     setViewMode(newMode);
     onViewModeChange(newMode);
-  };
+  }, [onViewModeChange]);
   
   const handleFormatDocument = () => {
     if (isLocked) {
@@ -463,7 +486,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     editorRef.current?.format();
   };
 
-  const handleRefine = async () => {
+  const handleRefine = useCallback(async () => {
     if (isLocked) {
       setError('Document is locked and cannot be modified.');
       addLog('WARNING', `AI refinement blocked for locked document "${title}".`);
@@ -482,7 +505,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     } finally {
       setIsRefining(false);
     }
-  };
+  }, [isLocked, addLog, title, content, settings]);
 
   const handleToggleLock = useCallback(async () => {
     if (isLocking) {
@@ -501,7 +524,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
   }, [isLocking, onToggleLock, isLocked, addLog, title]);
 
-  const handleGenerateTitle = async () => {
+  const handleGenerateTitle = useCallback(async () => {
     if (isLocked) {
       setError('Document is locked and cannot be modified.');
       addLog('WARNING', `Title regeneration blocked for locked document "${title}".`);
@@ -521,9 +544,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     } finally {
       setIsGeneratingTitle(false);
     }
-  };
+  }, [isLocked, addLog, title, settings, content]);
 
-  const handleAddEmojiToTitle = async () => {
+  const handleAddEmojiToTitle = useCallback(async () => {
     if (isLocked) {
       setError('Document is locked and cannot be modified.');
       addLog('WARNING', `Emoji update blocked for locked document "${title}".`);
@@ -551,7 +574,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     } finally {
       setIsGeneratingEmoji(false);
     }
-  };
+  }, [isLocked, addLog, title, settings]);
 
   const updateTitleSelection = useCallback(() => {
     const input = titleInputRef.current;
@@ -626,13 +649,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setRefinedContent(null);
   };
 
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     if (!content.trim()) return;
     await navigator.clipboard.writeText(content);
     setIsCopied(true);
     addLog('INFO', `Document content copied to clipboard.`);
     setTimeout(() => setIsCopied(false), 2000);
-  };
+  }, [content, addLog]);
 
   const language = documentNode.language_hint || 'plaintext';
   const normalizedLanguage = language.toLowerCase();
@@ -665,6 +688,41 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     zoomStep: previewZoomStep,
     initialScale: previewInitialScale,
   }), [previewInitialScale, previewMaxScale, previewMinScale, previewZoomStep]);
+
+  const openLanguageSelector = useCallback(() => {
+    languageButtonRef.current?.focus();
+  }, []);
+
+  const toggleDiffMode = useCallback(() => {
+    if (viewMode === 'preview') {
+      addLog('WARNING', 'Inline diff is unavailable in preview-only mode.');
+      return;
+    }
+    setIsDiffMode((previous) => !previous);
+  }, [viewMode, addLog]);
+
+  const cycleViewMode = useCallback(() => {
+    if (!supportsPreview) {
+      if (viewMode !== 'edit') {
+        handleViewModeButton('edit');
+      }
+      return;
+    }
+    const modes: ViewMode[] = ['edit', 'preview', 'split-vertical', 'split-horizontal'];
+    const currentIndex = modes.indexOf(viewMode);
+    const nextMode = modes[(currentIndex + 1) % modes.length];
+    handleViewModeButton(nextMode);
+  }, [supportsPreview, viewMode, handleViewModeButton]);
+
+  useCommandTrigger(commandTriggers.addEmojiToTitle, () => { void handleAddEmojiToTitle(); });
+  useCommandTrigger(commandTriggers.regenerateTitle, () => { void handleGenerateTitle(); });
+  useCommandTrigger(commandTriggers.openLanguageSelector, openLanguageSelector);
+  useCommandTrigger(commandTriggers.cycleViewMode, cycleViewMode);
+  useCommandTrigger(commandTriggers.toggleInlineDiff, toggleDiffMode);
+  useCommandTrigger(commandTriggers.cancelChanges, handleCancelChanges);
+  useCommandTrigger(commandTriggers.manualSave, handleManualSave);
+  useCommandTrigger(commandTriggers.copyContent, () => { void handleCopy(); });
+  useCommandTrigger(commandTriggers.refineWithAI, () => { void handleRefine(); });
 
   const scaledEditorFontSize = useMemo(() => {
     const baseSize = settings.editorFontSize;
@@ -901,7 +959,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
               <label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">
                 Language:
               </label>
-              <LanguageDropdown id="language-select" value={language} onChange={onLanguageChange} />
+              <LanguageDropdown
+                id="language-select"
+                value={language}
+                onChange={onLanguageChange}
+                ref={languageButtonRef}
+                openTrigger={commandTriggers.openLanguageSelector}
+              />
             </div>
             <div className="h-5 w-px bg-border-color mx-1"></div>
             {supportsPreview && (

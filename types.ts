@@ -542,6 +542,18 @@ export interface Command {
   monacoCommandId?: string;
 }
 
+export interface DocumentCommandTriggers {
+  addEmojiToTitle: number;
+  regenerateTitle: number;
+  openLanguageSelector: number;
+  cycleViewMode: number;
+  toggleInlineDiff: number;
+  cancelChanges: number;
+  manualSave: number;
+  copyContent: number;
+  refineWithAI: number;
+}
+
 export interface DiscoveredLLMService {
   id: string;
   name: string;
