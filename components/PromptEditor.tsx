@@ -43,7 +43,7 @@ interface DocumentEditorProps {
 }
 
 const useCommandTrigger = (trigger: number, callback: () => void | Promise<void>) => {
-  const previousRef = useRef(trigger);
+  const previousRef = useRef<number | null>(null);
   const callbackRef = useRef(callback);
 
   useEffect(() => {
