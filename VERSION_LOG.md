@@ -1,5 +1,26 @@
 # Version Log
 
+## v0.8.0 - The Emoji & Command Palette Update
+
+### ✨ Features
+
+-   Added AI-assisted emoji suggestions and inline emoji pickers to document titles and folder names, making it easy to personalize the tree or accept LLM-generated prefixes without leaving the editor.
+-   Expanded the Command Palette with document editor actions—including formatting, locking, manual saves, AI refinement, and emoji generation—so keyboard workflows can reach the newest tools instantly.
+
+### 🛠 Improvements
+
+-   Replaced the appearance color selectors with a compact palette that closes on outside clicks, speeding up theme tweaks while keeping the popover accessible.
+-   Restyled document search snippets with themed backgrounds and accent borders that stay legible across light and dark modes.
+-   Refined the "Last Saved" status indicator to show relative timestamps with a tooltip that reveals the exact save time.
+
+### 🐛 Fixes
+
+-   Ensured document command triggers reinitialize whenever the active editor changes so command palette shortcuts run reliably.
+
+### 📝 Documentation
+
+-   Updated the README and manuals to cover emoji-enhanced titles, new command palette entries, and the refreshed appearance controls while preparing the v0.8.0 release package.
+
 ## v0.7.0 - The Focused Zoom & Clipboard Intelligence Update
 
 ### ✨ Features
