@@ -2128,12 +2128,9 @@ export const MainApp: React.FC = () => {
         }
     }, [activeNodeId, activeNode, updateItem, addLog]);
 
-    const handleCommitVersion = useCallback((content: string) => {
-        if (activeNodeId) {
-            return commitVersion(activeNodeId, content);
-        }
-        return Promise.resolve();
-    }, [activeNodeId, commitVersion]);
+    const handleCommitVersion = useCallback((documentId: string, content: string) => {
+        return commitVersion(documentId, content);
+    }, [commitVersion]);
     
     const handleSaveTemplate = (updatedTemplate: Partial<Omit<DocumentTemplate, 'template_id'>>) => {
         if (activeTemplateId) {

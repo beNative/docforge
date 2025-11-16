@@ -12,6 +12,8 @@ interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> 
 const IconButton: React.FC<IconButtonProps> = ({ children, tooltip, className, variant = 'primary', size='md', tooltipPosition = 'top', ...props }) => {
     const [isHovered, setIsHovered] = useState(false);
     const wrapperRef = useRef<HTMLSpanElement>(null);
+    const { ['aria-label']: ariaLabel, ...buttonProps } = props;
+    const computedAriaLabel = ariaLabel ?? tooltip;
 
     const handleMouseEnter = useCallback(() => {
         if (tooltip) setIsHovered(true);
@@ -47,7 +49,8 @@ const IconButton: React.FC<IconButtonProps> = ({ children, tooltip, className, v
       >
         <button
           className={`${baseClasses} ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
-          {...props}
+          aria-label={computedAriaLabel}
+          {...buttonProps}
         >
           {children}
         </button>

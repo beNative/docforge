@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { DocumentCommandTriggers, DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon } from './Icons';
+import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon, CodeIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
@@ -20,7 +20,7 @@ import EmojiPickerOverlay from './EmojiPickerOverlay';
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
   onSave: (prompt: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => void;
-  onCommitVersion: (content: string) => Promise<void> | void;
+  onCommitVersion: (documentId: string, content: string) => Promise<void> | void;
   onDelete: (id: string) => void;
   settings: Settings;
   onShowHistory: () => void;
@@ -90,6 +90,35 @@ const PREVIEWABLE_LANGUAGES = new Set<string>([
   'image/svg+xml',
 ]);
 
+const RICH_TEXT_PLACEHOLDER_TEXT = 'This is a rich text document with inline formatting.';
+const RICH_TEXT_PLACEHOLDER_REGEX = /This is a rich text document with inline formatting\./g;
+
+const sanitizeDocumentContent = (
+  raw: string | null | undefined,
+  isRichText: boolean,
+): string => {
+  const base = raw ?? '';
+  if (!isRichText) {
+    return base;
+  }
+  const trimmed = base.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const textContent = trimmed.replace(/<[^>]+>/g, '').trim();
+  if (textContent !== RICH_TEXT_PLACEHOLDER_TEXT) {
+    return base;
+  }
+  const leftover = trimmed
+    .replace(RICH_TEXT_PLACEHOLDER_REGEX, '')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+  if (leftover.length === 0) {
+    return '';
+  }
+  return base;
+};
+
 type EditorEngine = 'lexical' | 'monaco';
 
 const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint: string | null | undefined): ViewMode => {
@@ -135,11 +164,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onZoomTargetChange,
   commandTriggers,
 }) => {
+  const isRichTextDocument = documentNode.doc_type === 'rich_text';
+  const initialContent = sanitizeDocumentContent(documentNode.content, isRichTextDocument);
   const [title, setTitle] = useState(documentNode.title);
-  const [content, setContent] = useState(documentNode.content || '');
-  const [baselineContent, setBaselineContent] = useState(documentNode.content || '');
+  const [content, setContent] = useState(initialContent);
+  const [baselineContent, setBaselineContent] = useState(initialContent);
   const [isDiffMode, setIsDiffMode] = useState(false);
-  
+
   const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refinedContent, setRefinedContent] = useState<string | null>(null);
@@ -154,7 +185,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [splitSize, setSplitSize] = useState(50);
   const isLocked = Boolean(documentNode.locked);
   const [isLocking, setIsLocking] = useState(false);
-  const isRichTextDocument = documentNode.doc_type === 'rich_text';
+  const sanitizedDocumentContent = useMemo(
+    () => sanitizeDocumentContent(documentNode.content, isRichTextDocument),
+    [documentNode.content, isRichTextDocument],
+  );
   const editorEnginePreferencesRef = useRef<Map<string, EditorEngine>>(new Map());
   const [editorEngine, setEditorEngine] = useState<EditorEngine>(isRichTextDocument ? 'lexical' : 'monaco');
   const { addLog } = useLogger();
@@ -248,7 +282,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   // Keep local editor state in sync with document updates without clobbering unsaved edits.
   useEffect(() => {
-    const nextContent = documentNode.content ?? '';
+    const nextContent = sanitizedDocumentContent;
 
     if (documentNode.id !== prevDocumentIdRef.current) {
         setTitle(documentNode.title);
@@ -261,18 +295,18 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         setIsSaving(false);
         setIsDiffMode(false);
         prevDocumentIdRef.current = documentNode.id;
-        prevDocumentContentRef.current = documentNode.content;
+        prevDocumentContentRef.current = sanitizedDocumentContent;
         return;
     }
 
-    if (documentNode.content !== prevDocumentContentRef.current) {
-        prevDocumentContentRef.current = documentNode.content;
+    if (sanitizedDocumentContent !== prevDocumentContentRef.current) {
+        prevDocumentContentRef.current = sanitizedDocumentContent;
         setBaselineContent(nextContent);
         if (!isDirty) {
             setContent(nextContent);
         }
     }
-  }, [documentNode.id, documentNode.content, documentNode.default_view_mode, documentNode.language_hint, documentNode.title, isDirty]);
+  }, [documentNode.id, sanitizedDocumentContent, documentNode.default_view_mode, documentNode.language_hint, documentNode.title, isDirty]);
 
   useEffect(() => {
     setTitle(documentNode.title);
@@ -305,19 +339,19 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   useEffect(() => {
     // Only mark as dirty after the initial content has been loaded.
     if (isContentInitialized.current) {
-        setIsDirty(content !== documentNode.content);
+        setIsDirty(content !== sanitizedDocumentContent);
     }
-  }, [content, documentNode.content]);
+  }, [content, sanitizedDocumentContent]);
 
   useEffect(() => {
     if (isLocked && !prevLockedRef.current) {
-      const nextContent = documentNode.content ?? '';
+      const nextContent = sanitizedDocumentContent;
       setContent(nextContent);
       setBaselineContent(nextContent);
       setIsDirty(false);
     }
     prevLockedRef.current = isLocked;
-  }, [isLocked, documentNode.content]);
+  }, [isLocked, sanitizedDocumentContent]);
 
   useEffect(() => {
   }, [content]);
@@ -454,7 +488,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
     addLog('INFO', `User action: Manually save version for document "${title}".`);
     setIsSaving(true);
-    const commitPromise = Promise.resolve(onCommitVersion(content));
+    const commitPromise = Promise.resolve(onCommitVersion(documentNode.id, content));
     commitPromise
       .then(() => {
         setIsDirty(false);
@@ -468,14 +502,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       .finally(() => {
         setIsSaving(false);
       });
-  }, [isLocked, isDirty, isRefining, isSaving, addLog, title, onCommitVersion, content]);
+  }, [isLocked, isDirty, isRefining, isSaving, addLog, title, onCommitVersion, content, documentNode.id]);
 
   const handleCancelChanges = useCallback(() => {
     if (!isDirty || isSaving) {
       return;
     }
 
-    const originalContent = documentNode.content ?? '';
+    const originalContent = sanitizedDocumentContent;
     addLog('INFO', `User action: Canceled changes for document "${documentNode.title}".`);
     skipNextAutoSave();
     setError(null);
@@ -484,7 +518,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setBaselineContent(originalContent);
     setTitle(documentNode.title);
     setIsDirty(false);
-  }, [isDirty, isSaving, documentNode.content, documentNode.title, addLog, skipNextAutoSave]);
+  }, [isDirty, isSaving, sanitizedDocumentContent, documentNode.title, addLog, skipNextAutoSave]);
 
   const handleDeleteDocument = () => {
     skipNextAutoSave();
@@ -1038,7 +1072,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     size="xs"
                     className={`rounded-md ${editorEngine === 'lexical' ? 'bg-secondary text-primary' : ''}`}
                   >
-                    <span className="text-[11px] font-semibold leading-none tracking-wide px-1">Visual</span>
+                    <SparklesIcon className="w-4 h-4" />
                   </IconButton>
                   <IconButton
                     onClick={() => handleEditorEngineChange('monaco')}
@@ -1046,7 +1080,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     size="xs"
                     className={`rounded-md ${editorEngine === 'monaco' ? 'bg-secondary text-primary' : ''}`}
                   >
-                    <span className="text-[11px] font-semibold leading-none tracking-wide px-1">Source</span>
+                    <CodeIcon className="w-4 h-4" />
                   </IconButton>
               </div>
             )}
