@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FileIcon, FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, LockClosedIcon, LockOpenIcon } from './Icons';
+import { FileIcon, FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, LockClosedIcon, LockOpenIcon, TrashIcon } from './Icons';
 import Tooltip from './Tooltip';
 import EmojiPickerOverlay from './EmojiPickerOverlay';
 
@@ -600,6 +600,17 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
                           ) : (
                             <LockOpenIcon className="w-3.5 h-3.5" />
                           )}
+                        </IconButton>
+                        <IconButton
+                          aria-label="Delete Document"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteNode(node.id, e.shiftKey);
+                          }}
+                          size="xs"
+                          variant="destructive"
+                        >
+                          <TrashIcon className="w-3.5 h-3.5" />
                         </IconButton>
                       </>
                     )}
