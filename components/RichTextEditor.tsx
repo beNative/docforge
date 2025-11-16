@@ -50,6 +50,7 @@ import {
   COMMAND_PRIORITY_EDITOR,
   FORMAT_ELEMENT_COMMAND,
   FORMAT_TEXT_COMMAND,
+  PASTE_COMMAND,
   REDO_COMMAND,
   SELECTION_CHANGE_COMMAND,
   UNDO_COMMAND,
@@ -590,7 +591,7 @@ const ToolbarPlugin: React.FC<{
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 border-b border-border bg-surface px-3 py-2">
+    <div className="flex flex-nowrap items-center gap-1.5 border-b border-border-color bg-secondary px-3 h-7 overflow-x-auto">
       {renderedToolbarElements.map(element =>
         'type' in element ? (
           <div key={element.id} className="mx-1 h-6 w-px bg-border-color/70" />
@@ -727,6 +728,66 @@ const ImagePlugin: React.FC = () => {
       COMMAND_PRIORITY_EDITOR,
     );
   }, [editor]);
+
+  return null;
+};
+
+const readFileAsDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(typeof reader.result === 'string' ? reader.result : '');
+    };
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+};
+
+const ClipboardImagePlugin: React.FC<{ readOnly: boolean }> = ({ readOnly }) => {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    if (readOnly) {
+      return undefined;
+    }
+
+    return editor.registerCommand(
+      PASTE_COMMAND,
+      (event: ClipboardEvent) => {
+        const clipboardData = event.clipboardData;
+        if (!clipboardData) {
+          return false;
+        }
+
+        const files = Array.from(clipboardData.items)
+          .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+          .map(item => item.getAsFile())
+          .filter((file): file is File => Boolean(file));
+
+        if (files.length === 0) {
+          return false;
+        }
+
+        event.preventDefault();
+        files.forEach(file => {
+          void readFileAsDataUrl(file)
+            .then(src => {
+              if (!src) {
+                return;
+              }
+              editor.dispatchCommand(INSERT_IMAGE_COMMAND, {
+                src,
+                altText: file.name || 'Pasted image',
+              });
+            })
+            .catch(() => undefined);
+        });
+
+        return true;
+      },
+      COMMAND_PRIORITY_EDITOR,
+    );
+  }, [editor, readOnly]);
 
   return null;
 };
@@ -874,7 +935,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     }, [html]);
 
     return (
-      <div className="h-full w-full bg-secondary">
+      <div className="h-full w-full bg-secondary" data-component="rich-text-editor">
         <LexicalComposer initialConfig={initialConfig}>
           {!readOnly && (
             <ToolbarPlugin
@@ -905,6 +966,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
                     onFocus={handleFocus}
                     onBlur={handleBlur}
                     spellCheck={!readOnly}
+                    data-component="rich-text-editor"
                   />
                 )}
                 placeholder={<Placeholder />}
@@ -917,6 +979,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           <ListPlugin />
           <LinkPlugin />
           <ImagePlugin />
+          <ClipboardImagePlugin readOnly={readOnly} />
           <OnChangePlugin onChange={handleChange} ignoreSelectionChange={true} />
           {!readOnly && (
             <ContextMenuComponent

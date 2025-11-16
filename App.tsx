@@ -55,6 +55,8 @@ const PREVIEW_ZOOM_STEP = 0.05;
 
 const isElectron = !!window.electronAPI;
 
+const TREE_SELECTION_COMMAND_IDS = new Set(['delete-item', 'duplicate-item', 'rename-item']);
+
 const resolveClipboardHelpUrl = (): string | null => {
     if (typeof navigator === 'undefined') {
         return null;
@@ -2858,19 +2860,25 @@ export const MainApp: React.FC = () => {
         };
     }, [handleGlobalMouseMove, handleGlobalMouseUp]);
     
-     useEffect(() => {
+    useEffect(() => {
         const shortcutMap = getShortcutMap(commands, settings.customShortcuts);
-        
+
         const handleKeyDown = (e: KeyboardEvent) => {
             const shortcut = formatShortcut(e);
             const command = shortcutMap.get(shortcut);
 
             const activeEl = document.activeElement;
             const isFormElement = activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
+            const isRichTextElement =
+                activeEl instanceof HTMLElement && Boolean(activeEl.closest('[data-component="rich-text-editor"]'));
             const isPaletteInput = activeEl === commandPaletteInputRef.current;
             const isCommandPaletteToggle = command?.id === 'toggle-command-palette';
 
             if (isFormElement && !isPaletteInput && !isCommandPaletteToggle) {
+                return;
+            }
+
+            if (isRichTextElement && command && TREE_SELECTION_COMMAND_IDS.has(command.id)) {
                 return;
             }
 
