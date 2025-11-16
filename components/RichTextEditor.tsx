@@ -925,13 +925,6 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
       [readOnly],
     );
 
-    useEffect(() => {
-      const normalized = html.trim();
-      if (normalized !== lastAppliedHtmlRef.current) {
-        lastAppliedHtmlRef.current = normalized;
-      }
-    }, [html]);
-
     return (
       <div className="h-full w-full bg-secondary" data-component="rich-text-editor">
         <LexicalComposer initialConfig={initialConfig}>
