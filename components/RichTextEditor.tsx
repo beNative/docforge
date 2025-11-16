@@ -143,11 +143,7 @@ const RICH_TEXT_THEME = {
   image: 'my-4 flex justify-center',
 };
 
-const Placeholder: React.FC = () => (
-  <div className="absolute top-3 left-3 select-none text-xs text-text-secondary">
-    Start writing your rich document...
-  </div>
-);
+const Placeholder: React.FC = () => null;
 
 const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, icon: Icon, isActive = false, disabled = false, onClick }) => (
   <IconButton
@@ -591,7 +587,9 @@ const ToolbarPlugin: React.FC<{
   );
 
   return (
-    <div className="flex flex-nowrap items-center gap-1.5 border-b border-border-color bg-secondary px-3 h-7 overflow-x-auto">
+    <div
+      className="flex flex-wrap content-center items-center gap-x-1.5 gap-y-1 border-b border-border-color bg-secondary px-3 py-0.5 min-h-[1.75rem] overflow-x-hidden"
+    >
       {renderedToolbarElements.map(element =>
         'type' in element ? (
           <div key={element.id} className="mx-1 h-6 w-px bg-border-color/70" />
