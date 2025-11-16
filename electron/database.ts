@@ -921,7 +921,7 @@ export const databaseService = {
         }
 
         if (nodeType === 'document') {
-          const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image'];
+          const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image', 'rich_text'];
           const allowedViewModes: ViewMode[] = ['edit', 'preview', 'split-vertical', 'split-horizontal'];
 
           let docType = allowedDocTypes.includes(node.doc_type as DocType)

@@ -35,11 +35,17 @@
   },
   "dependencies": {
     "@uiw/react-color-compact": "^2.9.2",
+    "@udecode/plate": "^49.0.0",
+    "@udecode/plate-basic-elements": "^49.0.0",
+    "@udecode/plate-basic-marks": "^49.0.0",
     "better-sqlite3": "^11.1.2",
     "electron-log": "^5.1.5",
     "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.2.1",
     "emoji-picker-react": "^4.15.0",
+    "slate": "^0.118.1",
+    "slate-history": "^0.113.1",
+    "slate-react": "^0.119.0",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
