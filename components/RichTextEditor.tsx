@@ -43,9 +43,11 @@ import {
   $getRoot,
   $getSelection,
   $isRangeSelection,
+  $isNodeSelection,
   CAN_REDO_COMMAND,
   CAN_UNDO_COMMAND,
   COMMAND_PRIORITY_CRITICAL,
+  COMMAND_PRIORITY_EDITOR,
   FORMAT_ELEMENT_COMMAND,
   FORMAT_TEXT_COMMAND,
   REDO_COMMAND,
@@ -54,6 +56,31 @@ import {
   type EditorState,
   type LexicalEditor,
 } from 'lexical';
+import IconButton from './IconButton';
+import ContextMenuComponent, { type MenuItem as ContextMenuItem } from './ContextMenu';
+import { RedoIcon, UndoIcon } from './Icons';
+import {
+  AlignCenterIcon,
+  AlignJustifyIcon,
+  AlignLeftIcon,
+  AlignRightIcon,
+  BoldIcon,
+  BulletListIcon,
+  ClearFormattingIcon,
+  CodeInlineIcon,
+  HeadingOneIcon,
+  HeadingThreeIcon,
+  HeadingTwoIcon,
+  ImageIcon as ToolbarImageIcon,
+  ItalicIcon,
+  LinkIcon as ToolbarLinkIcon,
+  NumberListIcon,
+  ParagraphIcon,
+  QuoteIcon,
+  StrikethroughIcon,
+  UnderlineIcon,
+} from './rich-text/RichTextToolbarIcons';
+import { $createImageNode, ImageNode, INSERT_IMAGE_COMMAND, type ImagePayload } from './rich-text/ImageNode';
 
 export interface RichTextEditorHandle {
   focus: () => void;
@@ -73,6 +100,8 @@ interface RichTextEditorProps {
 interface ToolbarButtonConfig {
   id: string;
   label: string;
+  icon: React.FC<{ className?: string }>;
+  group: 'history' | 'inline-format' | 'structure' | 'insert' | 'alignment' | 'utility';
   isActive?: boolean;
   disabled?: boolean;
   onClick: () => void;
@@ -110,6 +139,7 @@ const RICH_TEXT_THEME = {
     code: 'font-mono bg-secondary/80 rounded px-1 py-0.5 text-xs text-text-main',
   },
   link: 'text-primary underline hover:no-underline',
+  image: 'my-4 flex justify-center',
 };
 
 const Placeholder: React.FC = () => (
@@ -118,21 +148,22 @@ const Placeholder: React.FC = () => (
   </div>
 );
 
-const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, isActive = false, disabled = false, onClick }) => (
-  <button
+const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, icon: Icon, isActive = false, disabled = false, onClick }) => (
+  <IconButton
     type="button"
+    tooltip={label}
+    size="sm"
+    variant="ghost"
     onClick={onClick}
     disabled={disabled}
-    className={`rounded border px-2 py-1 text-xs font-medium transition-colors ${
-      disabled
-        ? 'cursor-not-allowed border-border/50 text-text-muted'
-        : isActive
-          ? 'border-primary bg-primary/10 text-primary'
-          : 'border-border bg-surface hover:border-primary/70 hover:text-primary'
-    }`}
+    aria-pressed={isActive}
+    aria-label={label}
+    className={`text-text-secondary ${
+      isActive ? 'bg-primary/15 text-primary hover:text-primary' : 'hover:text-text-main'
+    } disabled:opacity-40 disabled:pointer-events-none`}
   >
-    {label}
-  </button>
+    <Icon className="h-4 w-4" />
+  </IconButton>
 );
 
 const ToolbarPlugin: React.FC<{
@@ -140,6 +171,7 @@ const ToolbarPlugin: React.FC<{
   onActionsChange: (actions: ToolbarButtonConfig[]) => void;
 }> = ({ readOnly, onActionsChange }) => {
   const [editor] = useLexicalComposerContext();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isBold, setIsBold] = useState(false);
   const [isItalic, setIsItalic] = useState(false);
   const [isUnderline, setIsUnderline] = useState(false);
@@ -154,6 +186,14 @@ const ToolbarPlugin: React.FC<{
   const updateToolbar = useCallback(() => {
     const selection = $getSelection();
     if (!$isRangeSelection(selection)) {
+      setIsBold(false);
+      setIsItalic(false);
+      setIsUnderline(false);
+      setIsStrikethrough(false);
+      setIsCode(false);
+      setIsLink(false);
+      setBlockType('paragraph');
+      setAlignment('left');
       return;
     }
 
@@ -248,6 +288,9 @@ const ToolbarPlugin: React.FC<{
   }, [editor]);
 
   const toggleLink = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
     if (isLink) {
       editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
       return;
@@ -256,25 +299,69 @@ const ToolbarPlugin: React.FC<{
     if (url) {
       editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
     }
-  }, [editor, isLink]);
+  }, [editor, isLink, readOnly]);
+
+  const insertImage = useCallback(
+    (payload: ImagePayload) => {
+      if (!payload.src) {
+        return;
+      }
+      editor.dispatchCommand(INSERT_IMAGE_COMMAND, payload);
+    },
+    [editor],
+  );
+
+  const openImagePicker = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
+    fileInputRef.current?.click();
+  }, [readOnly]);
+
+  const handleImageFileChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = '';
+      if (!file) {
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          const altText = file.name.replace(/\.[^/.]+$/, '');
+          insertImage({ src: result, altText });
+        }
+      });
+      reader.readAsDataURL(file);
+    },
+    [insertImage],
+  );
 
   const toolbarButtons = useMemo<ToolbarButtonConfig[]>(
     () => [
       {
         id: 'undo',
         label: 'Undo',
+        icon: UndoIcon,
+        group: 'history',
         disabled: readOnly || !canUndo,
         onClick: () => editor.dispatchCommand(UNDO_COMMAND, undefined),
       },
       {
         id: 'redo',
         label: 'Redo',
+        icon: RedoIcon,
+        group: 'history',
         disabled: readOnly || !canRedo,
         onClick: () => editor.dispatchCommand(REDO_COMMAND, undefined),
       },
       {
         id: 'bold',
         label: 'Bold',
+        icon: BoldIcon,
+        group: 'inline-format',
         isActive: isBold,
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold'),
@@ -282,6 +369,8 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'italic',
         label: 'Italic',
+        icon: ItalicIcon,
+        group: 'inline-format',
         isActive: isItalic,
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic'),
@@ -289,20 +378,26 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'underline',
         label: 'Underline',
+        icon: UnderlineIcon,
+        group: 'inline-format',
         isActive: isUnderline,
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline'),
       },
       {
         id: 'strikethrough',
-        label: 'Strike',
+        label: 'Strikethrough',
+        icon: StrikethroughIcon,
+        group: 'inline-format',
         isActive: isStrikethrough,
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough'),
       },
       {
         id: 'code',
-        label: 'Code',
+        label: 'Inline Code',
+        icon: CodeInlineIcon,
+        group: 'inline-format',
         isActive: isCode,
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code'),
@@ -310,6 +405,8 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'paragraph',
         label: 'Paragraph',
+        icon: ParagraphIcon,
+        group: 'structure',
         isActive: blockType === 'paragraph',
         disabled: readOnly,
         onClick: formatParagraph,
@@ -317,6 +414,8 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'h1',
         label: 'Heading 1',
+        icon: HeadingOneIcon,
+        group: 'structure',
         isActive: blockType === 'h1',
         disabled: readOnly,
         onClick: () => formatHeading('h1'),
@@ -324,6 +423,8 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'h2',
         label: 'Heading 2',
+        icon: HeadingTwoIcon,
+        group: 'structure',
         isActive: blockType === 'h2',
         disabled: readOnly,
         onClick: () => formatHeading('h2'),
@@ -331,13 +432,17 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'h3',
         label: 'Heading 3',
+        icon: HeadingThreeIcon,
+        group: 'structure',
         isActive: blockType === 'h3',
         disabled: readOnly,
         onClick: () => formatHeading('h3'),
       },
       {
         id: 'bulleted',
-        label: 'Bullet List',
+        label: 'Bulleted List',
+        icon: BulletListIcon,
+        group: 'structure',
         isActive: blockType === 'bullet',
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined),
@@ -345,27 +450,43 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'numbered',
         label: 'Numbered List',
+        icon: NumberListIcon,
+        group: 'structure',
         isActive: blockType === 'number',
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined),
       },
       {
         id: 'quote',
-        label: 'Quote',
+        label: 'Block Quote',
+        icon: QuoteIcon,
+        group: 'structure',
         isActive: blockType === 'quote',
         disabled: readOnly,
         onClick: formatQuote,
       },
       {
         id: 'link',
-        label: isLink ? 'Unlink' : 'Link',
+        label: isLink ? 'Remove Link' : 'Insert Link',
+        icon: ToolbarLinkIcon,
+        group: 'insert',
         isActive: isLink,
         disabled: readOnly,
         onClick: toggleLink,
       },
       {
+        id: 'image',
+        label: 'Insert Image',
+        icon: ToolbarImageIcon,
+        group: 'insert',
+        disabled: readOnly,
+        onClick: openImagePicker,
+      },
+      {
         id: 'align-left',
         label: 'Align Left',
+        icon: AlignLeftIcon,
+        group: 'alignment',
         isActive: alignment === 'left',
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left'),
@@ -373,6 +494,8 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'align-center',
         label: 'Align Center',
+        icon: AlignCenterIcon,
+        group: 'alignment',
         isActive: alignment === 'center',
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center'),
@@ -380,6 +503,8 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'align-right',
         label: 'Align Right',
+        icon: AlignRightIcon,
+        group: 'alignment',
         isActive: alignment === 'right',
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right'),
@@ -387,6 +512,8 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'align-justify',
         label: 'Justify',
+        icon: AlignJustifyIcon,
+        group: 'alignment',
         isActive: alignment === 'justify',
         disabled: readOnly,
         onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'justify'),
@@ -394,6 +521,8 @@ const ToolbarPlugin: React.FC<{
       {
         id: 'clear-formatting',
         label: 'Clear Formatting',
+        icon: ClearFormattingIcon,
+        group: 'utility',
         disabled: readOnly,
         onClick: () => {
           if (isBold) {
@@ -410,6 +539,9 @@ const ToolbarPlugin: React.FC<{
           }
           if (isCode) {
             editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code');
+          }
+          if (isLink) {
+            editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
           }
           editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined);
           editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left');
@@ -432,6 +564,7 @@ const ToolbarPlugin: React.FC<{
       isLink,
       isStrikethrough,
       isUnderline,
+      openImagePicker,
       readOnly,
       toggleLink,
     ],
@@ -441,81 +574,37 @@ const ToolbarPlugin: React.FC<{
     onActionsChange(toolbarButtons);
   }, [toolbarButtons, onActionsChange]);
 
-  return (
-    <div className="flex flex-wrap gap-2 border-b border-border bg-surface px-3 py-2">
-      {toolbarButtons.map(button => (
-        <ToolbarButton key={button.id} {...button} />
-      ))}
-    </div>
+  const renderedToolbarElements = useMemo(
+    () => {
+      const items: (ToolbarButtonConfig | { type: 'separator'; id: string })[] = [];
+      toolbarButtons.forEach((button, index) => {
+        const previous = toolbarButtons[index - 1];
+        if (previous && previous.group !== button.group) {
+          items.push({ type: 'separator', id: `separator-${button.group}-${index}` });
+        }
+        items.push(button);
+      });
+      return items;
+    },
+    [toolbarButtons],
   );
-};
-
-const ContextMenu: React.FC<{
-  state: ContextMenuState;
-  actions: ToolbarButtonConfig[];
-  onClose: () => void;
-}> = ({ state, actions, onClose }) => {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!state.visible) {
-      return;
-    }
-
-    const handleMouseDown = (event: MouseEvent) => {
-      if (!menuRef.current || menuRef.current.contains(event.target as Node)) {
-        return;
-      }
-      onClose();
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [state.visible, onClose]);
-
-  if (!state.visible) {
-    return null;
-  }
 
   return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 w-56 rounded-md border border-border bg-surface shadow-lg"
-      style={{ top: state.y, left: state.x }}
-    >
-      <div className="max-h-96 overflow-y-auto py-1">
-        {actions.map(action => (
-          <button
-            key={`context-${action.id}`}
-            type="button"
-            onClick={() => {
-              if (!action.disabled) {
-                action.onClick();
-              }
-              onClose();
-            }}
-            disabled={action.disabled}
-            className={`flex w-full items-center justify-between px-3 py-2 text-sm ${
-              action.disabled
-                ? 'cursor-not-allowed text-text-muted'
-                : 'hover:bg-primary/10 hover:text-primary'
-            }`}
-          >
-            <span>{action.label}</span>
-            {action.isActive && <span className="text-primary">●</span>}
-          </button>
-        ))}
-      </div>
+    <div className="flex flex-wrap items-center gap-1.5 border-b border-border bg-surface px-3 py-2">
+      {renderedToolbarElements.map(element =>
+        'type' in element ? (
+          <div key={element.id} className="mx-1 h-6 w-px bg-border-color/70" />
+        ) : (
+          <ToolbarButton key={element.id} {...element} />
+        ),
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageFileChange}
+      />
     </div>
   );
 };
@@ -607,6 +696,41 @@ const ImperativeBridgePlugin: React.FC<{
   return null;
 };
 
+const ImagePlugin: React.FC = () => {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    if (!editor.hasNodes([ImageNode])) {
+      throw new Error('ImageNode not registered on editor');
+    }
+
+    return editor.registerCommand(
+      INSERT_IMAGE_COMMAND,
+      payload => {
+        if (!payload?.src) {
+          return false;
+        }
+
+        editor.update(() => {
+          const imageNode = $createImageNode(payload);
+          const selection = $getSelection();
+          if ($isRangeSelection(selection) || $isNodeSelection(selection)) {
+            selection.insertNodes([imageNode]);
+          } else {
+            const root = $getRoot();
+            root.append(imageNode);
+          }
+        });
+
+        return true;
+      },
+      COMMAND_PRIORITY_EDITOR,
+    );
+  }, [editor]);
+
+  return null;
+};
+
 const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
   ({ html, onChange, readOnly = false, onScroll, onFocusChange }, ref) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -618,6 +742,26 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
       visible: false,
     });
     const [contextActions, setContextActions] = useState<ToolbarButtonConfig[]>([]);
+    const contextMenuItems = useMemo<ContextMenuItem[]>(() => {
+      if (readOnly || contextActions.length === 0) {
+        return [];
+      }
+
+      const items: ContextMenuItem[] = [];
+      contextActions.forEach((action, index) => {
+        const previous = contextActions[index - 1];
+        if (previous && previous.group !== action.group) {
+          items.push({ type: 'separator' });
+        }
+        items.push({
+          label: action.label,
+          action: action.onClick,
+          icon: action.icon,
+          disabled: action.disabled,
+        });
+      });
+      return items;
+    }, [contextActions, readOnly]);
 
     const handleScroll = useCallback(
       (event: React.UIEvent<HTMLDivElement>) => {
@@ -662,7 +806,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
 
     const handleContextMenu = useCallback(
       (event: React.MouseEvent) => {
-        if (readOnly) {
+        if (readOnly || contextMenuItems.length === 0) {
           return;
         }
         event.preventDefault();
@@ -672,7 +816,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           visible: true,
         });
       },
-      [readOnly],
+      [contextMenuItems.length, readOnly],
     );
 
     const closeContextMenu = useCallback(() => {
@@ -684,7 +828,14 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         return;
       }
       setContextMenuState(prev => ({ ...prev, visible: false }));
+      setContextActions([]);
     }, [readOnly]);
+
+    useEffect(() => {
+      if (contextMenuState.visible && contextMenuItems.length === 0) {
+        setContextMenuState(prev => ({ ...prev, visible: false }));
+      }
+    }, [contextMenuItems, contextMenuState.visible]);
 
     const initialConfig = useMemo(
       () => ({
@@ -694,7 +845,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         onError: (error: Error) => {
           throw error;
         },
-        nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode],
+        nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, ImageNode],
         editorState: (editor: LexicalEditor) => {
           const initialHtml = (initialHtmlRef.current ?? '').trim();
           if (!initialHtml) {
@@ -765,9 +916,15 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           {!readOnly && <AutoFocusPlugin />}
           <ListPlugin />
           <LinkPlugin />
+          <ImagePlugin />
           <OnChangePlugin onChange={handleChange} ignoreSelectionChange={true} />
           {!readOnly && (
-            <ContextMenu state={contextMenuState} actions={contextActions} onClose={closeContextMenu} />
+            <ContextMenuComponent
+              isOpen={contextMenuState.visible && contextMenuItems.length > 0}
+              position={{ x: contextMenuState.x, y: contextMenuState.y }}
+              items={contextMenuItems}
+              onClose={closeContextMenu}
+            />
           )}
         </LexicalComposer>
       </div>
