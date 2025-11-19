@@ -5,7 +5,7 @@ DocForge is a desktop application designed to streamline the process of creating
 ## Key Features
 
 - **Modern, Draggable Title Bar:** A sleek, VS Code-style custom title bar maximizes screen space and integrates essential functions (Electron version only).
-- **Integrated Command Palette:** Quickly access all core functions from a central search bar.
+- **Integrated Command Palette:** Quickly access all core functions from a central search bar, including editor actions such as formatting, locking, AI refinement, and emoji generation.
 - **Hierarchical Document Organization:** Organize your documents in a familiar folder structure. Create nested subfolders, duplicate items, and use drag-and-drop to rearrange your workspace or import files from your computer.
 - **Clipboard Capture:** Turn whatever is on your system clipboard into a document in one step—DocForge classifies the contents automatically, generates a title with your connected LLM when possible, and prompts you to restore permissions if clipboard access is blocked.
 - **Full Context Menu & Keyboard Navigation:** Navigate and manage items using a complete right-click context menu or use only the keyboard for a faster workflow.
@@ -13,6 +13,7 @@ DocForge is a desktop application designed to streamline the process of creating
 - **One-Click Formatting:** Clean up Markdown, JSON, JavaScript, and TypeScript documents directly from the editor toolbar.
 - **Cancel Unsaved Changes:** Instantly roll a document back to its last saved state with a dedicated toolbar button when an experiment goes sideways.
 - **Document Locking:** Protect sensitive drafts by toggling a padlock button that flips the editor into a read-only mode until you intentionally unlock it.
+- **Emoji-Enhanced Titles:** Insert emoji directly into document and folder names or let the AI suggest a prefix so your workspace stays scannable at a glance.
 - **Multi-Document Tabs:** Keep several documents open at once, pin important files, and quickly jump between them using the tab strip and overflow picker.
 - **Multi-Format Live Preview:** Get a real-time, rendered preview for Markdown, HTML, PDFs, and common image formats. The preview can be displayed side-by-side (vertically or horizontally) with the editor, and binary formats open straight into preview mode with zoom and pan controls tailored to each viewer.
 - **Focused Workspace Zoom:** Use a single set of zoom controls that automatically follow whichever pane—editor or preview—has focus, complete with 5% increments, keyboard and mouse support, and quick resets.
@@ -25,7 +26,7 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Version History:** Explicitly save new versions of your documents. Manage your history by viewing diffs, deleting old versions, and restoring to any point in time.
 - **Local LLM Discovery:** Automatically detects running local LLM providers like Ollama and LM Studio for easy setup.
 - **Highly Customizable:**
-    - **Interface:** Switch between light and dark themes, adjust the UI scale, and choose from multiple icon sets.
+    - **Interface:** Switch between light and dark themes, adjust the UI scale, choose from multiple icon sets, and fine-tune accent colors with the compact picker.
     - **Keyboard Shortcuts:** Remap default shortcuts for core application commands to fit your preferences.
 - **Database Management:** A dedicated settings panel allows you to view database statistics, run integrity checks, and perform maintenance like backups and optimization.
 - **Workspace Bootstrap:** Create a brand new SQLite database from the status bar or settings to start fresh without leaving the app.
@@ -91,7 +92,7 @@ To create a new public build of DocForge:
 3. Review the Markdown documentation (README, manuals, and release notes) so the written guidance matches the current workflow.
 4. Sync the documentation copies under `docs/` (README, manuals, version log) with any updates made at the project root.
 5. Commit the changes and push them to the default branch so the release tag points at the finalized documentation.
-6. Create and push a tag that matches the new version (for example, `git tag v0.7.0` followed by `git push origin v0.7.0`) to trigger the automated release workflow.
+6. Create and push a tag that matches the new version (for example, `git tag v0.8.0` followed by `git push origin v0.8.0`) to trigger the automated release workflow.
 7. Monitor the "Release" workflow run, then confirm that the published GitHub release lists the correct notes and includes installers for every platform before announcing availability.
 
 ## Application Icon Workflow

@@ -66,6 +66,8 @@ const RELATIVE_TIME_DIVISIONS: { amount: number; unit: Intl.RelativeTimeFormatUn
   { amount: Number.POSITIVE_INFINITY, unit: 'year' },
 ];
 
+const LAST_SAVED_LOCALE = 'en-US';
+
 interface ZoomButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   hint: string;
   icon: React.ReactNode;
@@ -208,8 +210,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
       return { fallback: 'Invalid date' };
     }
 
-    const absolute = date.toLocaleString();
-    const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    const absolute = date.toLocaleString(LAST_SAVED_LOCALE);
+    const formatter = new Intl.RelativeTimeFormat(LAST_SAVED_LOCALE, { numeric: 'auto' });
     let duration = Math.round((date.getTime() - Date.now()) / 1000);
 
     for (const division of RELATIVE_TIME_DIVISIONS) {
