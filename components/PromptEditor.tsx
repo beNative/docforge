@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { DocumentCommandTriggers, DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon } from './Icons';
+import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon, CodeIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
@@ -10,6 +10,7 @@ import IconButton from './IconButton';
 import Button from './Button';
 import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
 import MonacoDiffEditor from './MonacoDiffEditor';
+import RichTextEditor, { type RichTextEditorHandle } from './RichTextEditor';
 import PreviewPane from './PreviewPane';
 import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
@@ -19,7 +20,7 @@ import EmojiPickerOverlay from './EmojiPickerOverlay';
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
   onSave: (prompt: Partial<Omit<DocumentOrFolder, 'id' | 'content'>>) => void;
-  onCommitVersion: (content: string) => Promise<void> | void;
+  onCommitVersion: (documentId: string, content: string) => Promise<void> | void;
   onDelete: (id: string) => void;
   settings: Settings;
   onShowHistory: () => void;
@@ -89,6 +90,37 @@ const PREVIEWABLE_LANGUAGES = new Set<string>([
   'image/svg+xml',
 ]);
 
+const RICH_TEXT_PLACEHOLDER_TEXT = 'This is a rich text document with inline formatting.';
+const RICH_TEXT_PLACEHOLDER_REGEX = /This is a rich text document with inline formatting\./g;
+
+const sanitizeDocumentContent = (
+  raw: string | null | undefined,
+  isRichText: boolean,
+): string => {
+  const base = raw ?? '';
+  if (!isRichText) {
+    return base;
+  }
+  const trimmed = base.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const textContent = trimmed.replace(/<[^>]+>/g, '').trim();
+  if (textContent !== RICH_TEXT_PLACEHOLDER_TEXT) {
+    return base;
+  }
+  const leftover = trimmed
+    .replace(RICH_TEXT_PLACEHOLDER_REGEX, '')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+  if (leftover.length === 0) {
+    return '';
+  }
+  return base;
+};
+
+type EditorEngine = 'lexical' | 'monaco';
+
 const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint: string | null | undefined): ViewMode => {
   if (mode) return mode;
   const normalizedHint = languageHint?.toLowerCase();
@@ -132,11 +164,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onZoomTargetChange,
   commandTriggers,
 }) => {
+  const isRichTextDocument = documentNode.doc_type === 'rich_text';
+  const initialContent = sanitizeDocumentContent(documentNode.content, isRichTextDocument);
   const [title, setTitle] = useState(documentNode.title);
-  const [content, setContent] = useState(documentNode.content || '');
-  const [baselineContent, setBaselineContent] = useState(documentNode.content || '');
+  const [content, setContent] = useState(initialContent);
+  const [baselineContent, setBaselineContent] = useState(initialContent);
   const [isDiffMode, setIsDiffMode] = useState(false);
-  
+
   const [isRefining, setIsRefining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refinedContent, setRefinedContent] = useState<string | null>(null);
@@ -151,6 +185,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [splitSize, setSplitSize] = useState(50);
   const isLocked = Boolean(documentNode.locked);
   const [isLocking, setIsLocking] = useState(false);
+  const sanitizedDocumentContent = useMemo(
+    () => sanitizeDocumentContent(documentNode.content, isRichTextDocument),
+    [documentNode.content, isRichTextDocument],
+  );
+  const editorEnginePreferencesRef = useRef<Map<string, EditorEngine>>(new Map());
+  const [editorEngine, setEditorEngine] = useState<EditorEngine>(isRichTextDocument ? 'lexical' : 'monaco');
   const { addLog } = useLogger();
   const { skipNextAutoSave } = useDocumentAutoSave({
     documentId: documentNode.id,
@@ -161,7 +201,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     onCommitVersion,
     addLog,
   });
-  
+
   const scriptPanelMinHeight = 180;
   const [isScriptPanelCollapsed, setIsScriptPanelCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
@@ -198,6 +238,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const languageButtonRef = useRef<HTMLButtonElement | null>(null);
   const isContentInitialized = useRef(false);
   const editorRef = useRef<CodeEditorHandle>(null);
+  const richTextEditorRef = useRef<RichTextEditorHandle>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
   const isSyncing = useRef(false);
   const syncTimeout = useRef<number | null>(null);
@@ -241,39 +282,50 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   // Keep local editor state in sync with document updates without clobbering unsaved edits.
   useEffect(() => {
-    const nextContent = documentNode.content ?? '';
+    const nextContent = sanitizedDocumentContent;
 
     if (documentNode.id !== prevDocumentIdRef.current) {
-        setTitle(documentNode.title);
-        setContent(nextContent);
-        setBaselineContent(nextContent);
-        setViewMode(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
-        setSplitSize(50);
-        isContentInitialized.current = true;
-        setIsDirty(false);
-        setIsSaving(false);
-        setIsDiffMode(false);
-        prevDocumentIdRef.current = documentNode.id;
-        prevDocumentContentRef.current = documentNode.content;
-        return;
+      setTitle(documentNode.title);
+      setContent(nextContent);
+      setBaselineContent(nextContent);
+      setViewMode(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
+      setSplitSize(50);
+      isContentInitialized.current = true;
+      setIsDirty(false);
+      setIsSaving(false);
+      setIsDiffMode(false);
+      prevDocumentIdRef.current = documentNode.id;
+      prevDocumentContentRef.current = sanitizedDocumentContent;
+      return;
     }
 
-    if (documentNode.content !== prevDocumentContentRef.current) {
-        prevDocumentContentRef.current = documentNode.content;
-        setBaselineContent(nextContent);
-        if (!isDirty) {
-            setContent(nextContent);
-        }
+    if (sanitizedDocumentContent !== prevDocumentContentRef.current) {
+      prevDocumentContentRef.current = sanitizedDocumentContent;
+      setBaselineContent(nextContent);
+      if (!isDirty) {
+        setContent(nextContent);
+      }
     }
-  }, [documentNode.id, documentNode.content, documentNode.default_view_mode, documentNode.language_hint, documentNode.title, isDirty]);
+  }, [documentNode.id, sanitizedDocumentContent, documentNode.default_view_mode, documentNode.language_hint, documentNode.title, isDirty]);
 
   useEffect(() => {
     setTitle(documentNode.title);
   }, [documentNode.id, documentNode.title]);
 
   useEffect(() => {
+    if (isRichTextDocument) {
+      const stored = editorEnginePreferencesRef.current.get(documentNode.id) ?? 'lexical';
+      editorEnginePreferencesRef.current.set(documentNode.id, stored);
+      setEditorEngine(stored);
+    } else {
+      editorEnginePreferencesRef.current.set(documentNode.id, 'monaco');
+      setEditorEngine('monaco');
+    }
+  }, [documentNode.id, isRichTextDocument]);
+
+  useEffect(() => {
     if (viewMode === 'preview' && isDiffMode) {
-        setIsDiffMode(false);
+      setIsDiffMode(false);
     }
   }, [viewMode, isDiffMode]);
 
@@ -287,19 +339,19 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   useEffect(() => {
     // Only mark as dirty after the initial content has been loaded.
     if (isContentInitialized.current) {
-        setIsDirty(content !== documentNode.content);
+      setIsDirty(content !== sanitizedDocumentContent);
     }
-  }, [content, documentNode.content]);
+  }, [content, sanitizedDocumentContent]);
 
   useEffect(() => {
     if (isLocked && !prevLockedRef.current) {
-      const nextContent = documentNode.content ?? '';
+      const nextContent = sanitizedDocumentContent;
       setContent(nextContent);
       setBaselineContent(nextContent);
       setIsDirty(false);
     }
     prevLockedRef.current = isLocked;
-  }, [isLocked, documentNode.content]);
+  }, [isLocked, sanitizedDocumentContent]);
 
   useEffect(() => {
   }, [content]);
@@ -321,15 +373,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }, 500);
     return () => clearTimeout(handler);
   }, [title, onSave, documentNode.title, isLocked]);
-  
+
   // Triggered by command palette
   useEffect(() => {
     if (isInitialMount.current) {
-        isInitialMount.current = false;
-        return;
+      isInitialMount.current = false;
+      return;
     }
     if (formatTrigger > 0) {
-        editorRef.current?.format();
+      editorRef.current?.format();
     }
   }, [formatTrigger]);
 
@@ -353,13 +405,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
     if (!isResizing.current || !splitContainerRef.current) return;
-    
+
     const container = splitContainerRef.current;
     const rect = container.getBoundingClientRect();
     const newSize = viewMode === 'split-vertical'
-        ? ((e.clientX - rect.left) / rect.width) * 100
-        : ((e.clientY - rect.top) / rect.height) * 100;
-    
+      ? ((e.clientX - rect.left) / rect.width) * 100
+      : ((e.clientY - rect.top) / rect.height) * 100;
+
     setSplitSize(Math.max(10, Math.min(90, newSize)));
   }, [viewMode]);
 
@@ -367,19 +419,19 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     window.addEventListener('mousemove', handleGlobalMouseMove);
     window.addEventListener('mouseup', handleGlobalMouseUp);
     return () => {
-        window.removeEventListener('mousemove', handleGlobalMouseMove);
-        window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
   }, [handleGlobalMouseMove, handleGlobalMouseUp]);
 
   // --- Scroll Synchronization Logic ---
   const handleEditorScroll = useCallback((scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number; }) => {
     if (!viewMode.startsWith('split-') || isSyncing.current || !previewScrollRef.current) return;
-    
+
     if (scrollInfo.scrollHeight <= scrollInfo.clientHeight) return;
 
     const percentage = scrollInfo.scrollTop / (scrollInfo.scrollHeight - scrollInfo.clientHeight);
-    
+
     const previewEl = previewScrollRef.current;
     if (previewEl.scrollHeight <= previewEl.clientHeight) return;
     const newPreviewScrollTop = percentage * (previewEl.scrollHeight - previewEl.clientHeight);
@@ -389,12 +441,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
     if (syncTimeout.current) clearTimeout(syncTimeout.current);
     syncTimeout.current = window.setTimeout(() => {
-        isSyncing.current = false;
+      isSyncing.current = false;
     }, 100);
   }, [viewMode]);
 
   const handlePreviewScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (!viewMode.startsWith('split-') || isSyncing.current || !editorRef.current) return;
+    if (!viewMode.startsWith('split-') || isSyncing.current) return;
+
+    const editorHandle = editorEngine === 'monaco' ? editorRef.current : richTextEditorRef.current;
+    if (!editorHandle) return;
 
     const previewEl = e.currentTarget;
     const { scrollTop, scrollHeight, clientHeight } = previewEl;
@@ -402,22 +457,21 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     if (scrollHeight <= clientHeight) return;
 
     const percentage = scrollTop / (scrollHeight - clientHeight);
-    
-    const editor = editorRef.current;
-    editor.getScrollInfo().then(editorInfo => {
-        if (!isSyncing.current && editorInfo.scrollHeight > editorInfo.clientHeight) {
-            const newEditorScrollTop = percentage * (editorInfo.scrollHeight - editorInfo.clientHeight);
-            
-            isSyncing.current = true;
-            editor.setScrollTop(newEditorScrollTop);
 
-            if (syncTimeout.current) clearTimeout(syncTimeout.current);
-            syncTimeout.current = window.setTimeout(() => {
-                isSyncing.current = false;
-            }, 100);
-        }
+    editorHandle.getScrollInfo().then(editorInfo => {
+      if (!isSyncing.current && editorInfo.scrollHeight > editorInfo.clientHeight) {
+        const newEditorScrollTop = percentage * (editorInfo.scrollHeight - editorInfo.clientHeight);
+
+        isSyncing.current = true;
+        editorHandle.setScrollTop(newEditorScrollTop);
+
+        if (syncTimeout.current) clearTimeout(syncTimeout.current);
+        syncTimeout.current = window.setTimeout(() => {
+          isSyncing.current = false;
+        }, 100);
+      }
     });
-  }, [viewMode]);
+  }, [viewMode, editorEngine]);
 
 
 
@@ -434,7 +488,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
     addLog('INFO', `User action: Manually save version for document "${title}".`);
     setIsSaving(true);
-    const commitPromise = Promise.resolve(onCommitVersion(content));
+    const commitPromise = Promise.resolve(onCommitVersion(documentNode.id, content));
     commitPromise
       .then(() => {
         setIsDirty(false);
@@ -448,14 +502,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       .finally(() => {
         setIsSaving(false);
       });
-  }, [isLocked, isDirty, isRefining, isSaving, addLog, title, onCommitVersion, content]);
+  }, [isLocked, isDirty, isRefining, isSaving, addLog, title, onCommitVersion, content, documentNode.id]);
 
   const handleCancelChanges = useCallback(() => {
     if (!isDirty || isSaving) {
       return;
     }
 
-    const originalContent = documentNode.content ?? '';
+    const originalContent = sanitizedDocumentContent;
     addLog('INFO', `User action: Canceled changes for document "${documentNode.title}".`);
     skipNextAutoSave();
     setError(null);
@@ -464,7 +518,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setBaselineContent(originalContent);
     setTitle(documentNode.title);
     setIsDirty(false);
-  }, [isDirty, isSaving, documentNode.content, documentNode.title, addLog, skipNextAutoSave]);
+  }, [isDirty, isSaving, sanitizedDocumentContent, documentNode.title, addLog, skipNextAutoSave]);
 
   const handleDeleteDocument = () => {
     skipNextAutoSave();
@@ -476,11 +530,26 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setViewMode(newMode);
     onViewModeChange(newMode);
   }, [onViewModeChange]);
-  
+
+  const handleEditorEngineChange = useCallback((engine: EditorEngine) => {
+    if (!isRichTextDocument) {
+      editorEnginePreferencesRef.current.set(documentNode.id, 'monaco');
+      setEditorEngine('monaco');
+      return;
+    }
+    editorEnginePreferencesRef.current.set(documentNode.id, engine);
+    setEditorEngine(engine);
+  }, [documentNode.id, isRichTextDocument]);
+
   const handleFormatDocument = () => {
     if (isLocked) {
       setError('Document is locked and cannot be modified.');
       addLog('WARNING', `Format request blocked for locked document "${title}".`);
+      return;
+    }
+    if (editorEngine === 'lexical') {
+      richTextEditorRef.current?.format();
+      addLog('INFO', `Triggered rich text format for document "${title}".`);
       return;
     }
     editorRef.current?.format();
@@ -657,9 +726,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setTimeout(() => setIsCopied(false), 2000);
   }, [content, addLog]);
 
-  const language = documentNode.language_hint || 'plaintext';
+  const handleRichTextChange = useCallback((html: string) => {
+    if (isLocked) {
+      return;
+    }
+    setContent(html);
+  }, [isLocked]);
+
+  const rawLanguage = documentNode.language_hint || 'plaintext';
+  const language = isRichTextDocument ? 'html' : rawLanguage;
   const normalizedLanguage = language.toLowerCase();
-  const supportsAiTools = ['markdown', 'plaintext'].includes(normalizedLanguage);
+  const supportsAiTools = ['markdown', 'plaintext', 'html'].includes(normalizedLanguage);
   const canAddEmojiToTitle = documentNode.type === 'document';
   const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
   const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
@@ -790,7 +867,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       target.removeEventListener('pointercancel', handlePointerCancel);
       try {
         target.releasePointerCapture(pointerId);
-      } catch {}
+      } catch { }
     };
 
     const handlePointerUp = () => {
@@ -803,12 +880,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
     try {
       target.setPointerCapture(pointerId);
-    } catch {}
+    } catch { }
     target.addEventListener('pointermove', handlePointerMove);
     target.addEventListener('pointerup', handlePointerUp);
     target.addEventListener('pointercancel', handlePointerCancel);
   }, [scriptPanelHeight, scriptPanelMinHeight]);
-  
+
   const handlePreviewFocus = useCallback(() => {
     onZoomTargetChange?.('preview');
   }, [onZoomTargetChange]);
@@ -822,22 +899,34 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const renderContent = () => {
     const editor = isDiffMode
       ? (
-          <MonacoDiffEditor
-            oldText={baselineContent}
-            newText={content}
-            language={language}
-            renderMode="inline"
-            readOnly={isLocked}
-            onChange={isLocked ? undefined : setContent}
+        <MonacoDiffEditor
+          oldText={baselineContent}
+          newText={content}
+          language={language}
+          renderMode="inline"
+          readOnly={isLocked || editorEngine === 'lexical'}
+          onChange={isLocked || editorEngine === 'lexical' ? undefined : setContent}
+          onScroll={handleEditorScroll}
+          fontFamily={settings.editorFontFamily}
+          fontSize={scaledEditorFontSize}
+          activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
+          activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+          onFocusChange={handleEditorFocusChange}
+        />
+      )
+      : editorEngine === 'lexical'
+        ? (
+          <RichTextEditor
+            key={documentNode.id}
+            ref={richTextEditorRef}
+            html={content}
+            onChange={handleRichTextChange}
             onScroll={handleEditorScroll}
-            fontFamily={settings.editorFontFamily}
-            fontSize={scaledEditorFontSize}
-            activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
-            activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
+            readOnly={isLocked}
             onFocusChange={handleEditorFocusChange}
           />
         )
-      : (
+        : (
           <MonacoEditor
             ref={editorRef}
             content={content}
@@ -875,32 +964,32 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         />
       </div>
     );
-    
-    switch(viewMode) {
-        case 'edit': return editor;
-        case 'preview': return supportsPreview ? preview : editor;
-        case 'split-vertical':
-            return (
-                <div ref={splitContainerRef} className="grid h-full" style={{ gridTemplateColumns: `${splitSize}% auto minmax(0, 1fr)` }}>
-                    <div className="h-full overflow-hidden min-w-0">{editor}</div>
-                    <div
-                      onMouseDown={handleSplitterMouseDown}
-                      className="w-1.5 h-full cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
-                    />
-                    <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
-                </div>
-            );
-        case 'split-horizontal':
-            return (
-                <div ref={splitContainerRef} className="grid w-full h-full" style={{ gridTemplateRows: `${splitSize}% auto minmax(0, 1fr)` }}>
-                    <div className="w-full overflow-hidden min-h-0">{editor}</div>
-                    <div
-                      onMouseDown={handleSplitterMouseDown}
-                      className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
-                    />
-                    <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
-                </div>
-            );
+
+    switch (viewMode) {
+      case 'edit': return editor;
+      case 'preview': return supportsPreview ? preview : editor;
+      case 'split-vertical':
+        return (
+          <div ref={splitContainerRef} className="grid h-full" style={{ gridTemplateColumns: `${splitSize}% auto minmax(0, 1fr)` }}>
+            <div className="h-full overflow-hidden min-w-0">{editor}</div>
+            <div
+              onMouseDown={handleSplitterMouseDown}
+              className="w-1.5 h-full cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
+            />
+            <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
+          </div>
+        );
+      case 'split-horizontal':
+        return (
+          <div ref={splitContainerRef} className="grid w-full h-full" style={{ gridTemplateRows: `${splitSize}% auto minmax(0, 1fr)` }}>
+            <div className="w-full overflow-hidden min-h-0">{editor}</div>
+            <div
+              onMouseDown={handleSplitterMouseDown}
+              className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
+            />
+            <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
+          </div>
+        );
     }
   }
 
@@ -908,127 +997,147 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     <div className="flex-1 flex flex-col bg-background overflow-y-auto">
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onContextMenu={handleTitleContextMenu}
-              onSelect={updateTitleSelection}
-              onKeyUp={updateTitleSelection}
-              onMouseUp={updateTitleSelection}
-              placeholder="Document Title"
-              disabled={isGeneratingTitle}
-              readOnly={isLocked}
-              className={`bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate ${isLocked ? 'cursor-default' : ''}`}
-            />
-            {canAddEmojiToTitle && (
-              <IconButton
-                onClick={handleAddEmojiToTitle}
-                disabled={
-                  isGeneratingEmoji ||
-                  !title.trim() ||
-                  !settings.llmProviderUrl ||
-                  !settings.llmModelName ||
-                  isLocked ||
-                  isLocking
-                }
-                tooltip="Add Emoji to Title"
-                size="xs"
-                variant="ghost"
-                className="flex-shrink-0"
-              >
-                {isGeneratingEmoji ? <Spinner /> : <span className="text-base">😊</span>}
-              </IconButton>
-            )}
-            {supportsAiTools && (
-              <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl || isLocked || isLocking} tooltip="Regenerate Title with AI" size="xs" variant="ghost" className="flex-shrink-0">
-                {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-4 h-4 text-primary" />}
-              </IconButton>
-            )}
-            {isDirty && <div className="relative group flex-shrink-0"><div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div><span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-md opacity-0 group-hover:opacity-100">Unsaved changes</span></div>}
-            {isLocked && (
-              <div className="flex items-center gap-1 text-xs font-semibold text-primary flex-shrink-0">
-                <LockClosedIcon className="w-3.5 h-3.5" />
-                <span>Locked</span>
-              </div>
-            )}
+          <input
+            ref={titleInputRef}
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onContextMenu={handleTitleContextMenu}
+            onSelect={updateTitleSelection}
+            onKeyUp={updateTitleSelection}
+            onMouseUp={updateTitleSelection}
+            placeholder="Document Title"
+            disabled={isGeneratingTitle}
+            readOnly={isLocked}
+            className={`bg-transparent text-base font-semibold text-text-main focus:outline-none w-full truncate ${isLocked ? 'cursor-default' : ''}`}
+          />
+          {canAddEmojiToTitle && (
+            <IconButton
+              onClick={handleAddEmojiToTitle}
+              disabled={
+                isGeneratingEmoji ||
+                !title.trim() ||
+                !settings.llmProviderUrl ||
+                !settings.llmModelName ||
+                isLocked ||
+                isLocking
+              }
+              tooltip="Add Emoji to Title"
+              size="xs"
+              variant="ghost"
+              className="flex-shrink-0"
+            >
+              {isGeneratingEmoji ? <Spinner /> : <span className="text-base">😊</span>}
+            </IconButton>
+          )}
+          {supportsAiTools && (
+            <IconButton onClick={handleGenerateTitle} disabled={isGeneratingTitle || !content.trim() || !settings.llmProviderUrl || isLocked || isLocking} tooltip="Regenerate Title with AI" size="xs" variant="ghost" className="flex-shrink-0">
+              {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-4 h-4 text-primary" />}
+            </IconButton>
+          )}
+          {isDirty && <div className="relative group flex-shrink-0"><div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div><span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-md opacity-0 group-hover:opacity-100">Unsaved changes</span></div>}
+          {isLocked && (
+            <div className="flex items-center gap-1 text-xs font-semibold text-primary flex-shrink-0">
+              <LockClosedIcon className="w-3.5 h-3.5" />
+              <span>Locked</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
-            <div className="flex items-center">
-              <label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">
-                Language:
-              </label>
-              <LanguageDropdown
-                id="language-select"
-                value={language}
-                onChange={onLanguageChange}
-                ref={languageButtonRef}
-                openTrigger={commandTriggers.openLanguageSelector}
-              />
+          <div className="flex items-center">
+            <label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">
+              Language:
+            </label>
+            <LanguageDropdown
+              id="language-select"
+              value={language}
+              onChange={onLanguageChange}
+              ref={languageButtonRef}
+              openTrigger={commandTriggers.openLanguageSelector}
+            />
+          </div>
+          <div className="h-5 w-px bg-border-color mx-1"></div>
+          {supportsPreview && (
+            <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
+              <IconButton onClick={() => handleViewModeButton('edit')} tooltip="Editor Only" size="xs" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : ''}`}><PencilIcon className="w-4 h-4" /></IconButton>
+              <IconButton onClick={() => handleViewModeButton('preview')} tooltip="Preview Only" size="xs" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : ''}`}><EyeIcon className="w-4 h-4" /></IconButton>
+              <IconButton onClick={() => handleViewModeButton('split-vertical')} tooltip="Split Vertical" size="xs" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : ''}`}><LayoutVerticalIcon className="w-4 h-4" /></IconButton>
+              <IconButton onClick={() => handleViewModeButton('split-horizontal')} tooltip="Split Horizontal" size="xs" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-4 h-4" /></IconButton>
             </div>
-            <div className="h-5 w-px bg-border-color mx-1"></div>
-            {supportsPreview && (
-              <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
-                  <IconButton onClick={() => handleViewModeButton('edit')} tooltip="Editor Only" size="xs" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : ''}`}><PencilIcon className="w-4 h-4" /></IconButton>
-                  <IconButton onClick={() => handleViewModeButton('preview')} tooltip="Preview Only" size="xs" className={`rounded-md ${viewMode === 'preview' ? 'bg-secondary text-primary' : ''}`}><EyeIcon className="w-4 h-4" /></IconButton>
-                  <IconButton onClick={() => handleViewModeButton('split-vertical')} tooltip="Split Vertical" size="xs" className={`rounded-md ${viewMode === 'split-vertical' ? 'bg-secondary text-primary' : ''}`}><LayoutVerticalIcon className="w-4 h-4" /></IconButton>
-                  <IconButton onClick={() => handleViewModeButton('split-horizontal')} tooltip="Split Horizontal" size="xs" className={`rounded-md ${viewMode === 'split-horizontal' ? 'bg-secondary text-primary' : ''}`}><LayoutHorizontalIcon className="w-4 h-4" /></IconButton>
-              </div>
-            )}
-            <div className="h-5 w-px bg-border-color mx-1"></div>
-            {supportsFormatting && (
-              <IconButton onClick={handleFormatDocument} tooltip="Format Document" size="xs" variant="ghost" disabled={isLocked || isLocking}>
-                <FormatIcon className="w-4 h-4" />
+          )}
+          {isRichTextDocument && (
+            <div className="flex items-center p-1 bg-background rounded-lg border border-border-color ml-2">
+              <IconButton
+                onClick={() => handleEditorEngineChange('lexical')}
+                tooltip="Visual Editor"
+                size="xs"
+                className={`rounded-md ${editorEngine === 'lexical' ? 'bg-secondary text-primary' : ''}`}
+              >
+                <SparklesIcon className="w-4 h-4" />
               </IconButton>
+              <IconButton
+                onClick={() => handleEditorEngineChange('monaco')}
+                tooltip="Source Editor"
+                size="xs"
+                className={`rounded-md ${editorEngine === 'monaco' ? 'bg-secondary text-primary' : ''}`}
+              >
+                <CodeIcon className="w-4 h-4" />
+              </IconButton>
+            </div>
+          )}
+          <div className="h-5 w-px bg-border-color mx-1"></div>
+          {supportsFormatting && (
+            <IconButton onClick={handleFormatDocument} tooltip="Format Document" size="xs" variant="ghost" disabled={isLocked || isLocking}>
+              <FormatIcon className="w-4 h-4" />
+            </IconButton>
+          )}
+          <IconButton
+            onClick={handleToggleLock}
+            tooltip={isLocked ? 'Unlock Document' : 'Lock Document'}
+            size="xs"
+            variant="ghost"
+            className={isLocked ? 'text-primary' : ''}
+            disabled={isLocking}
+          >
+            {isLocking ? <Spinner /> : isLocked ? <LockClosedIcon className="w-4 h-4" /> : <LockOpenIcon className="w-4 h-4" />}
+          </IconButton>
+          <IconButton
+            onClick={() => setIsDiffMode(prev => !prev)}
+            tooltip={isDiffMode ? 'Hide Inline Diff' : 'Show Inline Diff'}
+            size="xs"
+            variant="ghost"
+            disabled={viewMode === 'preview'}
+            className={isDiffMode ? 'bg-secondary text-primary' : ''}
+          >
+            <span className="font-semibold text-[11px] leading-none tracking-wide">Diff</span>
+          </IconButton>
+          <IconButton onClick={onShowHistory} tooltip="View Version History" size="xs" variant="ghost"><HistoryIcon className="w-4 h-4" /></IconButton>
+          <div className="h-5 w-px bg-border-color mx-1"></div>
+          <IconButton
+            onClick={handleCancelChanges}
+            disabled={!isDirty || isRefining || isSaving}
+            tooltip="Cancel Changes"
+            size="xs"
+            variant="ghost"
+          >
+            <UndoIcon className={`w-4 h-4 ${isDirty ? 'text-destructive-text' : ''}`} />
+          </IconButton>
+          <IconButton
+            onClick={handleManualSave}
+            disabled={!isDirty || isRefining || isSaving || isLocked || isLocking}
+            tooltip={isSaving ? 'Saving...' : 'Save Version'}
+            size="xs"
+            variant="ghost"
+          >
+            {isSaving ? (
+              <Spinner />
+            ) : (
+              <SaveIcon className={`w-4 h-4 ${isDirty ? 'text-primary' : ''}`} />
             )}
-            <IconButton
-              onClick={handleToggleLock}
-              tooltip={isLocked ? 'Unlock Document' : 'Lock Document'}
-              size="xs"
-              variant="ghost"
-              className={isLocked ? 'text-primary' : ''}
-              disabled={isLocking}
-            >
-              {isLocking ? <Spinner /> : isLocked ? <LockClosedIcon className="w-4 h-4" /> : <LockOpenIcon className="w-4 h-4" />}
-            </IconButton>
-            <IconButton
-              onClick={() => setIsDiffMode(prev => !prev)}
-              tooltip={isDiffMode ? 'Hide Inline Diff' : 'Show Inline Diff'}
-              size="xs"
-              variant="ghost"
-              disabled={viewMode === 'preview'}
-              className={isDiffMode ? 'bg-secondary text-primary' : ''}
-            >
-              <span className="font-semibold text-[11px] leading-none tracking-wide">Diff</span>
-            </IconButton>
-            <IconButton onClick={onShowHistory} tooltip="View Version History" size="xs" variant="ghost"><HistoryIcon className="w-4 h-4" /></IconButton>
-            <div className="h-5 w-px bg-border-color mx-1"></div>
-            <IconButton
-              onClick={handleCancelChanges}
-              disabled={!isDirty || isRefining || isSaving}
-              tooltip="Cancel Changes"
-              size="xs"
-              variant="ghost"
-            >
-              <UndoIcon className={`w-4 h-4 ${isDirty ? 'text-destructive-text' : ''}`} />
-            </IconButton>
-            <IconButton
-              onClick={handleManualSave}
-              disabled={!isDirty || isRefining || isSaving || isLocked || isLocking}
-              tooltip={isSaving ? 'Saving...' : 'Save Version'}
-              size="xs"
-              variant="ghost"
-            >
-              {isSaving ? (
-                <Spinner />
-              ) : (
-                <SaveIcon className={`w-4 h-4 ${isDirty ? 'text-primary' : ''}`} />
-              )}
-            </IconButton>
-            <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
-            {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining || isLocked} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
-            <IconButton onClick={handleDeleteDocument} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
+          </IconButton>
+          <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
+          {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining || isLocked} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
+          <IconButton onClick={handleDeleteDocument} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
         </div>
       </div>
       <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>
@@ -1086,9 +1195,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         <Modal onClose={() => setRefinedContent(null)} title="AI Refinement Suggestion" initialFocusRef={acceptButtonRef}>
           <form onSubmit={(e) => { e.preventDefault(); acceptRefinement(); }}>
             <div className="p-6 text-text-main">
-                <p className="text-text-secondary mb-4 text-sm">The AI suggests the following refinement.</p>
-                <div className="p-3 my-4 bg-background border border-border-color rounded-md whitespace-pre-wrap font-mono text-sm max-h-96 overflow-y-auto">{refinedContent}</div>
-                <div className="flex justify-end gap-3 mt-6"><Button onClick={() => setRefinedContent(null)} variant="secondary" type="button">Discard</Button><Button ref={acceptButtonRef} type="submit" variant="primary">Accept</Button></div>
+              <p className="text-text-secondary mb-4 text-sm">The AI suggests the following refinement.</p>
+              <div className="p-3 my-4 bg-background border border-border-color rounded-md whitespace-pre-wrap font-mono text-sm max-h-96 overflow-y-auto">{refinedContent}</div>
+              <div className="flex justify-end gap-3 mt-6"><Button onClick={() => setRefinedContent(null)} variant="secondary" type="button">Discard</Button><Button ref={acceptButtonRef} type="submit" variant="primary">Accept</Button></div>
             </div>
           </form>
         </Modal>

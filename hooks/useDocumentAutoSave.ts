@@ -8,7 +8,7 @@ interface UseDocumentAutoSaveOptions {
   title: string;
   isDirty: boolean;
   isSaving: boolean;
-  onCommitVersion: (content: string) => Promise<void> | void;
+  onCommitVersion: (documentId: string, content: string) => Promise<void> | void;
   addLog: (level: LogLevel, message: string) => void;
   skipRef?: MutableRefObject<boolean>;
 }
@@ -26,21 +26,10 @@ export const useDocumentAutoSave = ({
   const latestRef = useRef({ content, title, isDirty, isSaving });
   const localSkipRef = useRef(false);
 
-  useEffect(() => {
-    latestRef.current = { ...latestRef.current, content };
-  }, [content]);
-
-  useEffect(() => {
-    latestRef.current = { ...latestRef.current, title };
-  }, [title]);
-
-  useEffect(() => {
-    latestRef.current = { ...latestRef.current, isDirty };
-  }, [isDirty]);
-
-  useEffect(() => {
-    latestRef.current = { ...latestRef.current, isSaving };
-  }, [isSaving]);
+  latestRef.current.content = content;
+  latestRef.current.title = title;
+  latestRef.current.isDirty = isDirty;
+  latestRef.current.isSaving = isSaving;
 
   const skipNextAutoSave = useCallback(() => {
     localSkipRef.current = true;
@@ -66,7 +55,7 @@ export const useDocumentAutoSave = ({
       }
 
       addLog('INFO', `Auto-saving changes for document "${snapshot.title}" before leaving.`);
-      Promise.resolve(onCommitVersion(snapshot.content)).catch((err) => {
+      Promise.resolve(onCommitVersion(documentId, snapshot.content)).catch((err) => {
         const message = err instanceof Error ? err.message : 'Unknown error';
         addLog('ERROR', `Auto-save failed for document "${snapshot.title}": ${message}`);
       });

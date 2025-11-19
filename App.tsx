@@ -55,6 +55,8 @@ const PREVIEW_ZOOM_STEP = 0.05;
 
 const isElectron = !!window.electronAPI;
 
+const TREE_SELECTION_COMMAND_IDS = new Set(['delete-item', 'duplicate-item', 'rename-item']);
+
 const resolveClipboardHelpUrl = (): string | null => {
     if (typeof navigator === 'undefined') {
         return null;
@@ -1791,7 +1793,7 @@ export const MainApp: React.FC = () => {
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
-        const newDoc = await addDocument({ parentId: effectiveParentId });
+        const newDoc = await addDocument({ parentId: effectiveParentId, doc_type: 'rich_text', language_hint: 'html' });
         ensureNodeVisible(newDoc);
         activateDocumentTab(newDoc.id);
         setSelectedIds(new Set([newDoc.id]));
@@ -2128,12 +2130,9 @@ export const MainApp: React.FC = () => {
         }
     }, [activeNodeId, activeNode, updateItem, addLog]);
 
-    const handleCommitVersion = useCallback((content: string) => {
-        if (activeNodeId) {
-            return commitVersion(activeNodeId, content);
-        }
-        return Promise.resolve();
-    }, [activeNodeId, commitVersion]);
+    const handleCommitVersion = useCallback((documentId: string, content: string) => {
+        return commitVersion(documentId, content);
+    }, [commitVersion]);
     
     const handleSaveTemplate = (updatedTemplate: Partial<Omit<DocumentTemplate, 'template_id'>>) => {
         if (activeTemplateId) {
@@ -2861,19 +2860,25 @@ export const MainApp: React.FC = () => {
         };
     }, [handleGlobalMouseMove, handleGlobalMouseUp]);
     
-     useEffect(() => {
+    useEffect(() => {
         const shortcutMap = getShortcutMap(commands, settings.customShortcuts);
-        
+
         const handleKeyDown = (e: KeyboardEvent) => {
             const shortcut = formatShortcut(e);
             const command = shortcutMap.get(shortcut);
 
             const activeEl = document.activeElement;
             const isFormElement = activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
+            const isRichTextElement =
+                activeEl instanceof HTMLElement && Boolean(activeEl.closest('[data-component="rich-text-editor"]'));
             const isPaletteInput = activeEl === commandPaletteInputRef.current;
             const isCommandPaletteToggle = command?.id === 'toggle-command-palette';
 
             if (isFormElement && !isPaletteInput && !isCommandPaletteToggle) {
+                return;
+            }
+
+            if (isRichTextElement && command && TREE_SELECTION_COMMAND_IDS.has(command.id)) {
                 return;
             }
 
