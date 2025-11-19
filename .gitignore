@@ -27,3 +27,4 @@ assets/plantuml/plantuml.jar
 *.njsproj
 *.sln
 *.sw?
+/release
