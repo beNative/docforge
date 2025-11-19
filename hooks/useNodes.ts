@@ -62,10 +62,29 @@ export const useNodes = () => {
     addLog('INFO', `Moved ${draggedIds.length} item(s).`);
     await refreshNodes();
   }, [addLog, refreshNodes]);
-  
+
   const updateDocumentContent = useCallback(async (nodeId: string, newContent: string): Promise<void> => {
-      await repository.updateDocumentContent(nodeId, newContent);
-      addLog('DEBUG', `Content for node ${nodeId} saved.`);
+    await repository.updateDocumentContent(nodeId, newContent);
+
+    setNodes(currentNodes => {
+      const updateNodeInTree = (nodes: Node[]): Node[] => {
+        return nodes.map(node => {
+          if (node.node_id === nodeId) {
+            return {
+              ...node,
+              document: node.document ? { ...node.document, content: newContent } : undefined
+            };
+          }
+          if (node.children) {
+            return { ...node, children: updateNodeInTree(node.children) };
+          }
+          return node;
+        });
+      };
+      return updateNodeInTree(currentNodes);
+    });
+
+    addLog('DEBUG', `Content for node ${nodeId} saved.`);
   }, [addLog]);
 
   const importFiles = useCallback(

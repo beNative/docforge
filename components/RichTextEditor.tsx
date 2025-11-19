@@ -117,30 +117,30 @@ interface ContextMenuState {
 }
 
 const RICH_TEXT_THEME = {
-  paragraph: 'mb-2 text-sm leading-6 text-text-main',
+  paragraph: 'mb-3 text-base leading-7 text-text-main',
   heading: {
-    h1: 'text-2xl font-semibold text-text-main mb-4',
-    h2: 'text-xl font-semibold text-text-main mb-3',
-    h3: 'text-lg font-semibold text-text-main mb-2',
+    h1: 'text-3xl font-bold text-text-main mb-4 mt-6',
+    h2: 'text-2xl font-semibold text-text-main mb-3 mt-5',
+    h3: 'text-xl font-medium text-text-main mb-2 mt-4',
   },
-  quote: 'border-l-4 border-primary/40 pl-3 text-text-secondary italic mb-3',
+  quote: 'border-l-4 border-primary/50 pl-4 py-1 my-4 text-text-secondary italic bg-primary/5 rounded-r',
   list: {
     nested: {
       listitem: 'ml-4',
     },
-    ol: 'list-decimal ml-6 text-sm leading-6 text-text-main',
-    ul: 'list-disc ml-6 text-sm leading-6 text-text-main',
-    listitem: 'mb-1',
+    ol: 'list-decimal ml-8 mb-4 text-base leading-7 text-text-main',
+    ul: 'list-disc ml-8 mb-4 text-base leading-7 text-text-main',
+    listitem: 'mb-1 pl-1',
   },
   text: {
-    bold: 'font-semibold',
+    bold: 'font-bold text-text-main',
     italic: 'italic',
-    underline: 'underline',
-    strikethrough: 'line-through',
-    code: 'font-mono bg-secondary/80 rounded px-1 py-0.5 text-xs text-text-main',
+    underline: 'underline decoration-primary/50 underline-offset-4',
+    strikethrough: 'line-through opacity-70',
+    code: 'font-mono bg-secondary-hover rounded px-1.5 py-0.5 text-sm text-primary border border-border-color',
   },
-  link: 'text-primary underline hover:no-underline',
-  image: 'my-4 flex justify-center',
+  link: 'text-primary underline decoration-primary/30 hover:decoration-primary transition-colors cursor-pointer',
+  image: 'my-6 flex justify-center',
 };
 
 const Placeholder: React.FC = () => null;
@@ -149,15 +149,16 @@ const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, icon: Icon, isAct
   <IconButton
     type="button"
     tooltip={label}
-    size="sm"
+    size="xs"
     variant="ghost"
     onClick={onClick}
     disabled={disabled}
     aria-pressed={isActive}
     aria-label={label}
-    className={`text-text-secondary ${
-      isActive ? 'bg-primary/15 text-primary hover:text-primary' : 'hover:text-text-main'
-    } disabled:opacity-40 disabled:pointer-events-none`}
+    className={`transition-all duration-200 ${isActive
+        ? 'bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary shadow-sm'
+        : 'text-text-secondary hover:text-text-main hover:bg-secondary-hover'
+      } disabled:opacity-30 disabled:pointer-events-none`}
   >
     <Icon className="h-4 w-4" />
   </IconButton>
@@ -588,11 +589,12 @@ const ToolbarPlugin: React.FC<{
 
   return (
     <div
-      className="flex flex-wrap content-center items-center gap-x-1.5 gap-y-1 border-b border-border-color bg-secondary px-3 py-0.5 min-h-[1.75rem] overflow-x-hidden"
+      className="flex flex-wrap content-center items-center gap-x-0.5 gap-y-0.5 border-b border-border-color bg-secondary/50 backdrop-blur-sm px-2 py-0.5 overflow-hidden sticky top-0 z-10"
+      style={{ minHeight: '28px' }}
     >
       {renderedToolbarElements.map(element =>
         'type' in element ? (
-          <div key={element.id} className="mx-1 h-6 w-px bg-border-color/70" />
+          <div key={element.id} className="mx-1 h-3 w-px bg-border-color" />
         ) : (
           <ToolbarButton key={element.id} {...element} />
         ),
@@ -617,12 +619,19 @@ const HtmlContentSynchronizer: React.FC<{ html: string; lastAppliedHtmlRef: Reac
   useEffect(() => {
     const normalizedIncoming = html.trim();
 
-    if (normalizedIncoming === lastAppliedHtmlRef.current) {
-      return;
-    }
-
     editor.update(() => {
       const root = $getRoot();
+      const currentHtml = $generateHtmlFromNodes(editor).trim();
+
+      if (currentHtml === normalizedIncoming) {
+        lastAppliedHtmlRef.current = normalizedIncoming;
+        return;
+      }
+
+      if (normalizedIncoming === lastAppliedHtmlRef.current && currentHtml !== '') {
+        return;
+      }
+
       root.clear();
 
       if (!normalizedIncoming) {
@@ -632,7 +641,7 @@ const HtmlContentSynchronizer: React.FC<{ html: string; lastAppliedHtmlRef: Reac
 
       const parser = new DOMParser();
       const dom = parser.parseFromString(normalizedIncoming, 'text/html');
-      const nodes = $generateNodesFromDOM(editor, dom.body);
+      const nodes = $generateNodesFromDOM(editor, dom);
       nodes.forEach(node => root.append(node));
       lastAppliedHtmlRef.current = normalizedIncoming;
     });
@@ -669,7 +678,7 @@ const ImperativeBridgePlugin: React.FC<{
         }
         const parser = new DOMParser();
         const dom = parser.parseFromString(trimmed, 'text/html');
-        const nodes = $generateNodesFromDOM(editor, dom.body);
+        const nodes = $generateNodesFromDOM(editor, dom);
         nodes.forEach(node => root.append(node));
         lastAppliedHtmlRef.current = trimmed;
       });
@@ -916,7 +925,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           editor.update(() => {
             const root = $getRoot();
             root.clear();
-            const nodes = $generateNodesFromDOM(editor, dom.body);
+            const nodes = $generateNodesFromDOM(editor, dom);
             nodes.forEach(node => root.append(node));
             lastAppliedHtmlRef.current = initialHtml;
           });
@@ -926,7 +935,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     );
 
     return (
-      <div className="h-full w-full bg-secondary" data-component="rich-text-editor">
+      <div className="h-full w-full bg-secondary flex flex-col" data-component="rich-text-editor">
         <LexicalComposer initialConfig={initialConfig}>
           {!readOnly && (
             <ToolbarPlugin
@@ -945,15 +954,15 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           <HtmlContentSynchronizer html={html} lastAppliedHtmlRef={lastAppliedHtmlRef} />
           <div
             ref={scrollContainerRef}
-            className={`relative h-full overflow-auto ${readOnly ? 'cursor-not-allowed' : ''}`}
+            className={`relative flex-1 overflow-auto ${readOnly ? 'cursor-not-allowed' : ''}`}
             onScroll={handleScroll}
             onContextMenu={handleContextMenu}
           >
-            <div className="relative min-h-full px-6 py-4">
+            <div className="relative min-h-full px-4 py-6">
               <RichTextPlugin
                 contentEditable={(
                   <ContentEditable
-                    className="min-h-[calc(100vh-14rem)] outline-none text-sm leading-6 text-text-main"
+                    className="min-h-[calc(100vh-14rem)] outline-none"
                     onFocus={handleFocus}
                     onBlur={handleBlur}
                     spellCheck={!readOnly}
