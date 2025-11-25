@@ -15,6 +15,7 @@ import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
 import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
+import { TablePlugin } from '@lexical/react/LexicalTablePlugin';
 import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
@@ -64,6 +65,24 @@ import {
   $getNodeByKey,
   $setSelection,
 } from 'lexical';
+import {
+  $createTableSelection,
+  $deleteTableColumn__EXPERIMENTAL,
+  $deleteTableRow__EXPERIMENTAL,
+  $getTableCellNodeFromLexicalNode,
+  $getTableNodeFromLexicalNodeOrThrow,
+  $insertTableColumn__EXPERIMENTAL,
+  $insertTableRow__EXPERIMENTAL,
+  $isTableCellNode,
+  $isTableRowNode,
+  $isTableSelection,
+  INSERT_TABLE_COMMAND,
+  TableCellNode,
+  TableCellHeaderStates,
+  TableNode,
+  TableRowNode,
+  type TableSelection,
+} from '@lexical/table';
 import IconButton from './IconButton';
 import Button from './Button';
 import ContextMenuComponent, { type MenuItem as ContextMenuItem } from './ContextMenu';
@@ -87,6 +106,7 @@ import {
   ParagraphIcon,
   QuoteIcon,
   StrikethroughIcon,
+  TableIcon,
   UnderlineIcon,
 } from './rich-text/RichTextToolbarIcons';
 import { $createImageNode, ImageNode, INSERT_IMAGE_COMMAND, type ImagePayload } from './rich-text/ImageNode';
@@ -136,6 +156,12 @@ type SelectionSnapshot =
       focusType: 'text' | 'element';
     }
   | { type: 'node'; keys: string[] }
+  | {
+      type: 'table';
+      tableKey: string;
+      anchorCellKey: string;
+      focusCellKey: string;
+    }
   | null;
 
 const RICH_TEXT_THEME = {
@@ -163,6 +189,11 @@ const RICH_TEXT_THEME = {
   },
   link: 'text-primary underline decoration-primary/30 hover:decoration-primary transition-colors cursor-pointer',
   image: 'my-6 flex justify-center',
+  table: 'my-6 w-full border-collapse border border-border-color text-sm',
+  tableCell: 'border border-border-color px-3 py-2 align-top bg-secondary/40',
+  tableCellHeader: 'bg-secondary text-text-main font-semibold',
+  tableRow: 'even:bg-secondary/60',
+  tableSelection: 'outline outline-2 outline-primary',
 };
 
 const Placeholder: React.FC = () => null;
@@ -240,6 +271,200 @@ const LinkModal: React.FC<{
   );
 };
 
+const TableModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onInsertTable: (rows: number, columns: number, includeHeaderRow: boolean) => void;
+  onInsertRowAbove: () => void;
+  onInsertRowBelow: () => void;
+  onInsertColumnLeft: () => void;
+  onInsertColumnRight: () => void;
+  onDeleteRow: () => void;
+  onDeleteColumn: () => void;
+  onDeleteTable: () => void;
+  onToggleHeaderRow: () => void;
+  isInTable: boolean;
+  hasHeaderRow: boolean;
+}> = ({
+  isOpen,
+  onClose,
+  onInsertTable,
+  onInsertRowAbove,
+  onInsertRowBelow,
+  onInsertColumnLeft,
+  onInsertColumnRight,
+  onDeleteRow,
+  onDeleteColumn,
+  onDeleteTable,
+  onToggleHeaderRow,
+  isInTable,
+  hasHeaderRow,
+}) => {
+  const [rows, setRows] = useState(3);
+  const [columns, setColumns] = useState(3);
+  const [includeHeaderRow, setIncludeHeaderRow] = useState(true);
+  const [hoveredGrid, setHoveredGrid] = useState<{ rows: number; columns: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const displayRows = hoveredGrid?.rows ?? rows;
+  const displayColumns = hoveredGrid?.columns ?? columns;
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    setRows(3);
+    setColumns(3);
+    setIncludeHeaderRow(true);
+    setHoveredGrid(null);
+  }, [isOpen]);
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onInsertTable(displayRows, displayColumns, includeHeaderRow);
+  };
+
+  const handleGridClick = (row: number, column: number) => {
+    setRows(row);
+    setColumns(column);
+    setHoveredGrid(null);
+    onInsertTable(row, column, includeHeaderRow);
+  };
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <Modal title="Table options" onClose={onClose} initialFocusRef={inputRef}>
+      <form onSubmit={handleSubmit} className="px-4 py-3 space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm text-text-secondary">
+              <span>Select size</span>
+              <span>
+                {displayRows} × {displayColumns} cells
+              </span>
+            </div>
+            <div className="grid grid-cols-6 gap-1 rounded-md border border-border-color bg-secondary/70 p-3">
+              {Array.from({ length: 6 }).map((_, rowIndex) => (
+                <React.Fragment key={`row-${rowIndex}`}>
+                  {Array.from({ length: 6 }).map((_, columnIndex) => {
+                    const rowNumber = rowIndex + 1;
+                    const columnNumber = columnIndex + 1;
+                    const isActive =
+                      (hoveredGrid?.rows ?? rows) >= rowNumber && (hoveredGrid?.columns ?? columns) >= columnNumber;
+                    return (
+                      <button
+                        type="button"
+                        key={`cell-${rowNumber}-${columnNumber}`}
+                        onMouseEnter={() => setHoveredGrid({ rows: rowNumber, columns: columnNumber })}
+                        onMouseLeave={() => setHoveredGrid(null)}
+                        onFocus={() => setHoveredGrid({ rows: rowNumber, columns: columnNumber })}
+                        onBlur={() => setHoveredGrid(null)}
+                        onClick={() => handleGridClick(rowNumber, columnNumber)}
+                        className={`h-8 w-8 rounded border ${
+                          isActive ? 'border-primary bg-primary/10' : 'border-border-color bg-secondary-hover'
+                        } focus:outline-none focus:ring-1 focus:ring-primary/60`}
+                        aria-label={`Insert ${rowNumber} by ${columnNumber} table`}
+                      />
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-text-main" htmlFor="table-rows">
+              Custom size
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <span className="text-xs text-text-secondary">Rows</span>
+                <input
+                  id="table-rows"
+                  ref={inputRef}
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={rows}
+                  onChange={event => setRows(Math.max(1, Math.min(20, Number(event.target.value) || 1)))}
+                  className="w-full rounded-md border border-border-color bg-primary-text/5 px-3 py-2 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-text-secondary">Columns</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={columns}
+                  onChange={event => setColumns(Math.max(1, Math.min(20, Number(event.target.value) || 1)))}
+                  className="w-full rounded-md border border-border-color bg-primary-text/5 px-3 py-2 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-text-main">
+              <input
+                type="checkbox"
+                checked={includeHeaderRow}
+                onChange={event => setIncludeHeaderRow(event.target.checked)}
+                className="h-4 w-4 rounded border-border-color text-primary focus:ring-primary"
+              />
+              <span>Use first row as a header</span>
+            </label>
+            <div className="flex justify-end">
+              <Button type="submit" size="sm" className="px-3">
+                Insert table
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2 border-t border-border-color pt-3">
+          <div className="flex items-center justify-between text-sm text-text-secondary">
+            <span>Current table tools</span>
+            <span>{isInTable ? 'Actions apply to the selected cell' : 'Place the caret inside a table to enable tools'}</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Button type="button" size="sm" variant="secondary" onClick={onInsertRowAbove} disabled={!isInTable}>
+              Insert row above
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={onInsertRowBelow} disabled={!isInTable}>
+              Insert row below
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={onInsertColumnLeft} disabled={!isInTable}>
+              Insert column left
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={onInsertColumnRight} disabled={!isInTable}>
+              Insert column right
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={onToggleHeaderRow} disabled={!isInTable}>
+              {hasHeaderRow ? 'Remove header row' : 'Add header row'}
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={onDeleteRow} disabled={!isInTable}>
+              Delete row
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={onDeleteColumn} disabled={!isInTable}>
+              Delete column
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="text-danger hover:bg-danger/10"
+              onClick={onDeleteTable}
+              disabled={!isInTable}
+            >
+              Delete table
+            </Button>
+          </div>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
 const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, icon: Icon, isActive = false, disabled = false, onClick }) => (
   <IconButton
     type="button"
@@ -282,7 +507,11 @@ const ToolbarPlugin: React.FC<{
   const [canRedo, setCanRedo] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkDraftUrl, setLinkDraftUrl] = useState('');
+  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
+  const [isInTable, setIsInTable] = useState(false);
+  const [hasHeaderRow, setHasHeaderRow] = useState(false);
   const pendingLinkSelectionRef = useRef<SelectionSnapshot>(null);
+  const pendingTableSelectionRef = useRef<SelectionSnapshot>(null);
   const closeLinkModal = useCallback(() => {
     setIsLinkModalOpen(false);
   }, []);
@@ -292,27 +521,43 @@ const ToolbarPlugin: React.FC<{
   }, [closeLinkModal]);
 
   const restoreSelectionFromSnapshot = useCallback(
-    (snapshot: SelectionSnapshot = pendingLinkSelectionRef.current) => {
-    if (!snapshot) {
+    (snapshot: SelectionSnapshot | null | undefined = pendingLinkSelectionRef.current) => {
+    const snapshotToUse = snapshot ?? pendingLinkSelectionRef.current;
+
+    if (!snapshotToUse) {
       return null;
     }
 
-    if (snapshot.type === 'range') {
+    if (snapshotToUse.type === 'table') {
+      const selection = $createTableSelection();
+      const tableNode = $getNodeByKey(snapshotToUse.tableKey);
+      const anchorCell = $getNodeByKey(snapshotToUse.anchorCellKey);
+      const focusCell = $getNodeByKey(snapshotToUse.focusCellKey);
+
+      if (!tableNode || !anchorCell || !focusCell) {
+        return null;
+      }
+
+      selection.set(snapshotToUse.tableKey, snapshotToUse.anchorCellKey, snapshotToUse.focusCellKey);
+      return selection;
+    }
+
+    if (snapshotToUse.type === 'range') {
       const selection = $createRangeSelection();
-      const anchorNode = $getNodeByKey(snapshot.anchorKey);
-      const focusNode = $getNodeByKey(snapshot.focusKey);
+      const anchorNode = $getNodeByKey(snapshotToUse.anchorKey);
+      const focusNode = $getNodeByKey(snapshotToUse.focusKey);
 
       if (!anchorNode || !focusNode) {
         return null;
       }
 
-      selection.anchor.set(snapshot.anchorKey, snapshot.anchorOffset, snapshot.anchorType);
-      selection.focus.set(snapshot.focusKey, snapshot.focusOffset, snapshot.focusType);
+      selection.anchor.set(snapshotToUse.anchorKey, snapshotToUse.anchorOffset, snapshotToUse.anchorType);
+      selection.focus.set(snapshotToUse.focusKey, snapshotToUse.focusOffset, snapshotToUse.focusType);
       return selection;
     }
 
     const selection = $createNodeSelection();
-    snapshot.keys.forEach(key => {
+    snapshotToUse.keys.forEach(key => {
       const node = $getNodeByKey(key);
       if (node) {
         selection.add(node.getKey());
@@ -324,6 +569,38 @@ const ToolbarPlugin: React.FC<{
 
   const updateToolbar = useCallback(() => {
     const selection = $getSelection();
+    const hasValidSelection = $isRangeSelection(selection) || $isTableSelection(selection);
+
+    if (!hasValidSelection) {
+      setIsBold(false);
+      setIsItalic(false);
+      setIsUnderline(false);
+      setIsStrikethrough(false);
+      setIsCode(false);
+      setIsLink(false);
+      setBlockType('paragraph');
+      setAlignment('left');
+      setIsInTable(false);
+      setHasHeaderRow(false);
+      return;
+    }
+
+    const anchorNode = selection.anchor.getNode();
+    const tableCellNode = $getTableCellNodeFromLexicalNode(anchorNode);
+    if (tableCellNode) {
+      const tableNode = $getTableNodeFromLexicalNodeOrThrow(tableCellNode);
+      setIsInTable(true);
+      const firstRow = tableNode.getFirstChild();
+      let hasHeader = false;
+      if (firstRow && $isTableRowNode(firstRow)) {
+        hasHeader = firstRow.getChildren().some(child => $isTableCellNode(child) && child.hasHeaderState(TableCellHeaderStates.ROW));
+      }
+      setHasHeaderRow(hasHeader);
+    } else {
+      setIsInTable(false);
+      setHasHeaderRow(false);
+    }
+
     if (!$isRangeSelection(selection)) {
       setIsBold(false);
       setIsItalic(false);
@@ -342,7 +619,6 @@ const ToolbarPlugin: React.FC<{
     setIsStrikethrough(selection.hasFormat('strikethrough'));
     setIsCode(selection.hasFormat('code'));
 
-    const anchorNode = selection.anchor.getNode();
     const element = anchorNode.getTopLevelElementOrThrow();
 
     if ($isHeadingNode(element)) {
@@ -477,6 +753,54 @@ const ToolbarPlugin: React.FC<{
     return true;
   }, [editor]);
 
+  const captureTableSelection = useCallback(() => {
+    let snapshot: SelectionSnapshot = null;
+
+    editor.getEditorState().read(() => {
+      const selection = $getSelection();
+
+      if ($isTableSelection(selection)) {
+        const anchorCell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+        const focusCell = $getTableCellNodeFromLexicalNode(selection.focus.getNode());
+
+        if (!anchorCell || !focusCell) {
+          return;
+        }
+
+        const tableNode = $getTableNodeFromLexicalNodeOrThrow(anchorCell);
+        snapshot = {
+          type: 'table',
+          tableKey: tableNode.getKey(),
+          anchorCellKey: anchorCell.getKey(),
+          focusCellKey: focusCell.getKey(),
+        };
+        return;
+      }
+
+      if ($isRangeSelection(selection)) {
+        const anchorCell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+        const focusCell = $getTableCellNodeFromLexicalNode(selection.focus.getNode());
+
+        if (!anchorCell || !focusCell) {
+          return;
+        }
+
+        snapshot = {
+          type: 'range',
+          anchorKey: selection.anchor.key,
+          anchorOffset: selection.anchor.offset,
+          anchorType: selection.anchor.type,
+          focusKey: selection.focus.key,
+          focusOffset: selection.focus.offset,
+          focusType: selection.focus.type,
+        };
+      }
+    });
+
+    pendingTableSelectionRef.current = snapshot;
+    return snapshot !== null;
+  }, [editor]);
+
   const applyLink = useCallback(
     (url: string) => {
       closeLinkModal();
@@ -559,6 +883,132 @@ const ToolbarPlugin: React.FC<{
       editor.dispatchCommand(INSERT_IMAGE_COMMAND, payload);
     },
     [editor],
+  );
+
+  const closeTableModal = useCallback(() => {
+    pendingTableSelectionRef.current = null;
+    setIsTableModalOpen(false);
+  }, []);
+
+  const openTableModal = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
+
+    captureTableSelection();
+    setIsTableModalOpen(true);
+  }, [captureTableSelection, readOnly]);
+
+  const runWithActiveTable = useCallback(
+    (action: (selection: RangeSelection | NodeSelection | TableSelection) => void) => {
+      editor.update(() => {
+        let selection = $getSelection();
+        if (!selection || (!$isRangeSelection(selection) && !$isTableSelection(selection))) {
+          const restoredSelection = restoreSelectionFromSnapshot(pendingTableSelectionRef.current);
+          if (restoredSelection) {
+            $setSelection(restoredSelection);
+            selection = restoredSelection;
+          }
+        }
+
+        if (!selection || (!$isRangeSelection(selection) && !$isTableSelection(selection))) {
+          return;
+        }
+        const anchorNode = selection.anchor.getNode();
+        if (!$getTableCellNodeFromLexicalNode(anchorNode)) {
+          return;
+        }
+        action(selection);
+      });
+    },
+    [editor, restoreSelectionFromSnapshot],
+  );
+
+  const insertTable = useCallback(
+    (rows: number, columns: number, includeHeaderRow: boolean) => {
+      if (readOnly) {
+        return;
+      }
+      const normalizedRows = Math.max(1, Math.min(20, rows));
+      const normalizedColumns = Math.max(1, Math.min(20, columns));
+      editor.dispatchCommand(INSERT_TABLE_COMMAND, {
+        columns: String(normalizedColumns),
+        rows: String(normalizedRows),
+        includeHeaders: includeHeaderRow ? { rows: true, columns: false } : false,
+      });
+      setIsTableModalOpen(false);
+      editor.focus();
+    },
+    [editor, readOnly],
+  );
+
+  const insertTableRow = useCallback(
+    (insertAfter: boolean) =>
+      runWithActiveTable(() => {
+        $insertTableRow__EXPERIMENTAL(insertAfter);
+      }),
+    [runWithActiveTable],
+  );
+
+  const insertTableColumn = useCallback(
+    (insertAfter: boolean) =>
+      runWithActiveTable(() => {
+        $insertTableColumn__EXPERIMENTAL(insertAfter);
+      }),
+    [runWithActiveTable],
+  );
+
+  const deleteTableRow = useCallback(
+    () =>
+      runWithActiveTable(() => {
+        $deleteTableRow__EXPERIMENTAL();
+      }),
+    [runWithActiveTable],
+  );
+
+  const deleteTableColumn = useCallback(
+    () =>
+      runWithActiveTable(() => {
+        $deleteTableColumn__EXPERIMENTAL();
+      }),
+    [runWithActiveTable],
+  );
+
+  const deleteTable = useCallback(() => {
+    runWithActiveTable(selection => {
+      const tableCell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+      if (!tableCell) {
+        return;
+      }
+      const tableNode = $getTableNodeFromLexicalNodeOrThrow(tableCell);
+      tableNode.remove();
+    });
+    setIsTableModalOpen(false);
+  }, [runWithActiveTable]);
+
+  const toggleHeaderRow = useCallback(
+    () =>
+      runWithActiveTable(selection => {
+        const tableCell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+        if (!tableCell) {
+          return;
+        }
+        const tableNode = $getTableNodeFromLexicalNodeOrThrow(tableCell);
+        const firstRow = tableNode.getFirstChild();
+        if (!firstRow || !$isTableRowNode(firstRow)) {
+          return;
+        }
+        const shouldAddHeader = !firstRow
+          .getChildren()
+          .some(child => $isTableCellNode(child) && child.hasHeaderState(TableCellHeaderStates.ROW));
+
+        firstRow.getChildren().forEach(child => {
+          if ($isTableCellNode(child)) {
+            child.setHeaderStyles(shouldAddHeader ? TableCellHeaderStates.ROW : TableCellHeaderStates.NO_STATUS);
+          }
+        });
+      }),
+    [runWithActiveTable],
   );
 
   const openImagePicker = useCallback(() => {
@@ -725,6 +1175,14 @@ const ToolbarPlugin: React.FC<{
         onClick: toggleLink,
       },
       {
+        id: 'table',
+        label: isInTable ? 'Table tools' : 'Insert Table',
+        icon: TableIcon,
+        group: 'insert',
+        disabled: readOnly,
+        onClick: openTableModal,
+      },
+      {
         id: 'image',
         label: 'Insert Image',
         icon: ToolbarImageIcon,
@@ -815,6 +1273,7 @@ const ToolbarPlugin: React.FC<{
       isStrikethrough,
       isUnderline,
       openImagePicker,
+      openTableModal,
       readOnly,
       toggleLink,
     ],
@@ -866,6 +1325,21 @@ const ToolbarPlugin: React.FC<{
         onSubmit={applyLink}
         onRemove={removeLink}
         onClose={dismissLinkModal}
+      />
+      <TableModal
+        isOpen={isTableModalOpen}
+        onClose={closeTableModal}
+        onInsertTable={insertTable}
+        onInsertRowAbove={() => insertTableRow(false)}
+        onInsertRowBelow={() => insertTableRow(true)}
+        onInsertColumnLeft={() => insertTableColumn(false)}
+        onInsertColumnRight={() => insertTableColumn(true)}
+        onDeleteRow={deleteTableRow}
+        onDeleteColumn={deleteTableColumn}
+        onDeleteTable={deleteTable}
+        onToggleHeaderRow={toggleHeaderRow}
+        isInTable={isInTable}
+        hasHeaderRow={hasHeaderRow}
       />
     </>
   );
@@ -1213,7 +1687,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         onError: (error: Error) => {
           console.error('Rich text editor encountered an error.', error);
         },
-        nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, ImageNode],
+        nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, ImageNode, TableNode, TableCellNode, TableRowNode],
         editorState: (editor: LexicalEditor) => {
           const initialHtml = (initialHtmlRef.current ?? '').trim();
           if (!initialHtml) {
@@ -1268,6 +1742,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           </div>
           <HistoryPlugin />
           {!readOnly && <AutoFocusPlugin />}
+          <TablePlugin hasCellMerge={true} hasCellBackgroundColor={true} hasTabHandler={true} />
           <ListPlugin />
           <LinkPlugin />
           <ImagePlugin />

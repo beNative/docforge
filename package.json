@@ -39,6 +39,7 @@
     "@lexical/list": "^0.16.0",
     "@lexical/react": "^0.16.0",
     "@lexical/rich-text": "^0.16.0",
+    "@lexical/table": "^0.16.1",
     "@uiw/react-color-compact": "^2.9.2",
     "better-sqlite3": "^11.1.2",
     "electron-log": "^5.1.5",
