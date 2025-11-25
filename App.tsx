@@ -2119,7 +2119,21 @@ export const MainApp: React.FC = () => {
     const handleLanguageChange = useCallback((newLanguage: string) => {
         if (activeNodeId && activeNode?.type === 'document') {
             addLog('INFO', `User action: Change language for document "${activeNode?.title}" to "${newLanguage}".`);
-            updateItem(activeNodeId, { language_hint: newLanguage });
+            const normalizedLanguage = newLanguage.toLowerCase();
+            let nextDocType: DocType | undefined;
+
+            if (normalizedLanguage === 'html') {
+                nextDocType = 'rich_text';
+            } else if (activeNode.doc_type === 'rich_text') {
+                nextDocType = 'prompt';
+            }
+
+            const updates: Partial<Omit<DocumentOrFolder, 'id' | 'content'>> = { language_hint: newLanguage };
+            if (nextDocType) {
+                updates.doc_type = nextDocType;
+            }
+
+            updateItem(activeNodeId, updates);
         }
     }, [activeNodeId, activeNode, updateItem, addLog]);
 
