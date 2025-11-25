@@ -152,6 +152,11 @@ const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, icon: Icon, isAct
     tooltip={label}
     size="xs"
     variant="ghost"
+    onMouseDown={event => {
+      // Prevent the toolbar button from stealing focus, which would clear the
+      // user's selection in the editor before the command executes.
+      event.preventDefault();
+    }}
     onClick={onClick}
     disabled={disabled}
     aria-pressed={isActive}
@@ -291,26 +296,28 @@ const ToolbarPlugin: React.FC<{
         return;
       }
 
-      // Ensure the editor regains focus so the user's selection is still available
-      // when the link command runs. Without this, focus remains on the toolbar button
-      // or prompt dialog and the command receives no selection to wrap.
-      editor.focus();
-
-      if (isLink) {
-        editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
-        return;
-      }
-
       const promptFn = typeof window.prompt === 'function' ? window.prompt.bind(window) : null;
-      if (!promptFn) {
-        console.warn('Link insertion prompt is unavailable in this environment.');
-        return;
-      }
 
-      const url = promptFn('Enter URL');
-      if (url) {
-        editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
-      }
+      const dispatchLink = () => {
+        if (isLink) {
+          editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+          return;
+        }
+
+        if (!promptFn) {
+          console.warn('Link insertion prompt is unavailable in this environment.');
+          return;
+        }
+
+        const url = promptFn('Enter URL');
+        if (url) {
+          editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
+        }
+      };
+
+      // Focus the editor before running the command so the user's selection is
+      // preserved when the prompt opens and the link is applied.
+      editor.focus(() => dispatchLink());
     }, [editor, isLink, readOnly]);
 
   const insertImage = useCallback(
