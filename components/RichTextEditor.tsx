@@ -66,6 +66,7 @@ import {
   $setSelection,
 } from 'lexical';
 import {
+  $createTableSelection,
   $deleteTableColumn__EXPERIMENTAL,
   $deleteTableRow__EXPERIMENTAL,
   $getTableCellNodeFromLexicalNode,
@@ -155,6 +156,12 @@ type SelectionSnapshot =
       focusType: 'text' | 'element';
     }
   | { type: 'node'; keys: string[] }
+  | {
+      type: 'table';
+      tableKey: string;
+      anchorCellKey: string;
+      focusCellKey: string;
+    }
   | null;
 
 const RICH_TEXT_THEME = {
@@ -504,6 +511,7 @@ const ToolbarPlugin: React.FC<{
   const [isInTable, setIsInTable] = useState(false);
   const [hasHeaderRow, setHasHeaderRow] = useState(false);
   const pendingLinkSelectionRef = useRef<SelectionSnapshot>(null);
+  const pendingTableSelectionRef = useRef<SelectionSnapshot>(null);
   const closeLinkModal = useCallback(() => {
     setIsLinkModalOpen(false);
   }, []);
@@ -513,27 +521,43 @@ const ToolbarPlugin: React.FC<{
   }, [closeLinkModal]);
 
   const restoreSelectionFromSnapshot = useCallback(
-    (snapshot: SelectionSnapshot = pendingLinkSelectionRef.current) => {
-    if (!snapshot) {
+    (snapshot: SelectionSnapshot | null | undefined = pendingLinkSelectionRef.current) => {
+    const snapshotToUse = snapshot ?? pendingLinkSelectionRef.current;
+
+    if (!snapshotToUse) {
       return null;
     }
 
-    if (snapshot.type === 'range') {
+    if (snapshotToUse.type === 'table') {
+      const selection = $createTableSelection();
+      const tableNode = $getNodeByKey(snapshotToUse.tableKey);
+      const anchorCell = $getNodeByKey(snapshotToUse.anchorCellKey);
+      const focusCell = $getNodeByKey(snapshotToUse.focusCellKey);
+
+      if (!tableNode || !anchorCell || !focusCell) {
+        return null;
+      }
+
+      selection.set(snapshotToUse.tableKey, snapshotToUse.anchorCellKey, snapshotToUse.focusCellKey);
+      return selection;
+    }
+
+    if (snapshotToUse.type === 'range') {
       const selection = $createRangeSelection();
-      const anchorNode = $getNodeByKey(snapshot.anchorKey);
-      const focusNode = $getNodeByKey(snapshot.focusKey);
+      const anchorNode = $getNodeByKey(snapshotToUse.anchorKey);
+      const focusNode = $getNodeByKey(snapshotToUse.focusKey);
 
       if (!anchorNode || !focusNode) {
         return null;
       }
 
-      selection.anchor.set(snapshot.anchorKey, snapshot.anchorOffset, snapshot.anchorType);
-      selection.focus.set(snapshot.focusKey, snapshot.focusOffset, snapshot.focusType);
+      selection.anchor.set(snapshotToUse.anchorKey, snapshotToUse.anchorOffset, snapshotToUse.anchorType);
+      selection.focus.set(snapshotToUse.focusKey, snapshotToUse.focusOffset, snapshotToUse.focusType);
       return selection;
     }
 
     const selection = $createNodeSelection();
-    snapshot.keys.forEach(key => {
+    snapshotToUse.keys.forEach(key => {
       const node = $getNodeByKey(key);
       if (node) {
         selection.add(node.getKey());
@@ -729,6 +753,54 @@ const ToolbarPlugin: React.FC<{
     return true;
   }, [editor]);
 
+  const captureTableSelection = useCallback(() => {
+    let snapshot: SelectionSnapshot = null;
+
+    editor.getEditorState().read(() => {
+      const selection = $getSelection();
+
+      if ($isTableSelection(selection)) {
+        const anchorCell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+        const focusCell = $getTableCellNodeFromLexicalNode(selection.focus.getNode());
+
+        if (!anchorCell || !focusCell) {
+          return;
+        }
+
+        const tableNode = $getTableNodeFromLexicalNodeOrThrow(anchorCell);
+        snapshot = {
+          type: 'table',
+          tableKey: tableNode.getKey(),
+          anchorCellKey: anchorCell.getKey(),
+          focusCellKey: focusCell.getKey(),
+        };
+        return;
+      }
+
+      if ($isRangeSelection(selection)) {
+        const anchorCell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+        const focusCell = $getTableCellNodeFromLexicalNode(selection.focus.getNode());
+
+        if (!anchorCell || !focusCell) {
+          return;
+        }
+
+        snapshot = {
+          type: 'range',
+          anchorKey: selection.anchor.key,
+          anchorOffset: selection.anchor.offset,
+          anchorType: selection.anchor.type,
+          focusKey: selection.focus.key,
+          focusOffset: selection.focus.offset,
+          focusType: selection.focus.type,
+        };
+      }
+    });
+
+    pendingTableSelectionRef.current = snapshot;
+    return snapshot !== null;
+  }, [editor]);
+
   const applyLink = useCallback(
     (url: string) => {
       closeLinkModal();
@@ -814,13 +886,31 @@ const ToolbarPlugin: React.FC<{
   );
 
   const closeTableModal = useCallback(() => {
+    pendingTableSelectionRef.current = null;
     setIsTableModalOpen(false);
   }, []);
+
+  const openTableModal = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
+
+    captureTableSelection();
+    setIsTableModalOpen(true);
+  }, [captureTableSelection, readOnly]);
 
   const runWithActiveTable = useCallback(
     (action: (selection: RangeSelection | NodeSelection | TableSelection) => void) => {
       editor.update(() => {
-        const selection = $getSelection();
+        let selection = $getSelection();
+        if (!selection || (!$isRangeSelection(selection) && !$isTableSelection(selection))) {
+          const restoredSelection = restoreSelectionFromSnapshot(pendingTableSelectionRef.current);
+          if (restoredSelection) {
+            $setSelection(restoredSelection);
+            selection = restoredSelection;
+          }
+        }
+
         if (!selection || (!$isRangeSelection(selection) && !$isTableSelection(selection))) {
           return;
         }
@@ -831,7 +921,7 @@ const ToolbarPlugin: React.FC<{
         action(selection);
       });
     },
-    [editor],
+    [editor, restoreSelectionFromSnapshot],
   );
 
   const insertTable = useCallback(
@@ -1090,7 +1180,7 @@ const ToolbarPlugin: React.FC<{
         icon: TableIcon,
         group: 'insert',
         disabled: readOnly,
-        onClick: () => setIsTableModalOpen(true),
+        onClick: openTableModal,
       },
       {
         id: 'image',
@@ -1183,6 +1273,7 @@ const ToolbarPlugin: React.FC<{
       isStrikethrough,
       isUnderline,
       openImagePicker,
+      openTableModal,
       readOnly,
       toggleLink,
     ],
