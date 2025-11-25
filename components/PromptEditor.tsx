@@ -16,6 +16,7 @@ import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
 import ScriptExecutionPanel from './ScriptExecutionPanel';
 import EmojiPickerOverlay from './EmojiPickerOverlay';
+import Tooltip from './Tooltip';
 
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
@@ -179,6 +180,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isGeneratingEmoji, setIsGeneratingEmoji] = useState(false);
   const [isTitleEmojiPickerOpen, setIsTitleEmojiPickerOpen] = useState(false);
+  const [showUnsavedTooltip, setShowUnsavedTooltip] = useState(false);
   const [titleEmojiAnchor, setTitleEmojiAnchor] = useState<{ x: number; y: number } | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
@@ -236,6 +238,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const acceptButtonRef = useRef<HTMLButtonElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const languageButtonRef = useRef<HTMLButtonElement | null>(null);
+  const unsavedIndicatorRef = useRef<HTMLDivElement>(null);
   const isContentInitialized = useRef(false);
   const editorRef = useRef<CodeEditorHandle>(null);
   const richTextEditorRef = useRef<RichTextEditorHandle>(null);
@@ -1035,7 +1038,25 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
               {isGeneratingTitle ? <Spinner /> : <RefreshIcon className="w-4 h-4 text-primary" />}
             </IconButton>
           )}
-          {isDirty && <div className="relative group flex-shrink-0"><div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div><span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-md opacity-0 group-hover:opacity-100">Unsaved changes</span></div>}
+          {isDirty && (
+            <>
+              <div
+                ref={unsavedIndicatorRef}
+                className="relative flex-shrink-0"
+                onMouseEnter={() => setShowUnsavedTooltip(true)}
+                onMouseLeave={() => setShowUnsavedTooltip(false)}
+                onFocus={() => setShowUnsavedTooltip(true)}
+                onBlur={() => setShowUnsavedTooltip(false)}
+                tabIndex={0}
+                aria-label="Unsaved changes"
+              >
+                <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+              </div>
+              {showUnsavedTooltip && unsavedIndicatorRef.current && (
+                <Tooltip targetRef={unsavedIndicatorRef} content="Unsaved changes" position="bottom" />
+              )}
+            </>
+          )}
           {isLocked && (
             <div className="flex items-center gap-1 text-xs font-semibold text-primary flex-shrink-0">
               <LockClosedIcon className="w-3.5 h-3.5" />
