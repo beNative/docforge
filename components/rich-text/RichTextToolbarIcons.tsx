@@ -238,3 +238,108 @@ export const ClearFormattingIcon = createStrokeIcon('ClearFormattingIcon', () =>
     <path d="M10 9h8" />
   </>
 ));
+
+export const TableIcon = createStrokeIcon('TableIcon', () => (
+  <>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" ry="2" />
+    <path d="M3.5 9.5h17" />
+    <path d="M3.5 14.5h17" />
+    <path d="M9.5 4.5v15" />
+    <path d="M15.5 4.5v15" />
+  </>
+));
+
+export const InsertRowAboveIcon = createStrokeIcon('InsertRowAboveIcon', () => (
+  <>
+    <path d="M4 9h16" />
+    <path d="M4 15h16" />
+    <path d="M8 9V5" />
+    <path d="M12 7V3" />
+    <path d="M16 9V5" />
+    <path d="M8 6l4-3 4 3" />
+  </>
+));
+
+export const InsertRowBelowIcon = createStrokeIcon('InsertRowBelowIcon', () => (
+  <>
+    <path d="M4 9h16" />
+    <path d="M4 15h16" />
+    <path d="M8 15v4" />
+    <path d="M12 17v4" />
+    <path d="M16 15v4" />
+    <path d="M8 18l4 3 4-3" />
+  </>
+));
+
+export const InsertColumnLeftIcon = createStrokeIcon('InsertColumnLeftIcon', () => (
+  <>
+    <path d="M9 4v16" />
+    <path d="M15 4v16" />
+    <path d="M5 8h4" />
+    <path d="M3 12h4" />
+    <path d="M5 16h4" />
+    <path d="M4 8l-3 4 3 4" />
+  </>
+));
+
+export const InsertColumnRightIcon = createStrokeIcon('InsertColumnRightIcon', () => (
+  <>
+    <path d="M9 4v16" />
+    <path d="M15 4v16" />
+    <path d="M19 8h-4" />
+    <path d="M21 12h-4" />
+    <path d="M19 16h-4" />
+    <path d="M20 8l3 4-3 4" />
+  </>
+));
+
+export const DeleteRowIcon = createStrokeIcon('DeleteRowIcon', () => (
+  <>
+    <path d="M4 9h16" />
+    <path d="M4 15h16" />
+    <path d="M8 12h8" />
+    <path d="M10 10l4 4" />
+    <path d="M14 10l-4 4" />
+  </>
+));
+
+export const DeleteColumnIcon = createStrokeIcon('DeleteColumnIcon', () => (
+  <>
+    <path d="M9 4v16" />
+    <path d="M15 4v16" />
+    <path d="M12 8v8" />
+    <path d="M10 10l4 4" />
+    <path d="M14 10l-4 4" />
+  </>
+));
+
+export const DeleteTableIcon = createStrokeIcon('DeleteTableIcon', () => (
+  <>
+    <rect x="4" y="5" width="16" height="14" rx="2" ry="2" />
+    <path d="M4 10h16" />
+    <path d="M10 5v14" />
+    <path d="M14 5v14" />
+    <path d="M8 8l8 8" />
+    <path d="M16 8l-8 8" />
+  </>
+));
+
+export const HeaderRowIcon = createStrokeIcon('HeaderRowIcon', () => (
+  <>
+    <rect x="4" y="5" width="16" height="14" rx="2" ry="2" />
+    <path d="M4 10h16" />
+    <path d="M10 5v14" />
+    <path d="M14 5v14" />
+    <path d="M4 8h16" />
+  </>
+));
+
+export const HeaderColumnIcon = createStrokeIcon('HeaderColumnIcon', () => (
+  <>
+    <rect x="4" y="5" width="16" height="14" rx="2" ry="2" />
+    <path d="M4 10h16" />
+    <path d="M10 5v14" />
+    <path d="M14 5v14" />
+    <path d="M6.5 5v14" />
+  </>
+));
