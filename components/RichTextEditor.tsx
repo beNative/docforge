@@ -56,9 +56,13 @@ import {
   UNDO_COMMAND,
   type EditorState,
   type LexicalEditor,
+  type NodeSelection,
+  type RangeSelection,
   $createTextNode,
+  $setSelection,
 } from 'lexical';
 import IconButton from './IconButton';
+import Button from './Button';
 import ContextMenuComponent, { type MenuItem as ContextMenuItem } from './ContextMenu';
 import { RedoIcon, UndoIcon } from './Icons';
 import {
@@ -83,6 +87,7 @@ import {
   UnderlineIcon,
 } from './rich-text/RichTextToolbarIcons';
 import { $createImageNode, ImageNode, INSERT_IMAGE_COMMAND, type ImagePayload } from './rich-text/ImageNode';
+import Modal from './Modal';
 
 export interface RichTextEditorHandle {
   focus: () => void;
@@ -146,6 +151,79 @@ const RICH_TEXT_THEME = {
 
 const Placeholder: React.FC = () => null;
 
+const normalizeUrl = (url: string): string => {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (/^[a-zA-Z][\w+.-]*:/.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+};
+
+const LinkModal: React.FC<{
+  isOpen: boolean;
+  initialUrl: string;
+  onSubmit: (url: string) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}> = ({ isOpen, initialUrl, onSubmit, onRemove, onClose }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [url, setUrl] = useState(initialUrl);
+
+  useEffect(() => {
+    setUrl(initialUrl);
+  }, [initialUrl]);
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSubmit(url);
+  };
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <Modal onClose={onClose} title="Insert link" initialFocusRef={inputRef}>
+      <form onSubmit={handleSubmit}>
+        <div className="p-6 space-y-3">
+          <label className="block text-sm font-semibold text-text-main" htmlFor="link-url-input">
+            Link URL
+          </label>
+          <input
+            id="link-url-input"
+            ref={inputRef}
+            type="text"
+            inputMode="url"
+            autoComplete="url"
+            required
+            value={url}
+            onChange={event => setUrl(event.target.value)}
+            className="w-full rounded-md border border-border-color bg-background px-3 py-2 text-sm text-text-main focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            placeholder="https://example.com"
+          />
+          <p className="text-xs text-text-secondary">
+            Enter a valid URL. If you omit the protocol, https:// will be added automatically.
+          </p>
+        </div>
+        <div className="flex justify-end gap-3 px-6 py-4 bg-background/50 border-t border-border-color rounded-b-lg">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" variant="secondary" onClick={onRemove}>
+            Remove link
+          </Button>
+          <Button type="submit">Save link</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
 const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, icon: Icon, isActive = false, disabled = false, onClick }) => (
   <IconButton
     type="button"
@@ -186,6 +264,16 @@ const ToolbarPlugin: React.FC<{
   const [alignment, setAlignment] = useState<'left' | 'center' | 'right' | 'justify'>('left');
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkDraftUrl, setLinkDraftUrl] = useState('');
+  const pendingLinkSelectionRef = useRef<RangeSelection | NodeSelection | null>(null);
+  const closeLinkModal = useCallback(() => {
+    setIsLinkModalOpen(false);
+  }, []);
+  const dismissLinkModal = useCallback(() => {
+    pendingLinkSelectionRef.current = null;
+    closeLinkModal();
+  }, [closeLinkModal]);
 
   const updateToolbar = useCallback(() => {
     const selection = $getSelection();
@@ -291,34 +379,100 @@ const ToolbarPlugin: React.FC<{
     });
   }, [editor]);
 
-    const toggleLink = useCallback(() => {
-      if (readOnly) {
+  const captureLinkState = useCallback(() => {
+    let detectedUrl = '';
+
+    editor.getEditorState().read(() => {
+      const selection = $getSelection();
+      if (!$isRangeSelection(selection) && !$isNodeSelection(selection)) {
+        pendingLinkSelectionRef.current = null;
         return;
       }
 
-      const promptFn = typeof window.prompt === 'function' ? window.prompt.bind(window) : null;
+      pendingLinkSelectionRef.current = selection.clone();
 
-      const dispatchLink = () => {
-        if (isLink) {
-          editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
-          return;
-        }
+      const selectionNodes = selection.getNodes();
+      if (selectionNodes.length === 0) {
+        return;
+      }
 
-        if (!promptFn) {
-          console.warn('Link insertion prompt is unavailable in this environment.');
-          return;
-        }
+      const firstNode = selectionNodes[0];
+      const linkNode = $isLinkNode(firstNode)
+        ? firstNode
+        : $isLinkNode(firstNode.getParent())
+          ? firstNode.getParent()
+          : null;
 
-        const url = promptFn('Enter URL');
-        if (url) {
-          editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
-        }
-      };
+      if ($isLinkNode(linkNode)) {
+        detectedUrl = linkNode.getURL();
+      }
+    });
 
-      // Focus the editor before running the command so the user's selection is
-      // preserved when the prompt opens and the link is applied.
-      editor.focus(() => dispatchLink());
-    }, [editor, isLink, readOnly]);
+    if (!pendingLinkSelectionRef.current) {
+      return false;
+    }
+
+    setLinkDraftUrl(detectedUrl);
+    setIsLinkModalOpen(true);
+    return true;
+  }, [editor]);
+
+  const applyLink = useCallback(
+    (url: string) => {
+      closeLinkModal();
+
+      const selection = pendingLinkSelectionRef.current;
+      pendingLinkSelectionRef.current = null;
+
+      const normalizedUrl = normalizeUrl(url);
+      if (!normalizedUrl) {
+        return;
+      }
+
+      if (!selection) {
+        editor.focus();
+        return;
+      }
+
+      editor.update(() => {
+        $setSelection(selection.clone());
+      });
+
+      editor.dispatchCommand(TOGGLE_LINK_COMMAND, normalizedUrl);
+      editor.focus();
+    },
+    [closeLinkModal, editor],
+  );
+
+  const removeLink = useCallback(() => {
+    closeLinkModal();
+
+    const selection = pendingLinkSelectionRef.current;
+    pendingLinkSelectionRef.current = null;
+
+    if (!selection) {
+      editor.focus();
+      return;
+    }
+
+    editor.update(() => {
+      $setSelection(selection.clone());
+    });
+
+    editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+    editor.focus();
+  }, [closeLinkModal, editor]);
+
+  const toggleLink = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
+
+    const hasSelection = captureLinkState();
+    if (!hasSelection) {
+      editor.focus();
+    }
+  }, [captureLinkState, editor, readOnly]);
 
   const insertImage = useCallback(
     (payload: ImagePayload) => {
@@ -486,7 +640,7 @@ const ToolbarPlugin: React.FC<{
       },
       {
         id: 'link',
-        label: isLink ? 'Remove Link' : 'Insert Link',
+        label: isLink ? 'Edit or Remove Link' : 'Insert Link',
         icon: ToolbarLinkIcon,
         group: 'insert',
         isActive: isLink,
@@ -609,25 +763,34 @@ const ToolbarPlugin: React.FC<{
   );
 
   return (
-    <div
-      className="flex flex-wrap content-center items-center gap-x-0.5 gap-y-0.5 border-b border-border-color bg-secondary/50 backdrop-blur-sm px-2 py-0.5 overflow-hidden sticky top-0 z-10"
-      style={{ minHeight: '28px' }}
-    >
-      {renderedToolbarElements.map(element =>
-        'type' in element ? (
-          <div key={element.id} className="mx-1 h-3 w-px bg-border-color" />
-        ) : (
-          <ToolbarButton key={element.id} {...element} />
-        ),
-      )}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleImageFileChange}
+    <>
+      <div
+        className="flex flex-wrap content-center items-center gap-x-0.5 gap-y-0.5 border-b border-border-color bg-secondary/50 backdrop-blur-sm px-2 py-0.5 overflow-hidden sticky top-0 z-10"
+        style={{ minHeight: '28px' }}
+      >
+        {renderedToolbarElements.map(element =>
+          'type' in element ? (
+            <div key={element.id} className="mx-1 h-3 w-px bg-border-color" />
+          ) : (
+            <ToolbarButton key={element.id} {...element} />
+          ),
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageFileChange}
+        />
+      </div>
+      <LinkModal
+        isOpen={isLinkModalOpen}
+        initialUrl={linkDraftUrl}
+        onSubmit={applyLink}
+        onRemove={removeLink}
+        onClose={dismissLinkModal}
       />
-    </div>
+    </>
   );
 };
 
