@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Node, ViewMode, ImportedNodeSummary, DraggedNodeTransfer, ClassificationSummary } from '../types';
+import type { Node, ViewMode, ImportedNodeSummary, DraggedNodeTransfer, ClassificationSummary, DocType } from '../types';
 import { repository } from '../services/repository';
 import { useLogger } from './useLogger';
 
@@ -32,7 +32,10 @@ export const useNodes = () => {
     return newNode;
   }, [addLog, refreshNodes]);
 
-  const updateNode = useCallback(async (nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null; default_view_mode?: ViewMode | null }>) => {
+  const updateNode = useCallback(async (
+    nodeId: string,
+    updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null; default_view_mode?: ViewMode | null; doc_type?: DocType | null }>,
+  ) => {
     await repository.updateNode(nodeId, updates);
     addLog('DEBUG', `Node updated with ID: ${nodeId}. Refreshing tree.`);
     await refreshNodes(true);

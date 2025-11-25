@@ -117,6 +117,7 @@ export const useDocuments = () => {
     if (updates.parentId !== undefined) nodeUpdates.parent_id = updates.parentId;
     if (updates.language_hint !== undefined) nodeUpdates.language_hint = updates.language_hint;
     if (updates.default_view_mode !== undefined) nodeUpdates.default_view_mode = updates.default_view_mode;
+    if (updates.doc_type !== undefined) nodeUpdates.doc_type = updates.doc_type as DocType;
 
     if (Object.keys(nodeUpdates).length > 0) {
         await updateNode(id, nodeUpdates);

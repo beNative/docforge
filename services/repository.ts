@@ -965,7 +965,10 @@ export const repository = {
 
         return { node: newNode, summary: classification.summary };
     },
-    async updateNode(nodeId: string, updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null; default_view_mode?: ViewMode | null }>) {
+    async updateNode(
+        nodeId: string,
+        updates: Partial<Pick<Node, 'title' | 'parent_id'> & { language_hint?: string | null; default_view_mode?: ViewMode | null; doc_type?: DocType | null }>,
+    ) {
         if (!isElectron) {
             const state = ensureBrowserState();
             const result = findNodeWithParent(nodeId, state.nodes);
@@ -1001,6 +1004,11 @@ export const repository = {
                 if (updates.default_view_mode !== undefined) {
                     node.document.default_view_mode = updates.default_view_mode;
                 }
+                if (updates.doc_type !== undefined) {
+                    node.document.doc_type = updates.doc_type ?? node.document.doc_type;
+                    node.document.doc_type_source = 'user';
+                    node.document.classification_updated_at = now;
+                }
             }
 
             node.updated_at = now;
@@ -1035,6 +1043,14 @@ export const repository = {
             await window.electronAPI!.dbRun(
                 `UPDATE documents SET default_view_mode = ? WHERE node_id = ?`,
                 [updates.default_view_mode, nodeId]
+            );
+            await window.electronAPI!.dbRun(`UPDATE nodes SET updated_at = ? WHERE node_id = ?`, [now, nodeId]);
+        }
+
+        if (updates.doc_type !== undefined) {
+            await window.electronAPI!.dbRun(
+                `UPDATE documents SET doc_type = ?, doc_type_source = 'user', classification_updated_at = ? WHERE node_id = ?`,
+                [updates.doc_type, now, nodeId]
             );
             await window.electronAPI!.dbRun(`UPDATE nodes SET updated_at = ? WHERE node_id = ?`, [now, nodeId]);
         }
