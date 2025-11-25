@@ -15,6 +15,7 @@ import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin';
 import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin';
+import { TablePlugin } from '@lexical/react/LexicalTablePlugin';
 import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
@@ -36,6 +37,19 @@ import {
   type ListType,
 } from '@lexical/list';
 import { $isLinkNode, LinkNode, TOGGLE_LINK_COMMAND } from '@lexical/link';
+import {
+  $deleteTableColumn__EXPERIMENTAL,
+  $deleteTableRow__EXPERIMENTAL,
+  $getTableCellNodeFromLexicalNode,
+  $getTableNodeFromLexicalNodeOrThrow,
+  $insertTableColumn__EXPERIMENTAL,
+  $insertTableRow__EXPERIMENTAL,
+  $isTableSelection,
+  INSERT_TABLE_COMMAND,
+  TableCellNode,
+  TableNode,
+  TableRowNode,
+} from '@lexical/table';
 import { mergeRegister } from '@lexical/utils';
 import { $setBlocksType } from '@lexical/selection';
 import {
@@ -58,6 +72,7 @@ import {
   type LexicalEditor,
   type NodeSelection,
   type RangeSelection,
+  type LexicalNode,
   $createNodeSelection,
   $createRangeSelection,
   $createTextNode,
@@ -87,6 +102,7 @@ import {
   ParagraphIcon,
   QuoteIcon,
   StrikethroughIcon,
+  TableIcon,
   UnderlineIcon,
 } from './rich-text/RichTextToolbarIcons';
 import { $createImageNode, ImageNode, INSERT_IMAGE_COMMAND, type ImagePayload } from './rich-text/ImageNode';
@@ -111,7 +127,7 @@ interface ToolbarButtonConfig {
   id: string;
   label: string;
   icon: React.FC<{ className?: string }>;
-  group: 'history' | 'inline-format' | 'structure' | 'insert' | 'alignment' | 'utility';
+  group: 'history' | 'inline-format' | 'structure' | 'insert' | 'alignment' | 'utility' | 'table';
   isActive?: boolean;
   disabled?: boolean;
   onClick: () => void;
@@ -163,6 +179,11 @@ const RICH_TEXT_THEME = {
   },
   link: 'text-primary underline decoration-primary/30 hover:decoration-primary transition-colors cursor-pointer',
   image: 'my-6 flex justify-center',
+  table: 'w-full border-collapse my-4 text-sm text-text-main',
+  tableCell: 'border border-border-color px-3 py-2 align-top bg-background',
+  tableCellHeader: 'bg-secondary font-semibold',
+  tableCellSelected: 'ring-2 ring-primary ring-offset-1 ring-offset-background',
+  tableCellPrimarySelected: 'ring-2 ring-primary/70 ring-offset-1 ring-offset-background',
 };
 
 const Placeholder: React.FC = () => null;
@@ -240,6 +261,135 @@ const LinkModal: React.FC<{
   );
 };
 
+const clampTableDimension = (value: number, fallback: number, max = 10) => {
+  if (Number.isNaN(value) || value < 1) {
+    return fallback;
+  }
+  return Math.min(value, max);
+};
+
+const TableInsertModal: React.FC<{
+  isOpen: boolean;
+  onSubmit: (options: { rows: number; columns: number; withHeader: boolean }) => void;
+  onClose: () => void;
+}> = ({ isOpen, onSubmit, onClose }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState(3);
+  const [columns, setColumns] = useState(3);
+  const [withHeader, setWithHeader] = useState(true);
+  const [hoverPreview, setHoverPreview] = useState<{ rows: number; columns: number } | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setRows(3);
+      setColumns(3);
+      setWithHeader(true);
+      setHoverPreview(null);
+      inputRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSubmit({ rows, columns, withHeader });
+  };
+
+  const previewRows = hoverPreview?.rows ?? rows;
+  const previewColumns = hoverPreview?.columns ?? columns;
+  const gridSize = 6;
+
+  return (
+    <Modal onClose={onClose} title="Insert table" initialFocusRef={inputRef}>
+      <form onSubmit={handleSubmit}>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-text-secondary">
+            Drag across the grid to pick a size, or enter exact values. Just like Word, you can quickly start with a small table
+            and adjust it later.
+          </p>
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="flex-1">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">Quick picker</p>
+              <div
+                className="grid grid-cols-6 gap-1 rounded-md border border-border-color bg-background/70 p-2 shadow-sm"
+                onMouseLeave={() => setHoverPreview(null)}
+                role="grid"
+              >
+                {Array.from({ length: gridSize * gridSize }, (_, index) => {
+                  const row = Math.floor(index / gridSize) + 1;
+                  const column = (index % gridSize) + 1;
+                  const isActive = row <= previewRows && column <= previewColumns;
+                  return (
+                    <button
+                      key={`${row}-${column}`}
+                      type="button"
+                      className={`h-8 w-8 rounded border ${
+                        isActive ? 'border-primary bg-primary/10' : 'border-border-color bg-background'
+                      } transition-colors`}
+                      onMouseEnter={() => setHoverPreview({ rows: row, columns: column })}
+                      onClick={() => onSubmit({ rows: row, columns: column, withHeader })}
+                      aria-label={`Insert a ${row} by ${column} table`}
+                    />
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-sm text-text-secondary">
+                Selected: <span className="font-semibold text-text-main">{previewRows} × {previewColumns}</span>
+              </p>
+            </div>
+            <div className="flex-1 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Custom size</p>
+              <label className="block text-sm font-semibold text-text-main" htmlFor="table-rows-input">
+                Rows
+              </label>
+              <input
+                ref={inputRef}
+                id="table-rows-input"
+                type="number"
+                min={1}
+                max={10}
+                value={rows}
+                onChange={event => setRows(clampTableDimension(Number(event.target.value), rows))}
+                className="w-full rounded-md border border-border-color bg-background px-3 py-2 text-sm text-text-main focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <label className="block text-sm font-semibold text-text-main" htmlFor="table-columns-input">
+                Columns
+              </label>
+              <input
+                id="table-columns-input"
+                type="number"
+                min={1}
+                max={10}
+                value={columns}
+                onChange={event => setColumns(clampTableDimension(Number(event.target.value), columns))}
+                className="w-full rounded-md border border-border-color bg-background px-3 py-2 text-sm text-text-main focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              <label className="flex items-center gap-2 text-sm font-semibold text-text-main">
+                <input
+                  type="checkbox"
+                  checked={withHeader}
+                  onChange={event => setWithHeader(event.target.checked)}
+                  className="h-4 w-4 rounded border-border-color text-primary focus:ring-primary/40"
+                />
+                Include header row
+              </label>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 px-6 py-4 bg-background/50 border-t border-border-color rounded-b-lg">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit">Insert table</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
 const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, icon: Icon, isActive = false, disabled = false, onClick }) => (
   <IconButton
     type="button"
@@ -281,6 +431,8 @@ const ToolbarPlugin: React.FC<{
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [isTableModalOpen, setIsTableModalOpen] = useState(false);
+  const [isTableSelectionActive, setIsTableSelectionActive] = useState(false);
   const [linkDraftUrl, setLinkDraftUrl] = useState('');
   const pendingLinkSelectionRef = useRef<SelectionSnapshot>(null);
   const closeLinkModal = useCallback(() => {
@@ -324,6 +476,32 @@ const ToolbarPlugin: React.FC<{
 
   const updateToolbar = useCallback(() => {
     const selection = $getSelection();
+    if (!selection) {
+      setIsBold(false);
+      setIsItalic(false);
+      setIsUnderline(false);
+      setIsStrikethrough(false);
+      setIsCode(false);
+      setIsLink(false);
+      setBlockType('paragraph');
+      setAlignment('left');
+      setIsTableSelectionActive(false);
+      return;
+    }
+
+    if ($isTableSelection(selection)) {
+      setIsBold(false);
+      setIsItalic(false);
+      setIsUnderline(false);
+      setIsStrikethrough(false);
+      setIsCode(false);
+      setIsLink(false);
+      setBlockType('paragraph');
+      setAlignment('left');
+      setIsTableSelectionActive(true);
+      return;
+    }
+
     if (!$isRangeSelection(selection)) {
       setIsBold(false);
       setIsItalic(false);
@@ -333,6 +511,8 @@ const ToolbarPlugin: React.FC<{
       setIsLink(false);
       setBlockType('paragraph');
       setAlignment('left');
+      const selectedNode = selection.getNodes()[0];
+      setIsTableSelectionActive(Boolean(selectedNode && $getTableCellNodeFromLexicalNode(selectedNode)));
       return;
     }
 
@@ -360,6 +540,7 @@ const ToolbarPlugin: React.FC<{
 
     const nodes = selection.getNodes();
     setIsLink(nodes.some(node => $isLinkNode(node) || $isLinkNode(node.getParent())));
+    setIsTableSelectionActive(Boolean($getTableCellNodeFromLexicalNode(anchorNode)));
   }, []);
 
   useEffect(() => {
@@ -568,6 +749,102 @@ const ToolbarPlugin: React.FC<{
     fileInputRef.current?.click();
   }, [readOnly]);
 
+  const ensureActiveTableCell = useCallback(
+    (action: (cell: TableCellNode) => void) => {
+      editor.update(() => {
+        const selection = $getSelection();
+        const targetNode: LexicalNode | null = (() => {
+          if (!selection) {
+            return null;
+          }
+          if ($isTableSelection(selection)) {
+            return $getNodeByKey(selection.anchor.key);
+          }
+          if ($isRangeSelection(selection)) {
+            return selection.anchor.getNode();
+          }
+          if ($isNodeSelection(selection)) {
+            return selection.getNodes()[0] ?? null;
+          }
+          return null;
+        })();
+
+        if (!targetNode) {
+          return;
+        }
+
+        const tableCell = $getTableCellNodeFromLexicalNode(targetNode);
+        if (!tableCell) {
+          return;
+        }
+
+        action(tableCell);
+      });
+    },
+    [editor],
+  );
+
+  const insertTable = useCallback(
+    ({ rows, columns, withHeader }: { rows: number; columns: number; withHeader: boolean }) => {
+      setIsTableModalOpen(false);
+      editor.dispatchCommand(INSERT_TABLE_COMMAND, {
+        rows: rows.toString(),
+        columns: columns.toString(),
+        includeHeaders: withHeader ? { rows: true, columns: false } : false,
+      });
+    },
+    [editor],
+  );
+
+  const closeTableModal = useCallback(() => setIsTableModalOpen(false), []);
+
+  const openTableModal = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
+    setIsTableModalOpen(true);
+  }, [readOnly]);
+
+  const insertRowAbove = useCallback(() => {
+    ensureActiveTableCell(() => $insertTableRow__EXPERIMENTAL(false));
+  }, [ensureActiveTableCell]);
+
+  const insertRowBelow = useCallback(() => {
+    ensureActiveTableCell(() => $insertTableRow__EXPERIMENTAL(true));
+  }, [ensureActiveTableCell]);
+
+  const insertColumnLeft = useCallback(() => {
+    ensureActiveTableCell(() => $insertTableColumn__EXPERIMENTAL(false));
+  }, [ensureActiveTableCell]);
+
+  const insertColumnRight = useCallback(() => {
+    ensureActiveTableCell(() => $insertTableColumn__EXPERIMENTAL(true));
+  }, [ensureActiveTableCell]);
+
+  const deleteTableRow = useCallback(() => {
+    ensureActiveTableCell(() => $deleteTableRow__EXPERIMENTAL());
+  }, [ensureActiveTableCell]);
+
+  const deleteTableColumn = useCallback(() => {
+    ensureActiveTableCell(() => $deleteTableColumn__EXPERIMENTAL());
+  }, [ensureActiveTableCell]);
+
+  const deleteTable = useCallback(() => {
+    ensureActiveTableCell(cell => {
+      const tableNode = $getTableNodeFromLexicalNodeOrThrow(cell);
+      const root = $getRoot();
+      const neighbor = tableNode.getNextSibling() ?? tableNode.getPreviousSibling();
+      tableNode.remove();
+
+      if (root.getChildrenSize() === 0) {
+        root.append($createParagraphNode());
+      }
+
+      const selectionTarget = neighbor ?? root.getFirstChild();
+      selectionTarget?.selectEnd();
+    });
+  }, [ensureActiveTableCell]);
+
   const handleImageFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -590,231 +867,306 @@ const ToolbarPlugin: React.FC<{
   );
 
   const toolbarButtons = useMemo<ToolbarButtonConfig[]>(
-    () => [
-      {
-        id: 'undo',
-        label: 'Undo',
-        icon: UndoIcon,
-        group: 'history',
-        disabled: readOnly || !canUndo,
-        onClick: () => editor.dispatchCommand(UNDO_COMMAND, undefined),
-      },
-      {
-        id: 'redo',
-        label: 'Redo',
-        icon: RedoIcon,
-        group: 'history',
-        disabled: readOnly || !canRedo,
-        onClick: () => editor.dispatchCommand(REDO_COMMAND, undefined),
-      },
-      {
-        id: 'bold',
-        label: 'Bold',
-        icon: BoldIcon,
-        group: 'inline-format',
-        isActive: isBold,
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold'),
-      },
-      {
-        id: 'italic',
-        label: 'Italic',
-        icon: ItalicIcon,
-        group: 'inline-format',
-        isActive: isItalic,
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic'),
-      },
-      {
-        id: 'underline',
-        label: 'Underline',
-        icon: UnderlineIcon,
-        group: 'inline-format',
-        isActive: isUnderline,
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline'),
-      },
-      {
-        id: 'strikethrough',
-        label: 'Strikethrough',
-        icon: StrikethroughIcon,
-        group: 'inline-format',
-        isActive: isStrikethrough,
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough'),
-      },
-      {
-        id: 'code',
-        label: 'Inline Code',
-        icon: CodeInlineIcon,
-        group: 'inline-format',
-        isActive: isCode,
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code'),
-      },
-      {
-        id: 'paragraph',
-        label: 'Paragraph',
-        icon: ParagraphIcon,
-        group: 'structure',
-        isActive: blockType === 'paragraph',
-        disabled: readOnly,
-        onClick: formatParagraph,
-      },
-      {
-        id: 'h1',
-        label: 'Heading 1',
-        icon: HeadingOneIcon,
-        group: 'structure',
-        isActive: blockType === 'h1',
-        disabled: readOnly,
-        onClick: () => formatHeading('h1'),
-      },
-      {
-        id: 'h2',
-        label: 'Heading 2',
-        icon: HeadingTwoIcon,
-        group: 'structure',
-        isActive: blockType === 'h2',
-        disabled: readOnly,
-        onClick: () => formatHeading('h2'),
-      },
-      {
-        id: 'h3',
-        label: 'Heading 3',
-        icon: HeadingThreeIcon,
-        group: 'structure',
-        isActive: blockType === 'h3',
-        disabled: readOnly,
-        onClick: () => formatHeading('h3'),
-      },
-      {
-        id: 'bulleted',
-        label: 'Bulleted List',
-        icon: BulletListIcon,
-        group: 'structure',
-        isActive: blockType === 'bullet',
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined),
-      },
-      {
-        id: 'numbered',
-        label: 'Numbered List',
-        icon: NumberListIcon,
-        group: 'structure',
-        isActive: blockType === 'number',
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined),
-      },
-      {
-        id: 'quote',
-        label: 'Block Quote',
-        icon: QuoteIcon,
-        group: 'structure',
-        isActive: blockType === 'quote',
-        disabled: readOnly,
-        onClick: formatQuote,
-      },
-      {
-        id: 'link',
-        label: isLink ? 'Edit or Remove Link' : 'Insert Link',
-        icon: ToolbarLinkIcon,
-        group: 'insert',
-        isActive: isLink,
-        disabled: readOnly,
-        onClick: toggleLink,
-      },
-      {
-        id: 'image',
-        label: 'Insert Image',
-        icon: ToolbarImageIcon,
-        group: 'insert',
-        disabled: readOnly,
-        onClick: openImagePicker,
-      },
-      {
-        id: 'align-left',
-        label: 'Align Left',
-        icon: AlignLeftIcon,
-        group: 'alignment',
-        isActive: alignment === 'left',
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left'),
-      },
-      {
-        id: 'align-center',
-        label: 'Align Center',
-        icon: AlignCenterIcon,
-        group: 'alignment',
-        isActive: alignment === 'center',
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center'),
-      },
-      {
-        id: 'align-right',
-        label: 'Align Right',
-        icon: AlignRightIcon,
-        group: 'alignment',
-        isActive: alignment === 'right',
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right'),
-      },
-      {
-        id: 'align-justify',
-        label: 'Justify',
-        icon: AlignJustifyIcon,
-        group: 'alignment',
-        isActive: alignment === 'justify',
-        disabled: readOnly,
-        onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'justify'),
-      },
-      {
-        id: 'clear-formatting',
-        label: 'Clear Formatting',
-        icon: ClearFormattingIcon,
-        group: 'utility',
-        disabled: readOnly,
-        onClick: () => {
-          if (isBold) {
-            editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold');
-          }
-          if (isItalic) {
-            editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic');
-          }
-          if (isUnderline) {
-            editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline');
-          }
-          if (isStrikethrough) {
-            editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough');
-          }
-          if (isCode) {
-            editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code');
-          }
-          if (isLink) {
-            editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
-          }
-          editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined);
-          editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left');
-          formatParagraph();
+    () => {
+      const buttons: ToolbarButtonConfig[] = [
+        {
+          id: 'undo',
+          label: 'Undo',
+          icon: UndoIcon,
+          group: 'history',
+          disabled: readOnly || !canUndo,
+          onClick: () => editor.dispatchCommand(UNDO_COMMAND, undefined),
         },
-      },
-    ],
+        {
+          id: 'redo',
+          label: 'Redo',
+          icon: RedoIcon,
+          group: 'history',
+          disabled: readOnly || !canRedo,
+          onClick: () => editor.dispatchCommand(REDO_COMMAND, undefined),
+        },
+        {
+          id: 'bold',
+          label: 'Bold',
+          icon: BoldIcon,
+          group: 'inline-format',
+          isActive: isBold,
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold'),
+        },
+        {
+          id: 'italic',
+          label: 'Italic',
+          icon: ItalicIcon,
+          group: 'inline-format',
+          isActive: isItalic,
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic'),
+        },
+        {
+          id: 'underline',
+          label: 'Underline',
+          icon: UnderlineIcon,
+          group: 'inline-format',
+          isActive: isUnderline,
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline'),
+        },
+        {
+          id: 'strikethrough',
+          label: 'Strikethrough',
+          icon: StrikethroughIcon,
+          group: 'inline-format',
+          isActive: isStrikethrough,
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough'),
+        },
+        {
+          id: 'code',
+          label: 'Inline Code',
+          icon: CodeInlineIcon,
+          group: 'inline-format',
+          isActive: isCode,
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code'),
+        },
+        {
+          id: 'paragraph',
+          label: 'Paragraph',
+          icon: ParagraphIcon,
+          group: 'structure',
+          isActive: blockType === 'paragraph',
+          disabled: readOnly,
+          onClick: formatParagraph,
+        },
+        {
+          id: 'h1',
+          label: 'Heading 1',
+          icon: HeadingOneIcon,
+          group: 'structure',
+          isActive: blockType === 'h1',
+          disabled: readOnly,
+          onClick: () => formatHeading('h1'),
+        },
+        {
+          id: 'h2',
+          label: 'Heading 2',
+          icon: HeadingTwoIcon,
+          group: 'structure',
+          isActive: blockType === 'h2',
+          disabled: readOnly,
+          onClick: () => formatHeading('h2'),
+        },
+        {
+          id: 'h3',
+          label: 'Heading 3',
+          icon: HeadingThreeIcon,
+          group: 'structure',
+          isActive: blockType === 'h3',
+          disabled: readOnly,
+          onClick: () => formatHeading('h3'),
+        },
+        {
+          id: 'bulleted',
+          label: 'Bulleted List',
+          icon: BulletListIcon,
+          group: 'structure',
+          isActive: blockType === 'bullet',
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(INSERT_UNORDERED_LIST_COMMAND, undefined),
+        },
+        {
+          id: 'numbered',
+          label: 'Numbered List',
+          icon: NumberListIcon,
+          group: 'structure',
+          isActive: blockType === 'number',
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(INSERT_ORDERED_LIST_COMMAND, undefined),
+        },
+        {
+          id: 'quote',
+          label: 'Block Quote',
+          icon: QuoteIcon,
+          group: 'structure',
+          isActive: blockType === 'quote',
+          disabled: readOnly,
+          onClick: formatQuote,
+        },
+        {
+          id: 'link',
+          label: isLink ? 'Edit or Remove Link' : 'Insert Link',
+          icon: ToolbarLinkIcon,
+          group: 'insert',
+          isActive: isLink,
+          disabled: readOnly,
+          onClick: toggleLink,
+        },
+        {
+          id: 'image',
+          label: 'Insert Image',
+          icon: ToolbarImageIcon,
+          group: 'insert',
+          disabled: readOnly,
+          onClick: openImagePicker,
+        },
+        {
+          id: 'table',
+          label: 'Insert Table',
+          icon: TableIcon,
+          group: 'insert',
+          disabled: readOnly,
+          onClick: openTableModal,
+        },
+        {
+          id: 'align-left',
+          label: 'Align Left',
+          icon: AlignLeftIcon,
+          group: 'alignment',
+          isActive: alignment === 'left',
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left'),
+        },
+        {
+          id: 'align-center',
+          label: 'Align Center',
+          icon: AlignCenterIcon,
+          group: 'alignment',
+          isActive: alignment === 'center',
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'center'),
+        },
+        {
+          id: 'align-right',
+          label: 'Align Right',
+          icon: AlignRightIcon,
+          group: 'alignment',
+          isActive: alignment === 'right',
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'right'),
+        },
+        {
+          id: 'align-justify',
+          label: 'Justify',
+          icon: AlignJustifyIcon,
+          group: 'alignment',
+          isActive: alignment === 'justify',
+          disabled: readOnly,
+          onClick: () => editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'justify'),
+        },
+        {
+          id: 'clear-formatting',
+          label: 'Clear Formatting',
+          icon: ClearFormattingIcon,
+          group: 'utility',
+          disabled: readOnly,
+          onClick: () => {
+            if (isBold) {
+              editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold');
+            }
+            if (isItalic) {
+              editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic');
+            }
+            if (isUnderline) {
+              editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline');
+            }
+            if (isStrikethrough) {
+              editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough');
+            }
+            if (isCode) {
+              editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code');
+            }
+            if (isLink) {
+              editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+            }
+            editor.dispatchCommand(REMOVE_LIST_COMMAND, undefined);
+            editor.dispatchCommand(FORMAT_ELEMENT_COMMAND, 'left');
+            formatParagraph();
+          },
+        },
+      ];
+
+      if (isTableSelectionActive && !readOnly) {
+        buttons.push(
+          {
+            id: 'row-above',
+            label: 'Insert Row Above',
+            icon: TableIcon,
+            group: 'table',
+            onClick: insertRowAbove,
+          },
+          {
+            id: 'row-below',
+            label: 'Insert Row Below',
+            icon: TableIcon,
+            group: 'table',
+            onClick: insertRowBelow,
+          },
+          {
+            id: 'column-left',
+            label: 'Insert Column Left',
+            icon: TableIcon,
+            group: 'table',
+            onClick: insertColumnLeft,
+          },
+          {
+            id: 'column-right',
+            label: 'Insert Column Right',
+            icon: TableIcon,
+            group: 'table',
+            onClick: insertColumnRight,
+          },
+          {
+            id: 'delete-row',
+            label: 'Delete Row',
+            icon: TableIcon,
+            group: 'table',
+            onClick: deleteTableRow,
+          },
+          {
+            id: 'delete-column',
+            label: 'Delete Column',
+            icon: TableIcon,
+            group: 'table',
+            onClick: deleteTableColumn,
+          },
+          {
+            id: 'delete-table',
+            label: 'Delete Table',
+            icon: TableIcon,
+            group: 'table',
+            onClick: deleteTable,
+          },
+        );
+      }
+
+      return buttons;
+    },
     [
       alignment,
       blockType,
       canRedo,
       canUndo,
+      deleteTable,
+      deleteTableColumn,
+      deleteTableRow,
       editor,
       formatHeading,
       formatParagraph,
       formatQuote,
+      insertColumnLeft,
+      insertColumnRight,
+      insertRowAbove,
+      insertRowBelow,
       isBold,
       isCode,
       isItalic,
       isLink,
       isStrikethrough,
+      isTableSelectionActive,
       isUnderline,
       openImagePicker,
+      openTableModal,
       readOnly,
       toggleLink,
     ],
@@ -860,6 +1212,7 @@ const ToolbarPlugin: React.FC<{
           onChange={handleImageFileChange}
         />
       </div>
+      <TableInsertModal isOpen={isTableModalOpen} onSubmit={insertTable} onClose={closeTableModal} />
       <LinkModal
         isOpen={isLinkModalOpen}
         initialUrl={linkDraftUrl}
@@ -1213,7 +1566,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         onError: (error: Error) => {
           console.error('Rich text editor encountered an error.', error);
         },
-        nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, ImageNode],
+        nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, ImageNode, TableNode, TableRowNode, TableCellNode],
         editorState: (editor: LexicalEditor) => {
           const initialHtml = (initialHtmlRef.current ?? '').trim();
           if (!initialHtml) {
@@ -1268,6 +1621,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           </div>
           <HistoryPlugin />
           {!readOnly && <AutoFocusPlugin />}
+          <TablePlugin hasCellMerge={true} hasCellBackgroundColor={true} />
           <ListPlugin />
           <LinkPlugin />
           <ImagePlugin />
