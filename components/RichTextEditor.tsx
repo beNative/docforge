@@ -56,9 +56,16 @@ import {
   UNDO_COMMAND,
   type EditorState,
   type LexicalEditor,
+  type NodeSelection,
+  type RangeSelection,
+  $createNodeSelection,
+  $createRangeSelection,
   $createTextNode,
+  $getNodeByKey,
+  $setSelection,
 } from 'lexical';
 import IconButton from './IconButton';
+import Button from './Button';
 import ContextMenuComponent, { type MenuItem as ContextMenuItem } from './ContextMenu';
 import { RedoIcon, UndoIcon } from './Icons';
 import {
@@ -83,6 +90,7 @@ import {
   UnderlineIcon,
 } from './rich-text/RichTextToolbarIcons';
 import { $createImageNode, ImageNode, INSERT_IMAGE_COMMAND, type ImagePayload } from './rich-text/ImageNode';
+import Modal from './Modal';
 
 export interface RichTextEditorHandle {
   focus: () => void;
@@ -117,6 +125,19 @@ interface ContextMenuState {
   visible: boolean;
 }
 
+type SelectionSnapshot =
+  | {
+      type: 'range';
+      anchorKey: string;
+      anchorOffset: number;
+      anchorType: 'text' | 'element';
+      focusKey: string;
+      focusOffset: number;
+      focusType: 'text' | 'element';
+    }
+  | { type: 'node'; keys: string[] }
+  | null;
+
 const RICH_TEXT_THEME = {
   paragraph: 'mb-3 text-base leading-7 text-text-main',
   heading: {
@@ -146,12 +167,90 @@ const RICH_TEXT_THEME = {
 
 const Placeholder: React.FC = () => null;
 
+const normalizeUrl = (url: string): string => {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  if (/^[a-zA-Z][\w+.-]*:/.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+};
+
+const LinkModal: React.FC<{
+  isOpen: boolean;
+  initialUrl: string;
+  onSubmit: (url: string) => void;
+  onRemove: () => void;
+  onClose: () => void;
+}> = ({ isOpen, initialUrl, onSubmit, onRemove, onClose }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [url, setUrl] = useState(initialUrl);
+
+  useEffect(() => {
+    setUrl(initialUrl);
+  }, [initialUrl]);
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    onSubmit(url);
+  };
+
+  if (!isOpen) {
+    return null;
+  }
+
+  return (
+    <Modal onClose={onClose} title="Insert link" initialFocusRef={inputRef}>
+      <form onSubmit={handleSubmit}>
+        <div className="p-6 space-y-3">
+          <label className="block text-sm font-semibold text-text-main" htmlFor="link-url-input">
+            Link URL
+          </label>
+          <input
+            id="link-url-input"
+            ref={inputRef}
+            type="text"
+            inputMode="url"
+            autoComplete="url"
+            required
+            value={url}
+            onChange={event => setUrl(event.target.value)}
+            className="w-full rounded-md border border-border-color bg-background px-3 py-2 text-sm text-text-main focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            placeholder="https://example.com"
+          />
+          <p className="text-xs text-text-secondary">
+            Enter a valid URL. If you omit the protocol, https:// will be added automatically.
+          </p>
+        </div>
+        <div className="flex justify-end gap-3 px-6 py-4 bg-background/50 border-t border-border-color rounded-b-lg">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" variant="secondary" onClick={onRemove}>
+            Remove link
+          </Button>
+          <Button type="submit">Save link</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
 const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, icon: Icon, isActive = false, disabled = false, onClick }) => (
   <IconButton
     type="button"
     tooltip={label}
     size="xs"
     variant="ghost"
+    onMouseDown={event => {
+      // Prevent the toolbar button from stealing focus, which would clear the
+      // user's selection in the editor before the command executes.
+      event.preventDefault();
+    }}
     onClick={onClick}
     disabled={disabled}
     aria-pressed={isActive}
@@ -181,6 +280,47 @@ const ToolbarPlugin: React.FC<{
   const [alignment, setAlignment] = useState<'left' | 'center' | 'right' | 'justify'>('left');
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [linkDraftUrl, setLinkDraftUrl] = useState('');
+  const pendingLinkSelectionRef = useRef<SelectionSnapshot>(null);
+  const closeLinkModal = useCallback(() => {
+    setIsLinkModalOpen(false);
+  }, []);
+  const dismissLinkModal = useCallback(() => {
+    pendingLinkSelectionRef.current = null;
+    closeLinkModal();
+  }, [closeLinkModal]);
+
+  const restoreSelectionFromSnapshot = useCallback(
+    (snapshot: SelectionSnapshot = pendingLinkSelectionRef.current) => {
+    if (!snapshot) {
+      return null;
+    }
+
+    if (snapshot.type === 'range') {
+      const selection = $createRangeSelection();
+      const anchorNode = $getNodeByKey(snapshot.anchorKey);
+      const focusNode = $getNodeByKey(snapshot.focusKey);
+
+      if (!anchorNode || !focusNode) {
+        return null;
+      }
+
+      selection.anchor.set(snapshot.anchorKey, snapshot.anchorOffset, snapshot.anchorType);
+      selection.focus.set(snapshot.focusKey, snapshot.focusOffset, snapshot.focusType);
+      return selection;
+    }
+
+    const selection = $createNodeSelection();
+    snapshot.keys.forEach(key => {
+      const node = $getNodeByKey(key);
+      if (node) {
+        selection.add(node.getKey());
+      }
+    });
+
+    return selection.getNodes().length > 0 ? selection : null;
+  }, []);
 
   const updateToolbar = useCallback(() => {
     const selection = $getSelection();
@@ -286,26 +426,130 @@ const ToolbarPlugin: React.FC<{
     });
   }, [editor]);
 
-    const toggleLink = useCallback(() => {
-      if (readOnly) {
-        return;
-      }
-      if (isLink) {
-        editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+  const captureLinkState = useCallback(() => {
+    let detectedUrl = '';
+
+    editor.getEditorState().read(() => {
+      const selection = $getSelection();
+      if ($isRangeSelection(selection)) {
+        pendingLinkSelectionRef.current = {
+          type: 'range',
+          anchorKey: selection.anchor.key,
+          anchorOffset: selection.anchor.offset,
+          anchorType: selection.anchor.type,
+          focusKey: selection.focus.key,
+          focusOffset: selection.focus.offset,
+          focusType: selection.focus.type,
+        };
+
+        const selectionNodes = selection.getNodes();
+        if (selectionNodes.length === 0) {
+          return;
+        }
+
+        const firstNode = selectionNodes[0];
+        const linkNode = $isLinkNode(firstNode)
+          ? firstNode
+          : $isLinkNode(firstNode.getParent())
+            ? firstNode.getParent()
+            : null;
+
+        if ($isLinkNode(linkNode)) {
+          detectedUrl = linkNode.getURL();
+        }
         return;
       }
 
-      const promptFn = typeof window.prompt === 'function' ? window.prompt.bind(window) : null;
-      if (!promptFn) {
-        console.warn('Link insertion prompt is unavailable in this environment.');
+      if ($isNodeSelection(selection)) {
+        const nodes = selection.getNodes();
+        pendingLinkSelectionRef.current = { type: 'node', keys: nodes.map(node => node.getKey()) };
+      } else {
+        pendingLinkSelectionRef.current = null;
+      }
+    });
+
+    if (!pendingLinkSelectionRef.current) {
+      return false;
+    }
+
+    setLinkDraftUrl(detectedUrl);
+    setIsLinkModalOpen(true);
+    return true;
+  }, [editor]);
+
+  const applyLink = useCallback(
+    (url: string) => {
+      closeLinkModal();
+
+      const selectionSnapshot = pendingLinkSelectionRef.current;
+      pendingLinkSelectionRef.current = null;
+
+      const normalizedUrl = normalizeUrl(url);
+      if (!normalizedUrl) {
+        editor.focus();
         return;
       }
 
-      const url = promptFn('Enter URL');
-      if (url) {
-        editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
+      editor.update(() => {
+        const selectionFromSnapshot = restoreSelectionFromSnapshot(selectionSnapshot);
+        const selectionToUse = selectionFromSnapshot ?? (() => {
+          const activeSelection = $getSelection();
+          if ($isRangeSelection(activeSelection) || $isNodeSelection(activeSelection)) {
+            return activeSelection;
+          }
+          const root = $getRoot();
+          return root.selectEnd();
+        })();
+
+        if (!selectionToUse) {
+          return;
+        }
+
+        $setSelection(selectionToUse);
+        editor.dispatchCommand(TOGGLE_LINK_COMMAND, normalizedUrl);
+      });
+      editor.focus();
+    },
+    [closeLinkModal, editor, restoreSelectionFromSnapshot],
+  );
+
+  const removeLink = useCallback(() => {
+    closeLinkModal();
+
+    const selectionSnapshot = pendingLinkSelectionRef.current;
+    pendingLinkSelectionRef.current = null;
+
+    editor.update(() => {
+      const selectionFromSnapshot = restoreSelectionFromSnapshot(selectionSnapshot);
+      const selectionToUse = selectionFromSnapshot ?? (() => {
+        const activeSelection = $getSelection();
+        if ($isRangeSelection(activeSelection) || $isNodeSelection(activeSelection)) {
+          return activeSelection;
+        }
+        const root = $getRoot();
+        return root.selectEnd();
+      })();
+
+      if (!selectionToUse) {
+        return;
       }
-    }, [editor, isLink, readOnly]);
+
+      $setSelection(selectionToUse);
+      editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+    });
+    editor.focus();
+  }, [closeLinkModal, editor, restoreSelectionFromSnapshot]);
+
+  const toggleLink = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
+
+    const hasSelection = captureLinkState();
+    if (!hasSelection) {
+      editor.focus();
+    }
+  }, [captureLinkState, editor, readOnly]);
 
   const insertImage = useCallback(
     (payload: ImagePayload) => {
@@ -473,7 +717,7 @@ const ToolbarPlugin: React.FC<{
       },
       {
         id: 'link',
-        label: isLink ? 'Remove Link' : 'Insert Link',
+        label: isLink ? 'Edit or Remove Link' : 'Insert Link',
         icon: ToolbarLinkIcon,
         group: 'insert',
         isActive: isLink,
@@ -596,25 +840,34 @@ const ToolbarPlugin: React.FC<{
   );
 
   return (
-    <div
-      className="flex flex-wrap content-center items-center gap-x-0.5 gap-y-0.5 border-b border-border-color bg-secondary/50 backdrop-blur-sm px-2 py-0.5 overflow-hidden sticky top-0 z-10"
-      style={{ minHeight: '28px' }}
-    >
-      {renderedToolbarElements.map(element =>
-        'type' in element ? (
-          <div key={element.id} className="mx-1 h-3 w-px bg-border-color" />
-        ) : (
-          <ToolbarButton key={element.id} {...element} />
-        ),
-      )}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={handleImageFileChange}
+    <>
+      <div
+        className="flex flex-wrap content-center items-center gap-x-0.5 gap-y-0.5 border-b border-border-color bg-secondary/50 backdrop-blur-sm px-2 py-0.5 overflow-hidden sticky top-0 z-10"
+        style={{ minHeight: '28px' }}
+      >
+        {renderedToolbarElements.map(element =>
+          'type' in element ? (
+            <div key={element.id} className="mx-1 h-3 w-px bg-border-color" />
+          ) : (
+            <ToolbarButton key={element.id} {...element} />
+          ),
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageFileChange}
+        />
+      </div>
+      <LinkModal
+        isOpen={isLinkModalOpen}
+        initialUrl={linkDraftUrl}
+        onSubmit={applyLink}
+        onRemove={removeLink}
+        onClose={dismissLinkModal}
       />
-    </div>
+    </>
   );
 };
 
