@@ -67,10 +67,14 @@ export const storageService = {
    * @param content The string content to append.
    */
   appendLogToFile: async (content: string): Promise<void> => {
-    // This feature is not fully implemented in the electron backend.
-    // Logging a warning to avoid silent failures.
-    if (window.electronAPI) {
-        console.warn('appendLogToFile is not implemented in the Electron backend.');
+    if (window.electronAPI?.appendLog) {
+      const result = await window.electronAPI.appendLog(content);
+      if (!result?.success && !result?.canceled) {
+        throw new Error(result?.error || 'Failed to append log content.');
+      }
+      return;
     }
+
+    console.warn('Appending logs is only supported in the desktop application.');
   },
 };
