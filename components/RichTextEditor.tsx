@@ -19,6 +19,7 @@ import { TablePlugin } from '@lexical/react/LexicalTablePlugin';
 import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $generateHtmlFromNodes, $generateNodesFromDOM } from '@lexical/html';
+import { $patchStyleText } from '@lexical/selection';
 import {
   $createHeadingNode,
   $createQuoteNode,
@@ -45,6 +46,7 @@ import {
   $getSelection,
   $isRangeSelection,
   $isNodeSelection,
+  $isTextNode,
   CAN_REDO_COMMAND,
   CAN_UNDO_COMMAND,
   COMMAND_PRIORITY_CRITICAL,
@@ -164,6 +166,15 @@ type SelectionSnapshot =
     }
   | null;
 
+type EnhancedTableCellNode = TableCellNode & {
+  __borderColor?: string | null;
+  __borderWidth?: string | null;
+  getBorderColor?: () => string | null;
+  setBorderColor?: (color: string | null) => void;
+  getBorderWidth?: () => string | null;
+  setBorderWidth?: (width: string | null) => void;
+};
+
 const RICH_TEXT_THEME = {
   paragraph: 'mb-3 text-base leading-7 text-text-main',
   heading: {
@@ -196,6 +207,97 @@ const RICH_TEXT_THEME = {
   tableSelection: 'outline outline-2 outline-primary',
 };
 
+const enhanceTableCellNode = () => {
+  const prototype = TableCellNode.prototype as EnhancedTableCellNode & {
+    __createDOM?: TableCellNode['createDOM'];
+    __exportJSON?: TableCellNode['exportJSON'];
+    __updateDOM?: TableCellNode['updateDOM'];
+    __exportDOM?: TableCellNode['exportDOM'];
+  };
+
+  if (prototype.getBorderColor && prototype.getBorderWidth) {
+    return;
+  }
+
+  prototype.getBorderColor = function getBorderColor() {
+    return (this as EnhancedTableCellNode).__borderColor ?? null;
+  };
+
+  prototype.setBorderColor = function setBorderColor(color: string | null) {
+    const writable = this.getWritable() as EnhancedTableCellNode;
+    writable.__borderColor = color;
+  };
+
+  prototype.getBorderWidth = function getBorderWidth() {
+    return (this as EnhancedTableCellNode).__borderWidth ?? null;
+  };
+
+  prototype.setBorderWidth = function setBorderWidth(width: string | null) {
+    const writable = this.getWritable() as EnhancedTableCellNode;
+    writable.__borderWidth = width;
+  };
+
+  const originalCreateDom = prototype.createDOM.bind(TableCellNode.prototype);
+  prototype.createDOM = function createDOM(config) {
+    const element = originalCreateDom(config);
+    const cell = this as EnhancedTableCellNode;
+    if (cell.__borderColor) {
+      element.style.borderColor = cell.__borderColor;
+    }
+    if (cell.__borderWidth) {
+      element.style.borderWidth = cell.__borderWidth;
+    }
+    return element;
+  };
+
+  const originalUpdateDom = prototype.updateDOM.bind(TableCellNode.prototype);
+  prototype.updateDOM = function updateDOM(prevNode: TableCellNode) {
+    const previous = prevNode as EnhancedTableCellNode;
+    const current = this as EnhancedTableCellNode;
+    return (
+      originalUpdateDom(prevNode) ||
+      previous.__borderColor !== current.__borderColor ||
+      previous.__borderWidth !== current.__borderWidth
+    );
+  };
+
+  const originalExportJson = prototype.exportJSON.bind(TableCellNode.prototype);
+  prototype.exportJSON = function exportJSON() {
+    const json = originalExportJson();
+    return {
+      ...json,
+      borderColor: (this as EnhancedTableCellNode).__borderColor ?? null,
+      borderWidth: (this as EnhancedTableCellNode).__borderWidth ?? null,
+    } as ReturnType<TableCellNode['exportJSON']> & { borderColor: string | null; borderWidth: string | null };
+  };
+
+  const originalExportDom = prototype.exportDOM.bind(TableCellNode.prototype);
+  prototype.exportDOM = function exportDOM(editor: LexicalEditor) {
+    const result = originalExportDom(editor);
+    const cell = this as EnhancedTableCellNode;
+    if (result.element) {
+      if (cell.__borderColor) {
+        result.element.style.borderColor = cell.__borderColor;
+      }
+      if (cell.__borderWidth) {
+        result.element.style.borderWidth = cell.__borderWidth;
+      }
+    }
+    return result;
+  };
+
+  const originalImportJson = TableCellNode.importJSON.bind(TableCellNode);
+  TableCellNode.importJSON = function importJSON(serializedNode: unknown) {
+    const node = originalImportJson(serializedNode as never) as EnhancedTableCellNode;
+    const payload = serializedNode as { borderColor?: string | null; borderWidth?: string | null };
+    node.__borderColor = payload.borderColor ?? null;
+    node.__borderWidth = payload.borderWidth ?? null;
+    return node;
+  };
+};
+
+enhanceTableCellNode();
+
 const Placeholder: React.FC = () => null;
 
 const normalizeUrl = (url: string): string => {
@@ -209,6 +311,27 @@ const normalizeUrl = (url: string): string => {
   }
 
   return `https://${trimmed}`;
+};
+
+const parseStyleString = (style: string): Record<string, string> => {
+  if (!style) {
+    return {};
+  }
+
+  return style.split(';').reduce<Record<string, string>>((acc, part) => {
+    const [property, value] = part.split(':').map(entry => entry?.trim()).filter(Boolean);
+    if (property && value) {
+      acc[property] = value;
+    }
+    return acc;
+  }, {});
+};
+
+const buildStyleString = (styles: Record<string, string | null | undefined>): string => {
+  return Object.entries(styles)
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([property, value]) => `${property}: ${value}`)
+    .join('; ');
 };
 
 const LinkModal: React.FC<{
@@ -510,6 +633,12 @@ const ToolbarPlugin: React.FC<{
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isInTable, setIsInTable] = useState(false);
   const [hasHeaderRow, setHasHeaderRow] = useState(false);
+  const [textColor, setTextColor] = useState<string>('');
+  const [textBackgroundColor, setTextBackgroundColor] = useState<string>('');
+  const [fontFamily, setFontFamily] = useState<string>('');
+  const [cellBackgroundColor, setCellBackgroundColor] = useState<string>('');
+  const [cellBorderColor, setCellBorderColor] = useState<string>('');
+  const [cellBorderWidth, setCellBorderWidth] = useState<string>('');
   const pendingLinkSelectionRef = useRef<SelectionSnapshot>(null);
   const pendingTableSelectionRef = useRef<SelectionSnapshot>(null);
   const closeLinkModal = useCallback(() => {
@@ -578,6 +707,12 @@ const ToolbarPlugin: React.FC<{
       setIsStrikethrough(false);
       setIsCode(false);
       setIsLink(false);
+      setTextColor('');
+      setTextBackgroundColor('');
+      setFontFamily('');
+      setCellBackgroundColor('');
+      setCellBorderColor('');
+      setCellBorderWidth('');
       setBlockType('paragraph');
       setAlignment('left');
       setIsInTable(false);
@@ -590,6 +725,10 @@ const ToolbarPlugin: React.FC<{
     if (tableCellNode) {
       const tableNode = $getTableNodeFromLexicalNodeOrThrow(tableCellNode);
       setIsInTable(true);
+      setCellBackgroundColor(tableCellNode.getBackgroundColor() ?? '');
+      const enhancedCell = tableCellNode as EnhancedTableCellNode;
+      setCellBorderColor(enhancedCell.getBorderColor ? enhancedCell.getBorderColor() ?? '' : '');
+      setCellBorderWidth(enhancedCell.getBorderWidth ? enhancedCell.getBorderWidth() ?? '' : '');
       const firstRow = tableNode.getFirstChild();
       let hasHeader = false;
       if (firstRow && $isTableRowNode(firstRow)) {
@@ -618,6 +757,11 @@ const ToolbarPlugin: React.FC<{
     setIsUnderline(selection.hasFormat('underline'));
     setIsStrikethrough(selection.hasFormat('strikethrough'));
     setIsCode(selection.hasFormat('code'));
+
+    const styleMap = parseStyleString(selection.style);
+    setTextColor(styleMap.color ?? '');
+    setTextBackgroundColor(styleMap['background-color'] ?? '');
+    setFontFamily(styleMap['font-family'] ?? '');
 
     const element = anchorNode.getTopLevelElementOrThrow();
 
@@ -1039,6 +1183,102 @@ const ToolbarPlugin: React.FC<{
     [insertImage],
   );
 
+  const applyTextStyles = useCallback(
+    (styles: Record<string, string | null | undefined>) => {
+      if (readOnly) {
+        return;
+      }
+
+      editor.update(() => {
+        const selection = $getSelection();
+        if ($isRangeSelection(selection)) {
+          const cleanedEntries = Object.entries(styles).reduce<Record<string, string>>((acc, [property, value]) => {
+            acc[property] = value ?? '';
+            return acc;
+          }, {});
+          $patchStyleText(selection, cleanedEntries);
+        } else if ($isTableSelection(selection)) {
+          const cleanedEntries = Object.entries(styles).reduce<Record<string, string>>((acc, [property, value]) => {
+            if (value !== undefined) {
+              acc[property] = value ?? '';
+            }
+            return acc;
+          }, {});
+          selection.getNodes().forEach(node => {
+            if ($isTextNode(node)) {
+              const existing = parseStyleString(node.getStyle());
+              Object.entries(cleanedEntries).forEach(([property, value]) => {
+                if (!value) {
+                  delete existing[property];
+                } else {
+                  existing[property] = value;
+                }
+              });
+              node.setStyle(buildStyleString(existing));
+            }
+          });
+        }
+      });
+    },
+    [editor, readOnly],
+  );
+
+  const applyTableCellAppearance = useCallback(
+    (appearance: { backgroundColor?: string | null; borderColor?: string | null; borderWidth?: string | null }) => {
+      if (readOnly) {
+        return;
+      }
+
+      editor.update(() => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection) && !$isTableSelection(selection)) {
+          return;
+        }
+
+        const anchorCell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+        const cells: TableCellNode[] = [];
+
+        if ($isTableSelection(selection)) {
+          selection.getNodes().forEach(node => {
+            if ($isTableCellNode(node)) {
+              cells.push(node);
+            }
+          });
+        } else if (anchorCell) {
+          cells.push(anchorCell);
+        }
+
+        cells.forEach(cell => {
+          if (appearance.backgroundColor !== undefined) {
+            cell.setBackgroundColor(appearance.backgroundColor ?? null);
+          }
+
+          const enhancedCell = cell as EnhancedTableCellNode;
+          if (enhancedCell.setBorderColor && appearance.borderColor !== undefined) {
+            enhancedCell.setBorderColor(appearance.borderColor ?? null);
+          }
+          if (enhancedCell.setBorderWidth && appearance.borderWidth !== undefined) {
+            enhancedCell.setBorderWidth(appearance.borderWidth ?? null);
+          }
+
+          const cellElement = editor.getElementByKey(cell.getKey());
+          if (cellElement) {
+            if (appearance.backgroundColor !== undefined) {
+              cellElement.style.backgroundColor = appearance.backgroundColor ?? '';
+            }
+            if (appearance.borderColor !== undefined) {
+              cellElement.style.borderColor = appearance.borderColor ?? '';
+            }
+            if (appearance.borderWidth !== undefined) {
+              cellElement.style.borderWidth = appearance.borderWidth ?? '';
+            }
+          }
+        });
+      });
+    },
+    [editor, readOnly],
+  );
+
   const toolbarButtons = useMemo<ToolbarButtonConfig[]>(
     () => [
       {
@@ -1311,6 +1551,148 @@ const ToolbarPlugin: React.FC<{
             <ToolbarButton key={element.id} {...element} />
           ),
         )}
+        <div className="mx-2 flex flex-wrap items-center gap-2 border-l border-border-color pl-2">
+          <label className="flex items-center gap-1 text-[11px] text-text-secondary">
+            <span>Text</span>
+            <input
+              type="color"
+              value={textColor || '#000000'}
+              onChange={event => {
+                const value = event.target.value;
+                setTextColor(value);
+                applyTextStyles({ color: value });
+              }}
+              disabled={readOnly}
+              className="h-7 w-7 rounded border border-border-color bg-background p-0"
+              aria-label="Text color"
+            />
+            <button
+              type="button"
+              className="rounded border border-border-color px-1 text-[11px] text-text-secondary hover:text-text-main"
+              onClick={() => {
+                setTextColor('');
+                applyTextStyles({ color: null });
+              }}
+              disabled={readOnly}
+            >
+              Clear
+            </button>
+          </label>
+          <label className="flex items-center gap-1 text-[11px] text-text-secondary">
+            <span>Highlight</span>
+            <input
+              type="color"
+              value={textBackgroundColor || '#ffff00'}
+              onChange={event => {
+                const value = event.target.value;
+                setTextBackgroundColor(value);
+                applyTextStyles({ 'background-color': value });
+              }}
+              disabled={readOnly}
+              className="h-7 w-7 rounded border border-border-color bg-background p-0"
+              aria-label="Highlight color"
+            />
+            <button
+              type="button"
+              className="rounded border border-border-color px-1 text-[11px] text-text-secondary hover:text-text-main"
+              onClick={() => {
+                setTextBackgroundColor('');
+                applyTextStyles({ 'background-color': null });
+              }}
+              disabled={readOnly}
+            >
+              Clear
+            </button>
+          </label>
+          <label className="flex items-center gap-1 text-[11px] text-text-secondary">
+            <span>Font</span>
+            <select
+              value={fontFamily || 'default'}
+              onChange={event => {
+                const value = event.target.value === 'default' ? '' : event.target.value;
+                setFontFamily(value);
+                applyTextStyles({ 'font-family': value || null });
+              }}
+              disabled={readOnly}
+              className="h-8 rounded border border-border-color bg-background px-1 text-xs text-text-main"
+            >
+              <option value="default">Default</option>
+              <option value="Inter, system-ui, -apple-system, sans-serif">Sans</option>
+              <option value="'Times New Roman', serif">Serif</option>
+              <option value="'Courier New', monospace">Monospace</option>
+            </select>
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 border-l border-border-color pl-2">
+          <label className="flex items-center gap-1 text-[11px] text-text-secondary">
+            <span>Cell bg</span>
+            <input
+              type="color"
+              value={cellBackgroundColor || '#f5f5f5'}
+              onChange={event => {
+                const value = event.target.value;
+                setCellBackgroundColor(value);
+                applyTableCellAppearance({ backgroundColor: value });
+              }}
+              disabled={readOnly || !isInTable}
+              className="h-7 w-7 rounded border border-border-color bg-background p-0"
+              aria-label="Table cell background color"
+            />
+            <button
+              type="button"
+              className="rounded border border-border-color px-1 text-[11px] text-text-secondary hover:text-text-main"
+              onClick={() => {
+                setCellBackgroundColor('');
+                applyTableCellAppearance({ backgroundColor: null });
+              }}
+              disabled={readOnly || !isInTable}
+            >
+              Clear
+            </button>
+          </label>
+          <label className="flex items-center gap-1 text-[11px] text-text-secondary">
+            <span>Border</span>
+            <input
+              type="color"
+              value={cellBorderColor || '#d1d5db'}
+              onChange={event => {
+                const value = event.target.value;
+                setCellBorderColor(value);
+                applyTableCellAppearance({ borderColor: value });
+              }}
+              disabled={readOnly || !isInTable}
+              className="h-7 w-7 rounded border border-border-color bg-background p-0"
+              aria-label="Table cell border color"
+            />
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={cellBorderWidth ? parseFloat(cellBorderWidth) : 1}
+              onChange={event => {
+                const numeric = Number(event.target.value);
+                const value = Number.isFinite(numeric) ? `${numeric}px` : '';
+                setCellBorderWidth(value);
+                applyTableCellAppearance({ borderWidth: value || null });
+              }}
+              disabled={readOnly || !isInTable}
+              className="h-8 w-16 rounded border border-border-color bg-background px-1 text-xs text-text-main"
+              aria-label="Table cell border width"
+            />
+            <button
+              type="button"
+              className="rounded border border-border-color px-1 text-[11px] text-text-secondary hover:text-text-main"
+              onClick={() => {
+                setCellBorderColor('');
+                setCellBorderWidth('');
+                applyTableCellAppearance({ borderColor: null, borderWidth: null });
+              }}
+              disabled={readOnly || !isInTable}
+            >
+              Reset border
+            </button>
+          </label>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
