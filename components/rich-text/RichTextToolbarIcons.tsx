@@ -182,6 +182,16 @@ export const QuoteIcon = createStrokeIcon('QuoteIcon', () => (
   </>
 ));
 
+export const TableIcon = createStrokeIcon('TableIcon', () => (
+  <>
+    <rect x="4" y="5" width="16" height="14" rx="1" ry="1" />
+    <line x1="4" y1="10" x2="20" y2="10" />
+    <line x1="4" y1="14" x2="20" y2="14" />
+    <line x1="10" y1="5" x2="10" y2="19" />
+    <line x1="14" y1="5" x2="14" y2="19" />
+  </>
+));
+
 export const LinkIcon = createStrokeIcon('LinkIcon', () => (
   <>
     <path d="M10 14a4 4 0 0 1 0-5.66l2.12-2.12a4 4 0 0 1 5.66 5.66l-1.06 1.06" />
