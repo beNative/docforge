@@ -77,12 +77,12 @@ import {
   $isTableRowNode,
   $isTableSelection,
   INSERT_TABLE_COMMAND,
-  TableCellNode,
   TableCellHeaderStates,
   TableNode,
   TableRowNode,
   type TableSelection,
 } from '@lexical/table';
+import { $getSelectionStyleValueForProperty, $patchStyleText } from '@lexical/selection';
 import IconButton from './IconButton';
 import Button from './Button';
 import ContextMenuComponent, { type MenuItem as ContextMenuItem } from './ContextMenu';
@@ -111,6 +111,8 @@ import {
 } from './rich-text/RichTextToolbarIcons';
 import { $createImageNode, ImageNode, INSERT_IMAGE_COMMAND, type ImagePayload } from './rich-text/ImageNode';
 import Modal from './Modal';
+import ColorPicker from './ColorPicker';
+import { DocforgeTableCellNode } from './rich-text/DocforgeTableCellNode';
 
 export interface RichTextEditorHandle {
   focus: () => void;
@@ -510,6 +512,12 @@ const ToolbarPlugin: React.FC<{
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isInTable, setIsInTable] = useState(false);
   const [hasHeaderRow, setHasHeaderRow] = useState(false);
+  const [fontColor, setFontColor] = useState('#0f172a');
+  const [highlightColor, setHighlightColor] = useState('#ffffff00');
+  const [fontFamily, setFontFamily] = useState('');
+  const [cellBackgroundColor, setCellBackgroundColor] = useState('#ffffff00');
+  const [cellBorderColor, setCellBorderColor] = useState('');
+  const [cellBorderWidth, setCellBorderWidth] = useState(1);
   const pendingLinkSelectionRef = useRef<SelectionSnapshot>(null);
   const pendingTableSelectionRef = useRef<SelectionSnapshot>(null);
   const closeLinkModal = useCallback(() => {
@@ -582,6 +590,12 @@ const ToolbarPlugin: React.FC<{
       setAlignment('left');
       setIsInTable(false);
       setHasHeaderRow(false);
+      setFontColor('#0f172a');
+      setHighlightColor('#ffffff00');
+      setFontFamily('');
+      setCellBackgroundColor('#ffffff00');
+      setCellBorderColor('');
+      setCellBorderWidth(1);
       return;
     }
 
@@ -596,9 +610,28 @@ const ToolbarPlugin: React.FC<{
         hasHeader = firstRow.getChildren().some(child => $isTableCellNode(child) && child.hasHeaderState(TableCellHeaderStates.ROW));
       }
       setHasHeaderRow(hasHeader);
+      setCellBackgroundColor(tableCellNode.getBackgroundColor() ?? '#ffffff00');
+      if (tableCellNode instanceof DocforgeTableCellNode) {
+        setCellBorderColor(tableCellNode.getBorderColor() ?? '');
+        setCellBorderWidth(tableCellNode.getBorderWidth() ?? 1);
+      } else {
+        setCellBorderColor('');
+        setCellBorderWidth(1);
+      }
     } else {
       setIsInTable(false);
       setHasHeaderRow(false);
+      setCellBackgroundColor('#ffffff00');
+      setCellBorderColor('');
+      setCellBorderWidth(1);
+    }
+
+    if ($isRangeSelection(selection) || $isTableSelection(selection)) {
+      setFontColor($getSelectionStyleValueForProperty(selection, 'color', '#0f172a'));
+      setHighlightColor(
+        $getSelectionStyleValueForProperty(selection, 'background-color', '#ffffff00') || '#ffffff00',
+      );
+      setFontFamily($getSelectionStyleValueForProperty(selection, 'font-family', ''));
     }
 
     if (!$isRangeSelection(selection)) {
@@ -924,6 +957,47 @@ const ToolbarPlugin: React.FC<{
     [editor, restoreSelectionFromSnapshot],
   );
 
+  const applyTextStyles = useCallback(
+    (styles: Record<string, string>) => {
+      editor.update(() => {
+        const selection = $getSelection();
+        if ($isRangeSelection(selection) || $isTableSelection(selection)) {
+          $patchStyleText(selection, styles);
+        }
+      });
+    },
+    [editor],
+  );
+
+  const applyToSelectedCells = useCallback(
+    (updater: (cell: DocforgeTableCellNode) => void) => {
+      runWithActiveTable(selection => {
+        const visited = new Set<string>();
+        const cells = $isTableSelection(selection)
+          ? selection.getNodes().filter($isTableCellNode)
+          : (() => {
+              const anchor = selection.anchor.getNode();
+              const cell = $getTableCellNodeFromLexicalNode(anchor);
+              return cell ? [cell] : [];
+            })();
+
+        cells.forEach(cell => {
+          if (!cell) {
+            return;
+          }
+          const key = cell.getKey();
+          if (visited.has(key)) {
+            return;
+          }
+          visited.add(key);
+          const writableCell = cell.getWritable() as DocforgeTableCellNode;
+          updater(writableCell);
+        });
+      });
+    },
+    [runWithActiveTable],
+  );
+
   const insertTable = useCallback(
     (rows: number, columns: number, includeHeaderRow: boolean) => {
       if (readOnly) {
@@ -985,6 +1059,65 @@ const ToolbarPlugin: React.FC<{
     });
     setIsTableModalOpen(false);
   }, [runWithActiveTable]);
+
+  const handleFontChange = useCallback(
+    (value: string) => {
+      setFontFamily(value);
+      applyTextStyles({ 'font-family': value });
+    },
+    [applyTextStyles],
+  );
+
+  const handleTextColorChange = useCallback(
+    (value: string) => {
+      setFontColor(value);
+      applyTextStyles({ color: value });
+    },
+    [applyTextStyles],
+  );
+
+  const resetTextColor = useCallback(() => {
+    setFontColor('#0f172a');
+    applyTextStyles({ color: '' });
+  }, [applyTextStyles]);
+
+  const handleHighlightChange = useCallback(
+    (value: string) => {
+      setHighlightColor(value);
+      applyTextStyles({ 'background-color': value });
+    },
+    [applyTextStyles],
+  );
+
+  const clearHighlight = useCallback(() => {
+    setHighlightColor('#ffffff00');
+    applyTextStyles({ 'background-color': '' });
+  }, [applyTextStyles]);
+
+  const handleCellBackgroundChange = useCallback(
+    (value: string) => {
+      setCellBackgroundColor(value);
+      applyToSelectedCells(cell => cell.setBackgroundColor(value));
+    },
+    [applyToSelectedCells],
+  );
+
+  const handleCellBorderColorChange = useCallback(
+    (value: string) => {
+      setCellBorderColor(value);
+      applyToSelectedCells(cell => cell.setBorderColor(value));
+    },
+    [applyToSelectedCells],
+  );
+
+  const handleCellBorderWidthChange = useCallback(
+    (value: number) => {
+      const normalized = Math.max(0, Math.min(12, value));
+      setCellBorderWidth(normalized);
+      applyToSelectedCells(cell => cell.setBorderWidth(normalized || null));
+    },
+    [applyToSelectedCells],
+  );
 
   const toggleHeaderRow = useCallback(
     () =>
@@ -1304,6 +1437,90 @@ const ToolbarPlugin: React.FC<{
         className="flex flex-wrap content-center items-center gap-x-0.5 gap-y-0.5 border-b border-border-color bg-secondary/50 backdrop-blur-sm px-2 py-0.5 overflow-hidden sticky top-0 z-10"
         style={{ minHeight: '28px' }}
       >
+        <div className="flex items-center gap-2 pr-3 mr-3 border-r border-border-color text-xs text-text-secondary">
+          <label className="font-medium" htmlFor="rich-text-font-family">
+            Font
+          </label>
+          <select
+            id="rich-text-font-family"
+            className="h-8 rounded border border-border-color bg-background px-2 text-sm text-text-main"
+            value={fontFamily}
+            onChange={event => handleFontChange(event.target.value)}
+            disabled={readOnly}
+          >
+            <option value="">Default</option>
+            <option value="Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">Inter</option>
+            <option value="'Times New Roman', Times, serif">Times New Roman</option>
+            <option value="'Georgia', serif">Georgia</option>
+            <option value="'Arial', sans-serif">Arial</option>
+            <option value="'Courier New', Courier, monospace">Courier New</option>
+            <option value="'Menlo', monospace">Menlo</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2 pr-3 mr-3 border-r border-border-color">
+          <div className="flex items-center gap-1 text-xs text-text-secondary">
+            <span>Text</span>
+            <ColorPicker
+              color={fontColor}
+              onChange={handleTextColorChange}
+              ariaLabel="Change text color"
+              anchorClassName={readOnly ? 'pointer-events-none opacity-50' : ''}
+            />
+            <Button type="button" size="xs" variant="ghost" onClick={resetTextColor} disabled={readOnly}>
+              Reset
+            </Button>
+          </div>
+          <div className="flex items-center gap-1 text-xs text-text-secondary">
+            <span>Highlight</span>
+            <ColorPicker
+              color={highlightColor}
+              onChange={handleHighlightChange}
+              ariaLabel="Change highlight color"
+              anchorClassName={readOnly ? 'pointer-events-none opacity-50' : ''}
+            />
+            <Button type="button" size="xs" variant="ghost" onClick={clearHighlight} disabled={readOnly}>
+              Clear
+            </Button>
+          </div>
+        </div>
+
+        {isInTable && (
+          <div className="flex flex-wrap items-center gap-2 pr-3 mr-3 border-r border-border-color text-xs text-text-secondary">
+            <div className="flex items-center gap-1">
+              <span>Cell fill</span>
+              <ColorPicker
+                color={cellBackgroundColor}
+                onChange={handleCellBackgroundChange}
+                ariaLabel="Change table cell background color"
+                anchorClassName={readOnly ? 'pointer-events-none opacity-50' : ''}
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <span>Border</span>
+              <ColorPicker
+                color={cellBorderColor || '#1f2937'}
+                onChange={handleCellBorderColorChange}
+                ariaLabel="Change table cell border color"
+                anchorClassName={readOnly ? 'pointer-events-none opacity-50' : ''}
+              />
+              <label className="flex items-center gap-1">
+                <span>Width</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={12}
+                  step={0.5}
+                  value={cellBorderWidth}
+                  onChange={event => handleCellBorderWidthChange(Number(event.target.value))}
+                  className="h-8 w-20 rounded border border-border-color bg-background px-2 text-sm text-text-main"
+                  disabled={readOnly}
+                />
+              </label>
+            </div>
+          </div>
+        )}
+
         {renderedToolbarElements.map(element =>
           'type' in element ? (
             <div key={element.id} className="mx-1 h-3 w-px bg-border-color" />
@@ -1687,7 +1904,17 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         onError: (error: Error) => {
           console.error('Rich text editor encountered an error.', error);
         },
-        nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, ImageNode, TableNode, TableCellNode, TableRowNode],
+        nodes: [
+          HeadingNode,
+          QuoteNode,
+          ListNode,
+          ListItemNode,
+          LinkNode,
+          ImageNode,
+          TableNode,
+          DocforgeTableCellNode,
+          TableRowNode,
+        ],
         editorState: (editor: LexicalEditor) => {
           const initialHtml = (initialHtmlRef.current ?? '').trim();
           if (!initialHtml) {
