@@ -290,6 +290,12 @@ const ToolbarPlugin: React.FC<{
       if (readOnly) {
         return;
       }
+
+      // Ensure the editor regains focus so the user's selection is still available
+      // when the link command runs. Without this, focus remains on the toolbar button
+      // or prompt dialog and the command receives no selection to wrap.
+      editor.focus();
+
       if (isLink) {
         editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
         return;
