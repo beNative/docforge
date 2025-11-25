@@ -230,6 +230,80 @@ export const ImageIcon = createStrokeIcon('ImageIcon', () => (
   </>
 ));
 
+export const TableIcon = createStrokeIcon('TableIcon', () => (
+  <>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" ry="2" />
+    <path d="M3.5 10.5h17" />
+    <path d="M3.5 14.5h17" />
+    <path d="M9.5 4.5v15" />
+    <path d="M15.5 4.5v15" />
+  </>
+));
+
+export const RowAboveIcon = createStrokeIcon('RowAboveIcon', () => (
+  <>
+    <rect x="4" y="7" width="16" height="12" rx="2" ry="2" />
+    <path d="M4 13h16" />
+    <path d="M12 4v6" />
+    <path d="M9.5 7.5 12 5l2.5 2.5" />
+  </>
+));
+
+export const RowBelowIcon = createStrokeIcon('RowBelowIcon', () => (
+  <>
+    <rect x="4" y="5" width="16" height="12" rx="2" ry="2" />
+    <path d="M4 11h16" />
+    <path d="M12 17V11" />
+    <path d="M9.5 14.5 12 17l2.5-2.5" />
+  </>
+));
+
+export const ColumnLeftIcon = createStrokeIcon('ColumnLeftIcon', () => (
+  <>
+    <rect x="5" y="4" width="14" height="16" rx="2" ry="2" />
+    <path d="M11 4v16" />
+    <path d="M13 12h6" />
+    <path d="M7.5 12 5 9.5 2.5 12 5 14.5z" />
+  </>
+));
+
+export const ColumnRightIcon = createStrokeIcon('ColumnRightIcon', () => (
+  <>
+    <rect x="5" y="4" width="14" height="16" rx="2" ry="2" />
+    <path d="M13 4v16" />
+    <path d="M11 12H5" />
+    <path d="M16.5 9.5 19 12l-2.5 2.5L14 12z" />
+  </>
+));
+
+export const DeleteRowIcon = createStrokeIcon('DeleteRowIcon', () => (
+  <>
+    <rect x="4" y="5" width="16" height="14" rx="2" ry="2" />
+    <path d="M4 12h16" />
+    <path d="M9 3h6" />
+    <path d="M12 6V3" />
+  </>
+));
+
+export const DeleteColumnIcon = createStrokeIcon('DeleteColumnIcon', () => (
+  <>
+    <rect x="5" y="4" width="14" height="16" rx="2" ry="2" />
+    <path d="M12 4v16" />
+    <path d="M6 9v6" />
+    <path d="M18 9v6" />
+  </>
+));
+
+export const DeleteTableIcon = createStrokeIcon('DeleteTableIcon', () => (
+  <>
+    <rect x="4" y="5" width="16" height="14" rx="2" ry="2" />
+    <path d="M4 11h16" />
+    <path d="M12 5v14" />
+    <path d="M8 9l8 8" />
+    <path d="M16 9l-8 8" />
+  </>
+));
+
 export const ClearFormattingIcon = createStrokeIcon('ClearFormattingIcon', () => (
   <>
     <path d="M5 4h14" />

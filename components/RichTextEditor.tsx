@@ -37,6 +37,20 @@ import {
 } from '@lexical/list';
 import { $isLinkNode, LinkNode, TOGGLE_LINK_COMMAND } from '@lexical/link';
 import { mergeRegister } from '@lexical/utils';
+import {
+  $deleteTableColumn__EXPERIMENTAL,
+  $deleteTableRow__EXPERIMENTAL,
+  $findTableNode,
+  $insertTableColumn__EXPERIMENTAL,
+  $insertTableRow__EXPERIMENTAL,
+  $isTableCellNode,
+  $isTableSelection,
+  INSERT_TABLE_COMMAND,
+  TableCellNode,
+  TableNode,
+  TableRowNode,
+} from '@lexical/table';
+import { TablePlugin } from '@lexical/react/LexicalTablePlugin';
 import { $setBlocksType } from '@lexical/selection';
 import {
   $createParagraphNode,
@@ -85,6 +99,14 @@ import {
   LinkIcon as ToolbarLinkIcon,
   NumberListIcon,
   ParagraphIcon,
+  TableIcon,
+  RowAboveIcon,
+  RowBelowIcon,
+  ColumnLeftIcon,
+  ColumnRightIcon,
+  DeleteRowIcon,
+  DeleteColumnIcon,
+  DeleteTableIcon,
   QuoteIcon,
   StrikethroughIcon,
   UnderlineIcon,
@@ -111,7 +133,7 @@ interface ToolbarButtonConfig {
   id: string;
   label: string;
   icon: React.FC<{ className?: string }>;
-  group: 'history' | 'inline-format' | 'structure' | 'insert' | 'alignment' | 'utility';
+  group: 'history' | 'inline-format' | 'structure' | 'insert' | 'alignment' | 'utility' | 'table';
   isActive?: boolean;
   disabled?: boolean;
   onClick: () => void;
@@ -163,6 +185,11 @@ const RICH_TEXT_THEME = {
   },
   link: 'text-primary underline decoration-primary/30 hover:decoration-primary transition-colors cursor-pointer',
   image: 'my-6 flex justify-center',
+  table: 'w-full border-collapse border border-border-color rounded-md overflow-hidden my-6 text-text-main bg-background',
+  tableRow: 'even:bg-secondary/40',
+  tableCell: 'border border-border-color px-3 py-2 align-top text-sm sm:text-base',
+  tableCellHeader: 'bg-secondary font-semibold',
+  tableSelection: 'outline outline-2 outline-primary/40 outline-offset-0',
 };
 
 const Placeholder: React.FC = () => null;
@@ -240,6 +267,147 @@ const LinkModal: React.FC<{
   );
 };
 
+const TABLE_GRID_SIZE = 6;
+const clampTableDimension = (value: number, fallback = 1) => {
+  if (Number.isNaN(value) || value <= 0) {
+    return fallback;
+  }
+  return Math.min(12, Math.max(1, Math.round(value)));
+};
+
+const TableSizeSelector: React.FC<{
+  anchorRef: React.RefObject<HTMLElement>;
+  isOpen: boolean;
+  hoverSize: { rows: number; columns: number };
+  customSize: { rows: number; columns: number };
+  onHoverSizeChange: (rows: number, columns: number) => void;
+  onCustomSizeChange: (key: 'rows' | 'columns', value: number) => void;
+  onSelect: (rows: number, columns: number) => void;
+  onClose: () => void;
+}> = ({
+  anchorRef,
+  isOpen,
+  hoverSize,
+  customSize,
+  onHoverSizeChange,
+  onCustomSizeChange,
+  onSelect,
+  onClose,
+}) => {
+  const [localHover, setLocalHover] = useState(hoverSize);
+
+  useEffect(() => {
+    setLocalHover(hoverSize);
+  }, [hoverSize]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined;
+    }
+    const handleClickOutside = (event: MouseEvent) => {
+      if (anchorRef.current && !anchorRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [anchorRef, isOpen, onClose]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const rows = Array.from({ length: TABLE_GRID_SIZE }, (_, index) => index + 1);
+  const columns = rows;
+
+  return (
+    <div
+      className="absolute left-0 top-full mt-2 w-64 rounded-lg border border-border-color bg-background shadow-xl z-30"
+      role="dialog"
+      aria-label="Insert table"
+    >
+      <div className="px-3 pt-3">
+        <p className="text-xs font-semibold text-text-secondary">Choose table size</p>
+        <p className="text-[11px] text-text-secondary">Move over the grid and click to insert.</p>
+      </div>
+      <div className="p-3 pt-2">
+        <div className="grid grid-cols-6 gap-1" role="grid" aria-label="Table size selector">
+          {rows.map(row =>
+            columns.map(column => {
+              const isActive = row <= localHover.rows && column <= localHover.columns;
+              return (
+                <button
+                  key={`${row}-${column}`}
+                  type="button"
+                  aria-label={`${row} by ${column} table`}
+                  onMouseEnter={() => {
+                    setLocalHover({ rows: row, columns: column });
+                    onHoverSizeChange(row, column);
+                  }}
+                  onFocus={() => {
+                    setLocalHover({ rows: row, columns: column });
+                    onHoverSizeChange(row, column);
+                  }}
+                  onClick={() => onSelect(row, column)}
+                  className={`h-7 w-7 rounded border ${
+                    isActive ? 'border-primary bg-primary/10' : 'border-border-color bg-secondary'
+                  } hover:border-primary hover:bg-primary/10 transition-colors`}
+                />
+              );
+            }),
+          )}
+        </div>
+        <div className="mt-3 flex items-center justify-between text-xs text-text-secondary">
+          <span>
+            {localHover.rows} x {localHover.columns}
+          </span>
+          <button
+            type="button"
+            className="text-primary hover:underline"
+            onClick={() => onSelect(localHover.rows, localHover.columns)}
+          >
+            Insert selection
+          </button>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 border-t border-border-color bg-secondary/40 px-3 py-3">
+        <label className="flex items-center gap-1 text-xs text-text-secondary" htmlFor="table-rows-input">
+          Rows
+          <input
+            id="table-rows-input"
+            type="number"
+            min={1}
+            max={12}
+            className="w-16 rounded border border-border-color bg-background px-2 py-1 text-sm text-text-main"
+            value={customSize.rows}
+            onChange={event => onCustomSizeChange('rows', clampTableDimension(Number(event.target.value), 3))}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-text-secondary" htmlFor="table-columns-input">
+          Columns
+          <input
+            id="table-columns-input"
+            type="number"
+            min={1}
+            max={12}
+            className="w-16 rounded border border-border-color bg-background px-2 py-1 text-sm text-text-main"
+            value={customSize.columns}
+            onChange={event => onCustomSizeChange('columns', clampTableDimension(Number(event.target.value), 3))}
+          />
+        </label>
+        <Button
+          type="button"
+          className="ml-auto"
+          onClick={() => onSelect(customSize.rows, customSize.columns)}
+        >
+          Insert
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 const ToolbarButton: React.FC<ToolbarButtonConfig> = ({ label, icon: Icon, isActive = false, disabled = false, onClick }) => (
   <IconButton
     type="button"
@@ -276,12 +444,17 @@ const ToolbarPlugin: React.FC<{
   const [isStrikethrough, setIsStrikethrough] = useState(false);
   const [isCode, setIsCode] = useState(false);
   const [isLink, setIsLink] = useState(false);
+  const [isInTable, setIsInTable] = useState(false);
+  const [isTablePickerOpen, setIsTablePickerOpen] = useState(false);
+  const [tableHoverSize, setTableHoverSize] = useState({ rows: 3, columns: 3 });
+  const [customTableSize, setCustomTableSize] = useState({ rows: 3, columns: 3 });
   const [blockType, setBlockType] = useState<BlockType>('paragraph');
   const [alignment, setAlignment] = useState<'left' | 'center' | 'right' | 'justify'>('left');
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [linkDraftUrl, setLinkDraftUrl] = useState('');
+  const tableButtonWrapperRef = useRef<HTMLDivElement>(null);
   const pendingLinkSelectionRef = useRef<SelectionSnapshot>(null);
   const closeLinkModal = useCallback(() => {
     setIsLinkModalOpen(false);
@@ -333,6 +506,7 @@ const ToolbarPlugin: React.FC<{
       setIsLink(false);
       setBlockType('paragraph');
       setAlignment('left');
+      setIsInTable($isTableSelection(selection));
       return;
     }
 
@@ -354,6 +528,11 @@ const ToolbarPlugin: React.FC<{
     } else {
       setBlockType('paragraph');
     }
+
+    const focusNode = selection.focus.getNode();
+    const anchorTable = $findTableNode(anchorNode);
+    const focusTable = $findTableNode(focusNode);
+    setIsInTable(Boolean(anchorTable ?? focusTable));
 
     const elementAlignment = element.getFormatType();
     setAlignment((elementAlignment || 'left') as 'left' | 'center' | 'right' | 'justify');
@@ -551,6 +730,43 @@ const ToolbarPlugin: React.FC<{
     }
   }, [captureLinkState, editor, readOnly]);
 
+  const handleTableHoverChange = useCallback((rows: number, columns: number) => {
+    setTableHoverSize({ rows, columns });
+  }, []);
+
+  const handleCustomTableSizeChange = useCallback((key: 'rows' | 'columns', value: number) => {
+    setCustomTableSize(prev => ({ ...prev, [key]: clampTableDimension(value, prev[key]) }));
+  }, []);
+
+  const insertTable = useCallback(
+    (rows: number, columns: number) => {
+      const safeRows = clampTableDimension(rows, 1);
+      const safeColumns = clampTableDimension(columns, 1);
+      setTableHoverSize({ rows: safeRows, columns: safeColumns });
+      setCustomTableSize({ rows: safeRows, columns: safeColumns });
+      editor.dispatchCommand(INSERT_TABLE_COMMAND, {
+        rows: String(safeRows),
+        columns: String(safeColumns),
+        includeHeaders: { rows: true, columns: true },
+      });
+      setIsTablePickerOpen(false);
+    },
+    [editor],
+  );
+
+  const toggleTablePicker = useCallback(() => {
+    if (readOnly) {
+      return;
+    }
+    setIsTablePickerOpen(prev => !prev);
+  }, [readOnly]);
+
+  useEffect(() => {
+    if (readOnly) {
+      setIsTablePickerOpen(false);
+    }
+  }, [readOnly]);
+
   const insertImage = useCallback(
     (payload: ImagePayload) => {
       if (!payload.src) {
@@ -567,6 +783,90 @@ const ToolbarPlugin: React.FC<{
     }
     fileInputRef.current?.click();
   }, [readOnly]);
+
+  const modifyTableRow = useCallback(
+    (position: 'above' | 'below') => {
+      if (!isInTable) {
+        return;
+      }
+      editor.update(() => {
+        try {
+          $insertTableRow__EXPERIMENTAL(position === 'below');
+        } catch (error) {
+          console.error('Unable to insert table row.', error);
+        }
+      });
+    },
+    [editor, isInTable],
+  );
+
+  const modifyTableColumn = useCallback(
+    (position: 'left' | 'right') => {
+      if (!isInTable) {
+        return;
+      }
+      editor.update(() => {
+        try {
+          $insertTableColumn__EXPERIMENTAL(position === 'right');
+        } catch (error) {
+          console.error('Unable to insert table column.', error);
+        }
+      });
+    },
+    [editor, isInTable],
+  );
+
+  const deleteTableRow = useCallback(() => {
+    if (!isInTable) {
+      return;
+    }
+    editor.update(() => {
+      try {
+        $deleteTableRow__EXPERIMENTAL();
+      } catch (error) {
+        console.error('Unable to delete table row.', error);
+      }
+    });
+  }, [editor, isInTable]);
+
+  const deleteTableColumn = useCallback(() => {
+    if (!isInTable) {
+      return;
+    }
+    editor.update(() => {
+      try {
+        $deleteTableColumn__EXPERIMENTAL();
+      } catch (error) {
+        console.error('Unable to delete table column.', error);
+      }
+    });
+  }, [editor, isInTable]);
+
+  const deleteTable = useCallback(() => {
+    if (!isInTable) {
+      return;
+    }
+    editor.update(() => {
+      const selection = $getSelection();
+      if (!selection) {
+        return;
+      }
+
+      const focusNode = selection.focus.getNode();
+      const tableNode = $findTableNode(focusNode);
+      if (!tableNode) {
+        return;
+      }
+
+      tableNode.remove();
+      const root = $getRoot();
+      if (root.getChildrenSize() === 0) {
+        const paragraph = $createParagraphNode();
+        paragraph.append($createTextNode(''));
+        root.append(paragraph);
+      }
+    });
+  }, [editor, isInTable]);
 
   const handleImageFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -733,6 +1033,70 @@ const ToolbarPlugin: React.FC<{
         onClick: openImagePicker,
       },
       {
+        id: 'table',
+        label: 'Insert Table',
+        icon: TableIcon,
+        group: 'insert',
+        disabled: readOnly,
+        onClick: toggleTablePicker,
+      },
+      {
+        id: 'row-above',
+        label: 'Insert Row Above',
+        icon: RowAboveIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: () => modifyTableRow('above'),
+      },
+      {
+        id: 'row-below',
+        label: 'Insert Row Below',
+        icon: RowBelowIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: () => modifyTableRow('below'),
+      },
+      {
+        id: 'column-left',
+        label: 'Insert Column Left',
+        icon: ColumnLeftIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: () => modifyTableColumn('left'),
+      },
+      {
+        id: 'column-right',
+        label: 'Insert Column Right',
+        icon: ColumnRightIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: () => modifyTableColumn('right'),
+      },
+      {
+        id: 'delete-row',
+        label: 'Delete Row',
+        icon: DeleteRowIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: deleteTableRow,
+      },
+      {
+        id: 'delete-column',
+        label: 'Delete Column',
+        icon: DeleteColumnIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: deleteTableColumn,
+      },
+      {
+        id: 'delete-table',
+        label: 'Delete Table',
+        icon: DeleteTableIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: deleteTable,
+      },
+      {
         id: 'align-left',
         label: 'Align Left',
         icon: AlignLeftIcon,
@@ -814,8 +1178,16 @@ const ToolbarPlugin: React.FC<{
       isLink,
       isStrikethrough,
       isUnderline,
+      isInTable,
       openImagePicker,
       readOnly,
+      deleteTable,
+      deleteTableColumn,
+      deleteTableRow,
+      modifyTableColumn,
+      modifyTableRow,
+      insertTable,
+      toggleTablePicker,
       toggleLink,
     ],
   );
@@ -848,6 +1220,20 @@ const ToolbarPlugin: React.FC<{
         {renderedToolbarElements.map(element =>
           'type' in element ? (
             <div key={element.id} className="mx-1 h-3 w-px bg-border-color" />
+          ) : element.id === 'table' ? (
+            <div key={element.id} ref={tableButtonWrapperRef} className="relative">
+              <ToolbarButton {...element} />
+              <TableSizeSelector
+                anchorRef={tableButtonWrapperRef}
+                isOpen={isTablePickerOpen}
+                hoverSize={tableHoverSize}
+                customSize={customTableSize}
+                onHoverSizeChange={handleTableHoverChange}
+                onCustomSizeChange={handleCustomTableSizeChange}
+                onSelect={insertTable}
+                onClose={() => setIsTablePickerOpen(false)}
+              />
+            </div>
           ) : (
             <ToolbarButton key={element.id} {...element} />
           ),
@@ -1213,7 +1599,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         onError: (error: Error) => {
           console.error('Rich text editor encountered an error.', error);
         },
-        nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, ImageNode],
+        nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, ImageNode, TableNode, TableRowNode, TableCellNode],
         editorState: (editor: LexicalEditor) => {
           const initialHtml = (initialHtmlRef.current ?? '').trim();
           if (!initialHtml) {
@@ -1269,6 +1655,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           <HistoryPlugin />
           {!readOnly && <AutoFocusPlugin />}
           <ListPlugin />
+          <TablePlugin />
           <LinkPlugin />
           <ImagePlugin />
           <ClipboardImagePlugin readOnly={readOnly} />
