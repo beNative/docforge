@@ -656,6 +656,17 @@ ipcMain.handle('app:get-version', () => app.getVersion());
 // Fix: Error on line 145 is resolved by importing 'platform' from 'process'.
 ipcMain.handle('app:get-platform', () => platform);
 ipcMain.handle('app:get-log-path', () => log.transports.file.getFile().path);
+ipcMain.handle('log:append', async (_, content: string) => {
+    const logFilePath = log.transports.file.getFile().path;
+    try {
+        await fs.mkdir(path.dirname(logFilePath), { recursive: true });
+        await fs.appendFile(logFilePath, content, 'utf-8');
+        return { success: true, filePath: logFilePath };
+    } catch (error) {
+        console.error('Failed to append to log file:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+});
 ipcMain.handle('app:open-executable-folder', async () => {
     const execDir = path.dirname(process.execPath);
     try {

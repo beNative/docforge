@@ -56,6 +56,7 @@ import {
   UNDO_COMMAND,
   type EditorState,
   type LexicalEditor,
+  $createTextNode,
 } from 'lexical';
 import IconButton from './IconButton';
 import ContextMenuComponent, { type MenuItem as ContextMenuItem } from './ContextMenu';
@@ -285,19 +286,26 @@ const ToolbarPlugin: React.FC<{
     });
   }, [editor]);
 
-  const toggleLink = useCallback(() => {
-    if (readOnly) {
-      return;
-    }
-    if (isLink) {
-      editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
-      return;
-    }
-    const url = window.prompt('Enter URL');
-    if (url) {
-      editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
-    }
-  }, [editor, isLink, readOnly]);
+    const toggleLink = useCallback(() => {
+      if (readOnly) {
+        return;
+      }
+      if (isLink) {
+        editor.dispatchCommand(TOGGLE_LINK_COMMAND, null);
+        return;
+      }
+
+      const promptFn = typeof window.prompt === 'function' ? window.prompt.bind(window) : null;
+      if (!promptFn) {
+        console.warn('Link insertion prompt is unavailable in this environment.');
+        return;
+      }
+
+      const url = promptFn('Enter URL');
+      if (url) {
+        editor.dispatchCommand(TOGGLE_LINK_COMMAND, url);
+      }
+    }, [editor, isLink, readOnly]);
 
   const insertImage = useCallback(
     (payload: ImagePayload) => {
@@ -617,34 +625,7 @@ const HtmlContentSynchronizer: React.FC<{ html: string; lastAppliedHtmlRef: Reac
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
-    const normalizedIncoming = html.trim();
-
-    editor.update(() => {
-      const root = $getRoot();
-      const currentHtml = $generateHtmlFromNodes(editor).trim();
-
-      if (currentHtml === normalizedIncoming) {
-        lastAppliedHtmlRef.current = normalizedIncoming;
-        return;
-      }
-
-      if (normalizedIncoming === lastAppliedHtmlRef.current && currentHtml !== '') {
-        return;
-      }
-
-      root.clear();
-
-      if (!normalizedIncoming) {
-        lastAppliedHtmlRef.current = '';
-        return;
-      }
-
-      const parser = new DOMParser();
-      const dom = parser.parseFromString(normalizedIncoming, 'text/html');
-      const nodes = $generateNodesFromDOM(editor, dom);
-      nodes.forEach(node => root.append(node));
-      lastAppliedHtmlRef.current = normalizedIncoming;
-    });
+    applyHtmlToEditor(editor, html, lastAppliedHtmlRef);
   }, [editor, html, lastAppliedHtmlRef]);
 
   return null;
@@ -799,6 +780,68 @@ const ClipboardImagePlugin: React.FC<{ readOnly: boolean }> = ({ readOnly }) => 
   return null;
 };
 
+const sanitizeDomFromHtml = (html: string): Document => {
+  const parser = new DOMParser();
+  const dom = parser.parseFromString(html, 'text/html');
+  dom.querySelectorAll('script,style').forEach(node => node.remove());
+  return dom;
+};
+
+const fallbackToPlainText = (text: string) => {
+  const parser = new DOMParser();
+  const dom = parser.parseFromString(text, 'text/html');
+  return (dom.body.textContent || '').trim();
+};
+
+const applyHtmlToEditor = (
+  editor: LexicalEditor,
+  html: string,
+  lastAppliedHtmlRef: React.MutableRefObject<string>,
+) => {
+  const normalizedIncoming = html.trim();
+
+  editor.update(() => {
+    const root = $getRoot();
+    const currentHtml = $generateHtmlFromNodes(editor).trim();
+
+    if (currentHtml === normalizedIncoming) {
+      lastAppliedHtmlRef.current = normalizedIncoming;
+      return;
+    }
+
+    if (normalizedIncoming === lastAppliedHtmlRef.current && currentHtml !== '') {
+      return;
+    }
+
+    root.clear();
+
+    if (!normalizedIncoming) {
+      lastAppliedHtmlRef.current = '';
+      root.append($createParagraphNode());
+      return;
+    }
+
+    try {
+      const dom = sanitizeDomFromHtml(normalizedIncoming);
+      const nodes = $generateNodesFromDOM(editor, dom);
+      if (nodes.length === 0) {
+        const paragraph = $createParagraphNode();
+        paragraph.append($createTextNode(''));
+        root.append(paragraph);
+      } else {
+        nodes.forEach(node => root.append(node));
+      }
+      lastAppliedHtmlRef.current = normalizedIncoming;
+    } catch (error) {
+      console.error('Failed to sync HTML content into the rich text editor.', error);
+      const paragraph = $createParagraphNode();
+      paragraph.append($createTextNode(fallbackToPlainText(normalizedIncoming)));
+      root.append(paragraph);
+      lastAppliedHtmlRef.current = paragraph.getTextContent();
+    }
+  });
+};
+
 const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
   ({ html, onChange, readOnly = false, onScroll, onFocusChange }, ref) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -860,13 +903,17 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     const handleChange = useCallback(
       (editorState: EditorState, editor: LexicalEditor) => {
         editorState.read(() => {
-          const generated = $generateHtmlFromNodes(editor);
-          const normalized = generated.trim();
-          if (normalized === lastAppliedHtmlRef.current) {
-            return;
+          try {
+            const generated = $generateHtmlFromNodes(editor);
+            const normalized = generated.trim();
+            if (normalized === lastAppliedHtmlRef.current) {
+              return;
+            }
+            lastAppliedHtmlRef.current = normalized;
+            onChange(normalized);
+          } catch (error) {
+            console.error('Failed to serialize rich text content to HTML.', error);
           }
-          lastAppliedHtmlRef.current = normalized;
-          onChange(normalized);
         });
       },
       [onChange],
@@ -911,7 +958,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         editable: !readOnly,
         theme: RICH_TEXT_THEME,
         onError: (error: Error) => {
-          throw error;
+          console.error('Rich text editor encountered an error.', error);
         },
         nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, ImageNode],
         editorState: (editor: LexicalEditor) => {
@@ -920,15 +967,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
             lastAppliedHtmlRef.current = '';
             return;
           }
-          const parser = new DOMParser();
-          const dom = parser.parseFromString(initialHtml, 'text/html');
-          editor.update(() => {
-            const root = $getRoot();
-            root.clear();
-            const nodes = $generateNodesFromDOM(editor, dom);
-            nodes.forEach(node => root.append(node));
-            lastAppliedHtmlRef.current = initialHtml;
-          });
+          applyHtmlToEditor(editor, initialHtml, lastAppliedHtmlRef);
         },
       }),
       [readOnly],
