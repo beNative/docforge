@@ -1585,20 +1585,63 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         return [];
       }
 
-      const items: ContextMenuItem[] = [];
-      contextActions.forEach((action, index) => {
-        const previous = contextActions[index - 1];
-        if (previous && previous.group !== action.group) {
-          items.push({ type: 'separator' });
-        }
-        items.push({
-          label: action.label,
-          action: action.onClick,
-          icon: action.icon,
-          disabled: action.disabled,
+      const mapActionsToMenuItems = (actions: ToolbarButtonConfig[]) => {
+        const items: ContextMenuItem[] = [];
+        actions.forEach((action, index) => {
+          const previous = actions[index - 1];
+          if (previous && previous.group !== action.group) {
+            items.push({ type: 'separator' });
+          }
+          items.push({
+            label: action.label,
+            action: action.onClick,
+            icon: action.icon,
+            disabled: action.disabled,
+          });
         });
+        return items;
+      };
+
+      const historyActions = contextActions.filter(action => action.group === 'history');
+      const selectionActions = contextActions.filter(action =>
+        ['inline-format', 'alignment', 'structure', 'utility'].includes(action.group),
+      );
+      const insertActions = contextActions.filter(action => action.group === 'insert');
+
+      const items: ContextMenuItem[] = [];
+      items.push(...mapActionsToMenuItems(historyActions));
+
+      if (items.length > 0 && selectionActions.length > 0 && items[items.length - 1]?.type !== 'separator') {
+        items.push({ type: 'separator' });
+      }
+
+      if (selectionActions.length > 0) {
+        items.push({
+          label: 'Selection',
+          submenu: mapActionsToMenuItems(selectionActions),
+          disabled: selectionActions.every(action => action.disabled),
+        });
+      }
+
+      if (items.length > 0 && insertActions.length > 0) {
+        items.push({ type: 'separator' });
+      }
+
+      items.push(...mapActionsToMenuItems(insertActions));
+
+      const cleanedItems = items.filter((item, index, array) => {
+        if (item.type !== 'separator') {
+          return true;
+        }
+
+        const isLeadingSeparator = index === 0;
+        const isTrailingSeparator = index === array.length - 1;
+        const isDuplicateSeparator = array[index - 1]?.type === 'separator' || array[index + 1]?.type === 'separator';
+
+        return !isLeadingSeparator && !isTrailingSeparator && !isDuplicateSeparator;
       });
-      return items;
+
+      return cleanedItems;
     }, [contextActions, readOnly]);
 
     const handleScroll = useCallback(
