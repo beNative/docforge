@@ -274,7 +274,10 @@ const LinkModal: React.FC<{
   );
 };
 
-const ensureColGroupWithWidths = (tableElement: HTMLTableElement): HTMLTableColElement[] => {
+const ensureColGroupWithWidths = (
+  tableElement: HTMLTableElement,
+  preferredWidths: number[] = [],
+): HTMLTableColElement[] => {
   const firstRow = tableElement.rows[0];
   const columnCount = firstRow?.cells.length ?? 0;
   if (columnCount === 0) {
@@ -297,21 +300,58 @@ const ensureColGroupWithWidths = (tableElement: HTMLTableElement): HTMLTableColE
   }
 
   const colElements = Array.from(colGroup.children) as HTMLTableColElement[];
-  const existingWidths = colElements.map(col => parseFloat(col.style.width || ''));
-  const needInitialization = existingWidths.some(width => Number.isNaN(width) || width <= 0);
 
-  if (needInitialization) {
-    const columnWidths = Array.from(firstRow.cells).map(cell => cell.getBoundingClientRect().width || MIN_COLUMN_WIDTH);
+  if (preferredWidths.length === columnCount && preferredWidths.some(width => width > 0)) {
     colElements.forEach((col, index) => {
-      const width = Math.max(MIN_COLUMN_WIDTH, columnWidths[index] ?? MIN_COLUMN_WIDTH);
-      col.style.width = `${width}px`;
+      const width = preferredWidths[index];
+      if (Number.isFinite(width) && width > 0) {
+        col.style.width = `${Math.max(MIN_COLUMN_WIDTH, width)}px`;
+      }
     });
+  } else {
+    const existingWidths = colElements.map(col => parseFloat(col.style.width || ''));
+    const needInitialization = existingWidths.some(width => Number.isNaN(width) || width <= 0);
+
+    if (needInitialization) {
+      const columnWidths = Array.from(firstRow.cells).map(cell => cell.getBoundingClientRect().width || MIN_COLUMN_WIDTH);
+      colElements.forEach((col, index) => {
+        const width = Math.max(MIN_COLUMN_WIDTH, columnWidths[index] ?? MIN_COLUMN_WIDTH);
+        col.style.width = `${width}px`;
+      });
+    }
   }
 
   return colElements;
 };
 
-const attachColumnResizeHandles = (tableElement: HTMLTableElement): (() => void) => {
+const getColumnWidthsFromState = (editor: LexicalEditor, tableKey: string): number[] => {
+  let widths: number[] = [];
+
+  editor.getEditorState().read(() => {
+    const tableNode = $getNodeByKey<TableNode>(tableKey);
+    if (!tableNode) {
+      return;
+    }
+
+    const firstRow = tableNode.getChildren<TableRowNode>()[0];
+    if (!firstRow) {
+      return;
+    }
+
+    widths = firstRow
+      .getChildren<TableCellNode>()
+      .map(cell => cell.getWidth())
+      .filter((width): width is number => Number.isFinite(width));
+  });
+
+  return widths;
+};
+
+const attachColumnResizeHandles = (
+  tableElement: HTMLTableElement,
+  editor: LexicalEditor,
+  tableKey: string,
+): (() => void) => {
   const container = tableElement.parentElement ?? tableElement;
   const originalContainerPosition = container.style.position;
   const restoreContainerPosition = originalContainerPosition === '' && getComputedStyle(container).position === 'static';
@@ -340,7 +380,8 @@ const attachColumnResizeHandles = (tableElement: HTMLTableElement): (() => void)
       return;
     }
 
-    const cols = ensureColGroupWithWidths(tableElement);
+    const storedColumnWidths = getColumnWidthsFromState(editor, tableKey);
+    const cols = ensureColGroupWithWidths(tableElement, storedColumnWidths);
     const containerRect = container.getBoundingClientRect();
     const cells = Array.from(firstRow.cells);
 
@@ -378,6 +419,25 @@ const attachColumnResizeHandles = (tableElement: HTMLTableElement): (() => void)
       const handleMouseUp = () => {
         document.removeEventListener('mousemove', handleMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
+
+        const updatedWidths = cols.map(col => parseFloat(col.style.width || ''));
+        editor.update(() => {
+          const tableNode = $getNodeByKey<TableNode>(tableKey);
+          if (!tableNode) {
+            return;
+          }
+
+          const rows = tableNode.getChildren<TableRowNode>();
+          rows.forEach(row => {
+            const cellsInRow = row.getChildren<TableCellNode>();
+            cellsInRow.forEach((cellNode, cellIndex) => {
+              const width = updatedWidths[cellIndex];
+              if (Number.isFinite(width) && width > 0) {
+                cellNode.setWidth(Math.max(MIN_COLUMN_WIDTH, width));
+              }
+            });
+          });
+        });
       };
 
       const handleMouseDown = (event: MouseEvent) => {
@@ -431,7 +491,7 @@ const TableColumnResizePlugin: React.FC = () => {
       const tableElement = editor.getElementByKey(tableKey);
       if (tableElement instanceof HTMLTableElement) {
         cleanupTable(tableKey);
-        cleanupMap.set(tableKey, attachColumnResizeHandles(tableElement));
+        cleanupMap.set(tableKey, attachColumnResizeHandles(tableElement, editor, tableKey));
       }
     };
 
