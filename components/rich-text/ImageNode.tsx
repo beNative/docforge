@@ -9,6 +9,8 @@ import {
   CLICK_COMMAND,
   COMMAND_PRIORITY_LOW,
   DecoratorNode,
+  DRAGEND_COMMAND,
+  DRAGSTART_COMMAND,
   KEY_BACKSPACE_COMMAND,
   KEY_DELETE_COMMAND,
   SELECTION_CHANGE_COMMAND,
@@ -51,11 +53,15 @@ type ImageComponentProps = ImagePayload & {
   nodeKey: NodeKey;
 };
 
+type ResizeDirection = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
+
 type PointerState = {
   startX: number;
   startY: number;
   startWidth: number;
   startHeight: number;
+  direction: ResizeDirection;
+  aspectRatio: number;
 };
 
 const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, height, nodeKey }) => {
@@ -113,7 +119,8 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
         return false;
       }
 
-      if (event.target === imageRef.current) {
+      const target = event.target as HTMLElement | null;
+      if (target && (target === imageRef.current || target.dataset.type === 'image-handle')) {
         if (event.shiftKey) {
           setSelected(!isSelected);
           return true;
@@ -128,6 +135,24 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
     },
     [clearSelection, isSelected, setSelected],
   );
+
+  const onDragStart = useCallback(
+    (event: DragEvent) => {
+      if (!isEditable || !event.dataTransfer || !imageRef.current) {
+        return false;
+      }
+      event.dataTransfer.setData('text/plain', '_lexical_image');
+      event.dataTransfer.setDragImage(imageRef.current, imageRef.current.clientWidth / 2, imageRef.current.clientHeight / 2);
+      event.dataTransfer.effectAllowed = 'move';
+      return true;
+    },
+    [isEditable],
+  );
+
+  const onDragEnd = useCallback(() => {
+    setIsResizing(false);
+    return false;
+  }, []);
 
   useEffect(
     () =>
@@ -151,8 +176,10 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
         editor.registerCommand(CLICK_COMMAND, onClick, COMMAND_PRIORITY_LOW),
         editor.registerCommand(KEY_DELETE_COMMAND, onDelete, COMMAND_PRIORITY_LOW),
         editor.registerCommand(KEY_BACKSPACE_COMMAND, onDelete, COMMAND_PRIORITY_LOW),
+        editor.registerCommand(DRAGSTART_COMMAND, onDragStart, COMMAND_PRIORITY_LOW),
+        editor.registerCommand(DRAGEND_COMMAND, onDragEnd, COMMAND_PRIORITY_LOW),
       ),
-    [editor, isSelected, nodeKey, onClick, onDelete, setSelected],
+    [editor, isSelected, nodeKey, onClick, onDelete, onDragEnd, onDragStart, setSelected],
   );
 
   const resolvedWidth = useMemo(() => (typeof currentWidth === 'number' ? `${currentWidth}px` : currentWidth ?? 'auto'), [
@@ -169,29 +196,88 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
       return;
     }
 
-    const nextWidth = Math.max(MIN_DIMENSION, state.startWidth + (event.clientX - state.startX));
-    const nextHeight = Math.max(MIN_DIMENSION, state.startHeight + (event.clientY - state.startY));
+    const deltaX = event.clientX - state.startX;
+    const deltaY = event.clientY - state.startY;
 
-    setCurrentWidth(nextWidth);
-    setCurrentHeight(nextHeight);
-  }, []);
+    let nextWidth = state.startWidth;
+    let nextHeight = state.startHeight;
 
-  const handlePointerUp = useCallback((event: PointerEvent) => {
-    const state = pointerStateRef.current;
-    if (state) {
-      const nextWidth = Math.max(MIN_DIMENSION, state.startWidth + (event.clientX - state.startX));
-      const nextHeight = Math.max(MIN_DIMENSION, state.startHeight + (event.clientY - state.startY));
-      updateDimensions(nextWidth, nextHeight);
+    if (state.direction.includes('e')) {
+      nextWidth += deltaX;
+    }
+    if (state.direction.includes('w')) {
+      nextWidth -= deltaX;
+    }
+    if (state.direction.includes('s')) {
+      nextHeight += deltaY;
+    }
+    if (state.direction.includes('n')) {
+      nextHeight -= deltaY;
     }
 
-    pointerStateRef.current = null;
-    setIsResizing(false);
-    document.removeEventListener('pointermove', handlePointerMove);
-    document.removeEventListener('pointerup', handlePointerUp);
-  }, [handlePointerMove, updateDimensions]);
+    const lockAspect = event.shiftKey || state.direction.length === 2;
+    if (lockAspect) {
+      const widthBasedHeight = nextWidth / state.aspectRatio;
+      const heightBasedWidth = nextHeight * state.aspectRatio;
+      if (Math.abs(widthBasedHeight - nextHeight) > Math.abs(heightBasedWidth - nextWidth)) {
+        nextHeight = widthBasedHeight;
+      } else {
+        nextWidth = heightBasedWidth;
+      }
+    }
+
+    setCurrentWidth(Math.max(MIN_DIMENSION, nextWidth));
+    setCurrentHeight(Math.max(MIN_DIMENSION, nextHeight));
+  }, []);
+
+  const handlePointerUp = useCallback(
+    (event: PointerEvent) => {
+      const state = pointerStateRef.current;
+      if (state) {
+        const deltaX = event.clientX - state.startX;
+        const deltaY = event.clientY - state.startY;
+        let nextWidth = state.startWidth;
+        let nextHeight = state.startHeight;
+
+        if (state.direction.includes('e')) {
+          nextWidth += deltaX;
+        }
+        if (state.direction.includes('w')) {
+          nextWidth -= deltaX;
+        }
+        if (state.direction.includes('s')) {
+          nextHeight += deltaY;
+        }
+        if (state.direction.includes('n')) {
+          nextHeight -= deltaY;
+        }
+
+        const lockAspect = event.shiftKey || state.direction.length === 2;
+        if (lockAspect) {
+          const widthBasedHeight = nextWidth / state.aspectRatio;
+          const heightBasedWidth = nextHeight * state.aspectRatio;
+          if (Math.abs(widthBasedHeight - nextHeight) > Math.abs(heightBasedWidth - nextWidth)) {
+            nextHeight = widthBasedHeight;
+          } else {
+            nextWidth = heightBasedWidth;
+          }
+        }
+
+        nextWidth = Math.max(MIN_DIMENSION, nextWidth);
+        nextHeight = Math.max(MIN_DIMENSION, nextHeight);
+        updateDimensions(nextWidth, nextHeight);
+      }
+
+      pointerStateRef.current = null;
+      setIsResizing(false);
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+    },
+    [handlePointerMove, updateDimensions],
+  );
 
   const handlePointerDown = useCallback(
-    (event: React.PointerEvent<HTMLDivElement>) => {
+    (event: React.PointerEvent<HTMLDivElement>, direction: ResizeDirection) => {
       if (!isEditable || !imageRef.current) {
         return;
       }
@@ -204,6 +290,8 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
         startY: event.clientY,
         startWidth: rect.width,
         startHeight: rect.height,
+        direction,
+        aspectRatio: rect.width / rect.height,
       };
 
       setIsResizing(true);
@@ -220,36 +308,55 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
     };
   }, [handlePointerMove, handlePointerUp]);
 
-  const onDragStart = useCallback(
-    (event: React.DragEvent) => {
-      if (!isEditable || !event.dataTransfer) {
-        return;
-      }
-      event.stopPropagation();
-      event.dataTransfer.setData('text/plain', '_lexical_image');
-    },
-    [isEditable],
-  );
-
   const showHandles = isEditable && isSelected;
 
   return (
-    <span className="relative my-3 block w-full max-w-full" draggable={isEditable} onDragStart={onDragStart}>
+    <span
+      className={`group relative my-3 block w-full max-w-full ${isSelected ? 'cursor-move' : ''}`}
+      draggable={isEditable}
+    >
       <img
         ref={imageRef}
         src={src}
         alt={altText}
         style={{ width: resolvedWidth, height: resolvedHeight, maxWidth: '100%', borderRadius: '0.5rem', objectFit: 'contain' }}
-        className={`block border border-border-color/60 bg-secondary ${showHandles ? 'ring-2 ring-primary' : ''}`}
-        draggable={false}
+        className={`block border border-border-color/60 bg-secondary transition-shadow duration-150 ${showHandles ? 'ring-2 ring-primary shadow-lg' : 'shadow-sm'}`}
+        draggable={isEditable}
+        onDragStart={(event) => {
+          onDragStart(event.nativeEvent);
+        }}
+        onDragEnd={(event) => {
+          event.preventDefault();
+          onDragEnd();
+        }}
       />
       {showHandles ? (
-        <div className="pointer-events-none absolute inset-0">
-          <div
-            role="presentation"
-            className="pointer-events-auto absolute -bottom-2 -right-2 h-4 w-4 cursor-se-resize rounded-sm border border-primary bg-background"
-            onPointerDown={handlePointerDown}
-          />
+        <div className="pointer-events-none absolute inset-0 rounded-lg border border-primary/70 shadow-[0_0_0_1px_rgba(255,255,255,0.5)]">
+          {(
+            [
+              ['nw', '-top-2 -left-2 cursor-nw-resize'],
+              ['n', '-top-2 left-1/2 -translate-x-1/2 cursor-n-resize'],
+              ['ne', '-top-2 -right-2 cursor-ne-resize'],
+              ['e', 'top-1/2 -right-2 -translate-y-1/2 cursor-e-resize'],
+              ['se', '-bottom-2 -right-2 cursor-se-resize'],
+              ['s', '-bottom-2 left-1/2 -translate-x-1/2 cursor-s-resize'],
+              ['sw', '-bottom-2 -left-2 cursor-sw-resize'],
+              ['w', 'top-1/2 -left-2 -translate-y-1/2 cursor-w-resize'],
+            ] as const
+          ).map(([direction, positionClass]) => (
+            <button
+              key={direction}
+              type="button"
+              data-type="image-handle"
+              className={`pointer-events-auto absolute h-3 w-3 rounded-full border border-primary bg-background transition hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${positionClass}`}
+              onPointerDown={(event) => handlePointerDown(event, direction)}
+            />
+          ))}
+          <div className="pointer-events-none absolute left-2 top-2 rounded bg-background/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm">
+            {`${Math.round(typeof currentWidth === 'number' ? currentWidth : imageRef.current?.width ?? 0)} × ${Math.round(
+              typeof currentHeight === 'number' ? currentHeight : imageRef.current?.height ?? 0,
+            )} px`}
+          </div>
         </div>
       ) : null}
       {isResizing ? <div className="pointer-events-none absolute inset-0 rounded-md border-2 border-dashed border-primary" /> : null}
