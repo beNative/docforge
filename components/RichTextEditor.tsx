@@ -1011,6 +1011,31 @@ const ToolbarPlugin: React.FC<{
     [runWithActiveTable],
   );
 
+  const selectTable = useCallback(
+    () =>
+      runWithActiveTable(selection => {
+        const anchorCell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+        if (!anchorCell) {
+          return;
+        }
+        const tableNode = $getTableNodeFromLexicalNodeOrThrow(anchorCell);
+        const firstRow = tableNode.getFirstChild();
+        const lastRow = tableNode.getLastChild();
+        if (!$isTableRowNode(firstRow) || !$isTableRowNode(lastRow)) {
+          return;
+        }
+        const firstCell = firstRow.getFirstChild();
+        const lastCell = lastRow.getLastChild();
+        if (!$isTableCellNode(firstCell) || !$isTableCellNode(lastCell)) {
+          return;
+        }
+        const tableSelection = $createTableSelection();
+        tableSelection.set(tableNode.getKey(), firstCell.getKey(), lastCell.getKey());
+        $setSelection(tableSelection);
+      }),
+    [runWithActiveTable],
+  );
+
   const openImagePicker = useCallback(() => {
     if (readOnly) {
       return;
@@ -1586,20 +1611,74 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
       }
 
       const items: ContextMenuItem[] = [];
+      const tableSubmenuItems: ContextMenuItem[] = [
+        {
+          label: 'Insert column before',
+          action: () => insertTableColumn(false),
+          disabled: !isInTable,
+        },
+        {
+          label: 'Insert column after',
+          action: () => insertTableColumn(true),
+          disabled: !isInTable,
+        },
+        {
+          label: 'Insert row before',
+          action: () => insertTableRow(false),
+          disabled: !isInTable,
+        },
+        {
+          label: 'Insert row after',
+          action: () => insertTableRow(true),
+          disabled: !isInTable,
+        },
+        { type: 'separator' },
+        {
+          label: 'Delete row',
+          action: deleteTableRow,
+          disabled: !isInTable,
+        },
+        {
+          label: 'Delete column',
+          action: deleteTableColumn,
+          disabled: !isInTable,
+        },
+        {
+          label: 'Delete table',
+          action: deleteTable,
+          disabled: !isInTable,
+        },
+        { type: 'separator' },
+        {
+          label: 'Select table',
+          action: selectTable,
+          disabled: !isInTable,
+        },
+      ];
+
       contextActions.forEach((action, index) => {
         const previous = contextActions[index - 1];
         if (previous && previous.group !== action.group) {
           items.push({ type: 'separator' });
         }
-        items.push({
-          label: action.label,
-          action: action.onClick,
-          icon: action.icon,
-          disabled: action.disabled,
-        });
+        if (action.id === 'table') {
+          items.push({
+            label: 'Table',
+            icon: action.icon,
+            disabled: action.disabled,
+            children: tableSubmenuItems,
+          });
+        } else {
+          items.push({
+            label: action.label,
+            action: action.onClick,
+            icon: action.icon,
+            disabled: action.disabled,
+          });
+        }
       });
       return items;
-    }, [contextActions, readOnly]);
+    }, [contextActions, deleteTable, deleteTableColumn, deleteTableRow, insertTableColumn, insertTableRow, isInTable, readOnly, selectTable]);
 
     const handleScroll = useCallback(
       (event: React.UIEvent<HTMLDivElement>) => {
