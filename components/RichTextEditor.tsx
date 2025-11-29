@@ -131,7 +131,7 @@ interface ToolbarButtonConfig {
   id: string;
   label: string;
   icon: React.FC<{ className?: string }>;
-  group: 'history' | 'inline-format' | 'structure' | 'insert' | 'alignment' | 'utility';
+  group: 'history' | 'inline-format' | 'structure' | 'insert' | 'alignment' | 'utility' | 'table';
   isActive?: boolean;
   disabled?: boolean;
   onClick: () => void;
@@ -986,6 +986,35 @@ const ToolbarPlugin: React.FC<{
     setIsTableModalOpen(false);
   }, [runWithActiveTable]);
 
+  const selectTable = useCallback(
+    () =>
+      runWithActiveTable(selection => {
+        const tableCell = $getTableCellNodeFromLexicalNode(selection.anchor.getNode());
+        if (!tableCell) {
+          return;
+        }
+        const tableNode = $getTableNodeFromLexicalNodeOrThrow(tableCell);
+        const firstRow = tableNode.getFirstChild();
+        const lastRow = tableNode.getLastChild();
+
+        if (!$isTableRowNode(firstRow) || !$isTableRowNode(lastRow)) {
+          return;
+        }
+
+        const firstCell = firstRow.getFirstChild();
+        const lastCell = lastRow.getLastChild();
+
+        if (!$isTableCellNode(firstCell) || !$isTableCellNode(lastCell)) {
+          return;
+        }
+
+        const tableSelection = $createTableSelection();
+        tableSelection.set(tableNode.getKey(), firstCell.getKey(), lastCell.getKey());
+        $setSelection(tableSelection);
+      }),
+    [runWithActiveTable],
+  );
+
   const toggleHeaderRow = useCallback(
     () =>
       runWithActiveTable(selection => {
@@ -1279,9 +1308,93 @@ const ToolbarPlugin: React.FC<{
     ],
   );
 
+  const tableContextActions = useMemo<ToolbarButtonConfig[]>(
+    () => [
+      {
+        id: 'insert-column-before',
+        label: 'Insert column before',
+        icon: TableIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: () => insertTableColumn(false),
+      },
+      {
+        id: 'insert-column-after',
+        label: 'Insert column after',
+        icon: TableIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: () => insertTableColumn(true),
+      },
+      {
+        id: 'insert-row-before',
+        label: 'Insert row before',
+        icon: TableIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: () => insertTableRow(false),
+      },
+      {
+        id: 'insert-row-after',
+        label: 'Insert row after',
+        icon: TableIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: () => insertTableRow(true),
+      },
+      {
+        id: 'delete-row',
+        label: 'Delete row',
+        icon: TableIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: deleteTableRow,
+      },
+      {
+        id: 'delete-column',
+        label: 'Delete column',
+        icon: TableIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: deleteTableColumn,
+      },
+      {
+        id: 'delete-table',
+        label: 'Delete table',
+        icon: TableIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: deleteTable,
+      },
+      {
+        id: 'select-table',
+        label: 'Select table',
+        icon: TableIcon,
+        group: 'table',
+        disabled: readOnly || !isInTable,
+        onClick: selectTable,
+      },
+    ],
+    [
+      deleteTable,
+      deleteTableColumn,
+      deleteTableRow,
+      insertTableColumn,
+      insertTableRow,
+      isInTable,
+      readOnly,
+      selectTable,
+    ],
+  );
+
+  const contextMenuActions = useMemo(
+    () => [...toolbarButtons, ...tableContextActions],
+    [tableContextActions, toolbarButtons],
+  );
+
   useEffect(() => {
-    onActionsChange(toolbarButtons);
-  }, [toolbarButtons, onActionsChange]);
+    onActionsChange(contextMenuActions);
+  }, [contextMenuActions, onActionsChange]);
 
   const renderedToolbarElements = useMemo(
     () => {
@@ -1606,6 +1719,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
       const selectionActions = contextActions.filter(action =>
         ['inline-format', 'alignment', 'structure', 'utility'].includes(action.group),
       );
+      const tableActions = contextActions.filter(action => action.group === 'table');
       const insertActions = contextActions.filter(action => action.group === 'insert');
 
       const items: ContextMenuItem[] = [];
@@ -1620,6 +1734,18 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           label: 'Selection',
           submenu: mapActionsToMenuItems(selectionActions),
           disabled: selectionActions.every(action => action.disabled),
+        });
+      }
+
+      if (items.length > 0 && tableActions.length > 0 && items[items.length - 1]?.type !== 'separator') {
+        items.push({ type: 'separator' });
+      }
+
+      if (tableActions.length > 0) {
+        items.push({
+          label: 'Table',
+          submenu: mapActionsToMenuItems(tableActions),
+          disabled: tableActions.every(action => action.disabled),
         });
       }
 
