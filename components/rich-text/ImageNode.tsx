@@ -73,6 +73,10 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
   const pointerStateRef = useRef<PointerState | null>(null);
   const [currentWidth, setCurrentWidth] = useState<number | 'inherit'>(width ?? 'inherit');
   const [currentHeight, setCurrentHeight] = useState<number | 'inherit'>(height ?? 'inherit');
+  const [naturalSize, setNaturalSize] = useState({
+    width: typeof width === 'number' ? width : 0,
+    height: typeof height === 'number' ? height : 0,
+  });
 
   useEffect(() => {
     setCurrentWidth(width ?? 'inherit');
@@ -141,12 +145,15 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
       if (!isEditable || !event.dataTransfer || !imageRef.current) {
         return false;
       }
+      clearSelection();
+      setSelected(true);
       event.dataTransfer.setData('text/plain', '_lexical_image');
+      event.dataTransfer.setData('application/x-lexical-dragged-nodes', JSON.stringify([nodeKey]));
       event.dataTransfer.setDragImage(imageRef.current, imageRef.current.clientWidth / 2, imageRef.current.clientHeight / 2);
       event.dataTransfer.effectAllowed = 'move';
       return true;
     },
-    [isEditable],
+    [clearSelection, isEditable, nodeKey, setSelected],
   );
 
   const onDragEnd = useCallback(() => {
@@ -189,6 +196,20 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
     () => (typeof currentHeight === 'number' ? `${currentHeight}px` : currentHeight ?? 'auto'),
     [currentHeight],
   );
+
+  const measuredWidth = useMemo(() => {
+    if (typeof currentWidth === 'number') return currentWidth;
+    if (imageRef.current?.width) return imageRef.current.width;
+    if (naturalSize.width) return naturalSize.width;
+    return undefined;
+  }, [currentWidth, naturalSize.width]);
+
+  const measuredHeight = useMemo(() => {
+    if (typeof currentHeight === 'number') return currentHeight;
+    if (imageRef.current?.height) return imageRef.current.height;
+    if (naturalSize.height) return naturalSize.height;
+    return undefined;
+  }, [currentHeight, naturalSize.height]);
 
   const handlePointerMove = useCallback((event: PointerEvent) => {
     const state = pointerStateRef.current;
@@ -312,8 +333,12 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
 
   return (
     <span
-      className={`group relative my-3 block w-full max-w-full ${isSelected ? 'cursor-move' : ''}`}
+      className={`group relative my-3 inline-block max-w-full align-top ${isSelected ? 'cursor-move' : ''}`}
       draggable={isEditable}
+      style={{
+        width: measuredWidth ? `${measuredWidth}px` : undefined,
+        height: measuredHeight ? `${measuredHeight}px` : undefined,
+      }}
     >
       <img
         ref={imageRef}
@@ -322,6 +347,9 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
         style={{ width: resolvedWidth, height: resolvedHeight, maxWidth: '100%', borderRadius: '0.5rem', objectFit: 'contain' }}
         className={`block border border-border-color/60 bg-secondary transition-shadow duration-150 ${showHandles ? 'ring-2 ring-primary shadow-lg' : 'shadow-sm'}`}
         draggable={isEditable}
+        onLoad={(event) => {
+          setNaturalSize({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
+        }}
         onDragStart={(event) => {
           onDragStart(event.nativeEvent);
         }}
@@ -353,9 +381,7 @@ const ImageComponent: React.FC<ImageComponentProps> = ({ src, altText, width, he
             />
           ))}
           <div className="pointer-events-none absolute left-2 top-2 rounded bg-background/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm">
-            {`${Math.round(typeof currentWidth === 'number' ? currentWidth : imageRef.current?.width ?? 0)} × ${Math.round(
-              typeof currentHeight === 'number' ? currentHeight : imageRef.current?.height ?? 0,
-            )} px`}
+            {`${Math.round(measuredWidth ?? 0)} × ${Math.round(measuredHeight ?? 0)} px`}
           </div>
         </div>
       ) : null}
@@ -388,7 +414,7 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
 
   createDOM(): HTMLElement {
     const dom = document.createElement('span');
-    dom.className = 'inline-block my-3 w-full';
+    dom.className = 'inline-block my-3 max-w-full';
     dom.style.maxWidth = '100%';
     return dom;
   }
