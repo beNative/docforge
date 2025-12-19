@@ -232,6 +232,17 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
       return undefined;
     }
 
+    // When using CSS zoom, the wrapper width needs inverse scaling
+    // so the zoomed content fills the available space properly
+    if (useZoomProperty) {
+      // At 100% zoom, width is 100%. Below 100%, width stays 100%.
+      // Above 100%, we don't need to adjust as CSS zoom handles expansion
+      return {
+        width: '100%',
+        minHeight: '100%',
+      };
+    }
+
     const visualScale = Math.max(1, scale);
 
     return {
@@ -239,7 +250,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
       minWidth: `${visualScale * 100}%`,
       minHeight: `${visualScale * 100}%`,
     };
-  }, [disablePan, layout, scale]);
+  }, [disablePan, layout, scale, useZoomProperty]);
 
   const containerClasses = useMemo(() => {
     const classes = ['relative', 'bg-secondary'];
