@@ -300,7 +300,7 @@ const BASE_PALETTES: Record<ThemeMode, ThemePalette> = {
     modalBackdrop: '0 0 0 / 0.5',
     tooltipBg: '23 23 23',
     tooltipText: '245 245 245',
-    treeSelected: '150 150 150',
+    treeSelected: '200 200 200',
     selectArrowBackground: DEFAULT_LIGHT_SELECT_ARROW,
   },
   dark: {

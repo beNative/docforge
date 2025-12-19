@@ -478,8 +478,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
           minHeight: '22px',
         }}
         className={`w-full text-left pr-1 flex justify-between items-center transition-colors duration-0 text-[13px] relative focus:outline-none cursor-default ${isSelected
-          ? 'bg-tree-selected/20 text-text-main font-medium'
-          : 'hover:bg-tree-selected/10 text-text-secondary hover:text-text-main'
+          ? 'bg-tree-selected text-text-main font-medium'
+          : 'hover:bg-tree-selected/40 text-text-secondary hover:text-text-main'
           } ${isFocused ? 'ring-1 ring-inset ring-primary' : ''}`}
       >
         <div className="flex items-center gap-1 flex-1 min-w-0">
