@@ -333,22 +333,22 @@ const TONE_OVERRIDES: Record<ThemeMode, Record<ThemeTone, Partial<ThemePalette>>
   light: {
     neutral: {},
     warm: {
-      background: '253 246 239',
-      secondary: '255 240 228',
-      textMain: '49 27 11',
-      textSecondary: '139 94 52',
-      border: '242 209 179',
-      accent: '249 115 22',
+      background: '255 252 245', // Warmer, lighter off-white
+      secondary: '255 247 237', // Subtle warm secondary
+      textMain: '67 20 7', // Deep warm brown
+      textSecondary: '124 45 18', // Muted warm reddish-brown
+      border: '253 230 138', // Soft warm border
+      accent: '245 158 11', // Amber/Orange
       accentText: '255 255 255',
     },
     cool: {
-      background: '241 245 255',
-      secondary: '226 235 255',
-      textMain: '15 23 42',
-      textSecondary: '71 85 105',
-      border: '199 210 254',
-      accent: '37 99 235',
-      accentText: '248 250 252',
+      background: '248 250 252', // Very subtle cool slate-50
+      secondary: '241 245 249', // Slate-100
+      textMain: '15 23 42', // Slate-900
+      textSecondary: '71 85 105', // Slate-600
+      border: '226 232 240', // Slate-200
+      accent: '59 130 246', // Blue-500
+      accentText: '255 255 255',
     },
   },
   dark: {

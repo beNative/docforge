@@ -131,7 +131,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     searchTerm,
     isKnownNodeId,
   } = baseChildProps;
-  
+
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(node.title);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside' | null>(null);
@@ -173,7 +173,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     return node.title;
   }, [emojiForNode, isFolder, node.title]);
   const isActiveTab = isOpenInTab && activeDocumentId === node.id;
-  
+
   useEffect(() => {
     if (renamingNodeId === node.id) {
       setIsRenaming(true);
@@ -196,7 +196,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       setRenameEmojiAnchor(null);
     }
   }, [isRenaming]);
-  
+
   useEffect(() => {
     if (isRenaming && !isSelected) {
       setIsRenaming(false);
@@ -346,7 +346,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     e.dataTransfer.setData('application/json', JSON.stringify(draggedIds));
     const transferPayload = onRequestNodeExport(draggedIds);
     if (transferPayload) {
-        e.dataTransfer.setData(DOCFORGE_DRAG_MIME, JSON.stringify(transferPayload));
+      e.dataTransfer.setData(DOCFORGE_DRAG_MIME, JSON.stringify(transferPayload));
     }
     e.dataTransfer.effectAllowed = transferPayload ? 'copyMove' : 'move';
   };
@@ -384,7 +384,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       }
     }
   };
-  
+
   const handleDragLeave = (e: React.DragEvent) => {
     e.stopPropagation();
     setDropPosition(null);
@@ -396,11 +396,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
 
     const finalDropPosition = getDropPosition(e, isFolder, itemRef.current);
     setDropPosition(null);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        const parentId = finalDropPosition === 'inside' ? node.id : node.parentId;
-        onDropFiles(e.dataTransfer.files, parentId);
-        return;
+      const parentId = finalDropPosition === 'inside' ? node.id : node.parentId;
+      onDropFiles(e.dataTransfer.files, parentId);
+      return;
     }
 
     const localDragIds = readLocalDragIds(e.dataTransfer);
@@ -428,7 +428,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       }
     }
   };
-  
+
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -458,211 +458,209 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       className="relative"
       data-item-id={node.id}
     >
-        <div
-            ref={rowRef}
-            onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
-            onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
-            onMouseEnter={() => {
-                if (rowRef.current) {
-                    setLockedRowHeight(rowRef.current.getBoundingClientRect().height);
-                }
-                setIsHovered(true);
-            }}
-            onMouseLeave={() => {
-                setIsHovered(false);
-                setLockedRowHeight(null);
-            }}
-            style={{
-                paddingTop: `${paddingTopBottom}px`,
-                paddingBottom: `${paddingTopBottom}px`,
-                paddingLeft: `${rowPaddingLeft}px`,
-                minHeight: lockedRowHeight !== null ? `${lockedRowHeight}px` : undefined,
-            }}
-            className={`w-full text-left pr-1 rounded-md group flex justify-between items-center transition-colors duration-150 text-xs relative focus:outline-none ${
-                isSelected ? 'bg-tree-selected text-text-main' : 'hover:bg-border-color/30 text-text-secondary hover:text-text-main'
-            } ${isFocused ? 'ring-2 ring-primary ring-offset-[-2px] ring-offset-secondary' : ''}`}
-        >
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                {isFolder && node.children.length > 0 ? (
-                    <button onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }} className="-ml-1 p-0.5 rounded hover:bg-border-color">
-                        {isExpanded ? <ChevronDownIcon className="w-3.5 h-3.5" /> : <ChevronRightIcon className="w-3.5 h-3.5" />}
-                    </button>
-                ) : (
-                    <div className="w-4" /> // Spacer for alignment
-                )}
+      <div
+        ref={rowRef}
+        onClick={(e) => !isRenaming && onSelectNode(node.id, e)}
+        onDoubleClick={(e) => !isRenaming && handleRenameStart(e)}
+        onMouseEnter={() => {
+          if (rowRef.current) {
+            setLockedRowHeight(rowRef.current.getBoundingClientRect().height);
+          }
+          setIsHovered(true);
+        }}
+        onMouseLeave={() => {
+          setIsHovered(false);
+          setLockedRowHeight(null);
+        }}
+        style={{
+          paddingLeft: `${rowPaddingLeft}px`,
+          height: '22px', // VS Code standard row height
+          minHeight: '22px',
+        }}
+        className={`w-full text-left pr-1 flex justify-between items-center transition-colors duration-0 text-[13px] relative focus:outline-none cursor-default ${isSelected
+          ? 'bg-tree-selected/20 text-text-main font-medium'
+          : 'hover:bg-tree-selected/10 text-text-secondary hover:text-text-main'
+          } ${isFocused ? 'ring-1 ring-inset ring-primary' : ''}`}
+      >
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+          {isFolder && node.children.length > 0 ? (
+            <button onClick={(e) => { e.stopPropagation(); onToggleExpand(node.id); }} className="-ml-1 p-0.5 rounded hover:bg-border-color">
+              {isExpanded ? <ChevronDownIcon className="w-3.5 h-3.5" /> : <ChevronRightIcon className="w-3.5 h-3.5" />}
+            </button>
+          ) : (
+            <div className="w-4" /> // Spacer for alignment
+          )}
 
-                {isFolder ? (
-                    isExpanded ? <FolderOpenIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FolderIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                ) : emojiForNode ? (
-                    <span className="w-3.5 h-3.5 flex items-center justify-center text-base leading-none" aria-hidden="true">{emojiForNode}</span>
-                ) : (
-                    isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
-                )}
+          {/* Use standardized FolderIcon for both states to prevent 'broken' look of FolderOpenIcon */}
+          {isFolder ? (
+            <FolderIcon className="w-3.5 h-3.5 flex-shrink-0" />
+          ) : emojiForNode ? (
+            <span className="w-3.5 h-3.5 flex items-center justify-center text-base leading-none" aria-hidden="true">{emojiForNode}</span>
+          ) : (
+            isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
+          )}
 
-                {isOpenInTab && (
-                    <span
-                        aria-hidden="true"
-                        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActiveTab ? 'bg-primary' : 'bg-primary/50'}`}
-                    />
-                )}
+          {isOpenInTab && (
+            <span
+              aria-hidden="true"
+              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActiveTab ? 'bg-primary' : 'bg-primary/50'}`}
+            />
+          )}
 
-                {isRenaming ? (
-                    <input
-                        ref={renameInputRef}
-                        type="text"
-                        value={renameValue}
-                        onClick={(e) => { e.stopPropagation(); updateRenameSelection(); }}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onBlur={handleRenameBlur}
-                        onKeyDown={handleRenameKeyDown}
-                        onContextMenu={handleRenameContextMenu}
-                        onSelect={updateRenameSelection}
-                        onKeyUp={updateRenameSelection}
-                        onMouseUp={updateRenameSelection}
-                        className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
-                    />
-                ) : (
-                    <span
-                        ref={titleRef}
-                        className={`flex-1 px-1 ${
-                            areActionsVisible ? 'truncate' : 'whitespace-normal break-words'
-                        }`}
-                    >
-                        {highlightMatches(displayTitle, searchTerm)}
-                    </span>
-                )}
-            </div>
-
-            {isHovered && isTitleTruncated && titleRef.current && (
-                <Tooltip
-                    targetRef={titleRef}
-                    content={(
-                        <span className="inline-flex max-w-xs whitespace-pre-wrap break-words text-left leading-snug gap-1">
-                            {emojiForNode && !isFolder && (
-                                <span aria-hidden="true">{emojiForNode}</span>
-                            )}
-                            <span>{highlightMatches(displayTitle, searchTerm)}</span>
-                        </span>
-                    )}
-                />
-            )}
-
-            {!isRenaming && (
-                <div
-                    className={`transition-opacity flex items-center ${
-                        areActionsVisible ? 'opacity-100 pr-1' : 'opacity-0 pr-0 pointer-events-none'
-                    }`}
-                    style={{
-                        width: areActionsVisible ? undefined : 0,
-                        overflow: areActionsVisible ? undefined : 'hidden',
-                    }}
-                >
-                    <IconButton
-                        aria-label="Move Up"
-                        onClick={(e) => { e.stopPropagation(); onMoveUp(node.id); }}
-                        size="xs"
-                        variant="ghost"
-                        disabled={!canMoveUp}
-                    >
-                        <ArrowUpIcon className="w-3.5 h-3.5" />
-                    </IconButton>
-                    <IconButton
-                        aria-label="Move Down"
-                        onClick={(e) => { e.stopPropagation(); onMoveDown(node.id); }}
-                        size="xs"
-                        variant="ghost"
-                        disabled={!canMoveDown}
-                    >
-                        <ArrowDownIcon className="w-3.5 h-3.5" />
-                    </IconButton>
-                    {!isFolder && (
-                      <>
-                        <IconButton
-                            aria-label="Copy Content"
-                            onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }}
-                            size="xs"
-                            variant="ghost"
-                        >
-                          <CopyIcon className="w-3.5 h-3.5" />
-                        </IconButton>
-                        <IconButton
-                          aria-label={lockAriaLabel}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void onToggleLock(node.id, !node.locked);
-                          }}
-                          size="xs"
-                          variant="ghost"
-                          className={node.locked ? 'text-primary' : ''}
-                        >
-                          {node.locked ? (
-                            <LockClosedIcon className="w-3.5 h-3.5" />
-                          ) : (
-                            <LockOpenIcon className="w-3.5 h-3.5" />
-                          )}
-                        </IconButton>
-                        <IconButton
-                          aria-label="Delete Document"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteNode(node.id, e.shiftKey);
-                          }}
-                          size="xs"
-                          variant="destructive"
-                        >
-                          <TrashIcon className="w-3.5 h-3.5" />
-                        </IconButton>
-                      </>
-                    )}
-                </div>
-            )}
+          {isRenaming ? (
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameValue}
+              onClick={(e) => { e.stopPropagation(); updateRenameSelection(); }}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={handleRenameBlur}
+              onKeyDown={handleRenameKeyDown}
+              onContextMenu={handleRenameContextMenu}
+              onSelect={updateRenameSelection}
+              onKeyUp={updateRenameSelection}
+              onMouseUp={updateRenameSelection}
+              className="w-full text-left text-xs px-1.5 py-1 rounded-md bg-background text-text-main border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          ) : (
+            <span
+              ref={titleRef}
+              className={`flex-1 px-1 ${areActionsVisible ? 'truncate' : 'whitespace-normal break-words'
+                }`}
+            >
+              {highlightMatches(displayTitle, searchTerm)}
+            </span>
+          )}
         </div>
 
-        {!isFolder && searchTerm.trim() && node.searchSnippet && (
-            <div
-                className="text-[11px] text-text-secondary leading-snug whitespace-pre-wrap break-words pr-3"
-                style={{
-                    marginLeft: `${snippetMarginLeft}px`,
-                    paddingLeft: `${snippetAccentPadding}px`,
-                    borderLeftWidth: `${snippetAccentWidth}px`,
-                    borderLeftStyle: 'solid',
-                    borderLeftColor: snippetAccentColor,
-                    backgroundColor: snippetBackgroundColor,
-                    borderRadius: '4px',
-                }}
-            >
-                {highlightMatches(node.searchSnippet, searchTerm)}
-            </div>
+        {isHovered && isTitleTruncated && titleRef.current && (
+          <Tooltip
+            targetRef={titleRef}
+            content={(
+              <span className="inline-flex max-w-xs whitespace-pre-wrap break-words text-left leading-snug gap-1">
+                {emojiForNode && !isFolder && (
+                  <span aria-hidden="true">{emojiForNode}</span>
+                )}
+                <span>{highlightMatches(displayTitle, searchTerm)}</span>
+              </span>
+            )}
+          />
         )}
 
-        {dropPosition && <div className={`absolute left-0 right-0 h-0.5 bg-primary pointer-events-none ${
-            dropPosition === 'before' ? 'top-0' : dropPosition === 'after' ? 'bottom-0' : ''
+        {!isRenaming && (
+          <div
+            className={`transition-opacity flex items-center ${areActionsVisible ? 'opacity-100 pr-1' : 'opacity-0 pr-0 pointer-events-none'
+              }`}
+            style={{
+              width: areActionsVisible ? undefined : 0,
+              overflow: areActionsVisible ? undefined : 'hidden',
+            }}
+          >
+            <IconButton
+              aria-label="Move Up"
+              onClick={(e) => { e.stopPropagation(); onMoveUp(node.id); }}
+              size="xs"
+              variant="ghost"
+              disabled={!canMoveUp}
+            >
+              <ArrowUpIcon className="w-3.5 h-3.5" />
+            </IconButton>
+            <IconButton
+              aria-label="Move Down"
+              onClick={(e) => { e.stopPropagation(); onMoveDown(node.id); }}
+              size="xs"
+              variant="ghost"
+              disabled={!canMoveDown}
+            >
+              <ArrowDownIcon className="w-3.5 h-3.5" />
+            </IconButton>
+            {!isFolder && (
+              <>
+                <IconButton
+                  aria-label="Copy Content"
+                  onClick={(e) => { e.stopPropagation(); onCopyNodeContent(node.id); }}
+                  size="xs"
+                  variant="ghost"
+                >
+                  <CopyIcon className="w-3.5 h-3.5" />
+                </IconButton>
+                <IconButton
+                  aria-label={lockAriaLabel}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void onToggleLock(node.id, !node.locked);
+                  }}
+                  size="xs"
+                  variant="ghost"
+                  className={node.locked ? 'text-primary' : ''}
+                >
+                  {node.locked ? (
+                    <LockClosedIcon className="w-3.5 h-3.5" />
+                  ) : (
+                    <LockOpenIcon className="w-3.5 h-3.5" />
+                  )}
+                </IconButton>
+                <IconButton
+                  aria-label="Delete Document"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteNode(node.id, e.shiftKey);
+                  }}
+                  size="xs"
+                  variant="destructive"
+                >
+                  <TrashIcon className="w-3.5 h-3.5" />
+                </IconButton>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {!isFolder && searchTerm.trim() && node.searchSnippet && (
+        <div
+          className="text-[11px] text-text-secondary leading-snug whitespace-pre-wrap break-words pr-3"
+          style={{
+            marginLeft: `${snippetMarginLeft}px`,
+            paddingLeft: `${snippetAccentPadding}px`,
+            borderLeftWidth: `${snippetAccentWidth}px`,
+            borderLeftStyle: 'solid',
+            borderLeftColor: snippetAccentColor,
+            backgroundColor: snippetBackgroundColor,
+            borderRadius: '4px',
+          }}
+        >
+          {highlightMatches(node.searchSnippet, searchTerm)}
+        </div>
+      )}
+
+      {dropPosition && <div className={`absolute left-0 right-0 h-0.5 bg-primary pointer-events-none ${dropPosition === 'before' ? 'top-0' : dropPosition === 'after' ? 'bottom-0' : ''
         }`} />}
-        {dropPosition === 'inside' && <div className="absolute inset-0 border-2 border-primary rounded-md pointer-events-none bg-primary/10" />}
+      {dropPosition === 'inside' && <div className="absolute inset-0 border-2 border-primary rounded-md pointer-events-none bg-primary/10" />}
 
-        {isFolder && isExpanded && (
-            <ul
-                className="m-0 pl-0 list-none space-y-0"
-            >
-                {node.children.map((childNode, index) => (
-                    <DocumentTreeItem
-                        key={childNode.id}
-                        {...baseChildProps}
-                        node={childNode}
-                        level={level + 1}
-                        canMoveUp={index > 0}
-                        canMoveDown={index < node.children.length - 1}
-                    />
-                ))}
-            </ul>
-        )}
-        <EmojiPickerOverlay
-          isOpen={isRenaming && isRenameEmojiPickerOpen}
-          anchor={renameEmojiAnchor}
-          onClose={closeRenameEmojiPicker}
-          onSelectEmoji={handleRenameEmojiSelect}
-          ariaLabel="Insert emoji into node name"
-        />
+      {isFolder && isExpanded && (
+        <ul
+          className="m-0 pl-0 list-none space-y-0"
+        >
+          {node.children.map((childNode, index) => (
+            <DocumentTreeItem
+              key={childNode.id}
+              {...baseChildProps}
+              node={childNode}
+              level={level + 1}
+              canMoveUp={index > 0}
+              canMoveDown={index < node.children.length - 1}
+            />
+          ))}
+        </ul>
+      )}
+      <EmojiPickerOverlay
+        isOpen={isRenaming && isRenameEmojiPickerOpen}
+        anchor={renameEmojiAnchor}
+        onClose={closeRenameEmojiPicker}
+        onSelectEmoji={handleRenameEmojiSelect}
+        ariaLabel="Insert emoji into node name"
+      />
     </li>
   );
 };

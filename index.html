@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -46,50 +47,137 @@
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
     <style>
         :root {
-            /* Light theme variables */
-            --color-background: 245 245 245; --color-secondary: 255 255 255; --color-text-main: 23 23 23; --color-text-secondary: 82 82 82; --color-border: 229 231 235; --color-accent: 99 102 241; --color-accent-hover: 80 70 229; --color-accent-text: 255 255 255; --color-success: 34 197 94; --color-warning: 249 115 22; --color-error: 239 68 68; --color-info: 59 130 246; --color-debug: 22 163 74; --color-destructive-text: 185 28 28; --color-destructive-bg: 254 226 226; --color-destructive-bg-hover: 254 202 202; --color-destructive-border: 252 165 165; --color-modal-backdrop: 0 0 0 / 0.5; --color-tooltip-bg: 23 23 23; --color-tooltip-text: 245 245 245; --color-tree-selected: 212 212 212;
+            --color-background: 245 245 245;
+            --color-secondary: 255 255 255;
+            --color-text-main: 23 23 23;
+            --color-text-secondary: 82 82 82;
+            --color-border: 229 231 235;
+            --color-accent: 99 102 241;
+            --color-accent-hover: 80 70 229;
+            --color-accent-text: 255 255 255;
+            --color-success: 34 197 94;
+            --color-warning: 249 115 22;
+            --color-error: 239 68 68;
+            --color-info: 59 130 246;
+            --color-debug: 22 163 74;
+            --color-destructive-text: 185 28 28;
+            --color-destructive-bg: 254 226 226;
+            --color-destructive-bg-hover: 254 202 202;
+            --color-destructive-border: 252 165 165;
+            --color-modal-backdrop: 0 0 0 / 0.5;
+            --color-tooltip-bg: 23 23 23;
+            --color-tooltip-text: 245 245 245;
+            --color-tree-selected: 0 96 192;
             --select-arrow-background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23525252' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
         }
+
         .dark {
             /* Dark theme variables */
-            --color-background: 23 23 23; --color-secondary: 38 38 38; --color-text-main: 245 245 245; --color-text-secondary: 163 163 163; --color-border: 64 64 64; --color-accent: 129 140 248; --color-accent-hover: 99 102 241; --color-accent-text: 23 23 23; --color-destructive-text: 252 165 165; --color-destructive-bg: 127 29 29 / 0.5; --color-destructive-bg-hover: 127 29 29 / 0.8; --color-destructive-border: 153 27 27; --color-modal-backdrop: 0 0 0 / 0.7; --color-tooltip-bg: 245 245 245; --color-tooltip-text: 23 23 23; --color-tree-selected: 56 56 56;
+            --color-background: 23 23 23;
+            --color-secondary: 38 38 38;
+            --color-text-main: 245 245 245;
+            --color-text-secondary: 163 163 163;
+            --color-border: 64 64 64;
+            --color-accent: 129 140 248;
+            --color-accent-hover: 99 102 241;
+            --color-accent-text: 23 23 23;
+            --color-destructive-text: 252 165 165;
+            --color-destructive-bg: 127 29 29 / 0.5;
+            --color-destructive-bg-hover: 127 29 29 / 0.8;
+            --color-destructive-border: 153 27 27;
+            --color-modal-backdrop: 0 0 0 / 0.7;
+            --color-tooltip-bg: 245 245 245;
+            --color-tooltip-text: 23 23 23;
+            --color-tree-selected: 9 71 113;
             --select-arrow-background: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a3a3a3' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
         }
+
         /* Fix for UI Scaling */
-        html, body, #root {
+        html,
+        body,
+        #root {
             height: 100%;
             margin: 0;
             padding: 0;
         }
-        body { font-family: 'Segoe WPC', 'Segoe UI', sans-serif; }
+
+        body {
+            font-family: 'Segoe WPC', 'Segoe UI', sans-serif;
+        }
 
         /* Styles for custom title bar */
-        .draggable { -webkit-app-region: drag; }
-        .not-draggable { -webkit-app-region: no-drag; }
+        .draggable {
+            -webkit-app-region: drag;
+        }
+
+        .not-draggable {
+            -webkit-app-region: no-drag;
+        }
 
         /* Custom styles for components */
         .editor-container::after {
-          content: attr(data-placeholder);
-          position: absolute;
-          inset: 0;
-          padding: 1.5rem; /* p-6 */
-          color: rgb(var(--color-text-secondary) / 0.7);
-          pointer-events: none;
+            content: attr(data-placeholder);
+            position: absolute;
+            inset: 0;
+            padding: 1.5rem;
+            /* p-6 */
+            color: rgb(var(--color-text-secondary) / 0.7);
+            pointer-events: none;
         }
 
         /* Custom range slider thumb */
+        .range-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .range-slider:focus {
+            outline: none;
+        }
+
+        /* WebKit/Blink (Chrome, Edge, Electron) */
         .range-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 1rem; /* 16px */
-            height: 1rem; /* 16px */
+            width: 1rem;
+            /* 16px */
+            height: 1rem;
+            /* 16px */
             background: rgb(var(--color-accent));
             cursor: pointer;
             border-radius: 9999px;
-            margin-top: -6px; /* center thumb on track (track is h-2 = 8px, thumb is 16px) */
+            margin-top: -6px;
+            /* (TrackHeight 4px - ThumbHeight 16px) / 2 */
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
         }
+
+        .range-slider::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            background: rgb(var(--color-border));
+            border-radius: 9999px;
+            cursor: pointer;
+        }
+
+        /* Firefox */
         .range-slider::-moz-range-thumb {
-            width: 1rem; height: 1rem; background: rgb(var(--color-accent)); cursor: pointer; border-radius: 9999px; border: none;
+            width: 1rem;
+            height: 1rem;
+            background: rgb(var(--color-accent));
+            cursor: pointer;
+            border-radius: 9999px;
+            border: none;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        }
+
+        .range-slider::-moz-range-track {
+            width: 100%;
+            height: 4px;
+            background: rgb(var(--color-border));
+            border-radius: 9999px;
+            cursor: pointer;
         }
 
         /* Custom Scrollbar Styles */
@@ -97,25 +185,31 @@
             width: 12px;
             height: 12px;
         }
+
         ::-webkit-scrollbar-track {
             background: rgb(var(--color-secondary));
         }
+
         ::-webkit-scrollbar-thumb {
             background-color: rgb(var(--color-border));
             border-radius: 6px;
         }
+
         ::-webkit-scrollbar-thumb:hover {
             background-color: rgb(var(--color-text-secondary));
         }
+
         ::-webkit-scrollbar-corner {
             background: transparent;
         }
     </style>
 </head>
+
 <body class="bg-background">
     <div id="root"></div>
     <div id="overlay-root"></div>
     <!-- The app is loaded via an ES module script -->
     <script type="module" src="./dist/renderer.js"></script>
 </body>
+
 </html>
