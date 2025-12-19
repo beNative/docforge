@@ -427,54 +427,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     };
   }, [handleGlobalMouseMove, handleGlobalMouseUp]);
 
-  // --- Scroll Synchronization Logic ---
-  const handleEditorScroll = useCallback((scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number; }) => {
-    if (!viewMode.startsWith('split-') || isSyncing.current || !previewScrollRef.current) return;
+  // --- Scroll Synchronization Logic (DISABLED) ---
+  // Scroll sync between editor and preview is disabled per user request.
+  const handleEditorScroll = useCallback((_scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number; }) => {
+    // Scroll sync disabled - panes scroll independently
+  }, []);
 
-    if (scrollInfo.scrollHeight <= scrollInfo.clientHeight) return;
-
-    const percentage = scrollInfo.scrollTop / (scrollInfo.scrollHeight - scrollInfo.clientHeight);
-
-    const previewEl = previewScrollRef.current;
-    if (previewEl.scrollHeight <= previewEl.clientHeight) return;
-    const newPreviewScrollTop = percentage * (previewEl.scrollHeight - previewEl.clientHeight);
-
-    isSyncing.current = true;
-    previewEl.scrollTop = newPreviewScrollTop;
-
-    if (syncTimeout.current) clearTimeout(syncTimeout.current);
-    syncTimeout.current = window.setTimeout(() => {
-      isSyncing.current = false;
-    }, 100);
-  }, [viewMode]);
-
-  const handlePreviewScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (!viewMode.startsWith('split-') || isSyncing.current) return;
-
-    const editorHandle = editorEngine === 'monaco' ? editorRef.current : richTextEditorRef.current;
-    if (!editorHandle) return;
-
-    const previewEl = e.currentTarget;
-    const { scrollTop, scrollHeight, clientHeight } = previewEl;
-
-    if (scrollHeight <= clientHeight) return;
-
-    const percentage = scrollTop / (scrollHeight - clientHeight);
-
-    editorHandle.getScrollInfo().then(editorInfo => {
-      if (!isSyncing.current && editorInfo.scrollHeight > editorInfo.clientHeight) {
-        const newEditorScrollTop = percentage * (editorInfo.scrollHeight - editorInfo.clientHeight);
-
-        isSyncing.current = true;
-        editorHandle.setScrollTop(newEditorScrollTop);
-
-        if (syncTimeout.current) clearTimeout(syncTimeout.current);
-        syncTimeout.current = window.setTimeout(() => {
-          isSyncing.current = false;
-        }, 100);
-      }
-    });
-  }, [viewMode, editorEngine]);
+  const handlePreviewScroll = useCallback((_e: React.UIEvent<HTMLDivElement>) => {
+    // Scroll sync disabled - panes scroll independently
+  }, []);
 
 
 
