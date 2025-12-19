@@ -1,5 +1,15 @@
 # Version Log
 
+## v0.8.1 - The Native Fonts & Focus Fix Update
+
+### 🛠 Improvements
+
+-   Updated the application font stack to match VS Code on Windows, using **Segoe UI** for the interface and **Consolas** for code. This provides a more native and consistent look for Windows users.
+
+### 🐛 Fixes
+
+-   Resolved an issue where the "Create Document from Template" dialog would lose focus or reset the cursor position while typing in variable inputs. The focus trap logic has been optimized to handle dynamic content updates correctly.
+
 ## v0.8.0 - The Emoji & Command Palette Update
 
 ### ✨ Features
