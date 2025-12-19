@@ -40,7 +40,7 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef
     };
   }, [onClose]);
 
-  // Effect for focus trapping
+  // Effect for setting initial focus - RUNS ONLY ONCE
   useEffect(() => {
     const focusTimer = setTimeout(() => {
       const modalNode = modalRef.current;
@@ -58,22 +58,28 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef
           focusableElements[0].focus();
         }
       }
-    }, 0); // Use a timeout to ensure the DOM is ready for focus
+    }, 50); // Small delay to ensure render
 
-    // Focus trapping logic for Tab key
-    const modalNode = modalRef.current;
-    if (!modalNode) return () => clearTimeout(focusTimer);
-    
-    const focusableElements = modalNode.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    );
-    if (focusableElements.length === 0) return () => clearTimeout(focusTimer);
+    return () => clearTimeout(focusTimer);
+  }, []); // Empty dependency array ensures this runs only on mount
 
-    const firstElement = focusableElements[0];
-    const lastElement = focusableElements[focusableElements.length - 1];
-
+  // Effect for focus trapping (Tab key)
+  useEffect(() => {
     const handleTabKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
+
+      const modalNode = modalRef.current;
+      if (!modalNode) return;
+
+      // Re-query focusable elements every time Tab is pressed to handle dynamic content changes
+      const focusableElements = modalNode.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+
+      if (focusableElements.length === 0) return;
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
 
       if (e.shiftKey) { // Shift + Tab
         if (document.activeElement === firstElement) {
@@ -87,16 +93,21 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef
         }
       }
     };
-    
-    modalNode.addEventListener('keydown', handleTabKey);
+
+    // Attach listener to the specific modal node if possible, or window/document if needed for trapping.
+    // Attaching to modalNode is better for containment, but we need to ensure the modal has focus.
+    // For a robust trap, listening on the modal node is good IF the focus is inside.
+    const modalNode = modalRef.current;
+    if (modalNode) {
+      modalNode.addEventListener('keydown', handleTabKey);
+    }
 
     return () => {
-        clearTimeout(focusTimer);
-        if (modalNode) {
-            modalNode.removeEventListener('keydown', handleTabKey);
-        }
+      if (modalNode) {
+        modalNode.removeEventListener('keydown', handleTabKey);
+      }
     };
-  }, [onClose, initialFocusRef]);
+  }, []); // Run once to attach handlers
 
   const modalContent = (
     <div
