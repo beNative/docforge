@@ -273,7 +273,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
     backgroundSize: '1.2em 1.2em',
   };
 
-  const zoomButtonClass = 'p-1 rounded-sm text-text-secondary hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed';
+  const zoomButtonClass = 'p-1 text-text-secondary hover:text-text-main focus:outline-none focus:text-text-main disabled:opacity-50 disabled:cursor-not-allowed';
   const isZoomDisabled = !isPreviewZoomAvailable;
   const isAtMinZoom = previewScale <= previewMinScale + 0.001;
   const isAtMaxZoom = previewScale >= previewMaxScale - 0.001;
