@@ -312,6 +312,7 @@ const MarkdownViewer = forwardRef<HTMLDivElement, MarkdownViewerProps>(({ conten
         disablePan
         layout="natural"
         lockOverflow={false}
+        useZoomProperty
         className="min-h-full"
         wrapperClassName="df-markdown-shell"
         contentClassName="df-markdown-stage origin-top"

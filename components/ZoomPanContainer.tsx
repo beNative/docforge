@@ -17,6 +17,11 @@ interface ZoomPanContainerProps extends React.HTMLAttributes<HTMLDivElement> {
   wrapperClassName?: string;
   layout?: 'overlay' | 'natural';
   lockOverflow?: boolean;
+  /**
+   * When true, uses CSS `zoom` property instead of `transform: scale()`.
+   * This allows text to reflow when zooming, but panning becomes unavailable.
+   */
+  useZoomProperty?: boolean;
 }
 
 const clamp = (value: number, min: number, max: number) => {
@@ -49,6 +54,7 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     disableZoom = false,
     layout = 'overlay',
     lockOverflow = true,
+    useZoomProperty = false,
     ...rest
   } = props;
 
@@ -208,11 +214,18 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
   }, [initialScale, previewZoom, setOffset, setScale]);
 
   const transformStyle = useMemo(() => {
+    // When useZoomProperty is true, use CSS zoom for text reflow
+    if (useZoomProperty) {
+      return {
+        zoom: scale,
+      } as React.CSSProperties;
+    }
+    // Otherwise use transform: scale() for panning support
     return {
       transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
       transformOrigin: disablePan ? '0 0' : undefined,
     } as React.CSSProperties;
-  }, [disablePan, offset.x, offset.y, scale]);
+  }, [disablePan, offset.x, offset.y, scale, useZoomProperty]);
 
   const naturalWrapperStyle = useMemo<React.CSSProperties | undefined>(() => {
     if (layout !== 'natural' || !disablePan) {
@@ -244,8 +257,12 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
   }, [className, disablePan, isPanning, lockOverflow]);
 
   const renderContent = useCallback(() => {
+    // When using CSS zoom, no transform-gpu needed
+    const contentClass = useZoomProperty
+      ? contentClassName ?? ''
+      : `transform-gpu origin-center ${contentClassName ?? ''}`;
     const content = (
-      <div className={`transform-gpu origin-center ${contentClassName ?? ''}`} style={transformStyle}>
+      <div className={contentClass} style={transformStyle}>
         {children}
       </div>
     );
