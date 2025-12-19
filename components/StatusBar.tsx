@@ -117,31 +117,31 @@ const ZoomButton: React.FC<ZoomButtonProps> = ({ hint, icon, className = '', dis
 };
 
 const StatusBar: React.FC<StatusBarProps> = ({
-    status,
-    modelName,
-    llmProviderName,
-    llmProviderUrl,
-    documentCount,
-    lastSaved,
-    availableModels,
-    onModelChange,
-    discoveredServices,
-    onProviderChange,
-    appVersion,
-    databasePath,
-    databaseStatus,
-    onDatabaseMenu,
-    onOpenAbout,
-    previewScale,
-    onPreviewZoomIn,
-    onPreviewZoomOut,
-    onPreviewReset,
-    isPreviewZoomAvailable,
-    previewMinScale,
-    previewMaxScale,
-    previewInitialScale,
-    previewMetadata,
-    zoomTarget,
+  status,
+  modelName,
+  llmProviderName,
+  llmProviderUrl,
+  documentCount,
+  lastSaved,
+  availableModels,
+  onModelChange,
+  discoveredServices,
+  onProviderChange,
+  appVersion,
+  databasePath,
+  databaseStatus,
+  onDatabaseMenu,
+  onOpenAbout,
+  previewScale,
+  onPreviewZoomIn,
+  onPreviewZoomOut,
+  onPreviewReset,
+  isPreviewZoomAvailable,
+  previewMinScale,
+  previewMaxScale,
+  previewInitialScale,
+  previewMetadata,
+  zoomTarget,
 }) => {
   const { text, color, tooltip } = statusConfig[status];
   const selectedService = discoveredServices.find(s => s.generateUrl === llmProviderUrl);
@@ -292,8 +292,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
       const sizeText = `${previewMetadata.width} × ${previewMetadata.height} px`;
       const typeText = previewMetadata.mimeType
         ? (previewMetadata.mimeType.startsWith('image/')
-            ? previewMetadata.mimeType.replace('image/', '').toUpperCase()
-            : previewMetadata.mimeType.toUpperCase())
+          ? previewMetadata.mimeType.replace('image/', '').toUpperCase()
+          : previewMetadata.mimeType.toUpperCase())
         : null;
       return {
         label: baseLabel,
@@ -373,7 +373,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             event.preventDefault();
             handleDatabaseMenu(event);
           }}
-          className={`flex items-center gap-1.5 px-1.5 py-1 -my-1 rounded-md transition-colors ${onDatabaseMenu ? 'hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer' : 'cursor-default'}`}
+          className={`flex items-center gap-1.5 px-1.5 py-1 -my-1 transition-colors ${onDatabaseMenu ? 'hover:text-text-main focus:outline-none focus:text-text-main cursor-pointer' : 'cursor-default'}`}
           disabled={!onDatabaseMenu}
           ref={databaseTriggerRef}
           onMouseEnter={() => setShowDatabaseTooltip(true)}
