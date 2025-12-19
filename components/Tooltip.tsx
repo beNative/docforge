@@ -90,7 +90,7 @@ const Tooltip: React.FC<TooltipProps> = ({ targetRef, content, position = 'top',
   const overlayRoot = document.getElementById('overlay-root');
   if (!overlayRoot) return null;
 
-  const baseClassName = 'fixed z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-md shadow-lg transition-opacity duration-200 pointer-events-none';
+  const baseClassName = 'fixed z-50 w-max px-2 py-1 text-xs font-semibold text-tooltip-text bg-tooltip-bg rounded-sm border border-border-color transition-opacity duration-100 pointer-events-none';
   const composedClassName = className ? `${baseClassName} ${className}` : `${baseClassName} max-w-xs`;
 
   return ReactDOM.createPortal(

@@ -9,15 +9,15 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ children, variant = 'primary', isLoading = false, className, ...props }, ref) => {
-    const baseClasses = 'inline-flex items-center justify-center px-3 py-1.5 border text-xs font-semibold rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150';
-    
+    const baseClasses = 'inline-flex items-center justify-center px-3 py-1.5 border text-xs font-semibold rounded-sm focus:outline-none focus:ring-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-100';
+
     const variantClasses = {
-      primary: 'bg-primary text-primary-text border-transparent hover:bg-primary-hover focus:ring-primary',
-      secondary: 'bg-secondary text-text-main border-border-color hover:bg-border-color focus:ring-primary',
-      destructive: 'bg-destructive-bg text-destructive-text border-destructive-border hover:bg-destructive-bg-hover focus:ring-destructive-text',
-      ghost: 'bg-transparent text-text-main border-transparent hover:bg-border-color focus:ring-primary',
+      primary: 'bg-primary text-primary-text border-transparent hover:bg-primary-hover focus:ring-primary/50',
+      secondary: 'bg-secondary text-text-main border-border-color hover:bg-border-color/50 focus:ring-primary/50',
+      destructive: 'bg-destructive-bg text-destructive-text border-destructive-border hover:bg-destructive-bg-hover focus:ring-destructive-text/50',
+      ghost: 'bg-transparent text-text-secondary border-transparent hover:text-text-main focus:ring-primary/30',
     };
-    
+
     const disabled = props.disabled || isLoading;
 
     return (

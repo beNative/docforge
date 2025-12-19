@@ -14,14 +14,12 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ id, checked, onChange }) =>
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-secondary ${
-        checked ? 'bg-primary' : 'bg-border-color'
-      }`}
+      className={`relative inline-flex h-5 w-10 flex-shrink-0 items-center rounded-full transition-colors duration-100 focus:outline-none focus:ring-1 focus:ring-primary/50 ${checked ? 'bg-primary' : 'bg-border-color'
+        }`}
     >
       <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-          checked ? 'translate-x-6' : 'translate-x-1'
-        }`}
+        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'
+          }`}
       />
     </button>
   );

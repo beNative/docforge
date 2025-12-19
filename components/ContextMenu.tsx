@@ -3,21 +3,21 @@ import ReactDOM from 'react-dom';
 
 export type MenuItem =
   | {
-      label: string;
-      action: () => void;
-      icon?: React.FC<{ className?: string }>;
-      disabled?: boolean;
-      shortcut?: string;
-      submenu?: never;
-    }
+    label: string;
+    action: () => void;
+    icon?: React.FC<{ className?: string }>;
+    disabled?: boolean;
+    shortcut?: string;
+    submenu?: never;
+  }
   | {
-      label: string;
-      submenu: MenuItem[];
-      icon?: React.FC<{ className?: string }>;
-      disabled?: boolean;
-      shortcut?: string;
-      action?: never;
-    }
+    label: string;
+    submenu: MenuItem[];
+    icon?: React.FC<{ className?: string }>;
+    disabled?: boolean;
+    shortcut?: string;
+    action?: never;
+  }
   | { type: 'separator' };
 
 interface ContextMenuProps {
@@ -96,9 +96,9 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Escape') {
-            onClose();
-        }
+      if (event.key === 'Escape') {
+        onClose();
+      }
     }
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -200,7 +200,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
                 }
               }}
               disabled={item.disabled || !hasEnabledSubitem}
-              className="w-full flex items-center justify-between text-left px-2 py-1.5 text-xs rounded-md transition-colors text-text-main disabled:text-text-secondary/50 disabled:cursor-not-allowed hover:bg-primary hover:text-primary-text focus:bg-primary focus:text-primary-text focus:outline-none"
+              className="w-full flex items-center justify-between text-left px-2 py-1 text-xs rounded-sm transition-colors text-text-main disabled:text-text-secondary/50 disabled:cursor-not-allowed hover:bg-tree-selected hover:text-text-main focus:bg-tree-selected focus:text-text-main focus:outline-none"
             >
               <div className="flex items-center gap-3">
                 {Icon && <Icon className="w-4 h-4" />}
@@ -209,7 +209,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
               <span className="text-text-secondary">›</span>
             </button>
             {isOpen && item.submenu.length > 0 && (
-              <div className="absolute top-0 left-full ml-1 z-10 w-[16.8rem] rounded-md bg-secondary p-1.5 shadow-2xl border border-border-color animate-fade-in-fast">
+              <div className="absolute top-0 left-full ml-1 z-10 w-[16.8rem] rounded-sm bg-secondary p-1 border border-border-color animate-fade-in-fast">
                 <ul className="space-y-1">{renderItems(item.submenu, depth + 1)}</ul>
               </div>
             )}
@@ -229,7 +229,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
               }
             }}
             disabled={disabled}
-            className="w-full flex items-center justify-between text-left px-2 py-1.5 text-xs rounded-md transition-colors text-text-main disabled:text-text-secondary/50 disabled:cursor-not-allowed hover:bg-primary hover:text-primary-text focus:bg-primary focus:text-primary-text focus:outline-none"
+            className="w-full flex items-center justify-between text-left px-2 py-1 text-xs rounded-sm transition-colors text-text-main disabled:text-text-secondary/50 disabled:cursor-not-allowed hover:bg-tree-selected hover:text-text-main focus:bg-tree-selected focus:text-text-main focus:outline-none"
           >
             <div className="flex items-center gap-3">
               {Icon && <Icon className="w-4 h-4" />}
@@ -251,7 +251,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isOpen, position, items, onCl
         maxHeight: menuStyle.maxHeight ? menuStyle.maxHeight : undefined,
         overflowY: menuStyle.overflowY,
       }}
-      className="fixed z-50 w-[16.8rem] rounded-md bg-secondary p-1.5 shadow-2xl border border-border-color animate-fade-in-fast"
+      className="fixed z-50 w-[16.8rem] rounded-sm bg-secondary p-1 border border-border-color animate-fade-in-fast"
     >
       <ul className="space-y-1">
         {renderItems(items)}

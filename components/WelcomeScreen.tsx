@@ -4,13 +4,13 @@ import { PlusIcon, FileIcon } from './Icons';
 import Button from './Button';
 
 interface WelcomeScreenProps {
-  onNewDocument: () => void;
+    onNewDocument: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onNewDocument }) => {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center text-text-secondary p-8 bg-background">
-            <div className="p-8 bg-secondary rounded-lg border border-border-color max-w-lg">
+            <div className="p-8 bg-secondary rounded-sm border border-border-color max-w-lg">
                 <FileIcon className="w-16 h-16 text-primary mx-auto mb-6" />
                 <h2 className="text-xl font-semibold text-text-main mb-2">Welcome to DocForge</h2>
                 <p className="max-w-md mb-8 text-sm">

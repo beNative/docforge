@@ -95,7 +95,7 @@ const LanguageDropdown = React.forwardRef<HTMLButtonElement, LanguageDropdownPro
         type="button"
         ref={setButtonRef}
         onClick={toggleOpen}
-        className="flex items-center gap-2 bg-background text-text-main text-xs rounded-md py-1 pl-2 pr-2 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary"
+        className="flex items-center gap-2 bg-background text-text-main text-xs rounded-sm py-1 pl-2 pr-2 border border-border-color focus:outline-none focus:ring-1 focus:ring-primary/50"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
@@ -106,7 +106,7 @@ const LanguageDropdown = React.forwardRef<HTMLButtonElement, LanguageDropdownPro
       </button>
       {isOpen && (
         <div
-          className="absolute right-0 mt-1 z-50 w-72 rounded-md border border-border-color bg-background shadow-lg"
+          className="absolute right-0 mt-1 z-50 w-72 rounded-sm border border-border-color bg-background"
           role="listbox"
           aria-activedescendant={activeOptionId}
         >
@@ -119,11 +119,10 @@ const LanguageDropdown = React.forwardRef<HTMLButtonElement, LanguageDropdownPro
                 role="option"
                 aria-selected={language.id === selectedLanguage.id}
                 onClick={() => handleSelect(language.id)}
-                className={`text-left px-3 py-1.5 rounded-md transition-colors ${
-                  language.id === selectedLanguage.id
-                    ? 'bg-secondary/70 text-primary font-semibold'
-                    : 'text-text-main hover:bg-secondary'
-                }`}
+                className={`text-left px-3 py-1 rounded-sm transition-colors ${language.id === selectedLanguage.id
+                    ? 'bg-tree-selected text-text-main font-medium'
+                    : 'text-text-main hover:bg-tree-selected'
+                  }`}
               >
                 {language.label}
               </button>
