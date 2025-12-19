@@ -1,5 +1,32 @@
 # Version Log
 
+## v0.8.2 - The Antigravity Styling Update
+
+### 🛠 Improvements
+
+-   **Antigravity Design Language:** Applied a cleaner, VS Code-inspired design across the application:
+    -   Sharper corners (`rounded-sm`) on buttons, modals, tooltips, and dropdowns.
+    -   Reduced focus ring intensity for a more subtle, native appearance.
+    -   Removed shadows from modals, tooltips, and context menus for a flatter look.
+    -   Status bar controls (LLM selectors, database dropdown, zoom buttons) now use text-only hover/focus instead of visible rings.
+-   **Improved Markdown Preview Zoom:** Text now reflows properly when zooming in or out, eliminating whitespace issues at different zoom levels.
+-   **Better Tree Selection Visibility:** Fixed the tree item selection highlight in light mode to be clearly visible instead of nearly transparent.
+
+### 🐛 Fixes
+
+-   Disabled the scroll synchronization between the code editor and Markdown preview panes, as the sync behavior was unreliable. Panes now scroll independently.
+-   Fixed search box styling to be more professional with a subtle background and no visible border.
+
+## v0.8.1 - The Native Fonts & Focus Fix Update
+
+### 🛠 Improvements
+
+-   Updated the application font stack to match VS Code on Windows, using **Segoe UI** for the interface and **Consolas** for code. This provides a more native and consistent look for Windows users.
+
+### 🐛 Fixes
+
+-   Resolved an issue where the "Create Document from Template" dialog would lose focus or reset the cursor position while typing in variable inputs. The focus trap logic has been optimized to handle dynamic content updates correctly.
+
 ## v0.8.0 - The Emoji & Command Palette Update
 
 ### ✨ Features
@@ -58,6 +85,7 @@
 -   Documented the automatic-install controls and refreshed the release guides for the v0.6.10 tagging workflow.
 
 ## v0.6.9 - The Workflow & Execution Update
+
 
 ### ✨ Features
 
