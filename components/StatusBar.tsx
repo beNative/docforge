@@ -333,7 +333,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             value={selectedService?.id || ''}
             onChange={(e) => onProviderChange(e.target.value)}
             disabled={discoveredServices.length === 0}
-            className="bg-transparent font-semibold text-text-main rounded-md py-0.5 px-1 -my-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-4"
+            className="bg-transparent font-semibold text-text-main py-0.5 px-1 -my-1 hover:text-primary focus:outline-none focus:text-primary appearance-none pr-4"
             aria-label="LLM provider"
             style={selectStyles}
           >
@@ -352,7 +352,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             value={modelName}
             onChange={(e) => onModelChange(e.target.value)}
             disabled={availableModels.length === 0}
-            className="bg-transparent font-semibold text-text-main rounded-md py-0.5 px-1 -my-1 hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary appearance-none pr-4"
+            className="bg-transparent font-semibold text-text-main py-0.5 px-1 -my-1 hover:text-primary focus:outline-none focus:text-primary appearance-none pr-4"
             aria-label="LLM model"
             style={selectStyles}
           >
