@@ -1,5 +1,19 @@
 # Version Log
 
+## v0.8.3 - The Safety & Context Menu Update
+
+This release brings an intelligent context menu to the document editor and introduces deletion safeguards so your content stays secure during rapid editing.
+
+### ✨ Features
+
+-   **Intelligent Context Menu**: Added a custom right-click menu to the editor that adapts to your selection. It intelligently provides text formatting and link options for text, dedicated controls for selected images, and rich table manipulation (insert/delete rows and columns) when editing tables.
+-   **Deletion Protection**: Intercepts structural delete and backspace commands that would otherwise accidentally erase your entire document or empty the editor unexpectedly.
+
+### 🛠 Improvements
+
+-   Added keyboard shortcut hints to the editor toolbar tooltips (e.g., Undo (Ctrl+Z), Bold (Ctrl+B), Insert Link (Ctrl+K)) so you can discover standard hotkeys without leaving the composing window.
+-   Switched the HTML and image preview zoom mechanism to use native CSS zoom (`zoom:`). This improves alignment and removes the nested scrollbars introduced by the previous pan container.
+
 ## v0.8.2 - The Antigravity Styling Update
 
 ### 🛠 Improvements

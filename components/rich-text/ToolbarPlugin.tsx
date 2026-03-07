@@ -691,7 +691,7 @@ export const ToolbarPlugin: React.FC<{
         () => [
             {
                 id: 'undo',
-                label: 'Undo',
+                label: 'Undo (Ctrl+Z)',
                 icon: UndoIcon,
                 group: 'history',
                 disabled: readOnly || !canUndo,
@@ -699,7 +699,7 @@ export const ToolbarPlugin: React.FC<{
             },
             {
                 id: 'redo',
-                label: 'Redo',
+                label: 'Redo (Ctrl+Y)',
                 icon: RedoIcon,
                 group: 'history',
                 disabled: readOnly || !canRedo,
@@ -707,7 +707,7 @@ export const ToolbarPlugin: React.FC<{
             },
             {
                 id: 'bold',
-                label: 'Bold',
+                label: 'Bold (Ctrl+B)',
                 icon: BoldIcon,
                 group: 'inline-format',
                 isActive: isBold,
@@ -716,7 +716,7 @@ export const ToolbarPlugin: React.FC<{
             },
             {
                 id: 'italic',
-                label: 'Italic',
+                label: 'Italic (Ctrl+I)',
                 icon: ItalicIcon,
                 group: 'inline-format',
                 isActive: isItalic,
@@ -725,7 +725,7 @@ export const ToolbarPlugin: React.FC<{
             },
             {
                 id: 'underline',
-                label: 'Underline',
+                label: 'Underline (Ctrl+U)',
                 icon: UnderlineIcon,
                 group: 'inline-format',
                 isActive: isUnderline,
@@ -734,7 +734,7 @@ export const ToolbarPlugin: React.FC<{
             },
             {
                 id: 'strikethrough',
-                label: 'Strikethrough',
+                label: 'Strikethrough (Ctrl+Shift+S)',
                 icon: StrikethroughIcon,
                 group: 'inline-format',
                 isActive: isStrikethrough,
@@ -743,7 +743,7 @@ export const ToolbarPlugin: React.FC<{
             },
             {
                 id: 'code',
-                label: 'Inline Code',
+                label: 'Inline Code (Ctrl+`)',
                 icon: CodeInlineIcon,
                 group: 'inline-format',
                 isActive: isCode,
@@ -815,7 +815,7 @@ export const ToolbarPlugin: React.FC<{
             },
             {
                 id: 'link',
-                label: isLink ? 'Edit or Remove Link' : 'Insert Link',
+                label: isLink ? 'Edit Link (Ctrl+K)' : 'Insert Link (Ctrl+K)',
                 icon: ToolbarLinkIcon,
                 group: 'insert',
                 isActive: isLink,

@@ -1,35 +1,55 @@
 import React, { useMemo } from 'react';
 import type { IRenderer, RendererRenderOptions } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
-import ZoomPanContainer from '../../components/ZoomPanContainer';
+import { usePreviewZoom } from '../../contexts/PreviewZoomContext';
 
 interface HtmlPreviewProps {
   content: string;
 }
 
-const HtmlPreview: React.FC<HtmlPreviewProps> = ({ content }) => {
+/**
+ * Inner component that receives scale as a prop.
+ * This ensures React properly re-renders when scale changes.
+ */
+const HtmlPreviewInner: React.FC<{ content: string; scale: number }> = ({ content, scale }) => {
   const fullHtml = useMemo(
     () =>
-      `<html><head><style>body { color-scheme: light dark; font-family: sans-serif; padding: 1rem; }</style></head><body>${content}</body></html>`,
+      `<html><head><style>body { color-scheme: light dark; font-family: sans-serif; padding: 1rem; margin: 0; }</style></head><body>${content}</body></html>`,
     [content],
   );
 
+  // Apply CSS zoom directly to the iframe element
+  const iframeStyle: React.CSSProperties = useMemo(() => ({
+    width: '100%',
+    height: '100%',
+    minHeight: '100vh',
+    border: 'none',
+    backgroundColor: 'transparent',
+    zoom: scale,
+    transformOrigin: 'top left',
+  }), [scale]);
+
   return (
-    <ZoomPanContainer
-      className="w-full h-full"
-      contentClassName="w-full h-full origin-top flex"
-      wrapperClassName="items-stretch justify-center"
-      disablePan
-      role="document"
-    >
+    <div className="w-full h-full overflow-auto bg-secondary">
       <iframe
         srcDoc={fullHtml}
-        sandbox="allow-scripts" // Allow scripts for dynamic previews, but be mindful of security implications.
-        style={{ width: '100%', height: '100%', border: 'none', backgroundColor: 'transparent' }}
+        sandbox="allow-scripts"
+        style={iframeStyle}
         title="HTML Preview"
       />
-    </ZoomPanContainer>
+    </div>
   );
+};
+
+/**
+ * Wrapper component that reads the zoom context and passes scale as a prop.
+ * This pattern ensures the inner component re-renders when zoom changes.
+ */
+const HtmlPreview: React.FC<HtmlPreviewProps> = ({ content }) => {
+  const previewZoom = usePreviewZoom();
+  const scale = previewZoom?.scale ?? 1;
+
+  return <HtmlPreviewInner content={content} scale={scale} />;
 };
 
 export class HtmlRenderer implements IRenderer {

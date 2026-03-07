@@ -8,16 +8,19 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Integrated Command Palette:** Quickly access all core functions from a central search bar, including editor actions such as formatting, locking, AI refinement, and emoji generation.
 - **Hierarchical Document Organization:** Organize your documents in a familiar folder structure. Create nested subfolders, duplicate items, and use drag-and-drop to rearrange your workspace or import files from your computer.
 - **Clipboard Capture:** Turn whatever is on your system clipboard into a document in one step—DocForge classifies the contents automatically, generates a title with your connected LLM when possible, and prompts you to restore permissions if clipboard access is blocked.
-- **Full Context Menu & Keyboard Navigation:** Navigate and manage items using a complete right-click context menu or use only the keyboard for a faster workflow.
+- **Hover-First Tree Actions:** Keep document titles readable while revealing quick actions—duplicate, export, lock, etc.—only when you hover or focus each row in the sidebar.
+- **Intelligent Context Menu & Delete Protection:** Use a custom right-click menu in the editor for text formatting and table manipulation, backed by a safety plugin that prevents accidental deletions of your entire document.
 - **Universal Monaco Editor:** A powerful, VS Code-like editor is used for all document types, including Markdown, HTML, and various source code files, with syntax highlighting and code folding.
+- **One-Click Formatting:** Clean up Markdown, JSON, JavaScript, and TypeScript documents directly from the editor toolbar.
+- **Cancel Unsaved Changes:** Instantly roll a document back to its last saved state with a dedicated toolbar button when an experiment goes sideways.
+- **Document Locking:** Protect sensitive drafts by toggling a padlock button that flips the editor into a read-only mode until you intentionally unlock it.
+- **Emoji-Enhanced Titles:** Insert emoji directly into document and folder names or let the AI suggest a prefix so your workspace stays scannable at a glance.
+- **Multi-Document Tabs:** Keep several documents open at once, pin important files, and quickly jump between them using the tab strip and overflow picker.
 - **Multi-Format Live Preview:** Get a real-time, rendered preview for Markdown, HTML, PDFs, and common image formats. The preview can be displayed side-by-side (vertically or horizontally) with the editor, and binary formats open straight into preview mode with zoom and pan controls tailored to each viewer.
 - **Focused Workspace Zoom:** Use a single set of zoom controls that automatically follow whichever pane—editor or preview—has focus, complete with 5% increments, keyboard and mouse support, and quick resets.
 - **AI-Powered Refinement:** Use your connected local LLM to automatically refine and improve your documents with a single click.
 - **Document Templating:** Create reusable document templates with variables to quickly generate new documents for recurring tasks.
 - **Document Export:** Save any document to your filesystem with a suggested filename and the correct extension for its detected type, whether you're running the Electron app or using the browser build.
-- **Cancel Unsaved Changes:** Instantly roll a document back to its last saved state with a dedicated toolbar button when an experiment goes sideways.
-- **Document Locking:** Protect sensitive drafts by toggling a padlock button that flips the editor into a read-only mode until you intentionally unlock it.
-- **Emoji-Enhanced Titles:** Insert emoji directly into document and folder names or let the AI suggest a prefix so your workspace stays scannable at a glance.
 - **Hover-First Tree Actions:** Keep document titles readable while revealing quick actions—duplicate, export, lock, etc.—only when you hover or focus each row in the sidebar.
 - **Integrated Python Workflow:** Open an inline Python console tied to your documents to execute snippets, review logs, and manage isolated environments without leaving DocForge.
 - **Shell & PowerShell Execution:** Run or syntax-test scripts directly from the editor with per-document environment overrides that merge with workspace defaults configured in Settings.
@@ -42,11 +45,11 @@ DocForge is a desktop application designed to streamline the process of creating
 4.  **Create:** Start creating, organizing, and refining your documents!
 
 For detailed instructions on usage and features, please refer to the [Functional Manual](./FUNCTIONAL_MANUAL.md).
-To review the history of changes, see the [Version Log](./VERSION_LOG.md). Detailed release notes are archived under [`docs/releases/`](./releases).
+To review the history of changes, see the [Version Log](./VERSION_LOG.md). Detailed release notes are archived under [`docs/releases/`](./docs/releases).
 
 ## Spec-Driven Development Workflow
 
-DocForge adopts [GitHub Spec Kit](https://github.com/github/spec-kit) to keep feature planning, implementation, and review aligned. The toolkit installs slash commands for AI coding assistants and project scripts that generate numbered spec packages under [`specs/`](../specs/README.md).
+DocForge adopts [GitHub Spec Kit](https://github.com/github/spec-kit) to keep feature planning, implementation, and review aligned. The toolkit installs slash commands for AI coding assistants and project scripts that generate numbered spec packages under [`specs/`](./specs/README.md).
 
 ### Install the Specify CLI
 
@@ -99,4 +102,3 @@ To create a new public build of DocForge:
 - `npm run build` (and any script that calls it) automatically validates the SVG and regenerates `icon.icns`, `icon.ico`, and a high-resolution `icon.png` via the `scripts/prepare-icons.mjs` helper.
 - If the SVG is missing or invalid the script logs a warning and leaves existing binary icons untouched, allowing packaging to proceed with the previously generated assets.
 - Run `npm run prepare:icons` to regenerate the platform-specific icons on demand without rebuilding the JavaScript bundles.
-

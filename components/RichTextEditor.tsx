@@ -34,9 +34,10 @@ import {
 import { $getRoot } from 'lexical';
 
 import { ImageNode } from './rich-text/ImageNode';
-import ContextMenuComponent, { type MenuItem as ContextMenuItem } from './ContextMenu';
 import { ToolbarPlugin } from './rich-text/ToolbarPlugin';
 import { TableColumnResizePlugin } from './rich-text/TableColumnResizePlugin';
+import { ContextMenuPlugin } from './rich-text/ContextMenuPlugin';
+import { DeleteProtectionPlugin } from './rich-text/DeleteProtectionPlugin';
 import type { ToolbarButtonConfig } from './rich-text/types';
 
 export interface RichTextEditorHandle {
@@ -52,12 +53,6 @@ interface RichTextEditorProps {
   readOnly?: boolean;
   onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number }) => void;
   onFocusChange?: (hasFocus: boolean) => void;
-}
-
-interface ContextMenuState {
-  x: number;
-  y: number;
-  visible: boolean;
 }
 
 const RICH_TEXT_THEME = {
@@ -99,8 +94,6 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
     const [editorRef, setEditorRef] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [toolbarActions, setToolbarActions] = useState<ToolbarButtonConfig[]>([]);
-    const [contextMenu, setContextMenu] = useState<ContextMenuState>({ x: 0, y: 0, visible: false });
-    const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>([]);
 
     // Track if we are currently processing an external HTML update to avoid loops
     const isUpdatingFromServer = useRef(false);
@@ -242,9 +235,11 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
             <EditorRefPlugin setEditorRef={setEditorRef} />
             {/* Focus Handler */}
             <FocusPlugin onFocusChange={onFocusChange} />
+            {/* Context Menu */}
+            <ContextMenuPlugin readOnly={readOnly} />
+            {/* Delete Protection */}
+            <DeleteProtectionPlugin />
           </LexicalComposer>
-
-          {/* Context Menu would go here if we kept it enabled */}
         </div>
       </div>
     );

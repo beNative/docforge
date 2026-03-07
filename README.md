@@ -8,7 +8,8 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Integrated Command Palette:** Quickly access all core functions from a central search bar, including editor actions such as formatting, locking, AI refinement, and emoji generation.
 - **Hierarchical Document Organization:** Organize your documents in a familiar folder structure. Create nested subfolders, duplicate items, and use drag-and-drop to rearrange your workspace or import files from your computer.
 - **Clipboard Capture:** Turn whatever is on your system clipboard into a document in one step—DocForge classifies the contents automatically, generates a title with your connected LLM when possible, and prompts you to restore permissions if clipboard access is blocked.
-- **Full Context Menu & Keyboard Navigation:** Navigate and manage items using a complete right-click context menu or use only the keyboard for a faster workflow.
+- **Hover-First Tree Actions:** Keep document titles readable while revealing quick actions—duplicate, export, lock, etc.—only when you hover or focus each row in the sidebar.
+- **Intelligent Context Menu & Delete Protection:** Use a custom right-click menu in the editor for text formatting and table manipulation, backed by a safety plugin that prevents accidental deletions of your entire document.
 - **Universal Monaco Editor:** A powerful, VS Code-like editor is used for all document types, including Markdown, HTML, and various source code files, with syntax highlighting and code folding.
 - **One-Click Formatting:** Clean up Markdown, JSON, JavaScript, and TypeScript documents directly from the editor toolbar.
 - **Cancel Unsaved Changes:** Instantly roll a document back to its last saved state with a dedicated toolbar button when an experiment goes sideways.
