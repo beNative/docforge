@@ -1,6 +1,6 @@
 # Version Log
 
-## v0.8.4 - The Codebase Consistency Upgrade
+## v0.8.5 - The Codebase Consistency Upgrade
 
 This release is a comprehensive refactoring effort that standardizes styling, typing, and error handling patterns across the application, laying a cleaner foundation for future development without changing functional behavior.
 
