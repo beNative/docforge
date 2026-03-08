@@ -1,5 +1,16 @@
 # Version Log
 
+## v0.8.4 - The Codebase Consistency Upgrade
+
+This release is a comprehensive refactoring effort that standardizes styling, typing, and error handling patterns across the application, laying a cleaner foundation for future development without changing functional behavior.
+
+### 🛠 Improvements
+
+-   **Quotes Consistency**: All internal TypeScript and React source files now strictly enforce single quotes.
+-   **TypeScript Rigor**: Cleaned up inline object prop types into documented interfaces (`EditorRefPluginProps`) and replaced several broad `any` usages with exact Lexical editor state types.
+-   **Error Handling**: Globally unified our Promise implementations to catch as `error` (e.g., `catch (error) { ... }`) for consistency across backend and frontend calls.
+-   **Code Structure**: Converted mixed component initializations into predictable arrow functions, stripped unneeded `I` prefixes from interfaces, and hoisted deferred imports to the top of their modules.
+
 ## v0.8.3 - The Safety & Context Menu Update
 
 This release brings an intelligent context menu to the document editor and introduces deletion safeguards so your content stays secure during rapid editing.
