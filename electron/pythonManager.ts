@@ -233,7 +233,7 @@ const writeScriptToTempFile = async (code: string): Promise<{ filePath: string; 
 const appendRunLog = (runId: string, level: 'INFO' | 'ERROR', message: string) => {
   const timestamp = new Date().toISOString();
   databaseService.run(
-    `INSERT INTO python_execution_logs (run_id, timestamp, level, message) VALUES (?, ?, ?, ?)`
+    'INSERT INTO python_execution_logs (run_id, timestamp, level, message) VALUES (?, ?, ?, ?)'
   , [runId, timestamp, level, message]);
   pythonEvents.emit('run-log', { runId, entry: { runId, timestamp, level, message } });
 };
@@ -498,7 +498,7 @@ export const pythonManager = {
   async deleteEnvironment(envId: string): Promise<void> {
     const row = fetchEnvironmentRow(envId);
     if (!row) return;
-    databaseService.run(`DELETE FROM python_environments WHERE env_id = ?`, [envId]);
+    databaseService.run('DELETE FROM python_environments WHERE env_id = ?', [envId]);
     if (row.managed) {
       const envRoot = path.join(VENV_ROOT(), envId);
       if (existsSync(envRoot)) {
@@ -513,7 +513,7 @@ export const pythonManager = {
 
   async getNodeSettings(nodeId: string): Promise<NodePythonSettings> {
     const row = databaseService.get(
-      `SELECT node_id, env_id, auto_detect_env, last_run_id FROM node_python_settings WHERE node_id = ?`,
+      'SELECT node_id, env_id, auto_detect_env, last_run_id FROM node_python_settings WHERE node_id = ?',
       [nodeId]
     );
     if (!row) {
@@ -599,7 +599,7 @@ export const pythonManager = {
     const currentSettings = await this.getNodeSettings(nodeId);
 
     databaseService.run(
-      `INSERT INTO python_execution_runs (run_id, node_id, env_id, status, started_at) VALUES (?, ?, ?, ?, ?)`
+      'INSERT INTO python_execution_runs (run_id, node_id, env_id, status, started_at) VALUES (?, ?, ?, ?, ?)'
     , [runId, nodeId, environment.envId ?? null, 'running', startedAt]);
 
     databaseService.run(
@@ -759,7 +759,7 @@ export const pythonManager = {
 
   async getRunLogs(runId: string): Promise<{ runId: string; timestamp: string; level: 'INFO' | 'ERROR'; message: string; }[]> {
     const rows = databaseService.query(
-      `SELECT run_id, timestamp, level, message FROM python_execution_logs WHERE run_id = ? ORDER BY log_id ASC`,
+      'SELECT run_id, timestamp, level, message FROM python_execution_logs WHERE run_id = ? ORDER BY log_id ASC',
       [runId]
     );
     return rows.map((row) => ({

@@ -48,7 +48,7 @@ export const storageService = {
       }
     } else {
       // Fallback for web environments
-      console.warn("Saving logs is only supported in the desktop application.");
+      console.warn('Saving logs is only supported in the desktop application.');
       // In a web environment, we can offer a download link as a fallback.
       const blob = new Blob([content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);

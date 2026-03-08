@@ -266,7 +266,7 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
     console.log(`Migrating schema from version ${currentVersion} to 1...`);
     try {
       const transaction = connection.transaction(() => {
-        const columns = connection.prepare("PRAGMA table_info(documents)").all() as {name: string}[];
+        const columns = connection.prepare('PRAGMA table_info(documents)').all() as {name: string}[];
         const hasColumn = columns.some(col => col.name === 'default_view_mode');
         if (!hasColumn) {
           connection.exec('ALTER TABLE documents ADD COLUMN default_view_mode TEXT');
@@ -372,9 +372,9 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
           }
         };
 
-        ensureColumn('language_source', "ALTER TABLE documents ADD COLUMN language_source TEXT");
-        ensureColumn('doc_type_source', "ALTER TABLE documents ADD COLUMN doc_type_source TEXT");
-        ensureColumn('classification_updated_at', "ALTER TABLE documents ADD COLUMN classification_updated_at TEXT");
+        ensureColumn('language_source', 'ALTER TABLE documents ADD COLUMN language_source TEXT');
+        ensureColumn('doc_type_source', 'ALTER TABLE documents ADD COLUMN doc_type_source TEXT');
+        ensureColumn('classification_updated_at', 'ALTER TABLE documents ADD COLUMN classification_updated_at TEXT');
 
         connection.exec("UPDATE documents SET language_source = COALESCE(language_source, 'unknown')");
         connection.exec("UPDATE documents SET doc_type_source = COALESCE(doc_type_source, 'unknown')");
@@ -458,7 +458,7 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
   if (currentVersion < 7) {
     try {
       const transaction = connection.transaction(() => {
-        const columns = connection.prepare("PRAGMA table_info(nodes)").all() as { name: string }[];
+        const columns = connection.prepare('PRAGMA table_info(nodes)').all() as { name: string }[];
         const hasIsLocked = columns.some(column => column.name === 'is_locked');
         if (!hasIsLocked) {
           connection.exec('ALTER TABLE nodes ADD COLUMN is_locked INTEGER NOT NULL DEFAULT 0;');
@@ -584,7 +584,7 @@ export const databaseService = {
     try {
       return db.prepare(sql).all(...(params || []));
     } catch(e) {
-      console.error("DB Query Error:", sql, params, e);
+      console.error('DB Query Error:', sql, params, e);
       throw e;
     }
   },
@@ -593,7 +593,7 @@ export const databaseService = {
     try {
       return db.prepare(sql).get(...(params || []));
     } catch(e) {
-      console.error("DB Get Error:", sql, params, e);
+      console.error('DB Get Error:', sql, params, e);
       throw e;
     }
   },
@@ -619,7 +619,7 @@ export const databaseService = {
     try {
       return db.prepare(sql).run(...(params || []));
     } catch(e) {
-      console.error("DB Run Error:", sql, params, e);
+      console.error('DB Run Error:', sql, params, e);
       throw e;
     }
   },
@@ -1099,7 +1099,7 @@ export const databaseService = {
                         const maxSortOrderResult = db.prepare(`SELECT MAX(sort_order) as max_order FROM nodes WHERE parent_id ${currentParentId ? '= ?' : 'IS NULL'}`).get(currentParentId) as { max_order: number | null };
                         const sortOrder = (maxSortOrderResult?.max_order ?? -1) + 1;
 
-                        db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked) VALUES (?, ?, 'folder', ?, ?, ?, ?, 0)`).run(newFolderId, currentParentId, part, sortOrder, now, now);
+                        db.prepare('INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked) VALUES (?, ?, \'folder\', ?, ?, ?, ?, 0)').run(newFolderId, currentParentId, part, sortOrder, now, now);
                         console.log(`Created folder "${part}" with id ${newFolderId}`);
                         currentParentId = newFolderId;
                     }
@@ -1120,14 +1120,14 @@ export const databaseService = {
             const defaultViewMode: ViewMode | null = classification.defaultViewMode ?? (docType === 'pdf' || docType === 'image' ? 'preview' : null);
             const classificationTimestamp = new Date().toISOString();
 
-            db.prepare(`INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked) VALUES (?, ?, 'document', ?, ?, ?, ?, 0)`).run(newNodeId, currentParentId, file.name, sortOrder, now, now);
+            db.prepare('INSERT INTO nodes (node_id, parent_id, node_type, title, sort_order, created_at, updated_at, is_locked) VALUES (?, ?, \'document\', ?, ?, ?, ?, 0)').run(newNodeId, currentParentId, file.name, sortOrder, now, now);
 
-            const docResult = db.prepare(`INSERT INTO documents (node_id, doc_type, language_hint, language_source, doc_type_source, classification_updated_at, default_view_mode) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            const docResult = db.prepare('INSERT INTO documents (node_id, doc_type, language_hint, language_source, doc_type_source, classification_updated_at, default_view_mode) VALUES (?, ?, ?, ?, ?, ?, ?)')
               .run(newNodeId, docType, languageHint, languageSource, docTypeSource, classificationTimestamp, defaultViewMode);
             const documentId = Number(docResult.lastInsertRowid);
 
             const contentId = getContentId(file.content);
-            const versionResult = db.prepare(`INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)`).run(documentId, now, contentId);
+            const versionResult = db.prepare('INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)').run(documentId, now, contentId);
             const newVersionId = Number(versionResult.lastInsertRowid);
             db.prepare('UPDATE documents SET current_version_id = ? WHERE document_id = ?').run(newVersionId, documentId);
             console.log(`Created document "${file.name}" with node id ${newNodeId}`);
@@ -1177,7 +1177,7 @@ export const databaseService = {
     const pageCount = db.pragma('page_count', { simple: true }) as number;
     const schemaVersion = db.pragma('schema_version', { simple: true }) as number;
 
-    const tableNames = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`).all() as {name: string}[];
+    const tableNames = db.prepare('SELECT name FROM sqlite_master WHERE type=\'table\' AND name NOT LIKE \'sqlite_%\'').all() as {name: string}[];
 
     const tables = tableNames.map(({ name }) => {
         const rowCountResult = db.prepare(`SELECT COUNT(*) as count FROM "${name}"`).get() as { count: number };

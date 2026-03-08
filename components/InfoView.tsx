@@ -95,7 +95,7 @@ const InfoView: React.FC<InfoViewProps> = ({
 
       } catch (err) {
         if (err instanceof Error) {
-            console.error("Error fetching documents:", err);
+            console.error('Error fetching documents:', err);
             setError(`Could not load documentation. Error: ${err.message}`);
             const errorState = (Object.keys(docFiles) as DocTab[]).reduce((acc, tab) => {
                 acc[tab] = `# Error\nFailed to load content for ${tab}.`;

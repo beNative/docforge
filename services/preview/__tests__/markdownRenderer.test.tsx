@@ -405,7 +405,7 @@ describe('MarkdownRenderer', () => {
   });
 
   it('renders accessible GitHub-style tables with semantic sections', async () => {
-    const tableMarkdown = [`| Name | Value |`, `| ---- | -----:|`, `| Foo  |   100 |`].join('\n');
+    const tableMarkdown = ['| Name | Value |', '| ---- | -----:|', '| Foo  |   100 |'].join('\n');
     const { container } = await renderMarkdown(tableMarkdown);
 
     const wrapper = container.querySelector('.df-table-wrapper');

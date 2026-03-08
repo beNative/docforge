@@ -322,7 +322,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                                 Inline
                             </button>
                         </div>
-                        <IconButton onClick={handleCopy} tooltip={isCopied ? "Copied!" : "Copy Selected Version"} size="xs">
+                        <IconButton onClick={handleCopy} tooltip={isCopied ? 'Copied!' : 'Copy Selected Version'} size="xs">
                             {isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}
                         </IconButton>
                         <IconButton

@@ -18,7 +18,7 @@ const JsonEditor: React.FC<JsonEditorProps> = ({ value, onChange, readOnly = fal
   const highlightedContent = useMemo(() => {
     if (typeof Prism === 'undefined' || !Prism.languages.json) {
       // Fallback for when Prism isn't loaded yet
-      return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
     // Always use the JSON highlighter. It's robust enough to handle incomplete JSON
     // without crashing and prevents the language switching that caused cursor jumps.

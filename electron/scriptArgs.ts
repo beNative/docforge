@@ -37,7 +37,7 @@ const buildPowerShellTestArgs = (executable: string, scriptPath: string): string
   }
   const escapedPath = escapeSingleQuotes(scriptPath);
   const command =
-    "Set-StrictMode -Version Latest; try { " +
+    'Set-StrictMode -Version Latest; try { ' +
     `[ScriptBlock]::Create((Get-Content -LiteralPath '${escapedPath}' -Raw)) | Out-Null; ` +
     "Write-Output 'Syntax OK'; exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }";
   args.push('-Command', command);

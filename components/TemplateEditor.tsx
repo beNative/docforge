@@ -37,7 +37,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onSave, onDel
 
   const highlightedContent = useMemo(() => {
     if (typeof Prism === 'undefined' || !Prism.languages.markdown) {
-        return content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
     return Prism.highlight(content + '\n', Prism.languages.markdown, 'markdown');
   }, [content]);
@@ -81,7 +81,7 @@ const TemplateEditor: React.FC<TemplateEditorProps> = ({ template, onSave, onDel
       <div className="flex-1 flex flex-col bg-secondary overflow-y-auto">
         <div 
             className="editor-container relative w-full flex-1 focus-within:ring-2 focus-within:ring-primary"
-            data-placeholder={!content ? "Enter your template content with {{variables}} here..." : ""}
+            data-placeholder={!content ? 'Enter your template content with {{variables}} here...' : ''}
         >
             <textarea
             ref={editorRef}

@@ -64,7 +64,7 @@ const WindowControls: React.FC<{ platform: string, isMaximized: boolean }> = ({ 
   // Fix: Check for electronAPI existence.
   if (!window.electronAPI) return null;
 
-  const buttonClass = "not-draggable w-12 h-7 flex items-center justify-center transition-colors hover:bg-border-color/50 focus:outline-none";
+  const buttonClass = 'not-draggable w-12 h-7 flex items-center justify-center transition-colors hover:bg-border-color/50 focus:outline-none';
   const closeButtonClass = `${buttonClass} hover:bg-red-500 hover:text-white`;
 
   const controls = (

@@ -593,9 +593,9 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
         {/* Templates Panel */}
         <div className="flex-shrink-0 border-t border-border-color">
-          <header className={`flex items-center justify-between p-1 flex-shrink-0`}>
+          <header className={'flex items-center justify-between p-1 flex-shrink-0'}>
             <div className="flex items-center gap-1">
-              <IconButton onClick={handleToggleCollapse} tooltip={isTemplatesCollapsed ? "Show Templates" : "Hide Templates"} size="sm">
+              <IconButton onClick={handleToggleCollapse} tooltip={isTemplatesCollapsed ? 'Show Templates' : 'Hide Templates'} size="sm">
                 {isTemplatesCollapsed ? <ChevronRightIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
               </IconButton>
               <h2 className="text-xs font-semibold text-text-secondary px-2 tracking-wider uppercase">Templates</h2>

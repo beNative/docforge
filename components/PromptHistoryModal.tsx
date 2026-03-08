@@ -83,7 +83,7 @@ const DocumentHistoryModal: React.FC<DocumentHistoryModalProps> = ({ document, o
                     <p className="text-sm text-text-secondary">Compared to the previous version</p>
                 </div>
                  <div className="flex items-center gap-2">
-                    <IconButton onClick={() => handleCopy(selectedVersion.content)} tooltip={isCopied ? "Copied!" : "Copy Content"}>
+                    <IconButton onClick={() => handleCopy(selectedVersion.content)} tooltip={isCopied ? 'Copied!' : 'Copy Content'}>
                         {isCopied ? <CheckIcon className="w-5 h-5 text-success" /> : <CopyIcon className="w-5 h-5" />}
                     </IconButton>
                     <Button onClick={() => onRestore(selectedVersion.content)} disabled={selectedIndex === 0} variant="secondary">

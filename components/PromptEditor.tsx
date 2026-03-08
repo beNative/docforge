@@ -686,7 +686,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     if (!content.trim()) return;
     await navigator.clipboard.writeText(content);
     setIsCopied(true);
-    addLog('INFO', `Document content copied to clipboard.`);
+    addLog('INFO', 'Document content copied to clipboard.');
     setTimeout(() => setIsCopied(false), 2000);
   }, [content, addLog]);
 

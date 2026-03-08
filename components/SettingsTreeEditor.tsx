@@ -19,7 +19,7 @@ const ValueEditor: React.FC<{
   onSettingChange: (path: (string | number)[], value: any) => void;
 }> = ({ path, value, onSettingChange }) => {
   const type = getValueType(value);
-  const inputClass = "w-full p-1 text-sm rounded-md bg-background text-text-main border border-border-color focus:ring-1 focus:ring-primary focus:outline-none";
+  const inputClass = 'w-full p-1 text-sm rounded-md bg-background text-text-main border border-border-color focus:ring-1 focus:ring-primary focus:outline-none';
 
   switch (type) {
     case 'string':

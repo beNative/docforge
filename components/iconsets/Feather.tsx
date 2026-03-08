@@ -6,12 +6,12 @@ type IconProps = {
 
 const iconProps = (className: string | undefined) => ({
     className: className || 'w-6 h-6',
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
     strokeWidth: 2,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
 });
 
 export const GearIcon: React.FC<IconProps> = ({ className }) => (

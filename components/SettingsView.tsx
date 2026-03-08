@@ -606,7 +606,7 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
                     const models = await llmDiscoveryService.fetchModels(currentService);
                     setAvailableModels(models);
                 } catch (error) {
-                    console.error("Failed to fetch models for current service:", error);
+                    console.error('Failed to fetch models for current service:', error);
                     setAvailableModels([]);
                 } finally {
                     setIsFetchingModels(false);

@@ -51,7 +51,7 @@ const normalizeEnv = (extra: Record<string, string>): NodeJS.ProcessEnv => {
 const appendRunLog = (language: ScriptLanguage, runId: string, level: 'INFO' | 'ERROR', message: string) => {
   const timestamp = new Date().toISOString();
   databaseService.run(
-    `INSERT INTO script_execution_logs (run_id, timestamp, level, message) VALUES (?, ?, ?, ?)`
+    'INSERT INTO script_execution_logs (run_id, timestamp, level, message) VALUES (?, ?, ?, ?)'
   , [runId, timestamp, level, message]);
   scriptEvents.emit('run-log', { language, runId, entry: { runId, timestamp, level, message } });
 };
@@ -112,7 +112,7 @@ export const scriptRunner = {
 
   async getNodeSettings(nodeId: string, language: ScriptLanguage): Promise<NodeScriptSettings> {
     const row = databaseService.get(
-      `SELECT env_vars_json, working_directory, executable, last_run_id, updated_at FROM node_script_settings WHERE node_id = ? AND language = ?`,
+      'SELECT env_vars_json, working_directory, executable, last_run_id, updated_at FROM node_script_settings WHERE node_id = ? AND language = ?',
       [nodeId, language]
     );
     return loadNodeScriptSettings(row, nodeId, language);
@@ -322,7 +322,7 @@ export const scriptRunner = {
 
   async getRunLogs(runId: string): Promise<ScriptExecutionLogEntry[]> {
     const rows = databaseService.all(
-      `SELECT run_id, timestamp, level, message FROM script_execution_logs WHERE run_id = ? ORDER BY log_id ASC`,
+      'SELECT run_id, timestamp, level, message FROM script_execution_logs WHERE run_id = ? ORDER BY log_id ASC',
       [runId]
     );
     return rows.map((row: any) => ({

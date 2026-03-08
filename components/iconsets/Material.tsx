@@ -6,8 +6,8 @@ type IconProps = {
 
 const iconProps = (className: string | undefined) => ({
     className: className || 'w-6 h-6',
-    viewBox: "0 0 24 24",
-    fill: "currentColor",
+    viewBox: '0 0 24 24',
+    fill: 'currentColor',
 });
 
 export const GearIcon: React.FC<IconProps> = ({ className }) => (
