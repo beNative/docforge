@@ -31,7 +31,7 @@ import {
   TableNode,
   TableRowNode,
 } from '@lexical/table';
-import { $getRoot } from 'lexical';
+import { $getRoot, EditorState, LexicalEditor } from 'lexical';
 
 import { ImageNode } from './rich-text/ImageNode';
 import { ToolbarPlugin } from './rich-text/ToolbarPlugin';
@@ -166,9 +166,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
       });
     }, [html, editorRef]);
 
-    const handleEditorChange = (editorState: any) => {
+    const handleEditorChange = (editorState: EditorState) => {
       // Skip if this change was triggered by our own sync
-      if (isUpdatingFromServer.current) return;
+      if (isUpdatingFromServer.current || !editorRef) return;
 
       editorState.read(() => {
         // Generate HTML
@@ -249,7 +249,11 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 
 // Helper plugin to expose the editor instance
-const EditorRefPlugin = ({ setEditorRef }: { setEditorRef: (editor: any) => void }) => {
+interface EditorRefPluginProps {
+  setEditorRef: (editor: LexicalEditor) => void;
+}
+
+const EditorRefPlugin: React.FC<EditorRefPluginProps> = ({ setEditorRef }) => {
   const [editor] = useLexicalComposerContext();
   useEffect(() => {
     setEditorRef(editor);
@@ -258,7 +262,11 @@ const EditorRefPlugin = ({ setEditorRef }: { setEditorRef: (editor: any) => void
 };
 
 // Helper plugin to track focus
-const FocusPlugin = ({ onFocusChange }: { onFocusChange?: (hasFocus: boolean) => void }) => {
+interface FocusPluginProps {
+  onFocusChange?: (hasFocus: boolean) => void;
+}
+
+const FocusPlugin: React.FC<FocusPluginProps> = ({ onFocusChange }) => {
   const [editor] = useLexicalComposerContext();
   useEffect(() => {
     return editor.registerRootListener((rootElement: HTMLElement | null, prevRootElement: HTMLElement | null) => {
