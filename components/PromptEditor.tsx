@@ -137,6 +137,9 @@ const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint:
   if (normalizedHint === 'plantuml' || normalizedHint === 'puml' || normalizedHint === 'uml') {
     return 'preview';
   }
+  if (normalizedHint === 'html') {
+    return 'preview';
+  }
   return 'edit';
 };
 
