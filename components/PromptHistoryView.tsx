@@ -54,8 +54,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
     ];
   }, [document, versions]);
   
-  const [compareAIndex, setCompareAIndex] = useState(0);
-  const [compareBIndex, setCompareBIndex] = useState(versionsWithCurrent.length > 1 ? 1 : 0);
+  const [compareAIndex, setCompareAIndex] = useState(versionsWithCurrent.length > 1 ? 1 : 0);
+  const [compareBIndex, setCompareBIndex] = useState(0);
   const [diffRenderMode, setDiffRenderMode] = useState<'side-by-side' | 'inline'>('side-by-side');
 
   useEffect(() => {
@@ -103,12 +103,10 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   }, [handleGlobalMouseMove, handleGlobalMouseUp]);
 
 
-  const { newerVersion, olderVersion } = useMemo(() => {
-    const newerIdx = Math.min(compareAIndex, compareBIndex);
-    const olderIdx = Math.max(compareAIndex, compareBIndex);
+  const { versionA, versionB } = useMemo(() => {
     return { 
-      newerVersion: versionsWithCurrent[newerIdx],
-      olderVersion: versionsWithCurrent[olderIdx] || null
+      versionA: versionsWithCurrent[compareAIndex] || null,
+      versionB: versionsWithCurrent[compareBIndex] || null
     };
   }, [compareAIndex, compareBIndex, versionsWithCurrent]);
 
@@ -149,8 +147,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
   const handleDeleteSelected = async () => {
     await deleteVersions(Array.from(selectedVersionIds));
     setSelectedVersionIds(new Set());
-    setCompareAIndex(0);
-    setCompareBIndex(versionsWithCurrent.length > 1 ? 1 : 0);
+    setCompareAIndex(versionsWithCurrent.length > 1 ? 1 : 0);
+    setCompareBIndex(0);
     setIsConfirmingDelete(false);
   };
 
@@ -303,7 +301,7 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                 <div className="flex justify-between items-center flex-shrink-0 h-7 px-4 border-b border-border-color">
                     <div className="flex items-baseline gap-2 text-[11px] text-text-secondary flex-wrap">
                         <h3 className="text-xs font-semibold text-text-main m-0">Comparison</h3>
-                        <span>Comparing A (<span className="font-semibold text-text-main">{formatDate(newerVersion.createdAt)}</span>) with B (<span className="font-semibold text-text-main">{olderVersion ? formatDate(olderVersion.createdAt) : 'None'}</span>)</span>
+                        <span>Comparing A (<span className="font-semibold text-text-main">{versionA ? formatDate(versionA.createdAt) : 'None'}</span>) with B (<span className="font-semibold text-text-main">{versionB ? formatDate(versionB.createdAt) : 'None'}</span>)</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="flex items-center gap-0.5 bg-background border border-border-color rounded-md px-1 py-0.5">
@@ -342,8 +340,8 @@ const DocumentHistoryView: React.FC<DocumentHistoryViewProps> = ({ document, onB
                 
                 <div className="flex-1 min-h-0">
                     <MonacoDiffEditor
-                        oldText={olderVersion ? olderVersion.content : ''}
-                        newText={newerVersion ? newerVersion.content : ''}
+                        oldText={versionA ? versionA.content : ''}
+                        newText={versionB ? versionB.content : ''}
                         language={document.language_hint || 'plaintext'}
                         renderMode={diffRenderMode}
                         readOnly

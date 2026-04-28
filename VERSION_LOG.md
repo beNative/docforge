@@ -12,6 +12,10 @@ This release is a comprehensive refactoring effort that standardizes styling, ty
 -   **Code Structure**: Converted mixed component initializations into predictable arrow functions, stripped unneeded `I` prefixes from interfaces, and hoisted deferred imports to the top of their modules.
 -   **HTML Preview Default**: HTML content imported via "New from Clipboard" now automatically opens in Preview mode by default, saving an extra click when pasting web snippets.
 
+### 🐛 Fixes
+
+-   **Version History Diffing**: Fixed a bug where the A/B version comparison forced chronological ordering, causing the A/B labels to mismatch the diff view. The history pane now strictly respects your selection (A is always the left side, B is always the right).
+
 ## v0.8.3 - The Safety & Context Menu Update
 
 This release brings an intelligent context menu to the document editor and introduces deletion safeguards so your content stays secure during rapid editing.
