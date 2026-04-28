@@ -148,11 +148,11 @@ const FolderOverview: React.FC<FolderOverviewProps> = ({
             requestAnimationFrame(() => {
                 titleInputRef.current?.focus();
                 titleInputRef.current?.select();
-                const value = titleInputRef.current?.value ?? titleDraft;
+                const value = titleInputRef.current?.value ?? '';
                 titleSelectionRef.current = { start: 0, end: value.length };
             });
         }
-    }, [isEditingTitle, titleDraft]);
+    }, [isEditingTitle]);
 
     useEffect(() => {
         if (!isEditingTitle) {
