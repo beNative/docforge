@@ -156,6 +156,18 @@ The "Chat with Workspace" feature allows you to query your entire collection of 
 - **Source Attribution**: When the AI answers a question, it lists the specific documents it used as context. These sources are streamed immediately as soon as the search completes.
 - **Smart Privacy**: If the AI determines that none of the retrieved documents contain the answer to your question, the source list is automatically hidden to keep the chat interface clean.
 
+#### Agentic Chat & Workspace Orchestration
+
+Agent Mode transforms the chat assistant from a passive information retriever into an active workspace participant.
+
+- **Tool Calling**: When Agent Mode is enabled, the AI can proactively use tools to interact with your workspace. This includes:
+    - **Document Management**: Creating new documents or folders, renaming existing ones, and moving files between directories.
+    - **Content Refactoring**: Reading document contents and performing bulk edits or restructurings based on your instructions.
+    - **Script Execution**: Running Python, Shell, or PowerShell scripts to process data, generate files, or automate complex workflows.
+- **Action Approval Gate**: For security, all sensitive actions (like deleting documents or running scripts) can be configured to require your manual approval. A glassmorphic modal will appear showing exactly what the AI intends to do, including any script code or move parameters, allowing you to approve or deny the request before it executes.
+- **Thoughtful Execution**: The agent can perform multi-step tasks—for example, it can list all documents in a folder, search for specific patterns, and then create a summary document based on its findings—all in a single conversation turn.
+- **Deep Integration**: The agent has direct access to the same document hooks as the GUI, ensuring that its actions are consistent with the application's state and history.
+
 #### Python Execution Panel
 
 DocForge includes an embedded Python runner that integrates with the editor when you're working on Python content.

@@ -530,6 +530,8 @@ export interface Settings {
   ragEmbeddingModelName: string;
   ragContextLimit: number;
   ragSimilarityThreshold: number;
+  chatEnableAgentMode: boolean;
+  chatAgentRequiresApproval: boolean;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
@@ -622,11 +624,24 @@ export interface RagIndexResponse {
   error?: string;
 }
 
+export interface AgentToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export interface AgentToolResult {
+  toolCallId: string;
+  content: string;
+}
+
 export interface RagChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   sources?: RagSearchResult[];
+  toolCalls?: AgentToolCall[];
+  toolResult?: AgentToolResult;
   timestamp: string;
   isStreaming?: boolean;
 }

@@ -1,3 +1,25 @@
+## v0.8.8 - The Agentic Workspace Update
+
+### ✨ Features
+
+-   **Agentic Chat & Workspace Orchestrator**:
+    *   Transformed the chat panel from a passive RAG assistant into an active **Workspace Agent**.
+    *   **Autonomous Operations**: The AI can now create, rename, move, and edit documents and folders directly through natural language commands.
+    *   **Script Orchestration**: The agent can write and execute **Python**, **Shell**, and **PowerShell** scripts to automate complex data processing or system tasks.
+    *   **Multi-Step Reasoning**: Capable of performing complex workflows (e.g., "Find all documents mentioning X, then move them to a new folder called Y") in a single conversation.
+-   **Security & Action Approval**:
+    *   Implemented a high-fidelity **Action Approval Modal** with a glassmorphic design.
+    *   Configurable safety gates: Users can choose to require manual approval for all agent actions, especially destructive operations or script executions.
+-   **UI/UX Polish**:
+    *   **Tool Execution Visibility**: Added specialized status indicators and animated icons to show when the AI is "thinking" or "using a tool."
+    *   **Syntax-Highlighted Tool Results**: Results from scripts and workspace operations are now rendered in a dedicated terminal-style card within the chat history.
+    *   **Enhanced Settings**: Added a new "AI Chat" settings section to toggle Agent Mode and Approval requirements.
+
+### 🐛 Fixes
+
+-   **Chat Stability**: Fixed several syntax and state synchronization errors in the chat panel that could cause crashes during long-running tool executions.
+-   **Tag Balance**: Resolved various build-breaking JSX tag mismatches in the Chat UI.
+
 ## v0.8.7 - The RAG & Clipboard Image Update
 
 ### ✨ Features

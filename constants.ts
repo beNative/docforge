@@ -7,6 +7,7 @@ export const LOCAL_STORAGE_KEYS = {
   EXPANDED_FOLDERS: 'docforge_expanded_folders',
   SIDEBAR_TEMPLATES_COLLAPSED: 'docforge_sidebar_templates_collapsed',
   SIDEBAR_TEMPLATES_PANEL_HEIGHT: 'docforge_sidebar_templates_panel_height',
+  CHAT_PANEL_WIDTH: 'docforge_chat_panel_width',
   ACTIVE_DOCUMENT_ID: 'docforge_active_document_id',
 
   // Legacy keys used for migration check:
@@ -86,6 +87,8 @@ export const DEFAULT_SETTINGS: Settings = {
   ragEmbeddingModelName: 'nomic-embed-text',
   ragContextLimit: 5,
   ragSimilarityThreshold: 1.4,
+  chatEnableAgentMode: true,
+  chatAgentRequiresApproval: true,
 };
 
 export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [

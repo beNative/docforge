@@ -14,7 +14,7 @@ import type {
 } from '../types';
 import { llmDiscoveryService } from '../services/llmDiscoveryService';
 import { DEFAULT_SETTINGS } from '../constants';
-import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon, TerminalIcon, RefreshIcon, PlusIcon } from './Icons';
+import { SparklesIcon, FileIcon, SunIcon, GearIcon, DatabaseIcon, SaveIcon, CheckIcon, KeyboardIcon, TerminalIcon, RefreshIcon, PlusIcon, InfoIcon } from './Icons';
 import * as HeroIcons from './iconsets/Heroicons';
 import * as LucideIcons from './iconsets/Lucide';
 import * as FeatherIcons from './iconsets/Feather';
@@ -43,10 +43,11 @@ interface SettingsViewProps {
   commands: Command[];
 }
 
-type SettingsCategory = 'provider' | 'rag' | 'appearance' | 'shortcuts' | 'python' | 'shell' | 'powershell' | 'general' | 'database' | 'advanced';
+type SettingsCategory = 'provider' | 'chat' | 'rag' | 'appearance' | 'shortcuts' | 'python' | 'shell' | 'powershell' | 'general' | 'database' | 'advanced';
 
 const categories: { id: SettingsCategory; label: string; icon: React.FC<{ className?: string }> }[] = [
   { id: 'provider', label: 'LLM Provider', icon: SparklesIcon },
+  { id: 'chat', label: 'AI Chat', icon: SparklesIcon },
   { id: 'rag', label: 'RAG / Embeddings', icon: DatabaseIcon },
   { id: 'appearance', label: 'Appearance', icon: SunIcon },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: KeyboardIcon },
@@ -465,6 +466,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               onDetectServices,
               isDetecting,
             }}
+          />
+        );
+      case 'chat':
+        return (
+          <ChatSettingsSection
+            settings={currentSettings}
+            setCurrentSettings={setCurrentSettings}
           />
         );
       case 'rag':
@@ -2584,3 +2592,51 @@ const AdvancedSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurr
 
 
 export default SettingsView;
+const ChatSettingsSection: React.FC<SectionProps> = ({ settings, setCurrentSettings }) => {
+  return (
+    <section className="pt-2 pb-6">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-sm">
+           <SparklesIcon className="w-6 h-6" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-text-main">AI Chat Capabilities</h2>
+          <p className="text-sm text-text-tertiary">Configure how the AI interacts with your workspace</p>
+        </div>
+      </div>
+      
+      <div className="bg-secondary/30 border border-border-color/60 rounded-2xl overflow-hidden shadow-sm">
+        <div className="p-6 space-y-8">
+          <SettingRow 
+            label="Enable Agent Mode (Tool Calling)" 
+            description="Allows the AI to perform actions like reading/editing documents, creating files, and running scripts. Requires a model that supports tool-calling (Ollama 0.1.34+ or OpenAI)."
+          >
+            <ToggleSwitch
+              enabled={settings.chatEnableAgentMode}
+              onChange={(enabled) => setCurrentSettings(prev => ({ ...prev, chatEnableAgentMode: enabled }))}
+            />
+          </SettingRow>
+
+          <div className="h-px bg-border-color/40 mx-[-24px]" />
+
+          <SettingRow 
+            label="Require Approval for Actions" 
+            description="When enabled, the AI will ask for your permission before performing any destructive actions (like deleting or moving files) or running scripts."
+          >
+            <ToggleSwitch
+              enabled={settings.chatAgentRequiresApproval}
+              onChange={(enabled) => setCurrentSettings(prev => ({ ...prev, chatAgentRequiresApproval: enabled }))}
+            />
+          </SettingRow>
+        </div>
+        
+        <div className="px-6 py-4 bg-primary/5 border-t border-border-color/40 flex gap-3 items-start">
+           <InfoIcon className="w-4 h-4 text-primary mt-0.5" />
+           <p className="text-[11px] text-text-tertiary leading-relaxed">
+             Agent mode gives the AI significant power over your files. We recommend keeping <strong>Require Approval</strong> enabled for maximum security, especially when using models you don't fully trust.
+           </p>
+        </div>
+      </div>
+    </section>
+  );
+};

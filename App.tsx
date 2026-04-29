@@ -51,7 +51,7 @@ const MIN_LOGGER_HEIGHT = 100;
 
 const DEFAULT_CHAT_PANEL_WIDTH = 360;
 const MIN_CHAT_PANEL_WIDTH = 280;
-const MAX_CHAT_PANEL_WIDTH = 600;
+const MAX_CHAT_PANEL_WIDTH = 1200;
 
 const PREVIEW_INITIAL_SCALE = 1;
 const PREVIEW_MIN_SCALE = 0.25;
@@ -181,7 +181,7 @@ interface UpdateToastState {
 
 export const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, setItemLock, isLoading: areDocumentsLoading } = useDocuments();
+    const { nodes, items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, setItemLock, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
 
@@ -1475,6 +1475,9 @@ export const MainApp: React.FC = () => {
         });
         storageService.load(LOCAL_STORAGE_KEYS.LOGGER_PANEL_HEIGHT, DEFAULT_LOGGER_HEIGHT).then(height => {
             if (typeof height === 'number') setLoggerPanelHeight(height);
+        });
+        storageService.load(LOCAL_STORAGE_KEYS.CHAT_PANEL_WIDTH, DEFAULT_CHAT_PANEL_WIDTH).then(width => {
+            if (typeof width === 'number') setChatPanelWidth(width);
         });
 
         let isCancelled = false;
@@ -2902,11 +2905,15 @@ export const MainApp: React.FC = () => {
     
     const handleGlobalMouseMove = useCallback((e: MouseEvent) => {
         const zoomFactor = settings.uiScale / 100;
+        const mainContentMinWidth = 300;
+        const splitterWidth = 1.5;
 
         if (isSidebarResizing.current) {
-            const mainContentMinWidth = 300;
             const newWidth = e.clientX / zoomFactor;
-            const calculatedMaxWidth = (window.innerWidth / zoomFactor) - mainContentMinWidth;
+            // editorWidth = total - sidebarWidth - splitter - (chatVisible ? splitter + chatWidth : 0)
+            // sidebarWidth = total - editorWidth - splitter - (chatVisible ? splitter + chatWidth : 0)
+            const chatWidthPart = isChatPanelVisible ? chatPanelWidth + splitterWidth : 0;
+            const calculatedMaxWidth = (window.innerWidth / zoomFactor) - mainContentMinWidth - splitterWidth - chatWidthPart;
             
             const clampedWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(newWidth, calculatedMaxWidth));
             setSidebarWidth(clampedWidth);
@@ -2921,10 +2928,13 @@ export const MainApp: React.FC = () => {
         }
         if (isChatResizing.current) {
             const newWidth = (window.innerWidth - e.clientX) / zoomFactor;
-            const clampedWidth = Math.max(MIN_CHAT_PANEL_WIDTH, Math.min(newWidth, MAX_CHAT_PANEL_WIDTH));
+            // chatWidth = total - sidebarWidth - splitter - editorWidth - splitter
+            const calculatedMaxWidth = (window.innerWidth / zoomFactor) - mainContentMinWidth - sidebarWidth - (splitterWidth * 2);
+            
+            const clampedWidth = Math.max(MIN_CHAT_PANEL_WIDTH, Math.min(newWidth, Math.min(MAX_CHAT_PANEL_WIDTH, calculatedMaxWidth)));
             setChatPanelWidth(clampedWidth);
         }
-    }, [settings.uiScale]);
+    }, [settings.uiScale, isChatPanelVisible, chatPanelWidth, sidebarWidth]);
 
     const handleGlobalMouseUp = useCallback(() => {
         if (isSidebarResizing.current) {
@@ -2937,13 +2947,14 @@ export const MainApp: React.FC = () => {
         }
         if (isChatResizing.current) {
             isChatResizing.current = false;
+            storageService.save(LOCAL_STORAGE_KEYS.CHAT_PANEL_WIDTH, chatPanelWidth);
         }
         
         if (document.body.style.cursor !== 'default') {
             document.body.style.cursor = 'default';
             document.body.style.userSelect = 'auto';
         }
-    }, [sidebarWidth, loggerPanelHeight]);
+    }, [sidebarWidth, loggerPanelHeight, chatPanelWidth]);
     
     useEffect(() => {
         window.addEventListener('mousemove', handleGlobalMouseMove);
@@ -3246,6 +3257,7 @@ export const MainApp: React.FC = () => {
                                         onResizeStart={(e: React.MouseEvent) => {
                                             e.preventDefault();
                                             isChatResizing.current = true;
+                                            document.body.style.cursor = 'col-resize';
                                             document.body.style.userSelect = 'none';
                                         }}
                                         settings={settings}
@@ -3257,6 +3269,18 @@ export const MainApp: React.FC = () => {
                                         activeDocument={activeNode ? { title: activeNode.title, content: activeNode.content ?? '' } : undefined}
                                         selectedText={selectedText}
                                         addLog={addLog}
+                                        nodes={nodes}
+                                        addNode={handleNewDocument}
+                                        updateNode={handleRenameNode}
+                                        updateDocumentContent={handleCommitVersion}
+                                        deleteNodes={handleDeleteNode}
+                                        moveNodes={moveItems}
+                                        runPython={async (code, nodeId) => {
+                                            return ""; 
+                                        }}
+                                        runScript={async (lang, code, nodeId) => {
+                                            return "";
+                                        }}
                                     />
                                 </section>
                             </>

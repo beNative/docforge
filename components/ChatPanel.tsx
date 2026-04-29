@@ -5,6 +5,9 @@ import rehypeRaw from 'rehype-raw';
 import type { Settings, RagChatMessage, RagSearchResult } from '../types';
 import { ragService } from '../services/ragService';
 import { v4 as uuidv4 } from 'uuid';
+import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
+import { pythonService } from '../services/pythonService';
+import { scriptService } from '../services/scriptService';
 
 interface ChatPanelProps {
   isVisible: boolean;
@@ -17,6 +20,14 @@ interface ChatPanelProps {
   addLog: (level: 'INFO' | 'ERROR' | 'WARNING' | 'DEBUG', message: string) => void;
   activeDocument?: { title: string; content: string };
   selectedText?: string;
+  nodes: Node[];
+  addNode: (node: any) => Promise<Node>;
+  updateNode: (id: string, updates: any) => Promise<void>;
+  updateDocumentContent: (id: string, content: string) => Promise<void>;
+  deleteNodes: (ids: string[]) => Promise<void>;
+  moveNodes: (ids: string[], targetId: string | null, position: any) => Promise<void>;
+  runPython: (code: string, nodeId?: string) => Promise<string>;
+  runScript: (language: any, code: string, nodeId?: string) => Promise<string>;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -30,6 +41,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   addLog,
   activeDocument,
   selectedText,
+  nodes,
+  addNode,
+  updateNode,
+  updateDocumentContent,
+  deleteNodes,
+  moveNodes,
+  runPython,
+  runScript,
 }) => {
   const [messages, setMessages] = useState<RagChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -40,6 +59,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const { environments, interpreters, refreshEnvironments } = usePythonEnvironments();
+  const [pendingAction, setPendingAction] = useState<{ 
+    toolCall: any, 
+    implementation: (...args: any[]) => Promise<any>,
+    resolve: (val: string) => void, 
+    reject: (err: any) => void 
+  } | null>(null);
 
   // Load index status on mount and when panel becomes visible
   useEffect(() => {
@@ -140,15 +166,108 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
     setMessages(prev => [...prev, userMessage, assistantMessage]);
 
-    // Create abort controller for cancellation
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
     let sources: RagSearchResult[] = [];
-
     try {
-      sources = await ragService.askQuestion(
+
+      const toolContext: any = {
+        nodes,
+        addNode,
+        updateNode,
+        updateDocumentContent,
+        deleteNodes,
+        moveNodes,
+        runPython: async (code: string, nodeId?: string) => {
+          addLog('INFO', 'Agent: Running Python script...');
+          try {
+            let interpreterList = interpreters;
+            if (!interpreterList.length) {
+              interpreterList = await pythonService.detectInterpreters();
+            }
+            const env = await pythonService.ensureNodeEnvironment(nodeId || 'agent-temp', settings.pythonDefaults, interpreterList);
+            const run = await pythonService.runScript({
+              nodeId: nodeId || 'agent-temp',
+              code,
+              environment: env,
+              consoleTheme: settings.pythonConsoleTheme,
+              consoleBehavior: 'hidden'
+            });
+            
+            return new Promise((resolve) => {
+               const cleanup = pythonService.onRunStatus(({ runId, status }) => {
+                 if (runId === run.runId && (status === 'succeeded' || status === 'failed' || status === 'canceled')) {
+                   cleanup();
+                   pythonService.getRunLogs(runId).then(logs => {
+                     const output = logs.map(l => l.message).join('\n');
+                     resolve(output || `Script finished with status: ${status}`);
+                   });
+                 }
+               });
+               setTimeout(() => { cleanup(); resolve('Error: Script execution timed out.'); }, 30000);
+            });
+          } catch (err: any) {
+            return `Error: ${err.message || err}`;
+          }
+        },
+        runScript: async (language: any, code: string, nodeId?: string) => {
+          addLog('INFO', `Agent: Running ${language} script...`);
+          try {
+            const defaults = language === 'shell' ? settings.shellDefaults : settings.powershellDefaults;
+            const run = await scriptService.runScript({
+              nodeId: nodeId || 'agent-temp',
+              language,
+              code,
+              environmentVariables: defaults.environmentVariables,
+              workingDirectory: defaults.workingDirectory,
+              executable: defaults.executable,
+              overrides: {},
+              mode: 'run'
+            });
+
+            return new Promise((resolve) => {
+              const cleanup = scriptService.onRunStatus(({ runId, status }) => {
+                if (runId === run.runId && (status === 'succeeded' || status === 'failed' || status === 'canceled')) {
+                  cleanup();
+                  scriptService.getRunLogs(runId).then(logs => {
+                    const output = logs.map(l => l.message).join('\n');
+                    resolve(output || `Script finished with status: ${status}`);
+                  });
+                }
+              });
+              setTimeout(() => { cleanup(); resolve('Error: Script execution timed out.'); }, 30000);
+            });
+          } catch (err: any) {
+            return `Error: ${err.message || err}`;
+          }
+        },
+        searchRag: async (query: string) => {
+          const result = await window.electronAPI!.ragSearch(query, settings.ragEmbeddingProviderUrl, settings.ragEmbeddingModelName, 5);
+          return result.success ? result.results : [];
+        }
+      };
+
+      const wrappedContext: any = { ...toolContext };
+      if (settings.chatAgentRequiresApproval) {
+        ['deleteNodes', 'moveNodes', 'runPython', 'runScript'].forEach(method => {
+           const original = (toolContext as any)[method];
+           wrappedContext[method] = async (...args: any[]) => {
+             return new Promise((resolve, reject) => {
+               setPendingAction({
+                 toolCall: { name: method, arguments: JSON.stringify(args) },
+                 implementation: original,
+                 resolve,
+                 reject
+               });
+             });
+           };
+        });
+      }
+
+      await ragService.askQuestion(
         question,
+        [...messages, userMessage],
         settings,
         {
           onToken: (token) => {
@@ -170,23 +289,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               )
             );
           },
+          onMessageUpdate: (updatedHistory) => {
+             setMessages(prev => {
+                const userIndex = prev.findIndex(m => m.id === userMessage.id);
+                if (userIndex === -1) return prev;
+                return [...prev.slice(0, userIndex + 1), ...updatedHistory.slice(updatedHistory.findIndex(m => m.role === 'assistant'))];
+             });
+          },
           onDone: (fullText) => {
-            // If the AI says it couldn't find information, don't show sources
-            const noInfoPhrases = [
-              "couldn't find information",
-              "i don't have information",
-              "no information found",
-              "could not find",
-              "don't have any information"
-            ];
-            const lowerText = fullText.toLowerCase();
-            const noInfoFound = noInfoPhrases.some(phrase => lowerText.includes(phrase));
-            const finalSources = noInfoFound ? [] : sources;
-            
             setMessages(prev =>
               prev.map(msg =>
                 msg.id === assistantMessageId
-                  ? { ...msg, content: fullText, isStreaming: false, sources: finalSources }
+                  ? { ...msg, content: fullText, isStreaming: false }
                   : msg
               )
             );
@@ -204,17 +318,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             addLog('ERROR', `RAG chat error: ${error}`);
           },
         },
+        wrappedContext,
         { activeDocument, selectedText },
         abortController.signal
-      );
-
-      // Update sources on the assistant message after search completes
-      setMessages(prev =>
-        prev.map(msg =>
-          msg.id === assistantMessageId && sources.length > 0
-            ? { ...msg, sources }
-            : msg
-        )
       );
     } catch (error) {
       setIsLoading(false);
@@ -338,74 +444,104 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             </div>
           )}
 
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[90%] rounded-lg px-3 py-2 text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-primary text-white rounded-br-sm'
-                    : 'bg-secondary border border-border-color rounded-bl-sm'
-                }`}
-              >
-                <div className="prose prose-sm prose-invert max-w-none break-words leading-relaxed overflow-x-auto">
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]} 
-                    rehypePlugins={[rehypeRaw]}
-                    components={{
-                      table: ({node, ...props}) => <table className="border-collapse border border-border-color my-2 w-full text-xs" {...props} />,
-                      th: ({node, ...props}) => <th className="border border-border-color px-2 py-1 bg-secondary/50 font-semibold" {...props} />,
-                      td: ({node, ...props}) => <td className="border border-border-color px-2 py-1" {...props} />,
-                      p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                      ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
-                      ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
-                      code: ({node, ...props}) => {
-                        const isInline = !node?.position?.start.line || node.position.start.line === node.position.end.line;
-                        if (isInline) {
-                          return <code className="bg-border-color/30 px-1 rounded font-mono text-[11px]" {...props} />;
-                        }
-                        return (
-                          <div className="relative group">
-                            <pre className="bg-background/50 p-2 rounded-md border border-border-color/30 my-2 overflow-x-auto font-mono text-[11px]" {...props} />
-                            <button 
-                              onClick={() => onApplyToEditor(String(props.children))}
-                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-primary/80 hover:bg-primary text-white text-[9px] px-1.5 py-0.5 rounded transition-all shadow-sm"
-                              title="Apply to current document"
-                            >
-                              Apply
-                            </button>
-                          </div>
-                        );
-                      },
-                    }}
-                  >
-                    {msg.content}
-                  </ReactMarkdown>
+          {messages.map((msg) => {
+            if (msg.role === 'tool') {
+              return (
+                <div key={msg.id} className="flex justify-start">
+                   <div className="bg-secondary/40 border border-border-color/30 rounded-lg px-3 py-2 text-[11px] font-mono text-text-tertiary max-w-[90%] overflow-hidden">
+                     <div className="flex items-center gap-2 mb-1 opacity-70">
+                       <TerminalIcon className="w-3.5 h-3.5" />
+                       <span className="uppercase tracking-widest text-[9px]">Tool Result</span>
+                       <span className="ml-auto opacity-50">ID: {msg.toolResult?.toolCallId?.substring(0, 8)}</span>
+                     </div>
+                     <pre className="whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                       {msg.content}
+                     </pre>
+                   </div>
                 </div>
-                {msg.isStreaming && (
-                  <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse rounded-sm" />
-                )}
+              );
+            }
 
-                {/* Source citations */}
-                {msg.sources && msg.sources.length > 0 && !msg.isStreaming && (
-                  <div className="mt-2 pt-2 border-t border-border-color/30">
-                    <div className="text-[10px] text-text-tertiary mb-1 font-medium uppercase tracking-wider">Sources</div>
-                    <div className="flex flex-wrap gap-1">
-                      {/* Deduplicate sources by nodeId */}
-                      {[...new Map(msg.sources.map(s => [s.nodeId, s])).values()].map((source) => (
-                        <button
-                          key={source.nodeId}
-                          onClick={() => onNavigateToDocument(source.nodeId)}
-                          className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
-                          title={`Open "${source.nodeTitle}"`}
-                        >
-                          📄 {source.nodeTitle}
-                        </button>
-                      ))}
+            return (
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-[90%] rounded-lg px-3 py-2 text-sm ${
+                    msg.role === 'user'
+                      ? 'bg-primary text-white rounded-br-sm'
+                      : 'bg-secondary border border-border-color rounded-bl-sm shadow-sm'
+                  }`}
+                >
+                  {msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0 && (
+                    <div className="mb-3 space-y-2">
+                       {msg.toolCalls.map((tc: any) => (
+                         <div key={tc.id} className="flex items-center gap-2 px-2 py-1.5 bg-background/50 border border-border-color/50 rounded-md text-[11px] text-text-secondary animate-in fade-in slide-in-from-left-1 duration-300">
+                           <SparklesIcon className="w-3.5 h-3.5 text-primary animate-pulse" />
+                           <span className="font-medium">Using tool:</span>
+                           <code className="text-primary bg-primary/5 px-1 rounded">{tc.name}</code>
+                         </div>
+                       ))}
                     </div>
+                  )}
+
+                  <div className="prose prose-sm prose-invert max-w-none break-words leading-relaxed overflow-x-auto">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]} 
+                      rehypePlugins={[rehypeRaw]}
+                      components={{
+                        table: ({node, ...props}) => <table className="border-collapse border border-border-color my-2 w-full text-xs" {...props} />,
+                        th: ({node, ...props}) => <th className="border border-border-color px-2 py-1 bg-secondary/50 font-semibold" {...props} />,
+                        td: ({node, ...props}) => <td className="border border-border-color px-2 py-1" {...props} />,
+                        p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                        ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
+                        ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
+                        code: ({node, ...props}) => {
+                          const isInline = !node?.position?.start.line || node.position.start.line === node.position.end.line;
+                          if (isInline) {
+                            return <code className="bg-border-color/30 px-1 rounded font-mono text-[11px]" {...props} />;
+                          }
+                          return (
+                            <div className="relative group">
+                              <pre className="bg-background/50 p-2 rounded-md border border-border-color/30 my-2 overflow-x-auto font-mono text-[11px]" {...props} />
+                              <button 
+                                onClick={() => onApplyToEditor(String(props.children))}
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-primary/80 hover:bg-primary text-white text-[9px] px-1.5 py-0.5 rounded transition-all shadow-sm"
+                                title="Apply to current document"
+                              >
+                                Apply
+                              </button>
+                            </div>
+                          );
+                        },
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
                   </div>
-                )}
-                {/* Actions */}
-                {msg.role === 'assistant' && !msg.isStreaming && (
+                  {msg.isStreaming && (
+                    <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse rounded-sm" />
+                  )}
+
+                  {/* Source citations */}
+                  {msg.sources && msg.sources.length > 0 && !msg.isStreaming && (
+                    <div className="mt-2 pt-2 border-t border-border-color/30">
+                      <div className="text-[10px] text-text-tertiary mb-1 font-medium uppercase tracking-wider">Sources</div>
+                      <div className="flex flex-wrap gap-1">
+                        {/* Deduplicate sources by nodeId */}
+                        {[...new Map(msg.sources.map(s => [s.nodeId, s])).values()].map((source) => (
+                          <button
+                            key={source.nodeId}
+                            onClick={() => onNavigateToDocument(source.nodeId)}
+                            className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                            title={`Open "${source.nodeTitle}"`}
+                          >
+                            📄 {source.nodeTitle}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Actions */}
+                  {msg.role === 'assistant' && !msg.isStreaming && (
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => onCreateDocument(msg.content)}
@@ -426,7 +562,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 )}
               </div>
             </div>
-          ))}
+          );
+        })}
           <div ref={messagesEndRef} />
         </div>
 
@@ -472,6 +609,74 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
           </div>
         </div>
+
+        {/* Action Approval Modal */}
+        {pendingAction && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-secondary/90 border border-white/10 rounded-2xl shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="px-6 py-5 border-b border-border-color/50 bg-gradient-to-r from-primary/10 to-transparent">
+                <h3 className="text-lg font-bold text-text-main flex items-center gap-3">
+                  <div className="p-2 bg-primary/20 rounded-lg text-primary">
+                    <SparklesIcon className="w-5 h-5" />
+                  </div>
+                  Agent Action Request
+                </h3>
+              </div>
+              <div className="px-6 py-6 space-y-5">
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  The AI Agent is requesting permission to perform an automated action on your workspace.
+                </p>
+                <div className="relative group">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-blue-600 rounded-xl blur opacity-20 group-hover:opacity-30 transition duration-1000"></div>
+                  <div className="relative bg-background border border-border-color/60 rounded-xl overflow-hidden shadow-inner font-mono text-[11px]">
+                    <div className="flex items-center justify-between px-3 py-2 bg-secondary/50 border-b border-border-color/50">
+                      <span className="text-primary font-bold uppercase tracking-widest text-[9px]">Method</span>
+                      <code className="text-text-main">{pendingAction.toolCall.name}</code>
+                    </div>
+                    <div className="p-4 max-h-52 overflow-auto custom-scrollbar bg-background/50">
+                      <pre className="text-text-tertiary whitespace-pre-wrap">
+                        {JSON.stringify(JSON.parse(pendingAction.toolCall.arguments), null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg">
+                  <WarningIcon className="w-4 h-4 text-amber-500 mt-0.5" />
+                  <p className="text-[11px] text-amber-600/80 italic">
+                    Always review the parameters carefully. Actions like document deletion or script execution cannot be easily undone.
+                  </p>
+                </div>
+              </div>
+              <div className="px-6 py-4 bg-secondary/30 border-t border-border-color/50 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    pendingAction.reject('User denied the action.');
+                    setPendingAction(null);
+                  }}
+                  className="px-5 py-2 text-sm font-medium text-text-secondary hover:text-text-main hover:bg-white/5 rounded-xl transition-all"
+                >
+                  Deny
+                </button>
+                <button
+                  onClick={async () => {
+                    const action = pendingAction;
+                    setPendingAction(null);
+                    try {
+                      const args = JSON.parse(action.toolCall.arguments);
+                      const result = await action.implementation(...args);
+                      action.resolve(result || 'Success');
+                    } catch (err) {
+                      action.reject(err);
+                    }
+                  }}
+                  className="px-6 py-2 text-sm font-bold bg-primary text-white rounded-xl hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-primary/20"
+                >
+                  Approve
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
