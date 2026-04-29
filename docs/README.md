@@ -35,6 +35,9 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Comprehensive Action Logging**: Every user action is logged, and the logger panel now supports range selections, modifier-aware drag selection, and configurable copy-to-clipboard exports with or without timestamps and levels.
 - **Offline First:** All your data is stored locally on your machine.
 - **Auto-Update:** Control automatic startup checks, opt into pre-release builds, and trigger manual "Check for Updates" scans that report success or errors inline.
+- **RAG-Powered "Chat with Workspace":** Semantic search across your entire workspace. Adjust the similarity threshold to tune the relevance of retrieved context and analyze up to 500 documents at once.
+- **Smart Source Attribution:** Chat responses include streamed sources that automatically hide if no relevant information is found, keeping your context clean and focused.
+- **Enhanced Image Clipboard & Drag-Drop:** Create image documents directly from the clipboard, or update existing image nodes by simply pasting (**Ctrl+V**) or dropping an image file onto the editor.
 - **Resizable Layout:** The sidebar, templates panel, and logger panel are all fully resizable to customize your workspace.
 
 ## Getting Started
