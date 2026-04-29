@@ -31,6 +31,7 @@ declare global {
         targetParentId: string | null
       ) => Promise<{ success: boolean; error?: string; createdNodes?: ImportedNodeSummary[] }>;
       readClipboardText: () => Promise<{ success: boolean; text?: string; mimeType?: string | null; error?: string; errorCode?: string }>;
+      readClipboardImage: () => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
       legacyFileExists: (filename: string) => Promise<boolean>;
       readLegacyFile: (filename: string) => Promise<{ success: boolean, data?: string, error?: string }>;
       getAppVersion: () => Promise<string>;
@@ -527,6 +528,8 @@ export interface Settings {
   powershellDefaults: ScriptExecutionDefaults;
   ragEmbeddingProviderUrl: string;
   ragEmbeddingModelName: string;
+  ragContextLimit: number;
+  ragSimilarityThreshold: number;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';

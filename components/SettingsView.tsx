@@ -786,6 +786,40 @@ const RagSettingsSection: React.FC<SectionProps & { discoveredServices: Discover
             className="w-60 p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
           />
         </SettingRow>
+        <SettingRow 
+          label="Maximum Context Sources" 
+          description="Number of document chunks to retrieve as context for each question. More sources provide more information but use more LLM tokens."
+        >
+          <div className="flex items-center gap-4 w-60">
+            <input
+              type="range"
+              min="1"
+              max="500"
+              step="1"
+              value={settings.ragContextLimit}
+              onChange={(e) => setCurrentSettings(prev => ({ ...prev, ragContextLimit: parseInt(e.target.value, 10) }))}
+              className="flex-1 h-1.5 bg-border-color rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+            <span className="text-xs font-mono text-primary w-4">{settings.ragContextLimit}</span>
+          </div>
+        </SettingRow>
+        <SettingRow 
+          label="Similarity Threshold" 
+          description="Controls retrieval strictness. Lower values are stricter (fewer, higher quality results). Higher values are more inclusive (more, potentially noisier results). Default is 1.4."
+        >
+          <div className="flex items-center gap-4 w-60">
+            <input
+              type="range"
+              min="0.1"
+              max="2.0"
+              step="0.1"
+              value={settings.ragSimilarityThreshold}
+              onChange={(e) => setCurrentSettings(prev => ({ ...prev, ragSimilarityThreshold: parseFloat(e.target.value) }))}
+              className="flex-1 h-1.5 bg-border-color rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+            <span className="text-xs font-mono text-primary w-8">{settings.ragSimilarityThreshold.toFixed(1)}</span>
+          </div>
+        </SettingRow>
       </div>
     </section>
   );

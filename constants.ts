@@ -84,6 +84,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   ragEmbeddingProviderUrl: 'http://localhost:11434',
   ragEmbeddingModelName: 'nomic-embed-text',
+  ragContextLimit: 5,
+  ragSimilarityThreshold: 1.4,
 };
 
 export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [

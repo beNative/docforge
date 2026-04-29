@@ -53,6 +53,7 @@ interface StreamCallbacks {
   onToken: (token: string) => void;
   onDone: (fullText: string) => void;
   onError: (error: string) => void;
+  onSources?: (sources: RagSearchResult[]) => void;
 }
 
 const streamLLMResponse = async (
@@ -209,14 +210,14 @@ export const ragService = {
       return [];
     }
 
-    const { ragEmbeddingProviderUrl, ragEmbeddingModelName } = settings;
+    const { ragEmbeddingProviderUrl, ragEmbeddingModelName, ragContextLimit, ragSimilarityThreshold } = settings;
     if (!ragEmbeddingProviderUrl) {
       callbacks.onError('Embedding provider URL is not configured.');
       return [];
     }
 
     // 1. Search for relevant chunks
-    const searchResult = await window.electronAPI!.ragSearch(question, ragEmbeddingProviderUrl, ragEmbeddingModelName, 5);
+    const searchResult = await window.electronAPI!.ragSearch(question, ragEmbeddingProviderUrl, ragEmbeddingModelName, ragContextLimit || 5);
     if (!searchResult.success) {
       callbacks.onError(searchResult.error || 'Search failed.');
       return [];
@@ -224,13 +225,10 @@ export const ragService = {
 
     // Filter by distance threshold (heuristic for irrelevance)
     // For most models, distance > 1.2-1.4 starts being noise.
-    const filteredResults = searchResult.results.filter(r => r.distance < 1.4);
-
-    if (filteredResults.length === 0) {
-      // If nothing is even remotely relevant, we skip the LLM or tell it there's no context
-      // But it's better to let the LLM say it couldn't find it.
-      // We'll pass an empty context or a "no matches" note.
-    }
+    const filteredResults = searchResult.results.filter(r => r.distance < (ragSimilarityThreshold ?? 1.4));
+    
+    // Notify about sources as soon as we have them
+    callbacks.onSources?.(filteredResults);
 
     // 2. Build the RAG prompt
     const prompt = buildRagPrompt(question, filteredResults, extraContext);

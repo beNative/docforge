@@ -98,9 +98,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         addLog('INFO', `RAG: Current index status: ${statusResult.indexedDocuments}/${statusResult.totalDocuments} documents indexed.`);
       } else {
         // Find if there was an error in the status call
-        const rawResult = await window.electronAPI!.ragGetIndexStatus();
-        if (!rawResult.success && rawResult.error) {
-           addLog('ERROR', `RAG: Status check failed - ${rawResult.error}`);
+        if (window.electronAPI) {
+          const rawResult = await window.electronAPI.ragGetIndexStatus();
+          if (!rawResult.success && rawResult.error) {
+             addLog('ERROR', `RAG: Status check failed - ${rawResult.error}`);
+          }
         }
       }
     }
@@ -158,9 +160,27 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               )
             );
           },
+          onSources: (retrievedSources) => {
+            sources = retrievedSources;
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === assistantMessageId
+                  ? { ...msg, sources: retrievedSources }
+                  : msg
+              )
+            );
+          },
           onDone: (fullText) => {
             // If the AI says it couldn't find information, don't show sources
-            const noInfoFound = fullText.toLowerCase().includes("couldn't find information");
+            const noInfoPhrases = [
+              "couldn't find information",
+              "i don't have information",
+              "no information found",
+              "could not find",
+              "don't have any information"
+            ];
+            const lowerText = fullText.toLowerCase();
+            const noInfoFound = noInfoPhrases.some(phrase => lowerText.includes(phrase));
             const finalSources = noInfoFound ? [] : sources;
             
             setMessages(prev =>
@@ -383,6 +403,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       ))}
                     </div>
                   </div>
+                )}
                 {/* Actions */}
                 {msg.role === 'assistant' && !msg.isStreaming && (
                   <div className="mt-3 flex gap-2">

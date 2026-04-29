@@ -549,6 +549,18 @@ ipcMain.handle('clipboard:read-text', async () => {
     }
 });
 
+ipcMain.handle('clipboard:read-image', async () => {
+    try {
+        const image = clipboard.readImage();
+        if (image.isEmpty()) {
+            return { success: false, error: 'Clipboard does not contain an image.' };
+        }
+        return { success: true, dataUrl: image.toDataURL() };
+    } catch (error) {
+        return { success: false, error: String(error) };
+    }
+});
+
 ipcMain.handle('db:backup', async () => {
     if (!mainWindow) return { success: false, error: 'Main window not available' };
     const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {

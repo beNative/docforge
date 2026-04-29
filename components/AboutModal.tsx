@@ -30,7 +30,7 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
           </div>
           <div className="space-y-1">
             <p className="text-lg font-semibold">DocForge</p>
-            <p className="text-sm text-text-secondary">© 2025 Tim Sinaeve. All rights reserved.</p>
+            <p className="text-sm text-text-secondary">© 2026 Tim Sinaeve. All rights reserved.</p>
           </div>
         </div>
         <div className="flex flex-col items-center space-y-2">

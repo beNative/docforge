@@ -51,6 +51,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // --- Clipboard ---
   readClipboardText: () => ipcRenderer.invoke('clipboard:read-text'),
+  readClipboardImage: () => ipcRenderer.invoke('clipboard:read-image'),
 
   // --- Migration-related FS access ---
   legacyFileExists: (filename: string) => ipcRenderer.invoke('fs:legacy-file-exists', filename),

@@ -503,36 +503,10 @@ export const MainApp: React.FC = () => {
         });
     }, [items, bodySearchMatches, searchTerm]);
 
-    const handleApplyToEditor = useCallback((content: string) => {
-        if (!tabState.activeId) return;
-        setPendingInsertText(content);
-        setDocumentCommandTriggers(prev => ({
-            ...prev,
-            insertText: prev.insertText + 1
-        }));
-        addLog('INFO', 'Applying content from chat to editor.');
-    }, [tabState.activeId, addLog]);
-
-    const handleCreateDocumentFromChat = useCallback(async (content: string) => {
-        try {
-            // Generate a simple title from the first line or first 20 chars
-            const firstLine = content.split('\n')[0].substring(0, 30).replace(/[#*`]/g, '').trim();
-            const title = firstLine || 'New Document from Chat';
-            
-            const newNode = await addDocument(null, title);
-            if (newNode) {
-                await commitVersion(newNode.id, content);
-                handleNavigateToNode(newNode.id);
-                addLog('INFO', `Created new document "${title}" from chat.`);
-            }
-        } catch (error) {
-            addLog('ERROR', 'Failed to create document from chat.');
-        }
-    }, [addDocument, commitVersion, handleNavigateToNode, addLog]);
 
     const activeNode = useMemo(() => {
-        return itemsWithSearchMetadata.find(p => p.id === tabState.activeId) || null;
-    }, [itemsWithSearchMetadata, tabState.activeId]);
+        return items.find(p => p.id === tabState.activeId) || null;
+    }, [items, tabState.activeId]);
 
     useEffect(() => {
         setFolderSearchTerm('');
@@ -1828,6 +1802,42 @@ export const MainApp: React.FC = () => {
         setLastClickedId(nodeId);
     }, [items, ensureNodeVisible, activateDocumentTab, setActiveItem]);
 
+    const handleApplyToEditor = useCallback((content: string) => {
+        if (!tabState.activeId) return;
+        setPendingInsertText(content);
+        setDocumentCommandTriggers(prev => ({
+            ...prev,
+            insertText: prev.insertText + 1
+        }));
+        addLog('INFO', 'Applying content from chat to editor.');
+    }, [tabState.activeId, addLog, setPendingInsertText, setDocumentCommandTriggers]);
+
+    const handleCreateDocumentFromChat = useCallback(async (content: string) => {
+        try {
+            // Generate a simple title from the first line or first 20 chars
+            const firstLine = content.split('\n')[0].substring(0, 30).replace(/[#*`]/g, '').trim();
+            const title = firstLine || 'New Document from Chat';
+            
+            const newNode = await addDocument({ parentId: null, title });
+            if (newNode) {
+                await commitVersion(newNode.id, content);
+                
+                // Navigate to the new document directly since it might not be in 'items' yet
+                ensureNodeVisible(newNode);
+                activateDocumentTab(newNode.id);
+                setSelectedIds(new Set([newNode.id]));
+                setLastClickedId(newNode.id);
+                setActiveTemplateId(null);
+                setDocumentView('editor');
+                setView('editor');
+                
+                addLog('INFO', `Created new document "${title}" from chat.`);
+            }
+        } catch (error) {
+            addLog('ERROR', 'Failed to create document from chat.');
+        }
+    }, [addDocument, commitVersion, ensureNodeVisible, activateDocumentTab, addLog]);
+
     const handleNewDocument = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document.');
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
@@ -1847,14 +1857,29 @@ export const MainApp: React.FC = () => {
         const effectiveParentId = parentId !== undefined ? parentId : getParentIdForNewItem();
         try {
             const { text, warnings: clipboardWarnings, mimeType } = await readClipboardText();
-            if (!text || text.trim().length === 0) {
-                const message = 'Clipboard is empty or does not contain text content to import.';
-                addLog('WARNING', message);
-                setClipboardNotice({ title: 'Clipboard Empty', message });
-                return;
+            
+            let contentToImport = text;
+            let importTitle: string | undefined = undefined;
+
+            if (!contentToImport || contentToImport.trim().length === 0) {
+                // Try reading image if text is empty
+                const imgResult = await window.electronAPI!.readClipboardImage();
+                if (imgResult.success && imgResult.dataUrl) {
+                    contentToImport = imgResult.dataUrl;
+                    importTitle = `Pasted Image ${new Date().toLocaleTimeString()}`;
+                } else {
+                    const message = 'Clipboard is empty or does not contain text or image content to import.';
+                    addLog('WARNING', message);
+                    setClipboardNotice({ title: 'Clipboard Empty', message });
+                    return;
+                }
             }
 
-            const result = await createDocumentFromClipboard({ parentId: effectiveParentId, content: text });
+            const result = await createDocumentFromClipboard({ 
+                parentId: effectiveParentId, 
+                content: contentToImport,
+                title: importTitle
+            });
             const { summary } = result;
             const newDoc = result.item;
 
@@ -2162,7 +2187,11 @@ export const MainApp: React.FC = () => {
 
             if (normalizedLanguage === 'html') {
                 nextDocType = 'rich_text';
-            } else if (activeNode.doc_type === 'rich_text') {
+            } else if (normalizedLanguage === 'image' || normalizedLanguage.startsWith('image/')) {
+                nextDocType = 'image';
+            } else if (normalizedLanguage === 'pdf' || normalizedLanguage === 'application/pdf') {
+                nextDocType = 'pdf';
+            } else if (activeNode.doc_type === 'rich_text' || activeNode.doc_type === 'image' || activeNode.doc_type === 'pdf') {
                 nextDocType = 'prompt';
             }
 

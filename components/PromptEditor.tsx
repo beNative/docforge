@@ -163,9 +163,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   previewZoomStep,
   previewInitialScale,
   previewResetSignal,
-  onPreviewMetadataChange,
+  onPreviewVisibilityChange,
   onPreviewZoomAvailabilityChange,
-  onPreviewMetadataChange: onPreviewMetadataChangeProp,
+  onPreviewMetadataChange,
   onZoomTargetChange,
   onSelectionChange,
   pendingInsertText,
@@ -614,6 +614,59 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       setIsGeneratingEmoji(false);
     }
   }, [isLocked, addLog, title, settings]);
+
+  // Support pasting/dropping images into image nodes
+  useEffect(() => {
+    const handlePaste = async (e: ClipboardEvent) => {
+      if (documentNode.doc_type !== 'image' || isLocked) return;
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const dataUrl = event.target?.result as string;
+              if (dataUrl) {
+                onCommitVersion(documentNode.id, dataUrl);
+                addLog('INFO', `Image pasted into document "${title}".`);
+              }
+            };
+            reader.readAsDataURL(file);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [documentNode.id, documentNode.doc_type, isLocked, onCommitVersion, addLog, title]);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    if (documentNode.doc_type !== 'image' || isLocked) return;
+    
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(f => f.type.startsWith('image/'));
+    
+    if (imageFile) {
+      e.preventDefault();
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        if (dataUrl) {
+          onCommitVersion(documentNode.id, dataUrl);
+          addLog('INFO', `Image dropped into document "${title}".`);
+        }
+      };
+      reader.readAsDataURL(imageFile);
+    }
+  }, [documentNode.id, documentNode.doc_type, isLocked, onCommitVersion, addLog, title]);
 
   const updateTitleSelection = useCallback(() => {
     const input = titleInputRef.current;
@@ -1139,7 +1192,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           <IconButton onClick={handleDeleteDocument} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
         </div>
       </div>
-      <div className="flex-1 flex flex-col bg-secondary overflow-hidden">{renderContent()}</div>
+      <div 
+        className="flex-1 flex flex-col bg-secondary overflow-hidden"
+        onDrop={handleDrop}
+        onDragOver={(e) => {
+          if (documentNode.doc_type === 'image' && !isLocked) {
+            e.preventDefault();
+          }
+        }}
+      >
+        {renderContent()}
+      </div>
       {isPythonDocument && (
         <div
           className="flex-shrink-0 flex flex-col bg-secondary"

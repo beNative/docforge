@@ -136,8 +136,25 @@ The document editor is powered by Monaco, the same editor core used in VS Code, 
 Import PDFs by dragging `.pdf` files from your operating system into the sidebar, using the "Import" options in context menus, or converting clipboard data through **New from Clipboard** when it contains PDF bytes or data URLs. Opening a PDF switches the editor to **Preview Only** mode automatically so you can focus on the embedded viewer. The preview displays the document in an inline reader with Chromium's native toolbar (page navigation, zoom, and print controls) and honors keyboard shortcuts exposed by the viewer. DocForge synchronizes the viewer with the global preview zoom so the zoom buttons, scroll wheel shortcuts, and reset commands behave consistently across file types. Because PDFs are stored as binary data, editing is disabled by default; switching to the editor view will show the raw payload, and changing it can corrupt the file.
 
 #### Image Documents
+ 
+ PNG, JPEG, GIF, BMP, WEBP, and SVG assets are detected when you import them from disk, drop them into the sidebar, or pipe image data through **New from Clipboard**. Image documents also open directly in **Preview Only** mode. The preview uses DocForge's zoom and pan surface so you can scroll, drag to reposition, double-click to zoom, or press the on-screen controls to reset the view. Image metadata—such as pixel dimensions and MIME type—appears in the status bar while the preview is active.
+ 
+ **Interacting with Images**:
+ - **Pasting**: When an image document is open and unlocked, you can paste an image directly from your clipboard (**Ctrl+V**) to replace its content.
+ - **Drag-and-Drop**: Drop any image file from your computer onto the open image editor to update the document.
+ - **Manual Creation**: Create a new document, change its language to **Image**, and then paste or drop your content.
+ 
+ Editing the underlying binary/text data is optional but discouraged unless you are intentionally replacing the encoded image contents.
 
-PNG, JPEG, GIF, BMP, WEBP, and SVG assets are detected when you import them from disk, drop them into the sidebar, or pipe image data through **New from Clipboard**. Image documents also open directly in **Preview Only** mode. The preview uses DocForge's zoom and pan surface so you can scroll, drag to reposition, double-click to zoom, or press the on-screen controls to reset the view. Image metadata—such as pixel dimensions and MIME type—appears in the status bar while the preview is active, and the renderer clamps the image inside the workspace with padding so large assets remain manageable. Editing the underlying binary/text data is optional but discouraged unless you are intentionally replacing the encoded image contents.
+#### RAG (Chat with Workspace)
+
+The "Chat with Workspace" feature allows you to query your entire collection of documents using a local AI model.
+
+- **Indexing**: Before you can chat, DocForge needs to index your workspace. This process creates a semantic representation of your documents, allowing the AI to find relevant context even if the exact keywords don't match.
+- **Configurable Retrieval**: In Settings, you can adjust the **RAG Similarity Threshold**. A lower value (e.g., 0.8) makes the search more restrictive, returning only highly relevant matches, while a higher value (e.g., 1.5) returns more context.
+- **Context Limit**: You can configure the chat to analyze up to **500 documents** at once for deep workspace insights.
+- **Source Attribution**: When the AI answers a question, it lists the specific documents it used as context. These sources are streamed immediately as soon as the search completes.
+- **Smart Privacy**: If the AI determines that none of the retrieved documents contain the answer to your question, the source list is automatically hidden to keep the chat interface clean.
 
 #### Python Execution Panel
 

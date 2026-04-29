@@ -378,7 +378,13 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
             return new Promise(resolve => {
                 if (monacoInstanceRef.current) {
                     const editor = monacoInstanceRef.current;
+                    resolve({
+                        scrollTop: editor.getScrollTop(),
+                        scrollHeight: editor.getScrollHeight(),
+                        clientHeight: editor.getLayoutInfo().height,
                     });
+                } else {
+                    resolve({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
                 }
             });
         },
