@@ -562,6 +562,7 @@ export interface DocumentCommandTriggers {
   manualSave: number;
   copyContent: number;
   refineWithAI: number;
+  insertText: number;
 }
 
 export interface DiscoveredLLMService {

@@ -31,7 +31,7 @@ import {
   TableNode,
   TableRowNode,
 } from '@lexical/table';
-import { $getRoot, EditorState, LexicalEditor } from 'lexical';
+import { $getRoot, EditorState, LexicalEditor, $getSelection, $isRangeSelection, $insertNodes, $createTextNode } from 'lexical';
 
 import { ImageNode } from './rich-text/ImageNode';
 import { ToolbarPlugin } from './rich-text/ToolbarPlugin';
@@ -45,6 +45,8 @@ export interface RichTextEditorHandle {
   format: () => void;
   setScrollTop: (scrollTop: number) => void;
   getScrollInfo: () => Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number }>;
+  getSelection: () => string | undefined;
+  insertText: (text: string) => void;
 }
 
 interface RichTextEditorProps {
@@ -53,6 +55,7 @@ interface RichTextEditorProps {
   readOnly?: boolean;
   onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number }) => void;
   onFocusChange?: (hasFocus: boolean) => void;
+  onSelectionChange?: (selectedText: string | undefined) => void;
 }
 
 const RICH_TEXT_THEME = {
@@ -90,7 +93,7 @@ const RICH_TEXT_THEME = {
 const Placeholder: React.FC = () => null;
 
 const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
-  ({ html, onChange, readOnly = false, onScroll, onFocusChange }, ref) => {
+  ({ html, onChange, readOnly = false, onScroll, onFocusChange, onSelectionChange }, ref) => {
     const [editorRef, setEditorRef] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [toolbarActions, setToolbarActions] = useState<ToolbarButtonConfig[]>([]);
@@ -112,10 +115,29 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
       },
       getScrollInfo: async () => {
         if (scrollContainerRef.current) {
-          const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
           return { scrollTop, scrollHeight, clientHeight };
         }
         return { scrollTop: 0, scrollHeight: 0, clientHeight: 0 };
+      },
+      getSelection: () => {
+        if (!editorRef) return undefined;
+        let selectedText: string | undefined = undefined;
+        editorRef.read(() => {
+          const selection = $getSelection();
+          if ($isRangeSelection(selection)) {
+            selectedText = selection.getTextContent();
+          }
+        });
+        return selectedText;
+      },
+      insertText: (text: string) => {
+        if (!editorRef) return;
+        editorRef.update(() => {
+          const selection = $getSelection();
+          if ($isRangeSelection(selection)) {
+            $insertNodes([$createTextNode(text)]);
+          }
+        });
       },
     }));
 
@@ -165,6 +187,21 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
         isUpdatingFromServer.current = false;
       });
     }, [html, editorRef]);
+
+    useEffect(() => {
+      if (!editorRef) return;
+      return editorRef.registerUpdateListener(({ editorState }) => {
+        editorState.read(() => {
+          const selection = $getSelection();
+          if ($isRangeSelection(selection)) {
+            const text = selection.getTextContent();
+            onSelectionChange?.(text || undefined);
+          } else {
+            onSelectionChange?.(undefined);
+          }
+        });
+      });
+    }, [editorRef, onSelectionChange]);
 
     const handleEditorChange = (editorState: EditorState) => {
       // Skip if this change was triggered by our own sync

@@ -6,7 +6,11 @@ const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
 // RAG Prompt Assembly
 // =================================================================
 
-const buildRagPrompt = (question: string, contextChunks: RagSearchResult[]): string => {
+const buildRagPrompt = (
+  question: string, 
+  contextChunks: RagSearchResult[],
+  extraContext?: { activeDocument?: { title: string, content: string }, selectedText?: string }
+): string => {
   const contextBlocks = contextChunks
     .map(
       (chunk, idx) =>
@@ -14,14 +18,27 @@ const buildRagPrompt = (question: string, contextChunks: RagSearchResult[]): str
     )
     .join('\n---\n');
 
-  return `You are a helpful assistant answering questions about the user's document workspace in DocForge.
-Use ONLY the following context retrieved from the user's documents to answer. If the answer is not in the context, say "I couldn't find information about that in your workspace."
-Always cite which document(s) your answer comes from by referencing the source title.
+  let activeDocBlock = '';
+  if (extraContext?.activeDocument) {
+    activeDocBlock = `[CURRENT ACTIVE DOCUMENT: "${extraContext.activeDocument.title}"]\n${extraContext.activeDocument.content}\n---\n`;
+  }
 
-Context:
+  let selectionBlock = '';
+  if (extraContext?.selectedText) {
+    selectionBlock = `[USER SELECTED TEXT]:\n${extraContext.selectedText}\n---\n`;
+  }
+
+  return `You are a helpful assistant answering questions about the user's document workspace in DocForge.
+Use the following context to answer. 
+Priority context:
+${selectionBlock}${activeDocBlock}
+Retrieved background context:
 ---
 ${contextBlocks}
 ---
+
+If the answer is not in the provided context, say "I couldn't find information about that in your workspace."
+Always cite which document(s) your answer comes from by referencing the source title.
 
 User Question: ${question}
 
@@ -184,6 +201,7 @@ export const ragService = {
     question: string,
     settings: Settings,
     callbacks: StreamCallbacks,
+    extraContext?: { activeDocument?: { title: string, content: string }, selectedText?: string },
     signal?: AbortSignal
   ): Promise<RagSearchResult[]> {
     if (!isElectron) {
@@ -215,7 +233,7 @@ export const ragService = {
     }
 
     // 2. Build the RAG prompt
-    const prompt = buildRagPrompt(question, filteredResults);
+    const prompt = buildRagPrompt(question, filteredResults, extraContext);
 
     // 3. Stream the LLM response
     await streamLLMResponse(prompt, settings, callbacks, signal);

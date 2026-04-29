@@ -195,6 +195,8 @@ export const MainApp: React.FC = () => {
     const [hasLoadedExpandedFolders, setHasLoadedExpandedFolders] = useState(false);
     const [pendingRevealId, setPendingRevealId] = useState<string | null>(null);
     const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
+    const [selectedText, setSelectedText] = useState<string | undefined>(undefined);
+    const [pendingInsertText, setPendingInsertText] = useState<string | null>(null);
 
     const [view, setView] = useState<'editor' | 'info' | 'settings'>('editor');
     const [documentView, setDocumentView] = useState<'editor' | 'history'>('editor');
@@ -241,6 +243,7 @@ export const MainApp: React.FC = () => {
         manualSave: 0,
         copyContent: 0,
         refineWithAI: 0,
+        insertText: 0,
     });
     const [bodySearchMatches, setBodySearchMatches] = useState<Map<string, string>>(new Map());
     const [folderSearchTerm, setFolderSearchTerm] = useState('');
@@ -499,6 +502,33 @@ export const MainApp: React.FC = () => {
             return snippet ? { ...item, searchSnippet: snippet } : item;
         });
     }, [items, bodySearchMatches, searchTerm]);
+
+    const handleApplyToEditor = useCallback((content: string) => {
+        if (!tabState.activeId) return;
+        setPendingInsertText(content);
+        setDocumentCommandTriggers(prev => ({
+            ...prev,
+            insertText: prev.insertText + 1
+        }));
+        addLog('INFO', 'Applying content from chat to editor.');
+    }, [tabState.activeId, addLog]);
+
+    const handleCreateDocumentFromChat = useCallback(async (content: string) => {
+        try {
+            // Generate a simple title from the first line or first 20 chars
+            const firstLine = content.split('\n')[0].substring(0, 30).replace(/[#*`]/g, '').trim();
+            const title = firstLine || 'New Document from Chat';
+            
+            const newNode = await addDocument(null, title);
+            if (newNode) {
+                await commitVersion(newNode.id, content);
+                handleNavigateToNode(newNode.id);
+                addLog('INFO', `Created new document "${title}" from chat.`);
+            }
+        } catch (error) {
+            addLog('ERROR', 'Failed to create document from chat.');
+        }
+    }, [addDocument, commitVersion, handleNavigateToNode, addLog]);
 
     const activeNode = useMemo(() => {
         return itemsWithSearchMetadata.find(p => p.id === tabState.activeId) || null;
@@ -3014,6 +3044,8 @@ export const MainApp: React.FC = () => {
                         onLanguageChange={handleLanguageChange}
                         onViewModeChange={handleViewModeChange}
                         onToggleLock={(locked) => handleSetNodeLockState(activeNode.id, locked)}
+                        onSelectionChange={setSelectedText}
+                        pendingInsertText={pendingInsertText}
                         formatTrigger={formatTrigger}
                         previewScale={previewScale}
                         editorScale={editorScale}
@@ -3191,6 +3223,10 @@ export const MainApp: React.FC = () => {
                                         onNavigateToDocument={(nodeId: string) => {
                                             handleNavigateToNode(nodeId);
                                         }}
+                                        onApplyToEditor={handleApplyToEditor}
+                                        onCreateDocument={handleCreateDocumentFromChat}
+                                        activeDocument={activeNode ? { title: activeNode.title, content: activeNode.content ?? '' } : undefined}
+                                        selectedText={selectedText}
                                         addLog={addLog}
                                     />
                                 </section>

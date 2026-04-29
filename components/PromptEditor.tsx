@@ -39,8 +39,9 @@ interface DocumentEditorProps {
   previewResetSignal: number;
   onPreviewVisibilityChange?: (isVisible: boolean) => void;
   onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
-  onPreviewMetadataChange?: (metadata: PreviewMetadata | null) => void;
   onZoomTargetChange?: (target: 'preview' | 'editor') => void;
+  onSelectionChange?: (selectedText: string | undefined) => void;
+  pendingInsertText?: string | null;
   commandTriggers: DocumentCommandTriggers;
 }
 
@@ -162,10 +163,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   previewZoomStep,
   previewInitialScale,
   previewResetSignal,
-  onPreviewVisibilityChange,
-  onPreviewZoomAvailabilityChange,
   onPreviewMetadataChange,
+  onPreviewZoomAvailabilityChange,
+  onPreviewMetadataChange: onPreviewMetadataChangeProp,
   onZoomTargetChange,
+  onSelectionChange,
+  pendingInsertText,
   commandTriggers,
 }) => {
   const isRichTextDocument = documentNode.doc_type === 'rich_text';
@@ -767,6 +770,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   useCommandTrigger(commandTriggers.manualSave, handleManualSave);
   useCommandTrigger(commandTriggers.copyContent, () => { void handleCopy(); });
   useCommandTrigger(commandTriggers.refineWithAI, () => { void handleRefine(); });
+  useCommandTrigger(commandTriggers.insertText, () => {
+    if (pendingInsertText) {
+      if (editorEngine === 'lexical') {
+        richTextEditorRef.current?.insertText(pendingInsertText);
+      } else {
+        editorRef.current?.insertText(pendingInsertText);
+      }
+    }
+  });
 
   const scaledEditorFontSize = useMemo(() => {
     const baseSize = settings.editorFontSize;
@@ -891,6 +903,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             onScroll={handleEditorScroll}
             readOnly={isLocked}
             onFocusChange={handleEditorFocusChange}
+            onSelectionChange={onSelectionChange}
           />
         )
         : (
@@ -907,6 +920,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
             readOnly={isLocked}
             onFocusChange={handleEditorFocusChange}
+            onSelectionChange={onSelectionChange}
           />
         );
     const preview = (

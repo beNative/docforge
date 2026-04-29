@@ -23,12 +23,15 @@ interface CodeEditorProps {
   activeLineHighlightColorDark?: string;
   readOnly?: boolean;
   onFocusChange?: (hasFocus: boolean) => void;
+  onSelectionChange?: (selectedText: string | undefined) => void;
 }
 
 export interface CodeEditorHandle {
   format: () => void;
   setScrollTop: (scrollTop: number) => void;
   getScrollInfo: () => Promise<{ scrollTop: number; scrollHeight: number; clientHeight: number; }>;
+  getSelection: () => string | undefined;
+  insertText: (text: string) => void;
 }
 
 const LETTER_REGEX = /^[A-Z]$/;
@@ -127,7 +130,20 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
     return keybinding | primaryKey;
 };
 
-const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, language, onChange, onScroll, customShortcuts = {}, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark, readOnly = false, onFocusChange }, ref) => {
+const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ 
+    content, 
+    language, 
+    onChange, 
+    onScroll, 
+    customShortcuts = {}, 
+    fontFamily, 
+    fontSize, 
+    activeLineHighlightColorLight, 
+    activeLineHighlightColorDark, 
+    readOnly = false, 
+    onFocusChange,
+    onSelectionChange
+}, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -362,15 +378,34 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
             return new Promise(resolve => {
                 if (monacoInstanceRef.current) {
                     const editor = monacoInstanceRef.current;
-                    resolve({
-                        scrollTop: editor.getScrollTop(),
-                        scrollHeight: editor.getScrollHeight(),
-                        clientHeight: editor.getLayoutInfo().height,
                     });
-                } else {
-                    resolve({ scrollTop: 0, scrollHeight: 0, clientHeight: 0 });
                 }
             });
+        },
+        getSelection() {
+            if (monacoInstanceRef.current) {
+                const editor = monacoInstanceRef.current;
+                const selection = editor.getSelection();
+                if (selection && !selection.isEmpty()) {
+                    return editor.getModel().getValueInRange(selection);
+                }
+            }
+            return undefined;
+        },
+        insertText(text: string) {
+            const editor = monacoInstanceRef.current;
+            if (editor) {
+                const selection = editor.getSelection();
+                const range = selection || new monacoApiRef.current.Range(1, 1, 1, 1);
+                editor.executeEdits('chat-apply', [
+                    {
+                        range,
+                        text,
+                        forceMoveMarkers: true,
+                    },
+                ]);
+                editor.focus();
+            }
         }
     }));
 
@@ -526,6 +561,15 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ content, lan
                         });
                     }
                     updateEmojiPickerAnchor();
+                });
+
+                editorInstance.onDidChangeCursorSelection(() => {
+                    const selection = editorInstance.getSelection();
+                    if (selection && !selection.isEmpty()) {
+                        onSelectionChange?.(editorInstance.getModel().getValueInRange(selection));
+                    } else {
+                        onSelectionChange?.(undefined);
+                    }
                 });
 
                 editorInstance.onContextMenu((event: any) => {

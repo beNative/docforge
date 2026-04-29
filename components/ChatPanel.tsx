@@ -12,7 +12,11 @@ interface ChatPanelProps {
   onResizeStart: (e: React.MouseEvent) => void;
   settings: Settings;
   onNavigateToDocument: (nodeId: string) => void;
+  onApplyToEditor: (content: string) => void;
+  onCreateDocument: (content: string, title?: string) => void;
   addLog: (level: 'INFO' | 'ERROR' | 'WARNING' | 'DEBUG', message: string) => void;
+  activeDocument?: { title: string; content: string };
+  selectedText?: string;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -21,7 +25,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   onResizeStart,
   settings,
   onNavigateToDocument,
+  onApplyToEditor,
+  onCreateDocument,
   addLog,
+  activeDocument,
+  selectedText,
 }) => {
   const [messages, setMessages] = useState<RagChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -176,6 +184,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             addLog('ERROR', `RAG chat error: ${error}`);
           },
         },
+        { activeDocument, selectedText },
         abortController.signal
       );
 
@@ -256,6 +265,22 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         </div>
 
+        {/* Active Context Badges */}
+        {(activeDocument || selectedText) && (
+          <div className="px-3 py-1.5 border-b border-border-color bg-primary/5 flex flex-wrap gap-2 items-center min-h-[32px]">
+            {activeDocument && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-full text-[10px] text-primary font-medium" title={activeDocument.title}>
+                <span className="opacity-70">📄</span> {activeDocument.title.length > 20 ? activeDocument.title.substring(0, 17) + '...' : activeDocument.title}
+              </div>
+            )}
+            {selectedText && (
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-[10px] text-amber-600 font-medium">
+                <span className="opacity-70">✂️</span> Selection active
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Index progress bar */}
         {isIndexing && indexProgress && (
           <div className="px-3 py-1.5 border-b border-border-color bg-secondary/30 flex-shrink-0">
@@ -313,8 +338,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
                       ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
                       ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
-                      code: ({node, ...props}) => <code className="bg-border-color/30 px-1 rounded font-mono text-[11px]" {...props} />,
-                      pre: ({node, ...props}) => <pre className="bg-background/50 p-2 rounded-md border border-border-color/30 my-2 overflow-x-auto font-mono text-[11px]" {...props} />,
+                      code: ({node, ...props}) => {
+                        const isInline = !node?.position?.start.line || node.position.start.line === node.position.end.line;
+                        if (isInline) {
+                          return <code className="bg-border-color/30 px-1 rounded font-mono text-[11px]" {...props} />;
+                        }
+                        return (
+                          <div className="relative group">
+                            <pre className="bg-background/50 p-2 rounded-md border border-border-color/30 my-2 overflow-x-auto font-mono text-[11px]" {...props} />
+                            <button 
+                              onClick={() => onApplyToEditor(String(props.children))}
+                              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-primary/80 hover:bg-primary text-white text-[9px] px-1.5 py-0.5 rounded transition-all shadow-sm"
+                              title="Apply to current document"
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        );
+                      },
                     }}
                   >
                     {msg.content}
@@ -341,6 +382,25 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                         </button>
                       ))}
                     </div>
+                  </div>
+                {/* Actions */}
+                {msg.role === 'assistant' && !msg.isStreaming && (
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => onCreateDocument(msg.content)}
+                      className="text-[10px] text-text-secondary hover:text-primary bg-border-color/20 hover:bg-primary/10 px-2 py-1 rounded transition-colors border border-transparent hover:border-primary/30"
+                    >
+                      ✨ Create New Document
+                    </button>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content);
+                        addLog('INFO', 'Chat response copied to clipboard.');
+                      }}
+                      className="text-[10px] text-text-tertiary hover:text-text-secondary px-2 py-1 rounded transition-colors"
+                    >
+                      Copy All
+                    </button>
                   </div>
                 )}
               </div>
