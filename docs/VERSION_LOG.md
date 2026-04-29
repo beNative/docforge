@@ -1,4 +1,17 @@
-## v0.8.8 - The Agentic Workspace Update
+## v0.8.9 - The RAG Indexing & Transparency Fix
+1: 
+2: ### 🐛 Fixes
+3: 
+4: -   **RAG Workspace Indexing**:
+5:     *   Fixed a critical bug where workspace indexing would find documents but fail to process them (showing "0 documents processed").
+6:     *   Corrected the `rag_vectors` virtual table schema by removing an unsupported `PRIMARY KEY` constraint.
+7:     *   Added automated schema recovery logic to detect and report missing or broken vector tables.
+8: -   **Transparency & Feedback**:
+9:     *   **Main Process Error Propagation**: Backend indexing errors are now captured and displayed directly in the Chat Panel log, providing clear feedback if document processing fails.
+10:     *   **Enhanced Status Diagnostics**: The "Build Index" process now performs a pre-flight check of the database schema and reports specific configuration or initialization errors.
+11:     *   **Detailed Content Logs**: Added diagnostic logging to identify documents that are skipped due to missing content or extraction failures.
+12: 
+13: ## v0.8.8 - The Agentic Workspace Update
 
 ### ✨ Features
 

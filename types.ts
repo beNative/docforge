@@ -622,6 +622,7 @@ export interface RagIndexResponse {
   totalChunks: number;
   totalDocumentsFound?: number;
   error?: string;
+  errors?: string[];
 }
 
 export interface AgentToolCall {

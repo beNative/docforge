@@ -192,12 +192,13 @@ export const embeddingService = {
     ollamaBaseUrl: string,
     modelName: string,
     onProgress?: (current: number, total: number) => void
-  ): Promise<{ documentsProcessed: number; totalChunks: number; totalDocumentsFound: number }> {
+  ): Promise<{ documentsProcessed: number; totalChunks: number; totalDocumentsFound: number; errors?: string[] }> {
     const nodeIds = databaseService.ragGetAllDocumentNodeIds();
     console.log(`[RAG] Starting full index of ${nodeIds.length} documents.`);
     let totalChunks = 0;
     let documentsProcessed = 0;
     const totalDocumentsFound = nodeIds.length;
+    const errors: string[] = [];
 
     if (nodeIds.length === 0) {
       console.log('[RAG] No documents found to index.');
@@ -208,14 +209,19 @@ export const embeddingService = {
         const result = await this.indexDocument(nodeIds[i], ollamaBaseUrl, modelName);
         totalChunks += result.chunksCreated;
         if (result.chunksCreated > 0) documentsProcessed++;
-      } catch (error) {
-        console.error(`[RAG] Failed to index document ${nodeIds[i]}:`, error);
+      } catch (error: any) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        // Try to get document title for the error message
+        const doc = databaseService.ragGetDocumentContent(nodeIds[i]);
+        const title = doc ? doc.title : nodeIds[i];
+        console.error(`[RAG] Failed to index document "${title}":`, errorMsg);
+        errors.push(`"${title}": ${errorMsg}`);
       }
       onProgress?.(i + 1, nodeIds.length);
     }
 
     console.log(`[RAG] Full index complete. Processed ${documentsProcessed} documents, created ${totalChunks} total chunks.`);
-    return { documentsProcessed, totalChunks, totalDocumentsFound };
+    return { documentsProcessed, totalChunks, totalDocumentsFound, errors: errors.length > 0 ? errors : undefined };
   },
 
   /**

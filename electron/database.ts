@@ -1414,6 +1414,15 @@ export const databaseService = {
         };
       }
 
+      // Check if rag_vectors table exists
+      const tableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='rag_vectors'").get();
+      if (!tableCheck) {
+        return {
+          success: false,
+          error: 'The rag_vectors table is missing. This usually happens if the database was initialized with an invalid schema. You may need to reset your database if this persists.',
+        };
+      }
+
       const totalRow = db.prepare('SELECT COUNT(*) as count FROM nodes WHERE node_type = \'document\'').get() as { count: number };
       const indexedRow = db.prepare('SELECT COUNT(DISTINCT node_id) as count FROM rag_chunks').get() as { count: number };
       
@@ -1446,7 +1455,14 @@ export const databaseService = {
       WHERE n.node_id = ? AND n.node_type = 'document'
     `).get(nodeId) as { title: string; text_content: string } | undefined;
 
-    if (!row || !row.text_content) return null;
+    if (!row) {
+      console.log(`[RAG DB] Document entry not found for node: ${nodeId}`);
+      return null;
+    }
+    if (!row.text_content) {
+      console.log(`[RAG DB] Document "${row.title}" (${nodeId}) has no text content in store (it might be empty or a different type).`);
+      return null;
+    }
     return { title: row.title, content: row.text_content };
   },
 

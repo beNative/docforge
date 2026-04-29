@@ -106,8 +106,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       const result = await ragService.indexAll(settings);
       if (result.success) {
         addLog('INFO', `RAG: Index build complete. Found ${result.totalDocumentsFound || 0} documents. Processed ${result.documentsProcessed} documents, ${result.totalChunks} chunks.`);
+        if (result.errors && result.errors.length > 0) {
+          addLog('WARNING', `RAG: Encountered errors while indexing ${result.errors.length} documents:`);
+          result.errors.forEach(err => addLog('ERROR', `  - ${err}`));
+        }
         if (result.documentsProcessed === 0) {
           addLog('WARNING', `RAG: No documents were processed into the index. (Found ${result.totalDocumentsFound || 0} document nodes in total).`);
+          if (!result.errors || result.errors.length === 0) {
+            addLog('INFO', 'RAG: Tip - Check if Ollama is running and the embedding model is downloaded.');
+          }
         }
       } else {
         addLog('ERROR', `RAG: Index build failed: ${result.error}`);

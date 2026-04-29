@@ -2,7 +2,7 @@
 // removing the need for external .sql files which can complicate the build process.
 
 export const INITIAL_SCHEMA = `
--- PRAGMA user_version is set to 7 by the database service for this schema.
+-- PRAGMA user_version is set to 9 by the database service for this schema.
 
 -- =================================================================
 --  CORE HIERARCHY & METADATA
@@ -237,7 +237,7 @@ CREATE INDEX idx_rag_chunks_node ON rag_chunks(node_id);
 -- sqlite-vec virtual table for vector similarity search
 -- nomic-embed-text produces 768-dimensional vectors
 CREATE VIRTUAL TABLE IF NOT EXISTS rag_vectors USING vec0(
-    chunk_id INTEGER PRIMARY KEY,
+    chunk_id INTEGER,
     embedding float[768]
 );
 `;
