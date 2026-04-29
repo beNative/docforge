@@ -1,5 +1,22 @@
 # Version Log
 
+## v0.8.7 - The RAG & Clipboard Image Update
+
+### ✨ Features
+
+-   **RAG-Powered "Chat with Workspace"**:
+    -   Finalized the workspace analysis tool with configurable **Similarity Threshold** and increased context limits (up to **500 documents**).
+    -   Intelligent source attribution: Sources are now streamed immediately and automatically hidden if the AI determines no relevant information was found.
+-   **Enhanced Image Clipboard Support**:
+    -   **New from Clipboard**: Now detects images on the system clipboard and automatically creates a new image document.
+    -   **Direct Paste/Drop**: Drag-and-drop or paste images directly into existing image nodes to update their content.
+-   **Navigation Polish**: Refined the "Create New Document" action in chat to navigate directly to the new file, ensuring a seamless transition from AI response to workspace document.
+
+### 🐛 Fixes
+
+-   **RAG Reliability**: Optimized the retrieval logic to trigger search and streaming in parallel, reducing latency.
+-   **Copyright Maintenance**: Updated all internal About boxes and legal notices to **2026**.
+
 ## v0.8.6 - The Usability & Drag-Drop Fixes
 
 ### ✨ Features
