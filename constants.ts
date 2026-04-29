@@ -82,6 +82,8 @@ export const DEFAULT_SETTINGS: Settings = {
     workingDirectory: null,
     executable: null,
   },
+  ragEmbeddingProviderUrl: 'http://localhost:11434',
+  ragEmbeddingModelName: 'nomic-embed-text',
 };
 
 export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [

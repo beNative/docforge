@@ -10,6 +10,7 @@ interface CustomTitleBarProps {
   onToggleInfoView: () => void;
   onShowEditorView: () => void;
   onToggleLogger: () => void;
+  onToggleChat: () => void;
   onOpenCommandPalette: () => void;
   onOpenAbout: () => void;
   isInfoViewActive: boolean;
@@ -81,7 +82,7 @@ const WindowControls: React.FC<{ platform: string, isMaximized: boolean }> = ({ 
 };
 
 const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
-    onToggleSettingsView, onToggleInfoView, onShowEditorView, onToggleLogger, onOpenCommandPalette, onOpenAbout,
+    onToggleSettingsView, onToggleInfoView, onShowEditorView, onToggleLogger, onToggleChat, onOpenCommandPalette, onOpenAbout,
     isInfoViewActive, isSettingsViewActive, isEditorViewActive, commandPaletteTargetRef, commandPaletteInputRef, searchTerm, onSearchTermChange, commands
 }) => {
     const [platform, setPlatform] = useState('');
@@ -133,6 +134,9 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
                 </IconButton>
                 <IconButton onClick={onToggleLogger} tooltip={getTooltip('toggle-logs', 'Logs')} size="xs" className="not-draggable" tooltipPosition="bottom">
                     <TerminalIcon className="w-4 h-4" />
+                </IconButton>
+                <IconButton onClick={onToggleChat} tooltip={getTooltip('toggle-chat', 'Chat')} size="xs" className="not-draggable" tooltipPosition="bottom">
+                    <SearchIcon className="w-4 h-4" />
                 </IconButton>
                 <ThemeToggleButton size="xs" tooltipPosition="bottom" className="not-draggable" />
                 <IconButton onClick={onToggleSettingsView} tooltip={getTooltip('toggle-settings', 'Settings')} size="xs" className={`not-draggable ${isSettingsViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">

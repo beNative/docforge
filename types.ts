@@ -102,6 +102,13 @@ declare global {
       onScriptRunStatus: (
         callback: (payload: { language: ScriptLanguage; runId: string; status: ScriptExecutionStatus }) => void
       ) => () => void;
+      // RAG (Chat with Workspace)
+      ragIndexDocument: (nodeId: string, ollamaBaseUrl: string, modelName: string) => Promise<{ success: boolean; chunksCreated?: number; error?: string }>;
+      ragIndexAll: (ollamaBaseUrl: string, modelName: string) => Promise<RagIndexResponse>;
+      ragSearch: (query: string, ollamaBaseUrl: string, modelName: string, limit?: number) => Promise<{ success: boolean; results: RagSearchResult[]; error?: string }>;
+      ragGetIndexStatus: () => Promise<{ success: boolean; totalDocuments?: number; indexedDocuments?: number; error?: string }>;
+      ragClearIndex: () => Promise<{ success: boolean; error?: string }>;
+      onRagIndexProgress: (callback: (payload: { current: number; total: number }) => void) => () => void;
     };
     __DOCFORGE_SCRIPT_PREVIEW__?: ScriptExecutionBridge;
   }
@@ -518,6 +525,8 @@ export interface Settings {
   pythonConsoleTheme: 'light' | 'dark';
   shellDefaults: ScriptExecutionDefaults;
   powershellDefaults: ScriptExecutionDefaults;
+  ragEmbeddingProviderUrl: string;
+  ragEmbeddingModelName: string;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
@@ -588,4 +597,32 @@ export interface DatabaseLoadResult {
   previousPath?: string;
   error?: string;
   canceled?: boolean;
+}
+
+// =================================================================
+// RAG (Chat with Workspace) Types
+// =================================================================
+
+export interface RagSearchResult {
+  nodeId: string;
+  nodeTitle: string;
+  chunkText: string;
+  distance: number;
+}
+
+export interface RagIndexResponse {
+  success: boolean;
+  documentsProcessed: number;
+  totalChunks: number;
+  totalDocumentsFound?: number;
+  error?: string;
+}
+
+export interface RagChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  sources?: RagSearchResult[];
+  timestamp: string;
+  isStreaming?: boolean;
 }

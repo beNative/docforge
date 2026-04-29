@@ -43,10 +43,11 @@ interface SettingsViewProps {
   commands: Command[];
 }
 
-type SettingsCategory = 'provider' | 'appearance' | 'shortcuts' | 'python' | 'shell' | 'powershell' | 'general' | 'database' | 'advanced';
+type SettingsCategory = 'provider' | 'rag' | 'appearance' | 'shortcuts' | 'python' | 'shell' | 'powershell' | 'general' | 'database' | 'advanced';
 
 const categories: { id: SettingsCategory; label: string; icon: React.FC<{ className?: string }> }[] = [
   { id: 'provider', label: 'LLM Provider', icon: SparklesIcon },
+  { id: 'rag', label: 'RAG / Embeddings', icon: DatabaseIcon },
   { id: 'appearance', label: 'Appearance', icon: SunIcon },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', icon: KeyboardIcon },
   { id: 'python', label: 'Python', icon: TerminalIcon },
@@ -466,6 +467,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             }}
           />
         );
+      case 'rag':
+        return (
+          <RagSettingsSection
+            settings={currentSettings}
+            setCurrentSettings={setCurrentSettings}
+            discoveredServices={discoveredServices}
+          />
+        );
       case 'appearance':
         return <AppearanceSettingsSection {...{ settings: currentSettings, setCurrentSettings }} />;
       case 'shortcuts':
@@ -675,6 +684,107 @@ const ProviderSettingsSection: React.FC<SectionProps & { discoveredServices: Dis
             </select>
             {isFetchingModels && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Spinner /></div>}
           </div>
+        </SettingRow>
+      </div>
+    </section>
+  );
+};
+
+const RagSettingsSection: React.FC<SectionProps & { discoveredServices: DiscoveredLLMService[] }> = ({ settings, setCurrentSettings, discoveredServices }) => {
+  const [availableModels, setAvailableModels] = useState<DiscoveredLLMModel[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+
+  useEffect(() => {
+    const fetchModelsForRagService = async () => {
+      const currentService = discoveredServices.find(s => s.generateUrl === settings.ragEmbeddingProviderUrl);
+      if (currentService) {
+        setIsFetchingModels(true);
+        try {
+          const models = await llmDiscoveryService.fetchModels(currentService);
+          setAvailableModels(models);
+        } catch (error) {
+          console.error('Failed to fetch models for RAG service:', error);
+          setAvailableModels([]);
+        } finally {
+          setIsFetchingModels(false);
+        }
+      } else {
+        setAvailableModels([]);
+      }
+    }
+    fetchModelsForRagService();
+  }, [discoveredServices, settings.ragEmbeddingProviderUrl]);
+
+  return (
+    <section className="pt-2 pb-6">
+      <div className="flex items-center gap-2 mb-1">
+        <h2 className="text-lg font-semibold text-text-main">RAG / Embeddings</h2>
+        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">Local Vector Search</span>
+      </div>
+      <p className="text-xs text-text-tertiary mb-6">
+        Configure how DocForge indexes your documents for semantic search and chat. 
+        We recommend using <strong>Ollama</strong> with <strong>nomic-embed-text</strong> for a fast, private, and free experience.
+      </p>
+
+      <div className="space-y-6">
+        <SettingRow 
+          label="Embedding Provider" 
+          description="The service used to generate vector embeddings. Choose a running service from the list."
+        >
+          <select
+            id="ragProvider"
+            value={discoveredServices.find(s => s.generateUrl === settings.ragEmbeddingProviderUrl)?.id || ''}
+            onChange={(e) => {
+                const service = discoveredServices.find(s => s.id === e.target.value);
+                if (service) {
+                    setCurrentSettings(prev => ({ ...prev, ragEmbeddingProviderUrl: service.generateUrl }));
+                }
+            }}
+            disabled={discoveredServices.length === 0}
+            className="w-60 p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          >
+            <option value="" disabled>{discoveredServices.length > 0 ? 'Select a service' : 'No services detected'}</option>
+            {discoveredServices.map(service => (
+              <option key={service.id} value={service.id}>{service.name}</option>
+            ))}
+          </select>
+        </SettingRow>
+
+        <SettingRow 
+          label="Embedding Model" 
+          description="The specific model used for embeddings. 'nomic-embed-text' is highly recommended."
+        >
+          <div className="relative w-60">
+            <select
+              id="ragModel"
+              value={settings.ragEmbeddingModelName}
+              onChange={(e) => setCurrentSettings(prev => ({ ...prev, ragEmbeddingModelName: e.target.value }))}
+              disabled={availableModels.length === 0}
+              className="w-full p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+            >
+              <option value="" disabled>Select a model</option>
+              {availableModels.map(model => (
+                <option key={model.id} value={model.id}>{model.name}</option>
+              ))}
+            </select>
+            {isFetchingModels && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Spinner /></div>}
+          </div>
+          <p className="text-[10px] text-text-tertiary mt-2 italic">
+            Don't see your model? Run <code>ollama pull nomic-embed-text</code> in your terminal.
+          </p>
+        </SettingRow>
+
+        <SettingRow 
+          label="Custom Provider URL" 
+          description="Manually override the embedding provider URL if it wasn't detected."
+        >
+          <input
+            type="text"
+            value={settings.ragEmbeddingProviderUrl}
+            onChange={(e) => setCurrentSettings(prev => ({ ...prev, ragEmbeddingProviderUrl: e.target.value }))}
+            placeholder="http://localhost:11434"
+            className="w-60 p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
+          />
         </SettingRow>
       </div>
     </section>

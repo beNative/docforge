@@ -1,6 +1,6 @@
 import React from 'react';
 import IconButton from './IconButton';
-import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, PencilIcon, SparklesIcon } from './Icons';
+import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, PencilIcon, SparklesIcon, SearchIcon } from './Icons';
 import ThemeToggleButton from './ThemeToggleButton';
 import type { Command } from '../types';
 
@@ -9,6 +9,7 @@ interface HeaderProps {
   onToggleInfoView: () => void;
   onShowEditorView: () => void;
   onToggleLogger: () => void;
+  onToggleChat: () => void;
   onOpenCommandPalette: () => void;
   onOpenAbout: () => void;
   isInfoViewActive: boolean;
@@ -22,6 +23,7 @@ const Header: React.FC<HeaderProps> = ({
   onToggleInfoView,
   onShowEditorView,
   onToggleLogger,
+  onToggleChat,
   onOpenCommandPalette,
   onOpenAbout,
   isInfoViewActive,
@@ -55,6 +57,9 @@ const Header: React.FC<HeaderProps> = ({
         </IconButton>
         <IconButton onClick={onToggleLogger} tooltip={getTooltip('toggle-logs', 'Logs')} tooltipPosition="bottom" size="xs">
           <TerminalIcon className="w-4 h-4" />
+        </IconButton>
+        <IconButton onClick={onToggleChat} tooltip={getTooltip('toggle-chat', 'Chat')} tooltipPosition="bottom" size="xs">
+          <SearchIcon className="w-4 h-4" />
         </IconButton>
         <ThemeToggleButton size="xs" />
         <IconButton onClick={onToggleSettingsView} tooltip={getTooltip('toggle-settings', 'Settings')} className={`${isSettingsViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom" size="xs">

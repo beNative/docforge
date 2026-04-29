@@ -41,12 +41,17 @@ import { repository, type RepositoryStartupTiming } from './services/repository'
 import { DocumentNode } from './components/PromptTreeItem';
 import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './services/shortcutService';
 import { readClipboardText, ClipboardPermissionError, ClipboardUnavailableError } from './services/clipboardService';
+import ChatPanel from './components/ChatPanel';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
 
 const DEFAULT_LOGGER_HEIGHT = 288;
 const MIN_LOGGER_HEIGHT = 100;
+
+const DEFAULT_CHAT_PANEL_WIDTH = 360;
+const MIN_CHAT_PANEL_WIDTH = 280;
+const MAX_CHAT_PANEL_WIDTH = 600;
 
 const PREVIEW_INITIAL_SCALE = 1;
 const PREVIEW_MIN_SCALE = 0.25;
@@ -201,6 +206,8 @@ export const MainApp: React.FC = () => {
     const [isNewCodeFileModalOpen, setIsNewCodeFileModalOpen] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
     const [loggerPanelHeight, setLoggerPanelHeight] = useState(DEFAULT_LOGGER_HEIGHT);
+    const [isChatPanelVisible, setIsChatPanelVisible] = useState(false);
+    const [chatPanelWidth, setChatPanelWidth] = useState(DEFAULT_CHAT_PANEL_WIDTH);
     const [availableModels, setAvailableModels] = useState<DiscoveredLLMModel[]>([]);
     const [discoveredServices, setDiscoveredServices] = useState<DiscoveredLLMService[]>([]);
     const [isDetecting, setIsDetecting] = useState(false);
@@ -379,6 +386,7 @@ export const MainApp: React.FC = () => {
 
     const isSidebarResizing = useRef(false);
     const isLoggerResizing = useRef(false);
+    const isChatResizing = useRef(false);
     const commandPaletteTargetRef = useRef<HTMLDivElement>(null);
     const commandPaletteInputRef = useRef<HTMLInputElement>(null);
     const documentTreeSearchInputRef = useRef<HTMLInputElement>(null);
@@ -2144,9 +2152,13 @@ export const MainApp: React.FC = () => {
         }
     }, [activeNodeId, activeNode, updateItem, addLog]);
 
-    const handleCommitVersion = useCallback((documentId: string, content: string) => {
-        return commitVersion(documentId, content);
-    }, [commitVersion]);
+    const handleCommitVersion = useCallback(async (documentId: string, content: string) => {
+        await commitVersion(documentId, content);
+        // Auto-index for RAG (fire-and-forget)
+        if (settings.ragEmbeddingProviderUrl && window.electronAPI?.ragIndexDocument) {
+            window.electronAPI.ragIndexDocument(documentId, settings.ragEmbeddingProviderUrl, settings.ragEmbeddingModelName).catch(() => {});
+        }
+    }, [commitVersion, settings.ragEmbeddingProviderUrl, settings.ragEmbeddingModelName]);
     
     const handleSaveTemplate = (updatedTemplate: Partial<Omit<DocumentTemplate, 'template_id'>>) => {
         if (activeTemplateId) {
@@ -2734,6 +2746,7 @@ export const MainApp: React.FC = () => {
         { id: 'toggle-info', name: 'Toggle Info View', action: () => { addLog('INFO', 'Command: Toggle Info View.'); setView(v => v === 'info' ? 'editor' : 'info'); }, category: 'View', icon: InfoIcon, keywords: 'help docs readme' },
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
+        { id: 'toggle-chat', name: 'Toggle Chat Panel', action: () => { addLog('INFO', 'Command: Toggle Chat Panel.'); setIsChatPanelVisible(v => !v); }, category: 'View', icon: SearchIcon, keywords: 'rag workspace ask question ai' },
     ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleFocusDocumentTreeSearch, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock, triggerDocumentCommand, view, setDocumentView]);
 
     const enrichedCommands = useMemo(() => {
@@ -2847,6 +2860,11 @@ export const MainApp: React.FC = () => {
             const clampedHeight = Math.max(MIN_LOGGER_HEIGHT, Math.min(newHeight, calculatedMaxHeight));
             setLoggerPanelHeight(clampedHeight);
         }
+        if (isChatResizing.current) {
+            const newWidth = (window.innerWidth - e.clientX) / zoomFactor;
+            const clampedWidth = Math.max(MIN_CHAT_PANEL_WIDTH, Math.min(newWidth, MAX_CHAT_PANEL_WIDTH));
+            setChatPanelWidth(clampedWidth);
+        }
     }, [settings.uiScale]);
 
     const handleGlobalMouseUp = useCallback(() => {
@@ -2857,6 +2875,9 @@ export const MainApp: React.FC = () => {
         if (isLoggerResizing.current) {
             isLoggerResizing.current = false;
             storageService.save(LOCAL_STORAGE_KEYS.LOGGER_PANEL_HEIGHT, loggerPanelHeight);
+        }
+        if (isChatResizing.current) {
+            isChatResizing.current = false;
         }
         
         if (document.body.style.cursor !== 'default') {
@@ -3049,6 +3070,7 @@ export const MainApp: React.FC = () => {
         onToggleInfoView: () => { addLog('INFO', `User action: Toggled info view ${view === 'info' ? 'off' : 'on'}.`); setView(v => v === 'info' ? 'editor' : 'info'); },
         onShowEditorView: () => { addLog('INFO', 'User action: Switched to editor view.'); setView('editor'); },
         onToggleLogger: () => { addLog('INFO', `User action: Toggled logger panel ${isLoggerVisible ? 'off' : 'on'}.`); setIsLoggerVisible(v => !v); },
+        onToggleChat: () => { addLog('INFO', `User action: Toggled chat panel ${isChatPanelVisible ? 'off' : 'on'}.`); setIsChatPanelVisible(v => !v); },
         onOpenCommandPalette: handleOpenCommandPalette,
         onOpenAbout: handleOpenAbout,
         isInfoViewActive: view === 'info',
@@ -3139,22 +3161,38 @@ export const MainApp: React.FC = () => {
                                     onMouseDown={handleSidebarMouseDown}
                                     className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
                                 />
-                                <section className="flex-1 flex flex-col overflow-hidden bg-background">
-                                    {openDocumentIds.length > 0 && (
-                                        <DocumentTabs
-                                            documents={documentItems}
-                                            openDocumentIds={openDocumentIds}
-                                            activeDocumentId={activeDocumentId}
-                                            onSelectTab={handleActivateTab}
-                                            onCloseTab={handleCloseTab}
-                                            onCloseOthers={handleCloseOtherTabs}
-                                            onCloseTabsToRight={handleCloseTabsToRight}
-                                            onReorderTabs={reorderDocumentTabs}
-                                        />
-                                    )}
-                                    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                                        {renderMainContent()}
+                                <section className="flex-1 flex flex-row overflow-hidden bg-background">
+                                    <div className="flex-1 flex flex-col overflow-hidden">
+                                        {openDocumentIds.length > 0 && (
+                                            <DocumentTabs
+                                                documents={documentItems}
+                                                openDocumentIds={openDocumentIds}
+                                                activeDocumentId={activeDocumentId}
+                                                onSelectTab={handleActivateTab}
+                                                onCloseTab={handleCloseTab}
+                                                onCloseOthers={handleCloseOtherTabs}
+                                                onCloseTabsToRight={handleCloseTabsToRight}
+                                                onReorderTabs={reorderDocumentTabs}
+                                            />
+                                        )}
+                                        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                                            {renderMainContent()}
+                                        </div>
                                     </div>
+                                    <ChatPanel
+                                        isVisible={isChatPanelVisible}
+                                        width={chatPanelWidth}
+                                        onResizeStart={(e: React.MouseEvent) => {
+                                            e.preventDefault();
+                                            isChatResizing.current = true;
+                                            document.body.style.userSelect = 'none';
+                                        }}
+                                        settings={settings}
+                                        onNavigateToDocument={(nodeId: string) => {
+                                            handleNavigateToNode(nodeId);
+                                        }}
+                                        addLog={addLog}
+                                    />
                                 </section>
                             </>
                         ) : (

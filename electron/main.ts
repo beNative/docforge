@@ -8,6 +8,7 @@ import { createReadStream, createWriteStream } from 'fs';
 import { autoUpdater } from 'electron-updater';
 import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider';
 import { databaseService } from './database';
+import { embeddingService } from './embeddingService';
 import { pythonManager } from './pythonManager';
 import { scriptRunner } from './scriptRunner';
 import type { ScriptLanguage } from '../types';
@@ -1127,4 +1128,51 @@ ipcMain.handle('script:get-run-logs', async (_, runId: string) => {
 
 ipcMain.handle('script:get-run', async (_, runId: string) => {
     return scriptRunner.getRun(runId);
+});
+
+// --- RAG (Chat with Workspace) ---
+ipcMain.handle('rag:index-document', async (_, nodeId: string, ollamaBaseUrl: string, modelName: string) => {
+    try {
+        const result = await embeddingService.indexDocument(nodeId, ollamaBaseUrl, modelName);
+        return { success: true, ...result };
+    } catch (error) {
+        console.error('RAG index-document failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+});
+
+ipcMain.handle('rag:index-all', async (_, ollamaBaseUrl: string, modelName: string) => {
+    try {
+        const result = await embeddingService.indexAllDocuments(ollamaBaseUrl, modelName, (current, total) => {
+            mainWindow?.webContents.send('rag:index-progress', { current, total });
+        });
+        return { success: true, ...result };
+    } catch (error) {
+        console.error('RAG index-all failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+});
+
+ipcMain.handle('rag:search', async (_, query: string, ollamaBaseUrl: string, modelName: string, limit?: number) => {
+    try {
+        const results = await embeddingService.searchSimilarChunks(query, ollamaBaseUrl, modelName, limit);
+        return { success: true, results };
+    } catch (error) {
+        console.error('RAG search failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error), results: [] };
+    }
+});
+
+ipcMain.handle('rag:get-index-status', () => {
+    return databaseService.ragGetIndexStatus();
+});
+
+ipcMain.handle('rag:clear-index', () => {
+    try {
+        embeddingService.clearIndex();
+        return { success: true };
+    } catch (error) {
+        console.error('RAG clear-index failed:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
 });

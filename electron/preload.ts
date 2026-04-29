@@ -168,4 +168,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('script:run-status', handler);
     return () => ipcRenderer.removeListener('script:run-status', handler);
   },
+
+  // --- RAG (Chat with Workspace) ---
+  ragIndexDocument: (nodeId: string, ollamaBaseUrl: string, modelName: string) => ipcRenderer.invoke('rag:index-document', nodeId, ollamaBaseUrl, modelName),
+  ragIndexAll: (ollamaBaseUrl: string, modelName: string) => ipcRenderer.invoke('rag:index-all', ollamaBaseUrl, modelName),
+  ragSearch: (query: string, ollamaBaseUrl: string, modelName: string, limit?: number) => ipcRenderer.invoke('rag:search', query, ollamaBaseUrl, modelName, limit),
+  ragGetIndexStatus: () => ipcRenderer.invoke('rag:get-index-status'),
+  ragClearIndex: () => ipcRenderer.invoke('rag:clear-index'),
+  onRagIndexProgress: (callback: (payload: { current: number; total: number }) => void) => {
+    const handler = (_: IpcRendererEvent, data: { current: number; total: number }) => callback(data);
+    ipcRenderer.on('rag:index-progress', handler);
+    return () => ipcRenderer.removeListener('rag:index-progress', handler);
+  },
 });

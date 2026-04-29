@@ -47,6 +47,7 @@
     "electron-updater": "^6.2.1",
     "emoji-picker-react": "^4.15.0",
     "lexical": "^0.16.0",
+    "sqlite-vec": "^0.1.9",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
@@ -97,7 +98,14 @@
       "dist/**/*",
       "index.html",
       "assets/**/*",
-      "docs/**/*"
+      "docs/**/*",
+      "node_modules/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/sqlite-vec-windows-x64/**/*",
+      "node_modules/sqlite-vec-darwin-x64/**/*",
+      "node_modules/sqlite-vec-linux-x64/**/*"
     ],
     "directories": {
       "buildResources": "assets",

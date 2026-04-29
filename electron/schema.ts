@@ -221,4 +221,23 @@ CREATE TABLE node_script_settings (
 
 CREATE INDEX idx_script_runs_node_lang ON script_execution_runs(node_id, language);
 CREATE INDEX idx_script_logs_run ON script_execution_logs(run_id);
+
+-- =================================================================
+--  RAG (RETRIEVAL-AUGMENTED GENERATION) VECTOR SEARCH
+-- =================================================================
+CREATE TABLE IF NOT EXISTS rag_chunks (
+    chunk_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id     TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
+    chunk_index INTEGER NOT NULL,
+    chunk_text  TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
+CREATE INDEX idx_rag_chunks_node ON rag_chunks(node_id);
+
+-- sqlite-vec virtual table for vector similarity search
+-- nomic-embed-text produces 768-dimensional vectors
+CREATE VIRTUAL TABLE IF NOT EXISTS rag_vectors USING vec0(
+    chunk_id INTEGER PRIMARY KEY,
+    embedding float[768]
+);
 `;

@@ -2,6 +2,7 @@ import { app } from 'electron';
 import path from 'path';
 import fs, { statSync } from 'fs';
 import Database from 'better-sqlite3';
+import * as sqliteVec from 'sqlite-vec';
 import { INITIAL_SCHEMA } from './schema';
 import { v4 as uuidv4 } from 'uuid';
 import * as crypto from 'crypto';
@@ -244,11 +245,80 @@ const mapExtensionToLanguageId_local = (extension: string | null): string => {
 };
 
 const configureConnection = (connection: Database.Database, dbExists: boolean) => {
+  const arch = process.arch;
+  const platform = process.platform;
+  console.log(`[RAG] Initializing database connection on ${platform}-${arch}...`);
+
+  // Load the sqlite-vec extension for vector similarity search (RAG)
+  try {
+    // @ts-ignore
+    sqliteVec.load(connection);
+    console.log('sqlite-vec extension loaded successfully via helper.');
+  } catch (e: any) {
+    console.warn('[RAG] Failed to load sqlite-vec via helper, trying manual resolution:', e.message);
+    
+    try {
+        // Try to find the loadable path (if available in this version of the library)
+        const loadablePath = (sqliteVec as any).getLoadablePath ? (sqliteVec as any).getLoadablePath() : null;
+        if (loadablePath) {
+            connection.loadExtension(loadablePath);
+            console.log(`[RAG] sqlite-vec loaded successfully via getLoadablePath: ${loadablePath}`);
+        } else {
+            throw new Error('getLoadablePath not available');
+        }
+    } catch (e2: any) {
+        console.warn('[RAG] Failed to load sqlite-vec via getLoadablePath(), trying manual paths...');
+        
+        // Manual resolution for Windows (.dll) and others
+        const isWin = platform === 'win32';
+        const osName = isWin ? 'windows' : platform;
+        const packageName = `sqlite-vec-${osName}-${arch}`;
+        
+        const possiblePaths = [
+            // Try to resolve the specific binary package
+            (() => { 
+                try { 
+                    const pkgPath = path.dirname(require.resolve(`${packageName}/package.json`));
+                    return path.join(pkgPath, 'vec0');
+                } catch { return null; } 
+            })(),
+            // Dev path (relative to project root)
+            path.join(app.getAppPath(), 'node_modules', packageName, 'vec0'),
+            // Alternative dev path
+            path.join(process.cwd(), 'node_modules', packageName, 'vec0'),
+            // Production path (unpacked asar)
+            path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', packageName, 'vec0'),
+        ].filter(Boolean) as string[];
+        
+        console.log(`[RAG] Attempting manual load from ${possiblePaths.length} locations...`);
+        let loaded = false;
+        let lastError = '';
+        for (const p of possiblePaths) {
+            try {
+                connection.loadExtension(p);
+                console.log(`[RAG] sqlite-vec extension loaded successfully from manual path: ${p}`);
+                loaded = true;
+                break;
+            } catch (e3: any) {
+                lastError = e3.message;
+                console.warn(`[RAG] Failed to load from ${p}: ${e3.message}`);
+            }
+        }
+        
+        if (!loaded) {
+            const errorMsg = `All attempts to load sqlite-vec extension failed for ${platform}-${arch}. Last error: ${lastError}`;
+            console.error(`[RAG] CRITICAL: ${errorMsg}`);
+            // Store the error on the connection object so we can report it in status
+            (connection as any)._ragExtensionError = errorMsg;
+        }
+    }
+  }
+
   if (!dbExists) {
     console.log('Database does not exist, creating new one...');
     connection.exec(INITIAL_SCHEMA);
     // Set PRAGMAs for a new database
-    connection.pragma('user_version = 7');
+    connection.pragma('user_version = 9');
     connection.exec('PRAGMA journal_mode = WAL;');
     connection.exec('PRAGMA foreign_keys = ON;');
     console.log('Database created and schema applied.');
@@ -470,6 +540,56 @@ const configureConnection = (connection: Database.Database, dbExists: boolean) =
       console.log('Migration to version 7 complete.');
     } catch (e) {
       console.error('Fatal: Failed to migrate database to version 7:', e);
+    }
+  }
+
+  if (currentVersion < 8) {
+    console.log(`Migrating schema from version ${currentVersion} to 8 (RAG vector search)...`);
+    try {
+      const transaction = connection.transaction(() => {
+        connection.exec(`
+          CREATE TABLE IF NOT EXISTS rag_chunks (
+              chunk_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+              node_id     TEXT NOT NULL REFERENCES nodes(node_id) ON DELETE CASCADE,
+              chunk_index INTEGER NOT NULL,
+              chunk_text  TEXT NOT NULL,
+              created_at  TEXT NOT NULL
+          );
+        `);
+        connection.exec('CREATE INDEX IF NOT EXISTS idx_rag_chunks_node ON rag_chunks(node_id);');
+        connection.exec(`
+          CREATE VIRTUAL TABLE IF NOT EXISTS rag_vectors USING vec0(
+              chunk_id INTEGER,
+              embedding float[768]
+          );
+        `);
+        connection.pragma('user_version = 8');
+      });
+      transaction();
+      console.log('Migration to version 8 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 8:', e);
+    }
+  }
+
+  if (currentVersion < 9) {
+    console.log(`Migrating schema from version ${currentVersion} to 9 (RAG schema fix)...`);
+    try {
+      const transaction = connection.transaction(() => {
+        // Drop and recreate rag_vectors to ensure the schema is correct (no PRIMARY KEY keyword)
+        connection.exec('DROP TABLE IF EXISTS rag_vectors;');
+        connection.exec(`
+          CREATE VIRTUAL TABLE rag_vectors USING vec0(
+              chunk_id INTEGER,
+              embedding float[768]
+          );
+        `);
+        connection.pragma('user_version = 9');
+      });
+      transaction();
+      console.log('Migration to version 9 complete.');
+    } catch (e) {
+      console.error('Fatal: Failed to migrate database to version 9:', e);
     }
   }
 };
@@ -1197,6 +1317,146 @@ export const databaseService = {
       schemaVersion,
       tables,
     };
+  },
+
+  // =================================================================
+  // RAG (Chat with Workspace) Methods
+  // =================================================================
+
+  ragDeleteChunksForNode(nodeId: string): void {
+    // Delete vectors first (references chunk_id from rag_chunks)
+    db.prepare(`
+      DELETE FROM rag_vectors WHERE chunk_id IN (
+        SELECT chunk_id FROM rag_chunks WHERE node_id = ?
+      )
+    `).run(nodeId);
+    db.prepare('DELETE FROM rag_chunks WHERE node_id = ?').run(nodeId);
+  },
+
+  ragUpsertChunks(nodeId: string, chunks: { chunkIndex: number; text: string; embedding: Float32Array }[]): void {
+    const transaction = db.transaction((items: typeof chunks) => {
+      // Clear old chunks for this node
+      this.ragDeleteChunksForNode(nodeId);
+
+      const now = new Date().toISOString();
+      const insertChunk = db.prepare(
+        'INSERT INTO rag_chunks (node_id, chunk_index, chunk_text, created_at) VALUES (?, ?, ?, ?)'
+      );
+      const insertVector = db.prepare(
+        'INSERT INTO rag_vectors (chunk_id, embedding) VALUES (?, ?)'
+      );
+
+      for (const chunk of items) {
+        const result = insertChunk.run(nodeId, chunk.chunkIndex, chunk.text, now);
+        // Explicitly use BigInt to ensure sqlite-vec receives a proper integer type
+        const chunkId = BigInt(result.lastInsertRowid.toString());
+        
+        // Use a view to ensure we only get the relevant bytes from the buffer
+        const embeddingBytes = Buffer.from(
+          chunk.embedding.buffer,
+          chunk.embedding.byteOffset,
+          chunk.embedding.byteLength
+        );
+        
+        insertVector.run(chunkId, embeddingBytes);
+      }
+    });
+    transaction(chunks);
+  },
+
+  ragSearchSimilarChunks(queryEmbedding: Float32Array, limit: number = 5): { nodeId: string; nodeTitle: string; chunkText: string; distance: number }[] {
+    const results = db.prepare(`
+      SELECT
+        rc.node_id,
+        n.title AS node_title,
+        rc.chunk_text,
+        rv.distance
+      FROM rag_vectors rv
+      JOIN rag_chunks rc ON rc.chunk_id = rv.chunk_id
+      JOIN nodes n ON n.node_id = rc.node_id
+      WHERE rv.embedding MATCH ?
+        AND k = ?
+      ORDER BY rv.distance ASC
+    `).all(Buffer.from(queryEmbedding.buffer), limit) as {
+      node_id: string;
+      node_title: string;
+      chunk_text: string;
+      distance: number;
+    }[];
+
+    return results.map(r => ({
+      nodeId: r.node_id,
+      nodeTitle: r.node_title,
+      chunkText: r.chunk_text,
+      distance: r.distance,
+    }));
+  },
+
+  ragGetIndexedNodeIds(): string[] {
+    const rows = db.prepare('SELECT DISTINCT node_id FROM rag_chunks').all() as { node_id: string }[];
+    return rows.map(r => r.node_id);
+  },
+
+  ragGetIndexStatus(): { success: boolean; totalDocuments?: number; indexedDocuments?: number; error?: string } {
+    try {
+      // Check if we captured a loading error during initialization
+      const extError = (db as any)._ragExtensionError;
+      if (extError) {
+          return { success: false, error: extError };
+      }
+
+      // Check if vec0 module exists (it should if sqlite-vec loaded successfully)
+      const vec0Exists = db.prepare("SELECT name FROM pragma_module_list WHERE name = 'vec0'").get();
+      if (!vec0Exists) {
+        return {
+          success: false,
+          error: 'The sqlite-vec extension (vec0 module) is not loaded in the database. Vector search is unavailable. This may be due to an unsupported OS architecture or a failed migration.',
+        };
+      }
+
+      const totalRow = db.prepare('SELECT COUNT(*) as count FROM nodes WHERE node_type = \'document\'').get() as { count: number };
+      const indexedRow = db.prepare('SELECT COUNT(DISTINCT node_id) as count FROM rag_chunks').get() as { count: number };
+      
+      return {
+        success: true,
+        totalDocuments: totalRow.count,
+        indexedDocuments: indexedRow.count,
+      };
+    } catch (error: any) {
+      console.error('[RAG DB] Failed to get index status:', error);
+      return {
+        success: false,
+        error: `Database error: ${error.message}. This usually means the RAG tables were not created successfully. Check if the sqlite-vec extension is supported on your system.`,
+      };
+    }
+  },
+
+  ragClearIndex(): void {
+    db.exec('DELETE FROM rag_vectors;');
+    db.exec('DELETE FROM rag_chunks;');
+  },
+
+  ragGetDocumentContent(nodeId: string): { title: string; content: string } | null {
+    const row = db.prepare(`
+      SELECT n.title, cs.text_content
+      FROM nodes n
+      LEFT JOIN documents d ON d.node_id = n.node_id
+      LEFT JOIN doc_versions dv ON dv.version_id = d.current_version_id
+      LEFT JOIN content_store cs ON cs.content_id = dv.content_id
+      WHERE n.node_id = ? AND n.node_type = 'document'
+    `).get(nodeId) as { title: string; text_content: string } | undefined;
+
+    if (!row || !row.text_content) return null;
+    return { title: row.title, content: row.text_content };
+  },
+
+  ragGetAllDocumentNodeIds(): string[] {
+    const rows = db.prepare(`
+      SELECT node_id FROM nodes 
+      WHERE node_type = 'document'
+    `).all() as { node_id: string }[];
+    console.log(`[RAG DB] Found ${rows.length} document nodes for indexing.`);
+    return rows.map(r => r.node_id);
   },
 
   close() {
