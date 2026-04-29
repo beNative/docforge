@@ -118,7 +118,7 @@ const Modal: React.FC<ModalProps> = ({ onClose, children, title, initialFocusRef
     >
       <div
         ref={modalRef}
-        className="bg-secondary rounded-sm w-full max-w-xl mx-4 border border-border-color shadow-2xl"
+        className="bg-secondary rounded-lg overflow-hidden w-full max-w-xl mx-4 border border-border-color shadow-[0_0_40px_rgba(0,0,0,0.15)] dark:shadow-[0_0_40px_rgba(0,0,0,0.4)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center px-4 py-3 border-b border-border-color">

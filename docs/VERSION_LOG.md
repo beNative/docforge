@@ -1,5 +1,18 @@
 # Version Log
 
+## v0.8.6 - The Usability & Drag-Drop Fixes
+
+### ✨ Features
+
+-   **HTML Preview Default**: HTML content imported via "New from Clipboard" now automatically opens in Preview mode by default, saving an extra click when pasting web snippets.
+
+### 🐛 Fixes
+
+-   **Empty Folder Drag and Drop**: Fixed a subtle bug that prevented dropping documents directly into empty folders due to restrictive hit area dimensions.
+-   **Version History Diffing**: Fixed a bug where the A/B version comparison forced chronological ordering, causing the A/B labels to mismatch the diff view. The history pane now strictly respects your selection (A is always the left side, B is always the right).
+-   **Dialog & Rename Polish**: Resolved an input focus issue when renaming folders and added drop shadows to dialogs for better visual depth.
+
+
 ## v0.8.5 - The Codebase Consistency Upgrade
 
 This release is a comprehensive refactoring effort that standardizes styling, typing, and error handling patterns across the application, laying a cleaner foundation for future development without changing functional behavior.

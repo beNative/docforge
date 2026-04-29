@@ -47,19 +47,45 @@ interface DocumentTreeItemProps {
 const getDropPosition = (
   e: React.DragEvent,
   isFolder: boolean,
-  itemEl: HTMLElement | null
+  itemEl: HTMLElement | null,
+  isEmptyFolder: boolean,
+  isExpanded: boolean
 ): 'before' | 'after' | 'inside' | null => {
   if (!itemEl) return null;
 
-  const rect = itemEl.getBoundingClientRect();
+  // For folders, we only want to measure the header row, not the entire <li> which includes children
+  const measureEl = isFolder ? (itemEl.firstElementChild as HTMLElement) || itemEl : itemEl;
+  
+  const rect = measureEl.getBoundingClientRect();
   const y = e.clientY - rect.top;
   const height = rect.height;
 
   if (height === 0) return null; // Avoid division by zero
 
+  // If hovering over the children area of an expanded folder, default to inside or let children handle it
+  // Since we stop propagation, this case usually means we are in the gap/padding.
+  if (y > height) {
+    return isFolder ? 'inside' : 'after';
+  }
+
   if (isFolder) {
+    // If the folder is empty, force 'inside' unconditionally to prevent any accidental sibling drops.
+    if (isEmptyFolder) {
+      return 'inside';
+    }
+
+    // Top 25% -> before
     if (y < height * 0.25) return 'before';
+    
+    // If the folder is expanded, making the entire bottom 75% 'inside' 
+    // prevents confusing drops where the item goes after the folder instead of inside.
+    if (isExpanded) {
+      return 'inside';
+    }
+    
+    // For collapsed folders with children, we preserve 'after' on the bottom 25%
     if (y > height * 0.75) return 'after';
+    
     return 'inside';
   } else {
     if (y < height * 0.5) return 'before';
@@ -378,7 +404,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       const hasFiles = e.dataTransfer.types.includes('Files');
       const shouldCopy = hasFiles || (hasDocforgePayload && !hasKnownLocalIds);
       e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
-      const position = getDropPosition(e, isFolder, itemRef.current);
+      const isEmptyFolder = isFolder && node.children.length === 0;
+      const position = getDropPosition(e, isFolder, itemRef.current, isEmptyFolder, isExpanded);
       if (position !== dropPosition) {
         setDropPosition(position);
       }
@@ -394,7 +421,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     e.preventDefault();
     e.stopPropagation(); // Re-enabled to prevent event from bubbling to root drop handler
 
-    const finalDropPosition = getDropPosition(e, isFolder, itemRef.current);
+    const isEmptyFolder = isFolder && node.children.length === 0;
+    const finalDropPosition = getDropPosition(e, isFolder, itemRef.current, isEmptyFolder, isExpanded);
     setDropPosition(null);
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -638,7 +666,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
         }`} />}
       {dropPosition === 'inside' && <div className="absolute inset-0 border-2 border-primary rounded-md pointer-events-none bg-primary/10" />}
 
-      {isFolder && isExpanded && (
+      {isFolder && isExpanded && node.children.length > 0 && (
         <ul
           className="m-0 pl-0 list-none space-y-0"
         >
