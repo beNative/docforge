@@ -1423,7 +1423,17 @@ export const databaseService = {
         };
       }
 
-      const totalRow = db.prepare('SELECT COUNT(*) as count FROM nodes WHERE node_type = \'document\'').get() as { count: number };
+      const totalRow = db.prepare(`
+        SELECT COUNT(*) as count 
+        FROM nodes n
+        JOIN documents d ON d.node_id = n.node_id
+        JOIN doc_versions dv ON dv.version_id = d.current_version_id
+        JOIN content_store cs ON cs.content_id = dv.content_id
+        WHERE n.node_type = 'document' 
+          AND cs.text_content IS NOT NULL 
+          AND cs.text_content != ''
+      `).get() as { count: number };
+
       const indexedRow = db.prepare('SELECT COUNT(DISTINCT node_id) as count FROM rag_chunks').get() as { count: number };
       
       return {
@@ -1443,6 +1453,28 @@ export const databaseService = {
   ragClearIndex(): void {
     db.exec('DELETE FROM rag_vectors;');
     db.exec('DELETE FROM rag_chunks;');
+  },
+
+  ragEnsureVectorDimension(dimensions: number): void {
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='rag_vectors'").get() as { sql: string } | undefined;
+    
+    // Check if the table already has the correct dimension
+    if (tableInfo && tableInfo.sql.includes(`float[${dimensions}]`)) {
+      return; 
+    }
+
+    console.log(`[RAG DB] Re-initializing vector table for ${dimensions} dimensions. This clears the current index.`);
+    const transaction = db.transaction(() => {
+      db.exec('DROP TABLE IF EXISTS rag_vectors;');
+      db.exec('DELETE FROM rag_chunks;');
+      db.exec(`
+        CREATE VIRTUAL TABLE rag_vectors USING vec0(
+            chunk_id INTEGER,
+            embedding float[${dimensions}]
+        );
+      `);
+    });
+    transaction();
   },
 
   ragGetDocumentContent(nodeId: string): { title: string; content: string } | null {
@@ -1468,10 +1500,16 @@ export const databaseService = {
 
   ragGetAllDocumentNodeIds(): string[] {
     const rows = db.prepare(`
-      SELECT node_id FROM nodes 
-      WHERE node_type = 'document'
+      SELECT n.node_id 
+      FROM nodes n
+      JOIN documents d ON d.node_id = n.node_id
+      JOIN doc_versions dv ON dv.version_id = d.current_version_id
+      JOIN content_store cs ON cs.content_id = dv.content_id
+      WHERE n.node_type = 'document' 
+        AND cs.text_content IS NOT NULL 
+        AND cs.text_content != ''
     `).all() as { node_id: string }[];
-    console.log(`[RAG DB] Found ${rows.length} document nodes for indexing.`);
+    console.log(`[RAG DB] Found ${rows.length} indexable document nodes.`);
     return rows.map(r => r.node_id);
   },
 

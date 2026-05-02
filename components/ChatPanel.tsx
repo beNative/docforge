@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import type { Settings, RagChatMessage, RagSearchResult } from '../types';
+import type { Settings, RagChatMessage, RagSearchResult, Node } from '../types';
 import { ragService } from '../services/ragService';
 import { v4 as uuidv4 } from 'uuid';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
 import { pythonService } from '../services/pythonService';
 import { scriptService } from '../services/scriptService';
+import { SparklesIcon, TerminalIcon, WarningIcon } from './Icons';
 
 interface ChatPanelProps {
   isVisible: boolean;
@@ -106,15 +107,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       const result = await ragService.indexAll(settings);
       if (result.success) {
         addLog('INFO', `RAG: Index build complete. Found ${result.totalDocumentsFound || 0} documents. Processed ${result.documentsProcessed} documents, ${result.totalChunks} chunks.`);
+        
         if (result.errors && result.errors.length > 0) {
-          addLog('WARNING', `RAG: Encountered errors while indexing ${result.errors.length} documents:`);
+          addLog('WARNING', `RAG: Encountered errors while indexing ${result.errors.length} item(s):`);
           result.errors.forEach(err => addLog('ERROR', `  - ${err}`));
-        }
-        if (result.documentsProcessed === 0) {
+        } else if (result.documentsProcessed === 0 && (result.totalDocumentsFound || 0) > 0) {
           addLog('WARNING', `RAG: No documents were processed into the index. (Found ${result.totalDocumentsFound || 0} document nodes in total).`);
-          if (!result.errors || result.errors.length === 0) {
-            addLog('INFO', 'RAG: Tip - Check if Ollama is running and the embedding model is downloaded.');
-          }
+          addLog('INFO', 'RAG: Tip - Check if Ollama is running and the embedding model is downloaded.');
         }
       } else {
         addLog('ERROR', `RAG: Index build failed: ${result.error}`);

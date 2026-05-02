@@ -33,6 +33,7 @@ import { useLogger } from '../hooks/useLogger';
 import KeyboardShortcutsSection from './KeyboardShortcutsSection';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
 import { computeThemePalette, cssColorToHex, THEME_COLOR_TOKENS, type ThemePalette } from '../services/themeCustomization';
+import { ragService } from '../services/ragService';
 
 interface SettingsViewProps {
   settings: Settings;
@@ -762,20 +763,52 @@ const RagSettingsSection: React.FC<SectionProps & { discoveredServices: Discover
           label="Embedding Model" 
           description="The specific model used for embeddings. 'nomic-embed-text' is highly recommended."
         >
-          <div className="relative w-60">
-            <select
-              id="ragModel"
-              value={settings.ragEmbeddingModelName}
-              onChange={(e) => setCurrentSettings(prev => ({ ...prev, ragEmbeddingModelName: e.target.value }))}
-              disabled={availableModels.length === 0}
-              className="w-full p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+          <div className="flex flex-col gap-2 w-60">
+            <div className="relative w-full">
+              <select
+                id="ragModel"
+                value={availableModels.some(m => m.id === settings.ragEmbeddingModelName) ? settings.ragEmbeddingModelName : ""}
+                onChange={(e) => setCurrentSettings(prev => ({ ...prev, ragEmbeddingModelName: e.target.value }))}
+                disabled={availableModels.length === 0}
+                className="w-full p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-50"
+              >
+                <option value="" disabled>{availableModels.length > 0 ? 'Select a model' : 'No models found'}</option>
+                {availableModels.map(model => (
+                  <option key={model.id} value={model.id}>{model.name}</option>
+                ))}
+              </select>
+              {isFetchingModels && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Spinner /></div>}
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-[10px] text-text-tertiary font-medium uppercase tracking-wider">Manual Model Name</label>
+              <input
+                type="text"
+                value={settings.ragEmbeddingModelName}
+                onChange={(e) => setCurrentSettings(prev => ({ ...prev, ragEmbeddingModelName: e.target.value }))}
+                placeholder="e.g. nomic-embed-text"
+                className="w-full p-2 text-xs rounded-md bg-background text-text-main border border-border-color focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            <Button 
+                onClick={async () => {
+                    const btn = document.activeElement as HTMLButtonElement;
+                    if (btn) btn.disabled = true;
+                    try {
+                        await ragService.search("test connection", settings);
+                        alert("Connection successful! The model is responsive.");
+                    } catch (err: any) {
+                        alert("Connection failed: " + (err.message || String(err)));
+                    } finally {
+                        if (btn) btn.disabled = false;
+                    }
+                }}
+                variant="secondary"
+                className="w-full mt-2"
             >
-              <option value="" disabled>Select a model</option>
-              {availableModels.map(model => (
-                <option key={model.id} value={model.id}>{model.name}</option>
-              ))}
-            </select>
-            {isFetchingModels && <div className="absolute right-3 top-1/2 -translate-y-1/2"><Spinner /></div>}
+                Test Connection
+            </Button>
           </div>
           <p className="text-[10px] text-text-tertiary mt-2 italic">
             Don't see your model? Run <code>ollama pull nomic-embed-text</code> in your terminal.
@@ -2612,7 +2645,8 @@ const ChatSettingsSection: React.FC<SectionProps> = ({ settings, setCurrentSetti
             description="Allows the AI to perform actions like reading/editing documents, creating files, and running scripts. Requires a model that supports tool-calling (Ollama 0.1.34+ or OpenAI)."
           >
             <ToggleSwitch
-              enabled={settings.chatEnableAgentMode}
+              id="chatEnableAgentMode"
+              checked={settings.chatEnableAgentMode}
               onChange={(enabled) => setCurrentSettings(prev => ({ ...prev, chatEnableAgentMode: enabled }))}
             />
           </SettingRow>
@@ -2624,7 +2658,8 @@ const ChatSettingsSection: React.FC<SectionProps> = ({ settings, setCurrentSetti
             description="When enabled, the AI will ask for your permission before performing any destructive actions (like deleting or moving files) or running scripts."
           >
             <ToggleSwitch
-              enabled={settings.chatAgentRequiresApproval}
+              id="chatAgentRequiresApproval"
+              checked={settings.chatAgentRequiresApproval}
               onChange={(enabled) => setCurrentSettings(prev => ({ ...prev, chatAgentRequiresApproval: enabled }))}
             />
           </SettingRow>

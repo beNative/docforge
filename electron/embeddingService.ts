@@ -116,14 +116,52 @@ const generateEmbeddings = async (
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Embedding request failed (${response.status}): ${errorText}`);
+    let errorMessage = `Embedding request failed (${response.status})`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      errorMessage += `: ${errorJson.error || errorText}`;
+    } catch {
+      errorMessage += `: ${errorText}`;
+    }
+    throw new Error(errorMessage);
   }
 
-  const data = await response.json() as {
-    embeddings: number[][];
-  };
+  const data: any = await response.json();
+  // Ollama returns embeddings as an array of numbers
+  if (!data.embeddings || !Array.isArray(data.embeddings)) {
+    throw new Error('Invalid response format from Ollama embedding API.');
+  }
 
-  return data.embeddings.map(emb => new Float32Array(emb));
+  return data.embeddings.map((arr: number[]) => new Float32Array(arr));
+};
+
+/**
+ * Verifies if the specified model is available in Ollama.
+ */
+const checkModelAvailability = async (ollamaBaseUrl: string, modelName: string): Promise<void> => {
+  const baseUrl = ollamaBaseUrl.replace(/\/api\/(generate|chat\/completions|embed).*$/, '');
+  const tagsUrl = `${baseUrl}/api/tags`;
+
+  try {
+    const response = await fetch(tagsUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch model list from Ollama (status: ${response.status}).`);
+    }
+    const data: any = await response.json();
+    const models = data.models || [];
+    
+    // Check for exact match or name:latest match
+    const isAvailable = models.some((m: any) => 
+      m.name === modelName || m.name === `${modelName}:latest` || (m.name.includes(':') && m.name.split(':')[0] === modelName)
+    );
+
+    if (!isAvailable) {
+      throw new Error(`Model "${modelName}" not found in Ollama. Please run "ollama pull ${modelName}" in your terminal.`);
+    }
+  } catch (error: any) {
+    if (error.message.includes('not found in Ollama')) throw error;
+    throw new Error(`Could not connect to Ollama at ${baseUrl}. Ensure Ollama is running. (${error.message})`);
+  }
 };
 
 // =================================================================
@@ -172,6 +210,10 @@ export const embeddingService = {
     }
 
     // Store chunks + vectors in the database
+    if (allEmbeddings.length > 0) {
+      databaseService.ragEnsureVectorDimension(allEmbeddings[0].length);
+    }
+
     const dbChunks = chunks.map((chunk, idx) => ({
       chunkIndex: chunk.chunkIndex,
       text: chunk.text,
@@ -194,7 +236,7 @@ export const embeddingService = {
     onProgress?: (current: number, total: number) => void
   ): Promise<{ documentsProcessed: number; totalChunks: number; totalDocumentsFound: number; errors?: string[] }> {
     const nodeIds = databaseService.ragGetAllDocumentNodeIds();
-    console.log(`[RAG] Starting full index of ${nodeIds.length} documents.`);
+    console.log(`[RAG] Starting full index of ${nodeIds.length} documents using model "${modelName}".`);
     let totalChunks = 0;
     let documentsProcessed = 0;
     const totalDocumentsFound = nodeIds.length;
@@ -202,6 +244,16 @@ export const embeddingService = {
 
     if (nodeIds.length === 0) {
       console.log('[RAG] No documents found to index.');
+      return { documentsProcessed: 0, totalChunks: 0, totalDocumentsFound: 0 };
+    }
+
+    // Pre-flight check: Verify model exists in Ollama
+    try {
+        await checkModelAvailability(ollamaBaseUrl, modelName);
+    } catch (error: any) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error(`[RAG] Pre-flight check failed: ${errorMsg}`);
+        return { documentsProcessed: 0, totalChunks: 0, totalDocumentsFound, errors: [`System: ${errorMsg}`] };
     }
 
     for (let i = 0; i < nodeIds.length; i++) {
@@ -233,6 +285,7 @@ export const embeddingService = {
     modelName: string,
     limit: number = 5
   ): Promise<{ nodeId: string; nodeTitle: string; chunkText: string; distance: number }[]> {
+    await checkModelAvailability(ollamaBaseUrl, modelName);
     const [queryEmbedding] = await generateEmbeddings([query], ollamaBaseUrl, modelName);
     return databaseService.ragSearchSimilarChunks(queryEmbedding, limit);
   },

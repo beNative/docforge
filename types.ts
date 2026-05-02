@@ -110,6 +110,7 @@ declare global {
       ragGetIndexStatus: () => Promise<{ success: boolean; totalDocuments?: number; indexedDocuments?: number; error?: string }>;
       ragClearIndex: () => Promise<{ success: boolean; error?: string }>;
       onRagIndexProgress: (callback: (payload: { current: number; total: number }) => void) => () => void;
+      onAppLog: (callback: (payload: { level: LogLevel; message: string; timestamp: string }) => void) => () => void;
     };
     __DOCFORGE_SCRIPT_PREVIEW__?: ScriptExecutionBridge;
   }

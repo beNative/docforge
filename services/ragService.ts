@@ -1,4 +1,5 @@
 import type { Settings, RagSearchResult, RagChatMessage, RagIndexResponse, AgentToolCall } from '../types';
+import { v4 as uuidv4 } from 'uuid';
 
 const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
 
@@ -173,6 +174,13 @@ const streamLLMChatResponse = async (
 import { AGENT_TOOLS, executeTool, type ToolExecutorContext } from './agentService';
 
 export const ragService = {
+  async search(query: string, settings: Settings): Promise<{ success: boolean; results: RagSearchResult[]; error?: string }> {
+    if (!isElectron) return { success: false, results: [], error: 'RAG requires the desktop application.' };
+    const { ragEmbeddingProviderUrl, ragEmbeddingModelName, ragContextLimit } = settings;
+    if (!ragEmbeddingProviderUrl) return { success: false, results: [], error: 'Embedding provider URL is not configured.' };
+    return window.electronAPI!.ragSearch(query, ragEmbeddingProviderUrl, ragEmbeddingModelName, ragContextLimit || 5);
+  },
+
   // ... existing index methods (unchanged)
   async indexDocument(nodeId: string, settings: Settings): Promise<{ success: boolean; error?: string }> {
     if (!isElectron) return { success: false, error: 'RAG requires the desktop application.' };

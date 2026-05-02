@@ -422,6 +422,17 @@ export const MainApp: React.FC = () => {
     const lastLogRef = useRef<LogMessage | null>(null);
 
     useEffect(() => {
+        if (!window.electronAPI?.onAppLog) return;
+        
+        const unsubscribe = window.electronAPI.onAppLog(({ level, message, timestamp }) => {
+            // Avoid duplicate logs if they happen too quickly or are identical
+            addLog(level, `[BACKEND] ${message}`);
+        });
+
+        return unsubscribe;
+    }, [addLog]);
+
+    useEffect(() => {
         if (!isElectron || !window.electronAPI?.dbGetPath) {
             setDatabaseStatus({ message: 'Database actions unavailable in this environment.', tone: 'info' });
             return;

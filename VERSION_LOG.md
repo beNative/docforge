@@ -1,16 +1,3 @@
-## v0.8.9 - The RAG Indexing & Transparency Fix
-
-### 🐛 Fixes
-
--   **RAG Workspace Indexing**:
-    *   Fixed a critical bug where workspace indexing would find documents but fail to process them (showing "0 documents processed").
-    *   Corrected the `rag_vectors` virtual table schema by removing an unsupported `PRIMARY KEY` constraint.
-    *   Added automated schema recovery logic to detect and report missing or broken vector tables.
--   **Transparency & Feedback**:
-    *   **Main Process Error Propagation**: Backend indexing errors are now captured and displayed directly in the Chat Panel log, providing clear feedback if document processing fails.
-    *   **Enhanced Status Diagnostics**: The "Build Index" process now performs a pre-flight check of the database schema and reports specific configuration or initialization errors.
-    *   **Detailed Content Logs**: Added diagnostic logging to identify documents that are skipped due to missing content or extraction failures.
-
 ## v0.8.8 - The Agentic Workspace Update
 
 ### ✨ Features
@@ -30,8 +17,17 @@
 
 ### 🐛 Fixes
 
+-   **RAG Workspace Indexing**:
+    *   Fixed a critical bug where workspace indexing would find documents but fail to process them (showing "0 documents processed").
+    *   Corrected the `rag_vectors` virtual table schema by removing an unsupported `PRIMARY KEY` constraint.
+    *   Added automated schema recovery logic to detect and report missing or broken vector tables.
+-   **Transparency & Feedback**:
+    *   **Main Process Error Propagation**: Backend indexing errors are now captured and displayed directly in the Chat Panel log, providing clear feedback if document processing fails.
+    *   **Enhanced Status Diagnostics**: The "Build Index" process now performs a pre-flight check of the database schema and reports specific configuration or initialization errors.
+    *   **Detailed Content Logs**: Added diagnostic logging to identify documents that are skipped due to missing content or extraction failures.
 -   **Chat Stability**: Fixed several syntax and state synchronization errors in the chat panel that could cause crashes during long-running tool executions.
 -   **Tag Balance**: Resolved various build-breaking JSX tag mismatches in the Chat UI.
+
 
 ## v0.8.7 - The RAG & Clipboard Image Update
 

@@ -181,4 +181,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('rag:index-progress', handler);
     return () => ipcRenderer.removeListener('rag:index-progress', handler);
   },
+  onAppLog: (callback: (payload: { level: 'INFO' | 'ERROR' | 'WARNING' | 'DEBUG'; message: string; timestamp: string }) => void) => {
+    const handler = (_: IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on('app:log', handler);
+    return () => ipcRenderer.removeListener('app:log', handler);
+  },
 });

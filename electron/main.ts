@@ -40,6 +40,19 @@ declare global {
 // Override console.log, console.error, etc. to write to a log file
 log.transports.file.resolvePathFn = () => path.join(app.getPath('userData'), 'logs', 'main.log');
 Object.assign(console, log.functions);
+
+// Custom transport to send logs to the renderer
+(log.transports as any).renderer = (msg: any) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('app:log', {
+            level: msg.level.toUpperCase(),
+            message: msg.data.map((d: any) => typeof d === 'object' ? JSON.stringify(d) : String(d)).join(' '),
+            timestamp: msg.date.toISOString()
+        });
+    }
+};
+(log.transports as any).renderer.level = 'info';
+
 // Catch unhandled exceptions
 log.catchErrors({
   showDialog: false, // We'll handle fatal errors in the renderer
