@@ -370,6 +370,24 @@ function createWindow() {
     mainWindow?.show();
   });
 
+  // Open external links in the default browser
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http:') || url.startsWith('https:')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url !== mainWindow?.webContents.getURL() && (url.startsWith('http:') || url.startsWith('https:'))) {
+      const isLocalhost = url.includes('localhost:') || url.includes('127.0.0.1:');
+      if (!isLocalhost) {
+        event.preventDefault();
+        shell.openExternal(url);
+      }
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
