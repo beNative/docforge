@@ -14,6 +14,8 @@ This document provides a technical overview of the DocForge application's archit
 -   **Bundler:** [esbuild](https://esbuild.github.io/) for fast and efficient bundling of the application's source code.
 -   **Styling:** [Tailwind CSS](https://tailwindcss.com/) for a utility-first CSS framework.
 -   **Packaging:** [electron-builder](https://www.electron.build/) for creating distributable application packages.
+-   **Vector Search:** [sqlite-vec](https://github.com/asg017/sqlite-vec) extension for SQLite to enable efficient, local vector storage and similarity search.
+-   **Embeddings:** Integration with [Ollama](https://ollama.com/) or OpenAI-compatible APIs for generating document and query embeddings locally.
 -   **Diagram Rendering:** [PlantUML](https://plantuml.com/) via either the public plantuml.com service or a PlantUML jar bundled with the application (`assets/plantuml/plantuml.jar`). Offline rendering invokes the jar through the system Java Runtime Environment, so diagrams render without any network connectivity.
 
 ---
@@ -34,6 +36,8 @@ doc-forge/
 │   └── preload.ts        # Preload script for secure IPC.
 ├── hooks/                # Custom React hooks for business logic.
 ├── services/             # Modules for data access and external systems.
+│   ├── ragService.ts     # Orchestrates document indexing and semantic search.
+│   ├── embeddingService.ts # Manages vector generation via LLM providers.
 │   ├── preview/          # Renderer plugins for the preview system.
 │   └── ...
 ├── release/              # Output directory for packaged application.
@@ -122,7 +126,30 @@ This module handles all communication with the external Large Language Model. It
 -   It includes robust error handling to manage connection failures or non-OK responses from the provider.
 -   Clipboard imports invoke `llmService.generateTitle()` when a provider is online, allowing the renderer to assign meaningful titles to new documents automatically.
 
-### Component Breakdown
+### RAG & AI Chat Pipeline (`services/ragService.ts`)
+
+DocForge implements a fully local Retrieval-Augmented Generation (RAG) system to enable "Chat with Workspace" functionality.
+
+-   **Vector Storage (`sqlite-vec`):** The application uses the `sqlite-vec` extension to store document embeddings within the primary SQLite database. This allows for high-performance vector similarity searches using standard SQL syntax.
+-   **Indexing Workflow:**
+    1.  **Discovery:** The service identifies all indexable documents (Markdown and plaintext) in the workspace.
+    2.  **Chunking:** Large documents are split into smaller, overlapping segments to preserve context while staying within the model's token limits.
+    3.  **Embedding:** Each chunk is sent to the `embeddingService.ts`, which generates a high-dimensional vector representation using the configured local model (via Ollama).
+    4.  **Storage:** The vectors, along with document metadata and content snippets, are stored in a virtual `vec_documents` table.
+-   **Retrieval & Chat Workflow:**
+    1.  **Query Embedding:** The user's chat message is converted into a vector.
+    2.  **Similarity Search:** The system performs a `vec_distance_cosine` search against the indexed chunks to find the most relevant context.
+    3.  **Context Augmentation:** The retrieved snippets are combined with any explicitly pinned documents (Multi-Document Context) and passed to the LLM.
+    4.  **Streaming Response:** The AI generates an answer, which is streamed to the `ChatPanel.tsx` along with source citations linked to the original documents.
+
+### Multi-Document Context Management
+
+The chat system supports augmenting the LLM's prompt with specific, user-selected context.
+
+-   **State Management:** `App.tsx` maintains a `chatContextNodeIds` set, which stores the IDs of documents pinned to the chat.
+-   **Interaction Layer:** Users can add documents to the context via the treeview's context menu or by dragging nodes directly into the `ChatPanel.tsx`. 
+-   **Resolution:** Before sending a message, the system resolves these IDs into their full text content, ensuring the LLM has access to the exact documents the user is referencing.
+-   **Visual Feedback:** `ChatPanel.tsx` renders "Context Badges" for all active elements (active document, text selection, and pinned nodes), providing a clear overview of what information is being shared with the AI.
 
 -   **`App.tsx`:** The root component that orchestrates the entire application. It initializes the repository, triggers the data migration if needed, manages the main layout, and uses the data hooks (`useNodes`, `useSettings`, etc.).
 -   **`Sidebar.tsx`:** Manages the display of the `nodes` tree (documents and folders) and templates. It handles search/filtering, drag-and-drop, and keyboard navigation.

@@ -9,6 +9,7 @@ export const LOCAL_STORAGE_KEYS = {
   SIDEBAR_TEMPLATES_PANEL_HEIGHT: 'docforge_sidebar_templates_panel_height',
   CHAT_PANEL_WIDTH: 'docforge_chat_panel_width',
   ACTIVE_DOCUMENT_ID: 'docforge_active_document_id',
+  CHAT_CONTEXT_NODE_IDS: 'docforge_chat_context_node_ids',
 
   // Legacy keys used for migration check:
   LEGACY_PROMPTS: 'promptforge_prompts',
@@ -89,6 +90,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ragSimilarityThreshold: 1.4,
   chatEnableAgentMode: true,
   chatAgentRequiresApproval: true,
+  chatEnabledTools: ['get_workspace_tree', 'read_document', 'edit_document', 'create_node', 'move_nodes', 'delete_nodes', 'run_script', 'search_workspace'],
 };
 
 export const EXAMPLE_TEMPLATES: Omit<DocumentTemplate, 'template_id' | 'created_at' | 'updated_at'>[] = [

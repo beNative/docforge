@@ -20,6 +20,15 @@ export const LoggerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       message,
     };
     setLogs((prevLogs) => [...prevLogs, newLog]);
+    
+    // Sync to main process log if available
+    if (window.electronAPI?.log) {
+        try {
+            window.electronAPI.log({ level, message });
+        } catch (err) {
+            console.warn('[LoggerContext] Failed to sync log to main process:', err);
+        }
+    }
   }, []);
 
   const clearLogs = useCallback(() => {

@@ -62,6 +62,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPlatform: () => ipcRenderer.invoke('app:get-platform'),
   getLogPath: () => ipcRenderer.invoke('app:get-log-path'),
   appendLog: (content: string) => ipcRenderer.invoke('log:append', content),
+  log: (payload: { level: string; message: string }) => {
+    const formatted = `[${new Date().toLocaleTimeString()}] [${payload.level}] ${payload.message}`;
+    ipcRenderer.invoke('log:append', formatted);
+  },
   openExecutableFolder: () => ipcRenderer.invoke('app:open-executable-folder'),
   renderPlantUML: (diagram: string, format: 'svg' = 'svg') => ipcRenderer.invoke('plantuml:render-svg', diagram, format),
   updaterSetAllowPrerelease: (allow: boolean) => ipcRenderer.send('updater:set-allow-prerelease', allow),

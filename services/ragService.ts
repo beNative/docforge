@@ -9,7 +9,11 @@ const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
 
 const buildRagSystemPrompt = (
   contextChunks: RagSearchResult[],
-  extraContext?: { activeDocument?: { title: string, content: string }, selectedText?: string }
+  extraContext?: { 
+    activeDocument?: { id: string, title: string, content: string }, 
+    selectedText?: string,
+    attachedDocuments?: { title: string, content: string }[]
+  }
 ): string => {
   const contextBlocks = contextChunks
     .map(
@@ -20,7 +24,7 @@ const buildRagSystemPrompt = (
 
   let activeDocBlock = '';
   if (extraContext?.activeDocument) {
-    activeDocBlock = `[CURRENT ACTIVE DOCUMENT: "${extraContext.activeDocument.title}"]\n${extraContext.activeDocument.content}\n---\n`;
+    activeDocBlock = `[CURRENT ACTIVE DOCUMENT: "${extraContext.activeDocument.title}" (ID: ${extraContext.activeDocument.id})]\n${extraContext.activeDocument.content}\n---\n`;
   }
 
   let selectionBlock = '';
@@ -28,28 +32,53 @@ const buildRagSystemPrompt = (
     selectionBlock = `[USER SELECTED TEXT]:\n${extraContext.selectedText}\n---\n`;
   }
 
+  let attachedDocsBlock = '';
+  if (extraContext?.attachedDocuments && extraContext.attachedDocuments.length > 0) {
+    attachedDocsBlock = extraContext.attachedDocuments
+      .map(doc => `[ATTACHED DOCUMENT: "${doc.title}"]\n${doc.content}`)
+      .join('\n---\n') + '\n---\n';
+  }
+
   return `You are a helpful assistant answering questions about the user's document workspace in DocForge.
 Use the following context to answer when relevant.
 
+PRIORITY INSTRUCTIONS:
+1. ALWAYS check the "Priority Context" below first. This contains the document the user is currently looking at (Active Document) and any documents they have specifically pinned/attached to this conversation.
+2. If the user refers to "this document", "the current file", or "the attached code", they are talking about the items in the Priority Context.
+3. Use the "Retrieved background context" for broader knowledge from the rest of the workspace.
+
 TOOLS & CAPABILITIES:
-- You can read the entire workspace structure to find relevant documents.
-- You can create, edit, move, and delete documents and folders.
-- You can run Python, Shell, and PowerShell scripts to perform complex tasks or data processing.
+- [WORKSPACE] You can read the entire structure, create nodes, move items, and delete them to organize the workspace.
+- [SEARCH] You can perform semantic vector searches across all documents if the provided context is insufficient.
+- [READ/EDIT] You can read full document contents and write updates back to the workspace.
+- [SCRIPTING] You can execute Python, Shell, and PowerShell scripts. Use Python for data processing, analysis, or logic. Use Shell/PowerShell for system-level tasks.
 
 GUIDELINES:
-- When the user asks to "do" something (create, move, refactor), use the appropriate tool.
-- If you need more information about a document's content that wasn't in the RAG context, use tools to read it.
-- Always explain what you are doing before or after using a tool.
-- Cite sources when answering based on document content.
+- [Context First] Always check the Priority Context before calling tools.
+- [Plan then Act] For complex requests (like refactoring), first read the necessary files, then perform the edits.
+- [Explanations] Always explain what you are doing before or after using a tool.
+- [Citations] Cite sources when answering based on document content.
 
-Priority context:
-${selectionBlock}${activeDocBlock}
-Retrieved background context:
+WORKFLOW TIPS:
+1. If you need to find something but don't know where it is, use \`search_workspace\` or \`get_workspace_tree\`.
+2. When creating files in a new folder, you can use the folder's name as \`parentId\` if you just created it, or use its UUID.
+3. If a tool fails with a "not found" error, verify the ID in the workspace tree.
+
+  Priority context (Directly relevant to the user's current view):
+${selectionBlock}${activeDocBlock}${attachedDocsBlock}
+Retrieved background context (From RAG search):
 ---
 ${contextBlocks}
 ---
 
-If the answer is not in the provided context and you cannot find it using tools, say "I couldn't find information about that in your workspace."`;
+If the answer is not in the provided context and you cannot find it using tools, say "I couldn't find information about that in your workspace."
+---
+STRICT RULES FOR TOOL USE:
+1. ALWAYS use the \`nodeId\` (UUID) for any tool parameter requiring an ID (like \`parentId\` or \`nodeId\`).
+2. If you don't know the ID yet, you can use the exact title of the folder/document as a fallback—the system will attempt to resolve it.
+3. NEVER assume an ID if you haven't seen it in the workspace tree.
+4. If you just created a folder and need its ID for the next step, use the ID returned by the \`create_node\` tool.
+---`;
 };
 
 // =================================================================
@@ -63,6 +92,7 @@ interface StreamCallbacks {
   onSources?: (sources: RagSearchResult[]) => void;
   onToolCall?: (toolCalls: any[]) => void;
   onMessageUpdate?: (messages: RagChatMessage[]) => void;
+  onLog?: (level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR', message: string) => void;
 }
 
 const streamLLMChatResponse = async (
@@ -90,6 +120,10 @@ const streamLLMChatResponse = async (
     tools: settings.chatEnableAgentMode ? tools : undefined,
     stream: true,
   });
+
+  if (callbacks.onLog) {
+    callbacks.onLog('DEBUG', `[LLM Request] Sending ${messages.length} messages with ${tools?.length || 0} tools.`);
+  }
 
   console.log(`[RAG Service] Sending request to ${url} (Model: ${llmModelName}, Stream: true)`);
   
@@ -216,7 +250,11 @@ export const ragService = {
     settings: Settings,
     callbacks: StreamCallbacks,
     context: ToolExecutorContext,
-    extraContext?: { activeDocument?: { title: string, content: string }, selectedText?: string },
+    extraContext?: { 
+      activeDocument?: { title: string, content: string }, 
+      selectedText?: string,
+      attachedDocuments?: { title: string, content: string }[]
+    },
     signal?: AbortSignal
   ): Promise<RagSearchResult[]> {
     if (!isElectron) {
@@ -229,31 +267,44 @@ export const ragService = {
     // 1. Search for relevant chunks
     let filteredResults: RagSearchResult[] = [];
     if (ragEmbeddingProviderUrl) {
-      console.log(`[RAG Service] Searching index for: "${question}"`);
+      callbacks.onLog?.('INFO', `RAG: Searching index for: "${question}"`);
       const searchResult = await window.electronAPI!.ragSearch(question, ragEmbeddingProviderUrl, ragEmbeddingModelName, ragContextLimit || 5);
       if (searchResult.success) {
-        console.log(`[RAG Service] Retrieved ${searchResult.results.length} raw sources.`);
+        callbacks.onLog?.('INFO', `RAG: Retrieved ${searchResult.results.length} raw sources.`);
         filteredResults = searchResult.results.filter(r => r.distance < (ragSimilarityThreshold ?? 1.4));
-        console.log(`[RAG Service] Retained ${filteredResults.length} sources after threshold filter (threshold: ${ragSimilarityThreshold ?? 1.4}).`);
+        callbacks.onLog?.('INFO', `RAG: Retained ${filteredResults.length} sources after threshold filter (threshold: ${ragSimilarityThreshold ?? 1.4}).`);
         callbacks.onSources?.(filteredResults);
       } else {
-        console.error(`[RAG Service] Vector search failed: ${searchResult.error}`);
+        callbacks.onLog?.('ERROR', `RAG: Vector search failed: ${searchResult.error}`);
       }
     } else {
-      console.warn(`[RAG Service] No embedding provider configured, skipping vector search.`);
+      callbacks.onLog?.('WARNING', `RAG: No embedding provider configured, skipping vector search.`);
+    }
+
+    if (extraContext?.attachedDocuments?.length) {
+      callbacks.onLog?.('INFO', `RAG: Including ${extraContext.attachedDocuments.length} pinned documents in prompt context.`);
     }
 
     const systemPrompt = buildRagSystemPrompt(filteredResults, extraContext);
-    const tools = AGENT_TOOLS.map(t => ({
-      type: 'function',
-      function: {
-        name: t.name,
-        description: t.description,
-        parameters: t.parameters
-      }
-    }));
+    const tools = settings.chatEnableAgentMode 
+      ? AGENT_TOOLS
+          .filter(t => (settings.chatEnabledTools || []).includes(t.name))
+          .map(t => ({
+            type: 'function',
+            function: {
+              name: t.name,
+              description: t.description,
+              parameters: t.parameters
+            }
+          }))
+      : [];
 
     let currentHistory = [...history];
+    const MAX_HISTORY_TURNS = 10; // Keep last 10 turns (user+assistant+tool calls)
+    if (currentHistory.length > MAX_HISTORY_TURNS * 2) {
+      currentHistory = currentHistory.slice(-(MAX_HISTORY_TURNS * 2));
+    }
+
     let loopCount = 0;
     const MAX_LOOPS = 5;
 
@@ -263,11 +314,17 @@ export const ragService = {
         { role: 'system', content: systemPrompt },
         ...currentHistory.map(msg => ({ 
           role: msg.role, 
-          content: msg.content || '',
-          tool_calls: msg.toolCalls,
+          content: msg.content || (msg.role === 'assistant' && msg.toolCalls ? null : ''),
+          tool_calls: msg.toolCalls ? msg.toolCalls.map((tc: any) => ({
+            id: tc.id,
+            type: 'function',
+            function: {
+              name: tc.name,
+              arguments: tc.arguments
+            }
+          })) : undefined,
           tool_call_id: msg.toolResult?.toolCallId
-        })),
-        { role: 'user', content: question }
+        }))
       ];
 
       const result = await streamLLMChatResponse(apiMessages, settings, callbacks, tools, signal);
@@ -300,7 +357,10 @@ export const ragService = {
           };
 
           try {
+            callbacks.onLog?.('INFO', `[Agent] Executing tool: ${toolCall.name}...`);
             const toolResultContent = await executeTool(toolCall, context);
+            callbacks.onLog?.('DEBUG', `[Agent] Tool ${toolCall.name} returned: ${toolResultContent.substring(0, 500)}${toolResultContent.length > 500 ? '...' : ''}`);
+            
             const toolMsg: RagChatMessage = {
               id: uuidv4(),
               role: 'tool',
@@ -310,11 +370,13 @@ export const ragService = {
             };
             currentHistory.push(toolMsg);
           } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            callbacks.onLog?.('ERROR', `[Agent] Tool ${toolCall.name} execution failed: ${errMsg}`);
             const toolMsg: RagChatMessage = {
               id: uuidv4(),
               role: 'tool',
-              content: `Error executing tool: ${err}`,
-              toolResult: { toolCallId: toolCall.id, result: `Error: ${err}` },
+              content: `Error executing tool: ${errMsg}`,
+              toolResult: { toolCallId: toolCall.id, result: `Error: ${errMsg}` },
               timestamp: new Date().toISOString()
             };
             currentHistory.push(toolMsg);

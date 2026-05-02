@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
-import type { Node, DocumentOrFolder, DocType, ImportedNodeSummary, ClassificationSummary } from '../types';
 import { useNodes } from './useNodes';
+import { repository } from '../services/repository';
+import type { DocumentOrFolder, Node, DocType, ClassificationSummary, ImportedNodeSummary } from '../types';
 import { mapExtensionToLanguageId } from '../services/languageService';
 
 /**
@@ -195,9 +196,14 @@ export const useDocuments = () => {
       return getDescendantIdsRecursive(nodeId, allNodesFlat);
   }, [allNodesFlat]);
 
+  const getLatestItems = useCallback(async () => {
+    const latestNodes = await repository.getNodeTree();
+    return flattenNodes(latestNodes).map(nodeToDocumentOrFolder);
+  }, []);
+
   const setItemLock = useCallback(async (id: string, locked: boolean) => {
     await setNodeLock(id, locked);
   }, [setNodeLock]);
 
-  return { nodes, items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, moveItems, getDescendantIds, refresh: refreshNodes, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard: createDocumentFromClipboardAdapter, setItemLock, isLoading };
+  return { nodes, items, addDocument, addFolder, updateItem, commitVersion, deleteItem, deleteItems, duplicateItems, moveItems, getDescendantIds, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard: createDocumentFromClipboardAdapter, setItemLock, refreshNodes, getLatestItems, isLoading };
 };

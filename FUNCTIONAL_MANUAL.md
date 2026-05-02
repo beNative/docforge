@@ -148,13 +148,36 @@ Import PDFs by dragging `.pdf` files from your operating system into the sidebar
 
 #### RAG (Chat with Workspace)
 
-The "Chat with Workspace" feature allows you to query your entire collection of documents using a local AI model.
+The "Chat with Workspace" feature allows you to query your entire collection of documents using a local AI model. It uses semantic search to find answers even when you don't use the exact keywords.
 
-- **Indexing**: Before you can chat, DocForge needs to index your workspace. This process creates a semantic representation of your documents, allowing the AI to find relevant context even if the exact keywords don't match.
-- **Configurable Retrieval**: In Settings, you can adjust the **RAG Similarity Threshold**. A lower value (e.g., 0.8) makes the search more restrictive, returning only highly relevant matches, while a higher value (e.g., 1.5) returns more context.
-- **Context Limit**: You can configure the chat to analyze up to **500 documents** at once for deep workspace insights.
-- **Source Attribution**: When the AI answers a question, it lists the specific documents it used as context. These sources are streamed immediately as soon as the search completes.
-- **Smart Privacy**: If the AI determines that none of the retrieved documents contain the answer to your question, the source list is automatically hidden to keep the chat interface clean.
+-   **Indexing**: Before you can chat, DocForge needs to index your workspace. This process creates a semantic representation of your documents. 
+    -   Click **Build Index** (or **Rebuild**) in the Chat Panel to start.
+    -   A progress bar will show the number of documents being processed.
+    -   Once complete, the "indexed" badge in the chat header will reflect the current state of your workspace.
+-   **Semantic Retrieval**: When you ask a question, DocForge searches for the most relevant "chunks" of text across all your indexed files.
+-   **Configurable Retrieval**: In Settings, you can adjust the **RAG Similarity Threshold**. 
+    -   A **lower value** (e.g., 0.8) makes the search more restrictive, returning only highly relevant matches.
+    -   A **higher value** (e.g., 1.5) returns more broad context.
+-   **Context Limit**: You can configure the chat to analyze up to **500 documents** at once for deep workspace insights.
+-   **Source Attribution**: When the AI answers a question, it lists the specific documents it used as context. 
+    -   Click a source badge to instantly open and navigate to that document.
+    -   Sources are streamed as soon as the search completes, before the AI starts typing its answer.
+-   **Smart Privacy**: If the AI determines that none of the retrieved documents contain the answer to your question, the source list is automatically hidden to keep the chat interface clean.
+
+#### Multi-Document Context
+
+Beyond searching your entire workspace, you can explicitly "pin" documents to a conversation for focused reasoning.
+
+-   **Adding Context**: 
+    -   **Right-Click**: Select one or more documents in the sidebar, right-click, and choose **Add to Chat Context**.
+    -   **Drag and Drop**: Drag one or more nodes from the sidebar and drop them directly onto the Chat Panel. A "Drop to add Context" overlay will appear.
+-   **Context Badges**: Active context is displayed as badges at the top of the chat area.
+    -   **Active Document**: Automatically includes the file you are currently editing.
+    -   **Pinned Documents**: Indicated with a 📌 icon. These stay in the context even if you switch tabs.
+    -   **Selection active**: If you select text in the editor, it is automatically included in the next chat message.
+-   **Removing Context**: Click the **X** on any context badge to remove that specific document from the current session.
+-   **Cross-Document Reasoning**: Use this to ask questions like "Compare the requirements in Document A with the implementation in Document B."
+
 
 #### Agentic Chat & Workspace Orchestration
 
@@ -198,6 +221,8 @@ You can drop an item (or a group of items):
 - **Inside** a folder to move it into that folder.
 
 **Importing from your computer:** You can also drag files and folders directly from your operating system's file explorer into the sidebar. Dropping them on a folder will import them into that folder, while dropping them in an empty area will import them to the root. The original folder structure is preserved.
+
+**Adding to Chat Context:** Drag and drop is also used to augment your AI conversations. Drag one or more documents from the sidebar and drop them onto the **Chat Panel** to instantly pin them as context for your next question.
 
 ### AI-Powered Refinement
 

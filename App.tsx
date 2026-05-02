@@ -181,7 +181,7 @@ interface UpdateToastState {
 
 export const MainApp: React.FC = () => {
     const { settings, saveSettings, loaded: settingsLoaded } = useSettings();
-    const { nodes, items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, setItemLock, isLoading: areDocumentsLoading } = useDocuments();
+    const { nodes, items, addDocument, addFolder, updateItem, commitVersion, deleteItems, moveItems, getDescendantIds, duplicateItems, addDocumentsFromFiles, importNodesFromTransfer, createDocumentFromClipboard, setItemLock, refreshNodes, getLatestItems, isLoading: areDocumentsLoading } = useDocuments();
     const { templates, addTemplate, updateTemplate, deleteTemplate, deleteTemplates } = useTemplates();
     const { theme } = useTheme();
 
@@ -196,6 +196,8 @@ export const MainApp: React.FC = () => {
     const [pendingRevealId, setPendingRevealId] = useState<string | null>(null);
     const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
     const [selectedText, setSelectedText] = useState<string | undefined>(undefined);
+    const [chatContextNodeIds, setChatContextNodeIds] = useState(new Set<string>());
+    const [hasLoadedChatContext, setHasLoadedChatContext] = useState(false);
     const [pendingInsertText, setPendingInsertText] = useState<string | null>(null);
 
     const [view, setView] = useState<'editor' | 'info' | 'settings'>('editor');
@@ -431,6 +433,38 @@ export const MainApp: React.FC = () => {
 
         return unsubscribe;
     }, [addLog]);
+
+    const addToChatContextAction = useCallback((ids: string[]) => {
+        addLog('INFO', `User action: Adding ${ids.length} item(s) to chat context.`);
+        setChatContextNodeIds(prev => {
+            const next = new Set(prev);
+            ids.forEach(id => {
+                const item = items.find(i => i.id === id);
+                if (item?.type === 'folder') {
+                    // Recursively find all documents within this folder
+                    const descendantIds = getDescendantIds(id);
+                    descendantIds.forEach(dId => {
+                        const dNode = items.find(n => n.id === dId);
+                        if (dNode?.type === 'document') {
+                            next.add(dId);
+                        }
+                    });
+                } else if (item?.type === 'document') {
+                    next.add(id);
+                }
+            });
+            return next;
+        });
+        if (!isChatPanelVisible) {
+            setIsChatPanelVisible(true);
+        }
+    }, [addLog, isChatPanelVisible, items, getDescendantIds]);
+
+    useEffect(() => {
+        if (settingsLoaded && hasLoadedChatContext) {
+            storageService.save(LOCAL_STORAGE_KEYS.CHAT_CONTEXT_NODE_IDS, Array.from(chatContextNodeIds));
+        }
+    }, [chatContextNodeIds, settingsLoaded, hasLoadedChatContext]);
 
     useEffect(() => {
         if (!isElectron || !window.electronAPI?.dbGetPath) {
@@ -1501,13 +1535,22 @@ export const MainApp: React.FC = () => {
                 }
                 setExpandedFolderIds(new Set(ids));
             })
-            .catch(() => {
-                // Loading failed; we'll fall back to the default empty set.
-            })
+            .catch(() => {})
             .finally(() => {
-                if (!isCancelled) {
-                    setHasLoadedExpandedFolders(true);
+                if (!isCancelled) setHasLoadedExpandedFolders(true);
+            });
+
+        storageService
+            .load<string[]>(LOCAL_STORAGE_KEYS.CHAT_CONTEXT_NODE_IDS, [])
+            .then(ids => {
+                if (isCancelled) return;
+                if (Array.isArray(ids)) {
+                    setChatContextNodeIds(new Set(ids));
                 }
+            })
+            .catch(() => {})
+            .finally(() => {
+                if (!isCancelled) setHasLoadedChatContext(true);
             });
 
         return () => {
@@ -1865,6 +1908,52 @@ export const MainApp: React.FC = () => {
         setView('editor');
         setRenamingNodeId(newDoc.id);
     }, [addDocument, getParentIdForNewItem, ensureNodeVisible, addLog, activateDocumentTab]);
+
+    const handleAgentAddNode = useCallback(async (params: any) => {
+        addLog('INFO', `Agent action: Creating new ${params.node_type} "${params.title}"...`);
+        
+        let resultNode: any;
+        if (params.node_type === 'folder') {
+            resultNode = await addFolder(params.parent_id || params.parentId, params.title);
+        } else {
+            resultNode = await addDocument({
+                parentId: params.parent_id || params.parentId,
+                title: params.title,
+                content: params.document?.content || params.content,
+                doc_type: params.document?.doc_type || params.docType,
+                language_hint: params.document?.language_hint || params.languageHint
+            });
+            
+            if (params.document?.content || params.content) {
+                await commitVersion(resultNode.id, params.document?.content || params.content);
+            }
+        }
+        
+        if (resultNode) {
+            ensureNodeVisible(resultNode);
+            activateDocumentTab(resultNode.id);
+            setSelectedIds(new Set([resultNode.id]));
+            setLastClickedId(resultNode.id);
+            
+            // Map back to the 'Node' structure expected by agentService.ts
+            return {
+                node_id: resultNode.id,
+                parent_id: resultNode.parentId,
+                node_type: resultNode.type,
+                title: resultNode.title,
+                created_at: resultNode.createdAt,
+                updated_at: resultNode.updatedAt,
+                locked: resultNode.locked,
+                document: resultNode.type === 'document' ? {
+                    node_id: resultNode.id,
+                    content: resultNode.content,
+                    doc_type: resultNode.doc_type,
+                    language_hint: resultNode.language_hint,
+                } : undefined
+            };
+        }
+        throw new Error('Failed to create node via agent.');
+    }, [addDocument, addFolder, commitVersion, ensureNodeVisible, activateDocumentTab, addLog]);
 
     const handleNewDocumentFromClipboard = useCallback(async (parentId?: string | null) => {
         addLog('INFO', 'User action: Create New Document from Clipboard.');
@@ -2405,6 +2494,11 @@ export const MainApp: React.FC = () => {
         handleDeleteSelection(idsToDelete, { force: shiftKey });
     }, [items, selectedIds, handleDeleteSelection, addLog]);
 
+    const handleAgentDeleteNodes = useCallback(async (ids: string[]) => {
+        addLog('INFO', `Agent action: Deleting ${ids.length} nodes.`);
+        await handleDeleteSelection(new Set(ids), { force: true });
+    }, [handleDeleteSelection, addLog]);
+
     const handleDeleteTemplate = useCallback((id: string, shiftKey: boolean = false) => {
         const templateToDelete = templates.find(t => t.template_id === id);
         if (!templateToDelete) return;
@@ -2872,6 +2966,11 @@ export const MainApp: React.FC = () => {
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem), shortcut: getCommand('new-folder')?.shortcutString },
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
                 { type: 'separator' },
+                { label: 'Add to Chat Context', icon: SearchIcon, action: () => {
+                    const docIds = selectedNodes.filter(n => n.type === 'document').map(n => n.id);
+                    if (docIds.length > 0) addToChatContextAction(docIds);
+                }, disabled: !hasDocuments },
+                { type: 'separator' },
                 { label: 'Format', icon: FormatIcon, action: handleFormatDocument, disabled: !isFormattable || currentSelection.size !== 1, shortcut: getCommand('format-document')?.shortcutString },
                 { label: firstSelectedNode?.locked ? 'Unlock Document' : 'Lock Document', icon: firstSelectedNode?.locked ? LockOpenIcon : LockClosedIcon, action: () => { if (firstSelectedNode && firstSelectedNode.type === 'document') { void handleSetNodeLockState(firstSelectedNode.id, !firstSelectedNode.locked); } }, disabled: !isDocument || currentSelection.size !== 1, shortcut: getCommand('toggle-document-lock')?.shortcutString },
                 { label: 'Rename', icon: PencilIcon, action: () => handleStartRenamingNode(nodeId), disabled: currentSelection.size !== 1, shortcut: getCommand('rename-item')?.shortcutString },
@@ -2897,7 +2996,7 @@ export const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile, handleSetNodeLockState]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile, handleSetNodeLockState, addToChatContextAction]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -3278,18 +3377,35 @@ export const MainApp: React.FC = () => {
                                         onApplyToEditor={handleApplyToEditor}
                                         onCreateDocument={handleCreateDocumentFromChat}
                                         activeDocument={activeNode ? { title: activeNode.title, content: activeNode.content ?? '' } : undefined}
+                                        chatContextNodeIds={chatContextNodeIds}
+                                        onRemoveNodeFromContext={(id) => setChatContextNodeIds(prev => {
+                                            const next = new Set(prev);
+                                            next.delete(id);
+                                            return next;
+                                        })}
+                                        onAddNodesToContext={addToChatContextAction}
+                                        onClearAllContext={() => setChatContextNodeIds(new Set())}
                                         selectedText={selectedText}
                                         addLog={addLog}
                                         nodes={nodes}
-                                        addNode={handleNewDocument}
-                                        updateNode={handleRenameNode}
+                                        addNode={handleAgentAddNode}
+                                        updateNode={async (id, updates) => {
+                                            await handleRenameNode(id, updates.title);
+                                        }}
                                         updateDocumentContent={handleCommitVersion}
-                                        deleteNodes={handleDeleteNode}
+                                        deleteNodes={handleAgentDeleteNodes}
                                         moveNodes={moveItems}
+                                        getLatestItems={async () => {
+                                            await refreshNodes();
+                                            const latestNodes = await repository.getNodeTree();
+                                            return latestNodes;
+                                        }}
                                         runPython={async (code, nodeId) => {
+                                            // Real implementation would go here, currently handled by ChatPanel's inner context
                                             return ""; 
                                         }}
                                         runScript={async (lang, code, nodeId) => {
+                                            // Real implementation would go here
                                             return "";
                                         }}
                                     />

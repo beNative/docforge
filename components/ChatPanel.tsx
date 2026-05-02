@@ -2,14 +2,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import type { Settings, RagChatMessage, RagSearchResult, Node } from '../types';
+import type { Settings, RagChatMessage, RagSearchResult, Node, DocumentOrFolder } from '../types';
 import { ragService } from '../services/ragService';
 import { v4 as uuidv4 } from 'uuid';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
 import { pythonService } from '../services/pythonService';
 import { scriptService } from '../services/scriptService';
-import { SparklesIcon, TerminalIcon, WarningIcon } from './Icons';
+import { SparklesIcon, TerminalIcon, WarningIcon, XIcon, SearchIcon, TrashIcon, RefreshIcon } from './Icons';
 import Hint from './Hint';
+import Tooltip from './Tooltip';
+import IconButton from './IconButton';
 
 interface ChatPanelProps {
   isVisible: boolean;
@@ -23,14 +25,100 @@ interface ChatPanelProps {
   activeDocument?: { title: string; content: string };
   selectedText?: string;
   nodes: Node[];
+  chatContextNodeIds?: Set<string>;
+  onRemoveNodeFromContext?: (nodeId: string) => void;
+  onAddNodesToContext?: (nodeIds: string[]) => void;
+  onClearAllContext?: () => void;
   addNode: (node: any) => Promise<Node>;
   updateNode: (id: string, updates: any) => Promise<void>;
   updateDocumentContent: (id: string, content: string) => Promise<void>;
   deleteNodes: (ids: string[]) => Promise<void>;
   moveNodes: (ids: string[], targetId: string | null, position: any) => Promise<void>;
+  getLatestItems: () => Promise<Node[]>;
   runPython: (code: string, nodeId?: string) => Promise<string>;
   runScript: (language: any, code: string, nodeId?: string) => Promise<string>;
 }
+
+interface IndexActionButtonProps {
+  onClick: (e: React.MouseEvent) => void;
+  tooltip: string;
+  icon: React.ReactNode;
+  label: string;
+  disabled?: boolean;
+  primary?: boolean;
+}
+
+const IndexActionButton: React.FC<IndexActionButtonProps> = ({ onClick, tooltip, icon, label, disabled, primary }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  
+  return (
+    <>
+      <button
+        ref={ref}
+        onClick={onClick}
+        disabled={disabled}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors disabled:opacity-50 ${
+          primary 
+            ? 'text-primary hover:bg-primary/10' 
+            : 'text-text-tertiary hover:text-text-secondary hover:bg-border-color/30'
+        }`}
+      >
+        {icon}
+        <span>{label}</span>
+      </button>
+      {isHovered && ref.current && (
+        <Tooltip targetRef={ref} content={tooltip} position="bottom" />
+      )}
+    </>
+  );
+};
+
+const SourceCitation: React.FC<{ source: RagSearchResult; onNavigate: (id: string) => void }> = ({ source, onNavigate }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  
+  return (
+    <>
+      <button
+        ref={ref}
+        onClick={() => onNavigate(source.nodeId)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+      >
+        📄 {source.nodeTitle}
+      </button>
+      {isHovered && ref.current && (
+        <Tooltip targetRef={ref} content={`Open "${source.nodeTitle}"`} position="top" />
+      )}
+    </>
+  );
+};
+
+const ApplyCodeButton: React.FC<{ content: string; onApply: (content: string) => void }> = ({ content, onApply }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const ref = useRef<HTMLButtonElement>(null);
+  
+  return (
+    <>
+      <button 
+        ref={ref}
+        onClick={() => onApply(content)}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-primary/80 hover:bg-primary text-white text-[9px] px-1.5 py-0.5 rounded transition-all shadow-sm"
+      >
+        Apply
+      </button>
+      {isHovered && ref.current && (
+        <Tooltip targetRef={ref} content="Apply to current document" position="top" />
+      )}
+    </>
+  );
+};
 
 const ChatPanel: React.FC<ChatPanelProps> = ({
   isVisible,
@@ -49,8 +137,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   updateDocumentContent,
   deleteNodes,
   moveNodes,
+  getLatestItems,
   runPython,
   runScript,
+  chatContextNodeIds = new Set(),
+  onRemoveNodeFromContext,
+  onAddNodesToContext,
+  onClearAllContext,
 }) => {
   const [messages, setMessages] = useState<RagChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -58,9 +151,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isIndexing, setIsIndexing] = useState(false);
   const [indexProgress, setIndexProgress] = useState<{ current: number; total: number } | null>(null);
   const [indexStatus, setIndexStatus] = useState<{ totalDocuments: number; indexedDocuments: number } | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const dragCounter = useRef(0);
   const { environments, interpreters, refreshEnvironments } = usePythonEnvironments();
   const [pendingAction, setPendingAction] = useState<{ 
     toolCall: any, 
@@ -68,6 +163,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     resolve: (val: string) => void, 
     reject: (err: any) => void 
   } | null>(null);
+  
+  const nodesRef = useRef<Node[]>(nodes);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
 
   // Load index status on mount and when panel becomes visible
   useEffect(() => {
@@ -173,6 +273,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
     setMessages(prev => [...prev, userMessage, assistantMessage]);
 
+    const attachedDocuments = Array.from(chatContextNodeIds)
+      .map(id => nodes.find(n => n.id === id))
+      .filter((n): n is DocumentOrFolder => n !== undefined && n.type === 'document')
+      .map(n => ({ title: n.title, content: n.content || '' }));
+
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
@@ -180,20 +285,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     try {
 
       const toolContext: any = {
-        nodes,
+        nodes: nodesRef.current,
         addNode,
         updateNode,
         updateDocumentContent,
         deleteNodes,
         moveNodes,
+        getLatestItems,
         runPython: async (code: string, nodeId?: string) => {
-          addLog('INFO', 'Agent: Running Python script...');
+          addLog('INFO', `Agent: Running Python script${nodeId ? ` on node ${nodeId}` : ''}...`);
           try {
             let interpreterList = interpreters;
             if (!interpreterList.length) {
+              addLog('DEBUG', 'Agent: Detecting Python interpreters...');
               interpreterList = await pythonService.detectInterpreters();
             }
+            addLog('DEBUG', `Agent: Ensuring environment for ${nodeId || 'agent-temp'}...`);
             const env = await pythonService.ensureNodeEnvironment(nodeId || 'agent-temp', settings.pythonDefaults, interpreterList);
+            addLog('DEBUG', 'Agent: Script execution starting...');
             const run = await pythonService.runScript({
               nodeId: nodeId || 'agent-temp',
               code,
@@ -208,6 +317,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                    cleanup();
                    pythonService.getRunLogs(runId).then(logs => {
                      const output = logs.map(l => l.message).join('\n');
+                     addLog(status === 'succeeded' ? 'INFO' : 'ERROR', `Agent: Python script ${status}. Output length: ${output.length} chars.`);
                      resolve(output || `Script finished with status: ${status}`);
                    });
                  }
@@ -215,6 +325,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                setTimeout(() => { cleanup(); resolve('Error: Script execution timed out.'); }, 30000);
             });
           } catch (err: any) {
+            addLog('ERROR', `Agent: Python execution failed: ${err.message || err}`);
             return `Error: ${err.message || err}`;
           }
         },
@@ -249,10 +360,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             return `Error: ${err.message || err}`;
           }
         },
+        refreshWorkspace: async () => {
+          const latestItems = await getLatestItems();
+          nodesRef.current = latestItems;
+          toolContext.nodes = latestItems;
+        },
         searchRag: async (query: string) => {
           const result = await window.electronAPI!.ragSearch(query, settings.ragEmbeddingProviderUrl, settings.ragEmbeddingModelName, 5);
           return result.success ? result.results : [];
-        }
+        },
+        addLog
       };
 
       const wrappedContext: any = { ...toolContext };
@@ -324,9 +441,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             setIsLoading(false);
             addLog('ERROR', `RAG chat error: ${error}`);
           },
+          onLog: addLog,
         },
         wrappedContext,
-        { activeDocument, selectedText },
+        { activeDocument, selectedText, attachedDocuments },
         abortController.signal
       );
     } catch (error) {
@@ -352,6 +470,62 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     );
   }, []);
 
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('application/json') || e.dataTransfer.types.includes('application/vnd.docforge.nodes+json')) {
+      dragCounter.current++;
+      if (dragCounter.current === 1) {
+        setIsDraggingOver(true);
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes('application/json') || e.dataTransfer.types.includes('application/vnd.docforge.nodes+json')) {
+      e.dataTransfer.dropEffect = 'copy';
+      if (!isDraggingOver) setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setIsDraggingOver(false);
+    
+    let data = e.dataTransfer.getData('application/json');
+    if (!data) {
+      data = e.dataTransfer.getData('application/vnd.docforge.nodes+json');
+    }
+
+    if (data) {
+      try {
+        const payload = JSON.parse(data);
+        const ids = Array.isArray(payload) ? payload : (payload.nodes ? payload.nodes.map((n: any) => n.id) : []);
+        
+        if (Array.isArray(ids)) {
+          // Pass all IDs (including folders) to the handler, which handles expansion
+          onAddNodesToContext?.(ids);
+        }
+      } catch (err) {
+        console.error('Failed to parse dropped IDs:', err);
+      }
+    }
+  };
+
   if (!isVisible) return null;
 
   const hasIndex = indexStatus && indexStatus.indexedDocuments > 0;
@@ -364,59 +538,116 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         className="w-1.5 cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
       />
       <div
-        className="flex flex-col bg-background border-l border-border-color overflow-hidden"
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className="flex flex-col bg-background border-l border-border-color overflow-hidden relative"
         style={{ width: `${width}px`, minWidth: '280px' }}
       >
+        {isDraggingOver && (
+          <div className="absolute inset-0 z-50 bg-primary/20 backdrop-blur-[2px] border-2 border-dashed border-primary flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200 pointer-events-none">
+            <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mb-4 text-primary">
+              <SearchIcon className="w-8 h-8" />
+            </div>
+            <h4 className="text-lg font-bold text-primary mb-2">Drop to add Context</h4>
+            <p className="text-sm text-text-secondary">Release to add selected documents to the current chat session.</p>
+          </div>
+        )}
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border-color bg-secondary/50 flex-shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-text-main">💬 Chat</span>
             {indexStatus && (
-              <Hint>
+              <Hint tooltip="Indexing progress for RAG">
                 {indexStatus.indexedDocuments}/{indexStatus.totalDocuments} indexed
               </Hint>
             )}
           </div>
           <div className="flex items-center gap-1">
             {hasIndex && (
-              <button
+              <IndexActionButton
                 onClick={handleClearIndex}
-                className="text-[10px] text-text-tertiary hover:text-text-secondary px-1.5 py-0.5 rounded hover:bg-border-color/30 transition-colors"
-                title="Clear index"
-              >
-                Clear
-              </button>
+                tooltip="Clear index"
+                icon={<TrashIcon className="w-3 h-3" />}
+                label="Clear"
+              />
             )}
-            <button
+            <IndexActionButton
               onClick={handleBuildIndex}
               disabled={isIndexing}
-              className="text-[10px] text-primary hover:text-primary/80 px-1.5 py-0.5 rounded hover:bg-primary/10 transition-colors disabled:opacity-50"
-              title="Rebuild index"
-            >
-              {isIndexing ? 'Indexing...' : hasIndex ? 'Rebuild' : 'Build Index'}
-            </button>
+              tooltip="Rebuild index"
+              icon={<RefreshIcon className={`w-3 h-3 ${isIndexing ? 'animate-spin' : ''}`} />}
+              label={isIndexing ? 'Indexing...' : hasIndex ? 'Rebuild' : 'Build Index'}
+              primary
+            />
           </div>
         </div>
 
         {/* Active Context Badges */}
-        {(activeDocument || selectedText) && (
+        {(activeDocument || selectedText || (chatContextNodeIds && chatContextNodeIds.size > 0)) && (
           <div className="px-3 py-1.5 border-b border-border-color bg-primary/5 flex flex-wrap gap-2 items-center min-h-[32px]">
+            <span className="text-[10px] font-bold text-text-tertiary uppercase tracking-wider mr-1">Context:</span>
+            
             {activeDocument && (
               <Hint 
-                title={activeDocument.title} 
+                tooltip={`Active: ${activeDocument.title}`}
                 icon={<span className="opacity-70">📄</span>}
                 className="bg-primary/10 border border-primary/20 text-primary"
               >
                 {activeDocument.title.length > 20 ? activeDocument.title.substring(0, 17) + '...' : activeDocument.title}
               </Hint>
             )}
+            
             {selectedText && (
               <Hint 
+                tooltip="Currently selected text"
                 icon={<span className="opacity-70">✂️</span>}
                 className="bg-amber-500/10 border border-amber-500/20 text-amber-600"
               >
                 Selection active
               </Hint>
+            )}
+            
+            {Array.from(chatContextNodeIds).map(nodeId => {
+              const node = nodes.find(n => n.id === nodeId);
+              const title = node?.title || `Document ${nodeId.substring(0, 8)}...`;
+              
+              return (
+                <div key={nodeId} className="flex items-center group">
+                  <Hint 
+                    tooltip={node ? `Pinned: ${node.title}` : 'Pinned document (resolving...)'} 
+                    icon={<span className="opacity-70">{node?.type === 'folder' ? '📁' : '📌'}</span>}
+                    className="bg-secondary/30 border border-border-color text-text-main pr-1"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>{title.length > 20 ? title.substring(0, 17) + '...' : title}</span>
+                      <IconButton 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveNodeFromContext?.(nodeId);
+                        }}
+                        variant="ghost"
+                        size="xs"
+                        tooltip="Remove from context"
+                        tooltipPosition="bottom"
+                        className="!w-4 !h-4 p-0.5 opacity-40 group-hover:opacity-100 transition-opacity"
+                      >
+                        <XIcon className="w-2.5 h-2.5" />
+                      </IconButton>
+                    </div>
+                  </Hint>
+                </div>
+              );
+            })}
+
+            {chatContextNodeIds.size > 1 && (
+              <button 
+                onClick={() => onClearAllContext?.()}
+                className="text-[10px] text-text-tertiary hover:text-red-500 transition-colors ml-auto pl-2"
+              >
+                Clear all
+              </button>
             )}
           </div>
         )}
@@ -462,16 +693,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             if (msg.role === 'tool') {
               return (
                 <div key={msg.id} className="flex justify-start">
-                   <div className="bg-secondary/40 border border-border-color/30 rounded-lg px-3 py-2 text-[11px] font-mono text-text-tertiary max-w-[90%] overflow-hidden">
-                     <div className="flex items-center gap-2 mb-1 opacity-70">
-                       <TerminalIcon className="w-3.5 h-3.5" />
-                       <span className="uppercase tracking-widest text-[9px]">Tool Result</span>
-                       <span className="ml-auto opacity-50">ID: {msg.toolResult?.toolCallId?.substring(0, 8)}</span>
+                   <details className="bg-secondary/40 border border-border-color/30 rounded-lg px-3 py-2 text-[11px] font-mono text-text-tertiary max-w-[90%] overflow-hidden group">
+                     <summary className="flex items-center gap-2 cursor-pointer list-none select-none opacity-70 hover:opacity-100 transition-opacity">
+                        <TerminalIcon className="w-3.5 h-3.5" />
+                        <span className="uppercase tracking-widest text-[9px]">Tool Result</span>
+                        <span className="ml-auto opacity-50 font-mono">ID: {msg.toolResult?.toolCallId?.substring(0, 8)}</span>
+                        <span className="group-open:rotate-180 transition-transform duration-200">▼</span>
+                     </summary>
+                     <div className="mt-2">
+                       <pre className="whitespace-pre-wrap break-words max-h-64 overflow-y-auto bg-background/30 p-2 rounded border border-border-color/10">
+                         {msg.content}
+                       </pre>
                      </div>
-                     <pre className="whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
-                       {msg.content}
-                     </pre>
-                   </div>
+                   </details>
                 </div>
               );
             }
@@ -516,13 +750,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           return (
                             <div className="relative group">
                               <pre className="bg-background/50 p-2 rounded-md border border-border-color/30 my-2 overflow-x-auto font-mono text-[11px]" {...props} />
-                              <button 
-                                onClick={() => onApplyToEditor(String(props.children))}
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-primary/80 hover:bg-primary text-white text-[9px] px-1.5 py-0.5 rounded transition-all shadow-sm"
-                                title="Apply to current document"
-                              >
-                                Apply
-                              </button>
+                              <ApplyCodeButton content={String(props.children)} onApply={onApplyToEditor} />
                             </div>
                           );
                         },
@@ -542,20 +770,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       <div className="flex flex-wrap gap-1">
                         {/* Deduplicate sources by nodeId */}
                         {[...new Map(msg.sources.map(s => [s.nodeId, s])).values()].map((source) => (
-                          <button
-                            key={source.nodeId}
-                            onClick={() => onNavigateToDocument(source.nodeId)}
-                            className="inline-flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
-                            title={`Open "${source.nodeTitle}"`}
-                          >
-                            📄 {source.nodeTitle}
-                          </button>
+                          <SourceCitation 
+                            key={source.nodeId} 
+                            source={source} 
+                            onNavigate={onNavigateToDocument} 
+                          />
                         ))}
                       </div>
                     </div>
                   )}
                   {/* Actions */}
-                  {msg.role === 'assistant' && !msg.isStreaming && (
+                  {msg.role === 'assistant' && !msg.isStreaming && msg.content && (
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => onCreateDocument(msg.content)}
@@ -604,22 +829,26 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               }}
             />
             {isLoading ? (
-              <button
+              <IconButton
                 onClick={handleStopGeneration}
-                className="flex-shrink-0 bg-red-500/80 hover:bg-red-500 text-white rounded-md px-3 py-2 text-sm transition-colors"
-                title="Stop generation"
+                variant="destructive"
+                size="md"
+                tooltip="Stop generation"
+                className="flex-shrink-0 !rounded-md"
               >
                 ■
-              </button>
+              </IconButton>
             ) : (
-              <button
+              <IconButton
                 onClick={handleSendMessage}
                 disabled={!inputValue.trim() || !hasIndex || isIndexing}
-                className="flex-shrink-0 bg-primary hover:bg-primary/90 text-white rounded-md px-3 py-2 text-sm transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                title="Send message (Enter)"
+                variant="primary"
+                size="md"
+                tooltip="Send message (Enter)"
+                className="flex-shrink-0 !rounded-md bg-primary text-white hover:bg-primary/90"
               >
                 ↑
-              </button>
+              </IconButton>
             )}
           </div>
         </div>

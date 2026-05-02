@@ -54,9 +54,9 @@ Object.assign(console, log.functions);
 (log.transports as any).renderer.level = 'info';
 
 // Catch unhandled exceptions
-log.catchErrors({
-  showDialog: false, // We'll handle fatal errors in the renderer
-  onError(error) {
+log.errorHandler.startCatching({
+  showDialog: false,
+  onError({ error }) {
     console.error('Unhandled exception:', error);
   }
 });

@@ -533,6 +533,7 @@ export interface Settings {
   ragSimilarityThreshold: number;
   chatEnableAgentMode: boolean;
   chatAgentRequiresApproval: boolean;
+  chatEnabledTools: string[];
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
