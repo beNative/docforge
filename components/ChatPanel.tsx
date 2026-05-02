@@ -9,6 +9,7 @@ import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
 import { pythonService } from '../services/pythonService';
 import { scriptService } from '../services/scriptService';
 import { SparklesIcon, TerminalIcon, WarningIcon } from './Icons';
+import Hint from './Hint';
 
 interface ChatPanelProps {
   isVisible: boolean;
@@ -371,9 +372,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-text-main">💬 Chat</span>
             {indexStatus && (
-              <span className="text-[10px] text-text-tertiary px-1.5 py-0.5 rounded-full bg-border-color/30">
+              <Hint>
                 {indexStatus.indexedDocuments}/{indexStatus.totalDocuments} indexed
-              </span>
+              </Hint>
             )}
           </div>
           <div className="flex items-center gap-1">
@@ -401,14 +402,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         {(activeDocument || selectedText) && (
           <div className="px-3 py-1.5 border-b border-border-color bg-primary/5 flex flex-wrap gap-2 items-center min-h-[32px]">
             {activeDocument && (
-              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-primary/10 border border-primary/20 rounded-full text-[10px] text-primary font-medium" title={activeDocument.title}>
-                <span className="opacity-70">📄</span> {activeDocument.title.length > 20 ? activeDocument.title.substring(0, 17) + '...' : activeDocument.title}
-              </div>
+              <Hint 
+                title={activeDocument.title} 
+                icon={<span className="opacity-70">📄</span>}
+                className="bg-primary/10 border border-primary/20 text-primary"
+              >
+                {activeDocument.title.length > 20 ? activeDocument.title.substring(0, 17) + '...' : activeDocument.title}
+              </Hint>
             )}
             {selectedText && (
-              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-[10px] text-amber-600 font-medium">
-                <span className="opacity-70">✂️</span> Selection active
-              </div>
+              <Hint 
+                icon={<span className="opacity-70">✂️</span>}
+                className="bg-amber-500/10 border border-amber-500/20 text-amber-600"
+              >
+                Selection active
+              </Hint>
             )}
           </div>
         )}

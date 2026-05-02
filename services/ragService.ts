@@ -91,6 +91,8 @@ const streamLLMChatResponse = async (
     stream: true,
   });
 
+  console.log(`[RAG Service] Sending request to ${url} (Model: ${llmModelName}, Stream: true)`);
+  
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -101,6 +103,7 @@ const streamLLMChatResponse = async (
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[RAG Service] LLM HTTP Error ${response.status}: ${errorText}`);
       callbacks.onError(`LLM status ${response.status}: ${errorText}`);
       return;
     }
@@ -128,6 +131,14 @@ const streamLLMChatResponse = async (
           if (cleanedLine === '[DONE]') break;
 
           const parsed = JSON.parse(cleanedLine);
+
+          // Handle embedded JSON errors from the LLM provider
+          if (parsed.error) {
+             const errMsg = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+             console.error(`[RAG Service] API JSON Error: ${errMsg}`);
+             callbacks.onError(`API Error: ${errMsg}`);
+             return;
+          }
 
           // OpenAI or Ollama /api/chat format
           const delta = parsed.message || parsed.choices?.[0]?.delta;
@@ -218,11 +229,18 @@ export const ragService = {
     // 1. Search for relevant chunks
     let filteredResults: RagSearchResult[] = [];
     if (ragEmbeddingProviderUrl) {
+      console.log(`[RAG Service] Searching index for: "${question}"`);
       const searchResult = await window.electronAPI!.ragSearch(question, ragEmbeddingProviderUrl, ragEmbeddingModelName, ragContextLimit || 5);
       if (searchResult.success) {
+        console.log(`[RAG Service] Retrieved ${searchResult.results.length} raw sources.`);
         filteredResults = searchResult.results.filter(r => r.distance < (ragSimilarityThreshold ?? 1.4));
+        console.log(`[RAG Service] Retained ${filteredResults.length} sources after threshold filter (threshold: ${ragSimilarityThreshold ?? 1.4}).`);
         callbacks.onSources?.(filteredResults);
+      } else {
+        console.error(`[RAG Service] Vector search failed: ${searchResult.error}`);
       }
+    } else {
+      console.warn(`[RAG Service] No embedding provider configured, skipping vector search.`);
     }
 
     const systemPrompt = buildRagSystemPrompt(filteredResults, extraContext);
