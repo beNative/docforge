@@ -183,13 +183,15 @@ Beyond searching your entire workspace, you can explicitly "pin" documents to a 
 
 Agent Mode transforms the chat assistant from a passive information retriever into an active workspace participant.
 
-- **Tool Calling**: When Agent Mode is enabled, the AI can proactively use tools to interact with your workspace. This includes:
+- **Tool Calling**: When Agent Mode is enabled, the AI can proactively use tools to interact with your workspace. You can **enable or disable specific tools** in the **AI Chat** settings to control exactly what the agent can do. Available capabilities include:
     - **Document Management**: Creating new documents or folders, renaming existing ones, and moving files between directories.
     - **Content Refactoring**: Reading document contents and performing bulk edits or restructurings based on your instructions.
     - **Script Execution**: Running Python, Shell, or PowerShell scripts to process data, generate files, or automate complex workflows.
 - **Action Approval Gate**: For security, all sensitive actions (like deleting documents or running scripts) can be configured to require your manual approval. A glassmorphic modal will appear showing exactly what the AI intends to do, including any script code or move parameters, allowing you to approve or deny the request before it executes.
+- **Real-Time Execution Logs**: To provide transparency, DocForge streams detailed logs of the RAG search and tool execution process directly into the chat. You can see when the AI is searching the index, which files it found, and the exact status of tool calls as they happen.
 - **Thoughtful Execution**: The agent can perform multi-step tasks—for example, it can list all documents in a folder, search for specific patterns, and then create a summary document based on its findings—all in a single conversation turn.
 - **Deep Integration**: The agent has direct access to the same document hooks as the GUI, ensuring that its actions are consistent with the application's state and history.
+
 
 #### Python Execution Panel
 

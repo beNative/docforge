@@ -115,12 +115,16 @@ DocForge treats shell and PowerShell automation as first-class workflows that sp
 -   **Main-process runner (`electron/scriptRunner.ts`):** Persists run metadata, writes temporary script files, and spawns the resolved executable. Test mode leverages `scriptArgs.ts` to compute syntax-only flags (for example, Bash `-n`, or a PowerShell `ScriptBlock` parser) and gracefully fails when an interpreter cannot support syntax checks. Streams from stdout/stderr are recorded to `script_execution_logs` and broadcast back to the renderer.
 -   **Defaults management:** Global defaults live in the `settings` table (`shellDefaults`, `powershellDefaults`) and are edited through `SettingsView.tsx`. When a run starts, the runner merges these defaults with per-document overrides so teams can set organization-wide variables while allowing individual scripts to customize their environment safely.
 
-### LLM Service (`services/llmService.ts`)
+### LLM Service (`services/llmService.ts`) & RAG Orchestrator
 
-This module handles all communication with the external Large Language Model. It is largely unchanged by the database migration.
--   It constructs the appropriate API request body based on the configured API type (Ollama or OpenAI-compatible).
--   It includes robust error handling to manage connection failures or non-OK responses from the provider.
--   Clipboard imports invoke `llmService.generateTitle()` when a provider is online, allowing the renderer to assign meaningful titles to new documents automatically.
+This module handles all communication with the external Large Language Model and coordinates the "Chat with Workspace" workflow.
+
+- **API Integration**: It constructs the appropriate API request body based on the configured API type (Ollama or OpenAI-compatible). It includes robust error handling to manage connection failures or non-OK responses from the provider.
+- **Agentic Tool Filtering**: When Agent Mode is active, the service filters the available tools based on the `chatEnabledTools` user setting before sending them to the LLM. This ensures the AI only attempts actions that the user has explicitly permitted.
+- **Log Propagation (`onLog`)**: The `ragService` includes a callback mechanism that streams diagnostic logs (e.g., search distance, tool execution status, history trimming) back to the UI. This provides users with visibility into the "thinking" and "acting" phases of the assistant.
+- **Context Management**: To maintain efficiency and accuracy, the service automatically trims conversation history to the last 10 turns and includes pinned documents directly in the system prompt context.
+- **Clipboard Intelligence**: Clipboard imports invoke `llmService.generateTitle()` when a provider is online, allowing the renderer to assign meaningful titles to new documents automatically.
+
 
 ### Component Breakdown
 
