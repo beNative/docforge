@@ -1,4 +1,24 @@
+## v0.8.9 - The Agentic Polish & Transparency Update
+
+### ✨ Features
+
+-   **Customizable Agent Tools**: Users can now enable or disable specific AI Agent tools (e.g., Document Management, Content Refactoring, Script Execution) in the **AI Chat** settings, providing more granular control over AI autonomy.
+
+### 🛠 Improvements
+
+-   **RAG Execution Transparency**:
+    -   Integrated real-time log propagation from the backend RAG search and Agent tool execution process directly into the chat panel.
+    -   Users can now monitor search distances, source retrieval counts, and tool call statuses as they happen.
+-   **Context Window Efficiency**: Optimized conversation history management by limiting it to the last 10 turns (user/assistant/tool calls), ensuring faster response times and better token utilization.
+-   **Pinned Document Integration**: Refined how pinned documents are included in the prompt context to ensure more robust cross-document reasoning.
+
+### 📝 Documentation
+
+-   **Manual Refresh**: Extensively updated both the **Functional Manual** and **Technical Manual** to reflect the new Agent tool selection and RAG logging architecture.
+-   **Documentation Sync**: Standardized and synchronized all documentation files between the project root and the `docs/` folder.
+
 ## v0.8.8 - The Agentic Workspace Update
+
 
 ### ✨ Features
 
