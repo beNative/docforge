@@ -14,6 +14,8 @@ This document provides a technical overview of the DocForge application's archit
 -   **Bundler:** [esbuild](https://esbuild.github.io/) for fast and efficient bundling of the application's source code.
 -   **Styling:** [Tailwind CSS](https://tailwindcss.com/) for a utility-first CSS framework.
 -   **Packaging:** [electron-builder](https://www.electron.build/) for creating distributable application packages.
+-   **Vector Search:** [sqlite-vec](https://github.com/asg017/sqlite-vec) extension for SQLite to enable efficient, local vector storage and similarity search.
+-   **Embeddings:** Integration with [Ollama](https://ollama.com/) or OpenAI-compatible APIs for generating document and query embeddings locally.
 -   **Diagram Rendering:** [PlantUML](https://plantuml.com/) via either the public plantuml.com service or a PlantUML jar bundled with the application (`assets/plantuml/plantuml.jar`). Offline rendering invokes the jar through the system Java Runtime Environment, so diagrams render without any network connectivity.
 
 ---
@@ -34,6 +36,8 @@ doc-forge/
 │   └── preload.ts        # Preload script for secure IPC.
 ├── hooks/                # Custom React hooks for business logic.
 ├── services/             # Modules for data access and external systems.
+│   ├── ragService.ts     # Orchestrates document indexing and semantic search.
+│   ├── embeddingService.ts # Manages vector generation via LLM providers.
 │   ├── preview/          # Renderer plugins for the preview system.
 │   └── ...
 ├── release/              # Output directory for packaged application.
@@ -115,18 +119,36 @@ DocForge treats shell and PowerShell automation as first-class workflows that sp
 -   **Main-process runner (`electron/scriptRunner.ts`):** Persists run metadata, writes temporary script files, and spawns the resolved executable. Test mode leverages `scriptArgs.ts` to compute syntax-only flags (for example, Bash `-n`, or a PowerShell `ScriptBlock` parser) and gracefully fails when an interpreter cannot support syntax checks. Streams from stdout/stderr are recorded to `script_execution_logs` and broadcast back to the renderer.
 -   **Defaults management:** Global defaults live in the `settings` table (`shellDefaults`, `powershellDefaults`) and are edited through `SettingsView.tsx`. When a run starts, the runner merges these defaults with per-document overrides so teams can set organization-wide variables while allowing individual scripts to customize their environment safely.
 
-### LLM Service (`services/llmService.ts`) & RAG Orchestrator
+### LLM Service (`services/llmService.ts`)
 
-This module handles all communication with the external Large Language Model and coordinates the "Chat with Workspace" workflow.
+This module handles all communication with the external Large Language Model.
+-   It constructs the appropriate API request body based on the configured API type (Ollama or OpenAI-compatible).
+-   It includes robust error handling to manage connection failures or non-OK responses from the provider.
+-   **Agentic Tool Filtering**: When Agent Mode is active, the service filters available tools based on the `chatEnabledTools` user setting.
+-   Clipboard imports invoke `llmService.generateTitle()` when a provider is online, allowing the renderer to assign meaningful titles to new documents automatically.
 
-- **API Integration**: It constructs the appropriate API request body based on the configured API type (Ollama or OpenAI-compatible). It includes robust error handling to manage connection failures or non-OK responses from the provider.
-- **Agentic Tool Filtering**: When Agent Mode is active, the service filters the available tools based on the `chatEnabledTools` user setting before sending them to the LLM. This ensures the AI only attempts actions that the user has explicitly permitted.
-- **Log Propagation (`onLog`)**: The `ragService` includes a callback mechanism that streams diagnostic logs (e.g., search distance, tool execution status, history trimming) back to the UI. This provides users with visibility into the "thinking" and "acting" phases of the assistant.
-- **Context Management**: To maintain efficiency and accuracy, the service automatically trims conversation history to the last 10 turns and includes pinned documents directly in the system prompt context.
-- **Clipboard Intelligence**: Clipboard imports invoke `llmService.generateTitle()` when a provider is online, allowing the renderer to assign meaningful titles to new documents automatically.
+### RAG & AI Chat Pipeline (`services/ragService.ts`)
+
+DocForge implements a fully local Retrieval-Augmented Generation (RAG) system and Agentic Orchestrator to enable "Chat with Workspace" functionality.
+
+-   **Vector Storage (`sqlite-vec`):** The application uses the `sqlite-vec` extension to store document embeddings within the primary SQLite database.
+-   **Indexing Workflow:** Discovery, chunking, embedding (via `embeddingService.ts`), and storage in the `vec_documents` virtual table.
+-   **Retrieval & Agentic Workflow:**
+    1.  **Query Embedding:** The user's chat message is converted into a vector.
+    2.  **Similarity Search:** The system performs a similarity search against the indexed chunks.
+    3.  **Context Augmentation:** The retrieved snippets are combined with any explicitly pinned documents and passed to the LLM. The service automatically trims conversation history to the last 10 turns.
+    4.  **Log Propagation (`onLog`):** Diagnostic logs (search distance, tool execution status) are streamed back to the UI for transparency.
+    5.  **Streaming Response:** The AI generates an answer or executes tool calls, which are streamed to the `ChatPanel.tsx`.
 
 
-### Component Breakdown
+### Multi-Document Context Management
+
+The chat system supports augmenting the LLM's prompt with specific, user-selected context.
+
+-   **State Management:** `App.tsx` maintains a `chatContextNodeIds` set, which stores the IDs of documents pinned to the chat.
+-   **Interaction Layer:** Users can add documents to the context via the treeview's context menu or by dragging nodes directly into the `ChatPanel.tsx`. 
+-   **Resolution:** Before sending a message, the system resolves these IDs into their full text content, ensuring the LLM has access to the exact documents the user is referencing.
+-   **Visual Feedback:** `ChatPanel.tsx` renders "Context Badges" for all active elements (active document, text selection, and pinned nodes), providing a clear overview of what information is being shared with the AI.
 
 -   **`App.tsx`:** The root component that orchestrates the entire application. It initializes the repository, triggers the data migration if needed, manages the main layout, and uses the data hooks (`useNodes`, `useSettings`, etc.).
 -   **`Sidebar.tsx`:** Manages the display of the `nodes` tree (documents and folders) and templates. It handles search/filtering, drag-and-drop, and keyboard navigation.

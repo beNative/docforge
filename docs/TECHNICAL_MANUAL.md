@@ -121,26 +121,25 @@ DocForge treats shell and PowerShell automation as first-class workflows that sp
 
 ### LLM Service (`services/llmService.ts`)
 
-This module handles all communication with the external Large Language Model. It is largely unchanged by the database migration.
+This module handles all communication with the external Large Language Model.
 -   It constructs the appropriate API request body based on the configured API type (Ollama or OpenAI-compatible).
 -   It includes robust error handling to manage connection failures or non-OK responses from the provider.
+-   **Agentic Tool Filtering**: When Agent Mode is active, the service filters available tools based on the `chatEnabledTools` user setting.
 -   Clipboard imports invoke `llmService.generateTitle()` when a provider is online, allowing the renderer to assign meaningful titles to new documents automatically.
 
 ### RAG & AI Chat Pipeline (`services/ragService.ts`)
 
-DocForge implements a fully local Retrieval-Augmented Generation (RAG) system to enable "Chat with Workspace" functionality.
+DocForge implements a fully local Retrieval-Augmented Generation (RAG) system and Agentic Orchestrator to enable "Chat with Workspace" functionality.
 
--   **Vector Storage (`sqlite-vec`):** The application uses the `sqlite-vec` extension to store document embeddings within the primary SQLite database. This allows for high-performance vector similarity searches using standard SQL syntax.
--   **Indexing Workflow:**
-    1.  **Discovery:** The service identifies all indexable documents (Markdown and plaintext) in the workspace.
-    2.  **Chunking:** Large documents are split into smaller, overlapping segments to preserve context while staying within the model's token limits.
-    3.  **Embedding:** Each chunk is sent to the `embeddingService.ts`, which generates a high-dimensional vector representation using the configured local model (via Ollama).
-    4.  **Storage:** The vectors, along with document metadata and content snippets, are stored in a virtual `vec_documents` table.
--   **Retrieval & Chat Workflow:**
+-   **Vector Storage (`sqlite-vec`):** The application uses the `sqlite-vec` extension to store document embeddings within the primary SQLite database.
+-   **Indexing Workflow:** Discovery, chunking, embedding (via `embeddingService.ts`), and storage in the `vec_documents` virtual table.
+-   **Retrieval & Agentic Workflow:**
     1.  **Query Embedding:** The user's chat message is converted into a vector.
-    2.  **Similarity Search:** The system performs a `vec_distance_cosine` search against the indexed chunks to find the most relevant context.
-    3.  **Context Augmentation:** The retrieved snippets are combined with any explicitly pinned documents (Multi-Document Context) and passed to the LLM.
-    4.  **Streaming Response:** The AI generates an answer, which is streamed to the `ChatPanel.tsx` along with source citations linked to the original documents.
+    2.  **Similarity Search:** The system performs a similarity search against the indexed chunks.
+    3.  **Context Augmentation:** The retrieved snippets are combined with any explicitly pinned documents and passed to the LLM. The service automatically trims conversation history to the last 10 turns.
+    4.  **Log Propagation (`onLog`):** Diagnostic logs (search distance, tool execution status) are streamed back to the UI for transparency.
+    5.  **Streaming Response:** The AI generates an answer or executes tool calls, which are streamed to the `ChatPanel.tsx`.
+
 
 ### Multi-Document Context Management
 
