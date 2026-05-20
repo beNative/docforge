@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import IconButton from './IconButton';
-import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, SearchIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, PencilIcon, SparklesIcon } from './Icons';
+import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, SearchIcon, MinimizeIcon, MaximizeIcon, RestoreIcon, CloseIcon, PencilIcon, SparklesIcon, ChatIcon } from './Icons';
 import ThemeToggleButton from './ThemeToggleButton';
 import { useLogger } from '../hooks/useLogger';
 import type { Command } from '../types';
@@ -136,7 +136,7 @@ const CustomTitleBar: React.FC<CustomTitleBarProps> = ({
                     <TerminalIcon className="w-4 h-4" />
                 </IconButton>
                 <IconButton onClick={onToggleChat} tooltip={getTooltip('toggle-chat', 'Chat')} size="xs" className="not-draggable" tooltipPosition="bottom">
-                    <SearchIcon className="w-4 h-4" />
+                    <ChatIcon className="w-4 h-4" />
                 </IconButton>
                 <ThemeToggleButton size="xs" tooltipPosition="bottom" className="not-draggable" />
                 <IconButton onClick={onToggleSettingsView} tooltip={getTooltip('toggle-settings', 'Settings')} size="xs" className={`not-draggable ${isSettingsViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom">

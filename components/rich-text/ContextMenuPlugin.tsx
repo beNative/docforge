@@ -38,6 +38,7 @@ interface ContextMenuState {
 interface ContextMenuPluginProps {
     readOnly?: boolean;
     onInsertLink?: () => void;
+    onSaveToFile?: () => void;
 }
 
 /**
@@ -47,6 +48,7 @@ interface ContextMenuPluginProps {
 export const ContextMenuPlugin: React.FC<ContextMenuPluginProps> = ({
     readOnly = false,
     onInsertLink,
+    onSaveToFile,
 }) => {
     const [editor] = useLexicalComposerContext();
     const [menuState, setMenuState] = useState<ContextMenuState>({
@@ -156,9 +158,16 @@ export const ContextMenuPlugin: React.FC<ContextMenuPluginProps> = ({
                 }),
             });
         }
+        if (onSaveToFile) {
+            items.push({ type: 'separator' });
+            items.push({
+                label: 'Save to File…',
+                action: () => executeCommand(() => onSaveToFile()),
+            });
+        }
 
         return items;
-    }, [editor, executeCommand, onInsertLink, readOnly]);
+    }, [editor, executeCommand, onInsertLink, onSaveToFile, readOnly]);
 
     const buildImageSelectionMenu = useCallback((): MenuItem[] => {
         const items: MenuItem[] = [];
@@ -188,9 +197,16 @@ export const ContextMenuPlugin: React.FC<ContextMenuPluginProps> = ({
                 }),
             });
         }
+        if (onSaveToFile) {
+            items.push({ type: 'separator' });
+            items.push({
+                label: 'Save to File…',
+                action: () => executeCommand(() => onSaveToFile()),
+            });
+        }
 
         return items;
-    }, [editor, executeCommand, readOnly]);
+    }, [editor, executeCommand, onSaveToFile, readOnly]);
 
     const buildTableCellMenu = useCallback((): MenuItem[] => {
         if (readOnly) {
@@ -313,6 +329,18 @@ export const ContextMenuPlugin: React.FC<ContextMenuPluginProps> = ({
         ];
     }, [editor, executeCommand, readOnly]);
 
+    const buildTableCellMenuWithSave = useCallback((): MenuItem[] => {
+        const items = buildTableCellMenu();
+        if (onSaveToFile) {
+            items.push({ type: 'separator' });
+            items.push({
+                label: 'Save to File…',
+                action: () => executeCommand(() => onSaveToFile()),
+            });
+        }
+        return items;
+    }, [buildTableCellMenu, executeCommand, onSaveToFile]);
+
     const buildEmptySelectionMenu = useCallback((): MenuItem[] => {
         const items: MenuItem[] = [];
 
@@ -344,9 +372,16 @@ export const ContextMenuPlugin: React.FC<ContextMenuPluginProps> = ({
                 document.execCommand('selectAll');
             }),
         });
+        if (onSaveToFile) {
+            items.push({ type: 'separator' });
+            items.push({
+                label: 'Save to File…',
+                action: () => executeCommand(() => onSaveToFile()),
+            });
+        }
 
         return items;
-    }, [editor, executeCommand, readOnly]);
+    }, [editor, executeCommand, onSaveToFile, readOnly]);
 
     const handleContextMenu = useCallback(
         (event: MouseEvent) => {
@@ -370,7 +405,7 @@ export const ContextMenuPlugin: React.FC<ContextMenuPluginProps> = ({
                     const tableCell = $getTableCellNodeFromLexicalNode(anchorNode);
 
                     if (tableCell) {
-                        items = buildTableCellMenu();
+                        items = buildTableCellMenuWithSave();
                     } else if (selection.getTextContent().length > 0) {
                         // Text is selected
                         items = buildTextSelectionMenu();
@@ -400,7 +435,7 @@ export const ContextMenuPlugin: React.FC<ContextMenuPluginProps> = ({
                 });
             });
         },
-        [editor, buildEmptySelectionMenu, buildImageSelectionMenu, buildTableCellMenu, buildTextSelectionMenu],
+        [editor, buildEmptySelectionMenu, buildImageSelectionMenu, buildTableCellMenuWithSave, buildTextSelectionMenu],
     );
 
     useEffect(() => {

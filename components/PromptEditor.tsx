@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import type { DocumentCommandTriggers, DocumentOrFolder, PreviewMetadata, Settings, ViewMode } from '../types';
 import { llmService } from '../services/llmService';
-import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon, CodeIcon } from './Icons';
+import { SparklesIcon, TrashIcon, CopyIcon, CheckIcon, HistoryIcon, EyeIcon, PencilIcon, LayoutHorizontalIcon, LayoutVerticalIcon, RefreshIcon, SaveIcon, FormatIcon, LockClosedIcon, LockOpenIcon, UndoIcon, CodeIcon, DownloadIcon } from './Icons';
 import Spinner from './Spinner';
 import Modal from './Modal';
 import { useLogger } from '../hooks/useLogger';
@@ -43,6 +43,7 @@ interface DocumentEditorProps {
   onSelectionChange?: (selectedText: string | undefined) => void;
   pendingInsertText?: string | null;
   commandTriggers: DocumentCommandTriggers;
+  onSaveToFile?: (id: string) => void;
 }
 
 const useCommandTrigger = (trigger: number, callback: () => void | Promise<void>) => {
@@ -170,6 +171,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onSelectionChange,
   pendingInsertText,
   commandTriggers,
+  onSaveToFile,
 }) => {
   const isRichTextDocument = documentNode.doc_type === 'rich_text';
   const initialContent = sanitizeDocumentContent(documentNode.content, isRichTextDocument);
@@ -447,6 +449,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
 
   // --- Action Handlers ---
+  const handleSaveToFile = useCallback(() => {
+    if (onSaveToFile) {
+      onSaveToFile(documentNode.id);
+    }
+  }, [onSaveToFile, documentNode.id]);
+
   const handleManualSave = useCallback(() => {
     if (isLocked) {
       setError('Document is locked and cannot be modified.');
@@ -957,6 +965,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             readOnly={isLocked}
             onFocusChange={handleEditorFocusChange}
             onSelectionChange={onSelectionChange}
+            onSaveToFile={handleSaveToFile}
           />
         )
         : (
@@ -974,6 +983,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             readOnly={isLocked}
             onFocusChange={handleEditorFocusChange}
             onSelectionChange={onSelectionChange}
+            onSaveToFile={handleSaveToFile}
           />
         );
     const preview = (
@@ -1188,6 +1198,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             )}
           </IconButton>
           <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
+          <IconButton onClick={handleSaveToFile} disabled={!content.trim() || !onSaveToFile} tooltip="Save to File" size="xs" variant="ghost"><DownloadIcon className="w-4 h-4" /></IconButton>
           {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining || isLocked} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
           <IconButton onClick={handleDeleteDocument} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
         </div>

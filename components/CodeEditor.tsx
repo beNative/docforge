@@ -24,6 +24,7 @@ interface CodeEditorProps {
   readOnly?: boolean;
   onFocusChange?: (hasFocus: boolean) => void;
   onSelectionChange?: (selectedText: string | undefined) => void;
+  onSaveToFile?: () => void;
 }
 
 export interface CodeEditorHandle {
@@ -142,7 +143,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
     activeLineHighlightColorDark, 
     readOnly = false, 
     onFocusChange,
-    onSelectionChange
+    onSelectionChange,
+    onSaveToFile
 }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
@@ -469,7 +471,20 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                 actionDisposablesRef.current.push(disposable);
             }
         });
-    }, [disposeEditorShortcuts]);
+
+        if (onSaveToFile) {
+            const saveToFileDisposable = monacoInstanceRef.current.addAction({
+                id: 'docforge.saveToFile',
+                label: 'Save to File…',
+                contextMenuGroupId: 'navigation',
+                contextMenuOrder: 1.5,
+                run: () => onSaveToFile(),
+            });
+            if (saveToFileDisposable) {
+                actionDisposablesRef.current.push(saveToFileDisposable);
+            }
+        }
+    }, [disposeEditorShortcuts, onSaveToFile]);
 
     useEffect(() => {
         customShortcutsRef.current = customShortcuts ?? {};

@@ -3210,6 +3210,7 @@ export const MainApp: React.FC = () => {
                         onPreviewMetadataChange={setPreviewMetadata}
                         onZoomTargetChange={handleWorkspaceZoomTargetChange}
                         commandTriggers={documentCommandTriggers}
+                        onSaveToFile={handleSaveNodeToFile}
                     />
                 );
             }

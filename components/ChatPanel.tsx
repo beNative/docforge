@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { usePythonEnvironments } from '../hooks/usePythonEnvironments';
 import { pythonService } from '../services/pythonService';
 import { scriptService } from '../services/scriptService';
-import { SparklesIcon, TerminalIcon, WarningIcon, XIcon, SearchIcon, TrashIcon, RefreshIcon } from './Icons';
+import { SparklesIcon, TerminalIcon, WarningIcon, XIcon, SearchIcon, TrashIcon, RefreshIcon, ChatIcon } from './Icons';
 import Hint from './Hint';
 import Tooltip from './Tooltip';
 import IconButton from './IconButton';
@@ -548,7 +548,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         {isDraggingOver && (
           <div className="absolute inset-0 z-50 bg-primary/20 backdrop-blur-[2px] border-2 border-dashed border-primary flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200 pointer-events-none">
             <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mb-4 text-primary">
-              <SearchIcon className="w-8 h-8" />
+              <ChatIcon className="w-8 h-8" />
             </div>
             <h4 className="text-lg font-bold text-primary mb-2">Drop to add Context</h4>
             <p className="text-sm text-text-secondary">Release to add selected documents to the current chat session.</p>
@@ -672,7 +672,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4 min-h-0">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center px-4">
-              <div className="text-3xl mb-3">🔍</div>
+              <div className="text-primary mb-3">
+                <ChatIcon className="w-12 h-12" />
+              </div>
               <p className="text-sm font-medium text-text-secondary mb-1">Chat with your workspace</p>
               <p className="text-xs text-text-tertiary mb-4">
                 Ask questions about your documents and get AI-powered answers with source citations.

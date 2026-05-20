@@ -1,6 +1,6 @@
 import React from 'react';
 import IconButton from './IconButton';
-import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, PencilIcon, SparklesIcon, SearchIcon } from './Icons';
+import { GearIcon, InfoIcon, CommandIcon, TerminalIcon, PencilIcon, SparklesIcon, SearchIcon, ChatIcon } from './Icons';
 import ThemeToggleButton from './ThemeToggleButton';
 import type { Command } from '../types';
 
@@ -59,7 +59,7 @@ const Header: React.FC<HeaderProps> = ({
           <TerminalIcon className="w-4 h-4" />
         </IconButton>
         <IconButton onClick={onToggleChat} tooltip={getTooltip('toggle-chat', 'Chat')} tooltipPosition="bottom" size="xs">
-          <SearchIcon className="w-4 h-4" />
+          <ChatIcon className="w-4 h-4" />
         </IconButton>
         <ThemeToggleButton size="xs" />
         <IconButton onClick={onToggleSettingsView} tooltip={getTooltip('toggle-settings', 'Settings')} className={`${isSettingsViewActive ? 'bg-primary/10 text-primary' : ''}`} tooltipPosition="bottom" size="xs">

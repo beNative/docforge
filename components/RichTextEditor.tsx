@@ -56,6 +56,7 @@ interface RichTextEditorProps {
   onScroll?: (scrollInfo: { scrollTop: number; scrollHeight: number; clientHeight: number }) => void;
   onFocusChange?: (hasFocus: boolean) => void;
   onSelectionChange?: (selectedText: string | undefined) => void;
+  onSaveToFile?: () => void;
 }
 
 const RICH_TEXT_THEME = {
@@ -93,7 +94,7 @@ const RICH_TEXT_THEME = {
 const Placeholder: React.FC = () => null;
 
 const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
-  ({ html, onChange, readOnly = false, onScroll, onFocusChange, onSelectionChange }, ref) => {
+  ({ html, onChange, readOnly = false, onScroll, onFocusChange, onSelectionChange, onSaveToFile }, ref) => {
     const [editorRef, setEditorRef] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [toolbarActions, setToolbarActions] = useState<ToolbarButtonConfig[]>([]);
@@ -273,7 +274,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
             {/* Focus Handler */}
             <FocusPlugin onFocusChange={onFocusChange} />
             {/* Context Menu */}
-            <ContextMenuPlugin readOnly={readOnly} />
+            <ContextMenuPlugin readOnly={readOnly} onSaveToFile={onSaveToFile} />
             {/* Delete Protection */}
             <DeleteProtectionPlugin />
           </LexicalComposer>
