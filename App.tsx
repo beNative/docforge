@@ -42,6 +42,7 @@ import { DocumentNode } from './components/PromptTreeItem';
 import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './services/shortcutService';
 import { readClipboardText, ClipboardPermissionError, ClipboardUnavailableError } from './services/clipboardService';
 import ChatPanel from './components/ChatPanel';
+import { monacoEditorPool } from './services/editor/monacoEditorPool';
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -345,9 +346,10 @@ export const MainApp: React.FC = () => {
             const nextOrder = prev.order.filter(id => id !== documentId);
             const nextActive = prev.activeId === documentId
                 ? (nextOrder[nextOrder.length - 1] ?? null)
-                : prev.activeId;
+                 : prev.activeId;
             return { order: nextOrder, activeId: nextActive };
         });
+        monacoEditorPool.disposeModel(documentId);
     }, []);
 
     const closeOtherDocumentTabs = useCallback((documentId: string) => {
@@ -355,6 +357,11 @@ export const MainApp: React.FC = () => {
             if (!prev.order.includes(documentId)) {
                 return prev;
             }
+            prev.order.forEach(id => {
+                if (id !== documentId) {
+                    monacoEditorPool.disposeModel(id);
+                }
+            });
             return { order: [documentId], activeId: documentId };
         });
     }, []);
@@ -369,6 +376,9 @@ export const MainApp: React.FC = () => {
             const nextActive = prev.activeId && nextOrder.includes(prev.activeId)
                 ? prev.activeId
                 : documentId;
+            prev.order.slice(index + 1).forEach(id => {
+                monacoEditorPool.disposeModel(id);
+            });
             return { order: nextOrder, activeId: nextActive };
         });
     }, []);
@@ -2427,6 +2437,10 @@ export const MainApp: React.FC = () => {
             if (templateIdsToDelete.length > 0) {
                 await deleteTemplates(templateIdsToDelete);
             }
+
+            idsToDelete.forEach(id => {
+                monacoEditorPool.disposeModel(id);
+            });
     
             setSelectedIds(prev => {
                 const newSet = new Set(prev);

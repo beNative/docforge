@@ -970,6 +970,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         )
         : (
           <MonacoEditor
+            documentId={documentNode.id}
             ref={editorRef}
             content={content}
             language={language}

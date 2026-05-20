@@ -1,3 +1,13 @@
+## v0.8.10 - The Monaco Performance Update
+
+### 🛠 Improvements
+
+-   **Monaco Editor Lifecycle Pooling**:
+    -   Implemented a unified Monaco editor pooling mechanism (`monacoEditorPool`) that uses a single, shared Monaco instance instead of recreating the editor on every tab switch.
+    -   Saves cursor positions, selection ranges, and scroll positions across tabs, restoring them instantly when switching back.
+    -   Maintains text models (`ITextModel`) in memory to preserve undo/redo history for all open documents.
+    -   Automatically disposes of models when a tab is closed or a document is deleted to prevent memory leaks and minimize resource footprint.
+
 ## v0.8.9 - The Agentic Polish & Transparency Update
 
 ### ✨ Features

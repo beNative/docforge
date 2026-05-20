@@ -6,12 +6,14 @@ import { ensureMonaco } from '../services/editor/monacoLoader';
 import { applyDocforgeTheme } from '../services/editor/monacoTheme';
 import { registerTomlLanguage } from '../services/editor/registerTomlLanguage';
 import { registerPlantumlLanguage } from '../services/editor/registerPlantumlLanguage';
+import { monacoEditorPool } from '../services/editor/monacoEditorPool';
 import EmojiPickerOverlay from './EmojiPickerOverlay';
 
 // Let TypeScript know monaco is available on the window
 declare const monaco: any;
 
 interface CodeEditorProps {
+  documentId: string;
   content: string;
   language: string | null;
   onChange: (newContent: string) => void;
@@ -132,6 +134,7 @@ const toMonacoKeybinding = (monacoApi: any, keys: string[]): number | null => {
 };
 
 const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({ 
+    documentId,
     content, 
     language, 
     onChange, 
@@ -158,6 +161,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
     const blurDisposableRef = useRef<{ dispose: () => void } | null>(null);
     const emojiActionDisposableRef = useRef<{ dispose: () => void } | null>(null);
     const lastContextMenuCoordsRef = useRef<{ x: number; y: number } | null>(null);
+    const listenerDisposablesRef = useRef<Array<{ dispose: () => void }>>([]);
     const [emojiPickerState, setEmojiPickerState] = useState<{ selection: StoredSelection | null; anchor: { x: number; y: number } | null } | null>(null);
     const computedFontFamily = useMemo(() => {
         const candidate = (fontFamily ?? '').trim();
@@ -497,6 +501,19 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
         contentRef.current = content;
     }, [content]);
 
+    const disposeListeners = useCallback(() => {
+        listenerDisposablesRef.current.forEach(disposable => {
+            if (disposable && typeof disposable.dispose === 'function') {
+                try {
+                    disposable.dispose();
+                } catch {
+                    // Ignore errors during cleanup
+                }
+            }
+        });
+        listenerDisposablesRef.current = [];
+    }, []);
+
     useEffect(() => {
         let isCancelled = false;
 
@@ -515,33 +532,30 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                 registerTomlLanguage(monacoApi);
                 registerPlantumlLanguage(monacoApi);
 
-                if (monacoInstanceRef.current) {
-                    disposeEditorShortcuts();
-                    disposeFocusListeners();
-                    monacoInstanceRef.current.dispose();
+                disposeEditorShortcuts();
+                disposeListeners();
+
+                const { editor: editorInstance, container } = await monacoEditorPool.getSharedEditor();
+                if (isCancelled || !editorRef.current) {
+                    return;
                 }
+
+                // Append the shared container to our DOM ref
+                editorRef.current.appendChild(container);
 
                 const variant = themeRef.current === 'dark' ? 'dark' : 'light';
                 const themeName = applyDocforgeTheme(monacoApi, variant, highlightColorRef.current);
 
-                const editorInstance = monacoApi.editor.create(editorRef.current, {
-                    value: content,
-                    language: language || 'plaintext',
+                // Update shared editor options
+                editorInstance.updateOptions({
                     theme: themeName,
-                    automaticLayout: true,
                     fontSize: computedFontSize,
                     fontFamily: computedFontFamily,
-                    minimap: {
-                        enabled: true,
-                    },
-                    wordWrap: 'on',
-                    folding: true,
-                    showFoldingControls: 'always',
-                    bracketPairColorization: {
-                        enabled: true,
-                    },
                     readOnly,
                 });
+
+                // Switch the shared editor to target this document
+                monacoEditorPool.switchToDocument(documentId, content, language || 'plaintext');
 
                 const storeSelection = () => {
                     const selection = editorInstance.getSelection();
@@ -566,14 +580,15 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                     }
                 };
 
-                editorInstance.onDidChangeModelContent(() => {
+                const contentDisposable = editorInstance.onDidChangeModelContent(() => {
                     const currentValue = editorInstance.getValue();
                     if (currentValue !== contentRef.current) {
                         onChange(currentValue);
                     }
                 });
+                listenerDisposablesRef.current.push(contentDisposable);
 
-                editorInstance.onDidScrollChange((e: any) => {
+                const scrollDisposable = editorInstance.onDidScrollChange((e: any) => {
                     if (e.scrollTopChanged) {
                         onScroll?.({
                             scrollTop: e.scrollTop,
@@ -583,8 +598,9 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                     }
                     updateEmojiPickerAnchor();
                 });
+                listenerDisposablesRef.current.push(scrollDisposable);
 
-                editorInstance.onDidChangeCursorSelection(() => {
+                const selectionDisposable = editorInstance.onDidChangeCursorSelection(() => {
                     const selection = editorInstance.getSelection();
                     if (selection && !selection.isEmpty()) {
                         onSelectionChange?.(editorInstance.getModel().getValueInRange(selection));
@@ -592,8 +608,9 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                         onSelectionChange?.(undefined);
                     }
                 });
+                listenerDisposablesRef.current.push(selectionDisposable);
 
-                editorInstance.onContextMenu((event: any) => {
+                const contextDisposable = editorInstance.onContextMenu((event: any) => {
                     const contextEvent = event?.event;
                     const posx = contextEvent?.posx ?? contextEvent?.browserEvent?.clientX;
                     const posy = contextEvent?.posy ?? contextEvent?.browserEvent?.clientY;
@@ -602,19 +619,23 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                     }
                     storeSelection();
                 });
+                listenerDisposablesRef.current.push(contextDisposable);
 
-                disposeFocusListeners();
                 if (onFocusChange) {
-                    focusDisposableRef.current = editorInstance.onDidFocusEditorWidget(() => {
+                    const focusDisposable = editorInstance.onDidFocusEditorWidget(() => {
                         onFocusChange(true);
                     });
-                    blurDisposableRef.current = editorInstance.onDidBlurEditorWidget(() => {
+                    listenerDisposablesRef.current.push(focusDisposable);
+                    
+                    const blurDisposable = editorInstance.onDidBlurEditorWidget(() => {
                         onFocusChange(false);
                     });
+                    listenerDisposablesRef.current.push(blurDisposable);
                 }
 
                 monacoInstanceRef.current = editorInstance;
                 applyEditorShortcuts();
+                
                 emojiActionDisposableRef.current?.dispose();
                 emojiActionDisposableRef.current = editorInstance.addAction({
                     id: 'docforge.insertEmoji',
@@ -629,7 +650,6 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                     },
                 });
             } catch (error) {
-                // eslint-disable-next-line no-console
                 console.error('Failed to initialize Monaco editor', error);
             }
         };
@@ -639,16 +659,25 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
         return () => {
             isCancelled = true;
             disposeEditorShortcuts();
-            disposeFocusListeners();
-            if (monacoInstanceRef.current) {
-                monacoInstanceRef.current.dispose();
-                monacoInstanceRef.current = null;
-            }
+            disposeListeners();
+            
+            // Save the view state of this document before unmounting
+            monacoEditorPool.saveCurrentViewState();
+
+            // Detach the container from DOM ref
+            const currentRef = editorRef.current;
+            void monacoEditorPool.getSharedEditor().then(({ container }) => {
+                if (container && currentRef && container.parentNode === currentRef) {
+                    currentRef.removeChild(container);
+                }
+            }).catch(() => {});
+
+            monacoInstanceRef.current = null;
             emojiActionDisposableRef.current?.dispose();
             emojiActionDisposableRef.current = null;
             monacoApiRef.current = null;
         };
-    }, [onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, disposeFocusListeners, computedFontFamily, computedFontSize, readOnly, onFocusChange]);
+    }, [documentId, onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, disposeListeners, computedFontFamily, computedFontSize, readOnly, onFocusChange]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {
