@@ -5,6 +5,8 @@ import IconButton from './IconButton';
 import { FileIcon, FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, LockClosedIcon, LockOpenIcon, TrashIcon, GlobeIcon } from './Icons';
 import Tooltip from './Tooltip';
 import EmojiPickerOverlay from './EmojiPickerOverlay';
+import { getDroppedUrl } from './dragDropUtils';
+
 
 export interface DocumentNode extends DocumentOrFolder {
   children: DocumentNode[];
@@ -399,7 +401,10 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       e.dataTransfer.types.includes('Files') ||
       e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ||
       e.dataTransfer.types.includes('application/json') ||
-      e.dataTransfer.types.includes('text/uri-list')
+      e.dataTransfer.types.includes('text/uri-list') ||
+      e.dataTransfer.types.includes('URL') ||
+      e.dataTransfer.types.includes('url') ||
+      e.dataTransfer.types.includes('text/plain')
     ) {
       const localIds = readLocalDragIds(e.dataTransfer);
       const hasKnownLocalIds = Array.isArray(localIds) && localIds.length > 0 && localIds.every(isKnownNodeId);
@@ -416,7 +421,6 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    e.stopPropagation();
     setDropPosition(null);
   };
 
@@ -428,13 +432,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     const finalDropPosition = getDropPosition(e, isFolder, itemRef.current, isEmptyFolder, isExpanded);
     setDropPosition(null);
 
-    if (e.dataTransfer.types.includes('text/uri-list')) {
-      const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('URL');
-      if (url) {
-        const parentId = finalDropPosition === 'inside' ? node.id : node.parentId;
-        onDropLink(url, parentId);
-        return;
-      }
+    const url = getDroppedUrl(e.dataTransfer);
+    if (url) {
+      const parentId = finalDropPosition === 'inside' ? node.id : node.parentId;
+      onDropLink(url, parentId);
+      return;
     }
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {

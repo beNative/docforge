@@ -2,6 +2,8 @@ import React, { useState, useMemo, useCallback } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer, SerializedNodeForTransfer } from '../types';
 import DocumentTreeItem, { DocumentNode, DOCFORGE_DRAG_MIME } from './PromptTreeItem';
+import { getDroppedUrl } from './dragDropUtils';
+
 
 interface DocumentListProps {
   tree: DocumentNode[];
@@ -148,13 +150,12 @@ const DocumentList: React.FC<DocumentListProps> = ({
       return;
     }
 
-    if (e.dataTransfer.types.includes('text/uri-list')) {
-      const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('URL');
-      if (url) {
-        onDropLink(url, null);
-        return;
-      }
+    const url = getDroppedUrl(e.dataTransfer);
+    if (url) {
+      onDropLink(url, null);
+      return;
     }
+
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       onDropFiles(e.dataTransfer.files, null);
@@ -192,7 +193,10 @@ const DocumentList: React.FC<DocumentListProps> = ({
       e.dataTransfer.types.includes('Files') ||
       e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ||
       e.dataTransfer.types.includes('application/json') ||
-      e.dataTransfer.types.includes('text/uri-list')
+      e.dataTransfer.types.includes('text/uri-list') ||
+      e.dataTransfer.types.includes('URL') ||
+      e.dataTransfer.types.includes('url') ||
+      e.dataTransfer.types.includes('text/plain')
     ) {
       const target = e.target as HTMLElement;
       if (!target.closest('li[draggable="true"]')) {

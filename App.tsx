@@ -43,6 +43,8 @@ import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './serv
 import { readClipboardText, ClipboardPermissionError, ClipboardUnavailableError } from './services/clipboardService';
 import ChatPanel from './components/ChatPanel';
 import { monacoEditorPool } from './services/editor/monacoEditorPool';
+import { getDroppedUrl, getCleanTitleFromUrl } from './components/dragDropUtils';
+
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -85,22 +87,6 @@ type NavigableItem = { id: string; type: 'document' | 'folder' | 'template'; par
 interface FileWithRelativePath extends File {
     readonly webkitRelativePath: string;
 }
-
-const getCleanTitleFromUrl = (urlString: string): string => {
-    try {
-        const url = new URL(urlString);
-        let title = url.hostname;
-        if (url.pathname && url.pathname !== '/') {
-            title += url.pathname;
-        }
-        if (title.length > 50) {
-            title = title.substring(0, 47) + '...';
-        }
-        return title;
-    } catch {
-        return urlString;
-    }
-};
 
 const App: React.FC = () => {
     const { addLog } = useLogger();
@@ -1803,7 +1789,12 @@ export const MainApp: React.FC = () => {
 
     useEffect(() => {
         const handleDragEnter = (e: DragEvent) => {
-            if (e.dataTransfer?.types.includes('Files') || e.dataTransfer?.types.includes('text/uri-list')) {
+            if (
+                e.dataTransfer?.types.includes('Files') ||
+                e.dataTransfer?.types.includes('text/uri-list') ||
+                e.dataTransfer?.types.includes('URL') ||
+                e.dataTransfer?.types.includes('url')
+            ) {
                 e.preventDefault();
                 dragCounter.current++;
                 if (dragCounter.current === 1) {
@@ -1814,7 +1805,12 @@ export const MainApp: React.FC = () => {
         };
 
         const handleDragOver = (e: DragEvent) => {
-            if (e.dataTransfer?.types.includes('Files') || e.dataTransfer?.types.includes('text/uri-list')) {
+            if (
+                e.dataTransfer?.types.includes('Files') ||
+                e.dataTransfer?.types.includes('text/uri-list') ||
+                e.dataTransfer?.types.includes('URL') ||
+                e.dataTransfer?.types.includes('url')
+            ) {
                 e.preventDefault();
             }
         };
@@ -1838,8 +1834,8 @@ export const MainApp: React.FC = () => {
                 return;
             }
 
-            if (e.dataTransfer?.types.includes('text/uri-list')) {
-                const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('URL');
+            if (e.dataTransfer) {
+                const url = getDroppedUrl(e.dataTransfer);
                 if (url) {
                     void handleDropLink(url, null);
                     return;
@@ -1852,16 +1848,25 @@ export const MainApp: React.FC = () => {
             }
         };
 
+        const handleGlobalDragReset = () => {
+            dragCounter.current = 0;
+            setIsDraggingFile(false);
+        };
+
         window.addEventListener('dragenter', handleDragEnter);
         window.addEventListener('dragover', handleDragOver);
         window.addEventListener('dragleave', handleDragLeave);
         window.addEventListener('drop', handleDrop);
+        window.addEventListener('drop', handleGlobalDragReset, true);
+        window.addEventListener('dragend', handleGlobalDragReset, true);
         
         return () => {
             window.removeEventListener('dragenter', handleDragEnter);
             window.removeEventListener('dragover', handleDragOver);
             window.removeEventListener('dragleave', handleDragLeave);
             window.removeEventListener('drop', handleDrop);
+            window.removeEventListener('drop', handleGlobalDragReset, true);
+            window.removeEventListener('dragend', handleGlobalDragReset, true);
         };
     }, [handleDropFiles, handleDropLink, addLog]);
 
