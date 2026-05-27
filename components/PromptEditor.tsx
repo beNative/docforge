@@ -17,6 +17,7 @@ import PythonExecutionPanel from './PythonExecutionPanel';
 import ScriptExecutionPanel from './ScriptExecutionPanel';
 import EmojiPickerOverlay from './EmojiPickerOverlay';
 import Tooltip from './Tooltip';
+import EmbeddedBrowser from './EmbeddedBrowser';
 
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
@@ -174,6 +175,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onSaveToFile,
 }) => {
   const isRichTextDocument = documentNode.doc_type === 'rich_text';
+  const isWebLink = documentNode.doc_type === 'weblink';
   const initialContent = sanitizeDocumentContent(documentNode.content, isRichTextDocument);
   const [title, setTitle] = useState(documentNode.title);
   const [content, setContent] = useState(initialContent);
@@ -767,10 +769,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const rawLanguage = documentNode.language_hint || 'plaintext';
   const language = isRichTextDocument ? 'html' : rawLanguage;
   const normalizedLanguage = language.toLowerCase();
-  const supportsAiTools = ['markdown', 'plaintext', 'html'].includes(normalizedLanguage);
+  const supportsAiTools = !isWebLink && ['markdown', 'plaintext', 'html'].includes(normalizedLanguage);
   const canAddEmojiToTitle = documentNode.type === 'document';
-  const supportsPreview = PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
-  const supportsFormatting = ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
+  const supportsPreview = !isWebLink && PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
+  const supportsFormatting = !isWebLink && ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
   const scriptBridgeAvailable =
     typeof window !== 'undefined' && (!!window.electronAPI || !!window.__DOCFORGE_SCRIPT_PREVIEW__);
   const isPythonDocument = typeof window !== 'undefined' && !!window.electronAPI && (normalizedLanguage === 'python');
@@ -937,6 +939,17 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [onZoomTargetChange]);
 
   const renderContent = () => {
+    if (documentNode.doc_type === 'weblink') {
+      return (
+        <EmbeddedBrowser
+          key={documentNode.id}
+          url={content}
+          isLocked={isLocked}
+          onSaveLocation={(newUrl) => onCommitVersion(documentNode.id, newUrl)}
+        />
+      );
+    }
+
     const editor = isDiffMode
       ? (
         <MonacoDiffEditor
@@ -1107,19 +1120,23 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center">
-            <label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">
-              Language:
-            </label>
-            <LanguageDropdown
-              id="language-select"
-              value={language}
-              onChange={onLanguageChange}
-              ref={languageButtonRef}
-              openTrigger={commandTriggers.openLanguageSelector}
-            />
-          </div>
-          <div className="h-5 w-px bg-border-color mx-1"></div>
+          {!isWebLink && (
+            <>
+              <div className="flex items-center">
+                <label htmlFor="language-select" className="text-xs font-medium text-text-secondary mr-2">
+                  Language:
+                </label>
+                <LanguageDropdown
+                  id="language-select"
+                  value={language}
+                  onChange={onLanguageChange}
+                  ref={languageButtonRef}
+                  openTrigger={commandTriggers.openLanguageSelector}
+                />
+              </div>
+              <div className="h-5 w-px bg-border-color mx-1"></div>
+            </>
+          )}
           {supportsPreview && (
             <div className="flex items-center p-1 bg-background rounded-lg border border-border-color">
               <IconButton onClick={() => handleViewModeButton('edit')} tooltip="Editor Only" size="xs" className={`rounded-md ${viewMode === 'edit' ? 'bg-secondary text-primary' : ''}`}><PencilIcon className="w-4 h-4" /></IconButton>
@@ -1148,7 +1165,9 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
               </IconButton>
             </div>
           )}
-          <div className="h-5 w-px bg-border-color mx-1"></div>
+          {!isWebLink && (supportsPreview || isRichTextDocument) && (
+            <div className="h-5 w-px bg-border-color mx-1"></div>
+          )}
           {supportsFormatting && (
             <IconButton onClick={handleFormatDocument} tooltip="Format Document" size="xs" variant="ghost" disabled={isLocked || isLocking}>
               <FormatIcon className="w-4 h-4" />
@@ -1164,43 +1183,50 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           >
             {isLocking ? <Spinner /> : isLocked ? <LockClosedIcon className="w-4 h-4" /> : <LockOpenIcon className="w-4 h-4" />}
           </IconButton>
-          <IconButton
-            onClick={() => setIsDiffMode(prev => !prev)}
-            tooltip={isDiffMode ? 'Hide Inline Diff' : 'Show Inline Diff'}
-            size="xs"
-            variant="ghost"
-            disabled={viewMode === 'preview'}
-            className={isDiffMode ? 'bg-secondary text-primary' : ''}
-          >
-            <span className="font-semibold text-[11px] leading-none tracking-wide">Diff</span>
-          </IconButton>
+          {!isWebLink && (
+            <IconButton
+              onClick={() => setIsDiffMode(prev => !prev)}
+              tooltip={isDiffMode ? 'Hide Inline Diff' : 'Show Inline Diff'}
+              size="xs"
+              variant="ghost"
+              disabled={viewMode === 'preview'}
+              className={isDiffMode ? 'bg-secondary text-primary' : ''}
+            >
+              <span className="font-semibold text-[11px] leading-none tracking-wide">Diff</span>
+            </IconButton>
+          )}
           <IconButton onClick={onShowHistory} tooltip="View Version History" size="xs" variant="ghost"><HistoryIcon className="w-4 h-4" /></IconButton>
+          {!isWebLink && (
+            <>
+              <div className="h-5 w-px bg-border-color mx-1"></div>
+              <IconButton
+                onClick={handleCancelChanges}
+                disabled={!isDirty || isRefining || isSaving}
+                tooltip="Cancel Changes"
+                size="xs"
+                variant="ghost"
+              >
+                <UndoIcon className={`w-4 h-4 ${isDirty ? 'text-destructive-text' : ''}`} />
+              </IconButton>
+              <IconButton
+                onClick={handleManualSave}
+                disabled={!isDirty || isRefining || isSaving || isLocked || isLocking}
+                tooltip={isSaving ? 'Saving...' : 'Save Version'}
+                size="xs"
+                variant="ghost"
+              >
+                {isSaving ? (
+                  <Spinner />
+                ) : (
+                  <SaveIcon className={`w-4 h-4 ${isDirty ? 'text-primary' : ''}`} />
+                )}
+              </IconButton>
+              <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
+              <IconButton onClick={handleSaveToFile} disabled={!content.trim() || !onSaveToFile} tooltip="Save to File" size="xs" variant="ghost"><DownloadIcon className="w-4 h-4" /></IconButton>
+              {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining || isLocked} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
+            </>
+          )}
           <div className="h-5 w-px bg-border-color mx-1"></div>
-          <IconButton
-            onClick={handleCancelChanges}
-            disabled={!isDirty || isRefining || isSaving}
-            tooltip="Cancel Changes"
-            size="xs"
-            variant="ghost"
-          >
-            <UndoIcon className={`w-4 h-4 ${isDirty ? 'text-destructive-text' : ''}`} />
-          </IconButton>
-          <IconButton
-            onClick={handleManualSave}
-            disabled={!isDirty || isRefining || isSaving || isLocked || isLocking}
-            tooltip={isSaving ? 'Saving...' : 'Save Version'}
-            size="xs"
-            variant="ghost"
-          >
-            {isSaving ? (
-              <Spinner />
-            ) : (
-              <SaveIcon className={`w-4 h-4 ${isDirty ? 'text-primary' : ''}`} />
-            )}
-          </IconButton>
-          <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
-          <IconButton onClick={handleSaveToFile} disabled={!content.trim() || !onSaveToFile} tooltip="Save to File" size="xs" variant="ghost"><DownloadIcon className="w-4 h-4" /></IconButton>
-          {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining || isLocked} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
           <IconButton onClick={handleDeleteDocument} tooltip="Delete Document" size="xs" variant="destructive"><TrashIcon className="w-4 h-4" /></IconButton>
         </div>
       </div>

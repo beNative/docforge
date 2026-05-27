@@ -22,6 +22,7 @@ const DEFAULT_DOC_TYPE_EXTENSION: Record<DocType, string> = {
   pdf: 'pdf',
   image: 'png',
   rich_text: 'html',
+  weblink: 'txt',
 };
 
 const DOC_TYPE_FILTER_LABELS: Partial<Record<DocType, string>> = {
@@ -30,6 +31,7 @@ const DOC_TYPE_FILTER_LABELS: Partial<Record<DocType, string>> = {
   pdf: 'PDF Documents',
   image: 'Image Files',
   rich_text: 'Rich Documents (HTML)',
+  weblink: 'Web Links',
 };
 
 const LANGUAGE_EXTENSION_MAP: Record<string, string> = {

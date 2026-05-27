@@ -18,6 +18,7 @@ interface DocumentListProps {
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void | Promise<void>;
   onDropFiles: (files: FileList, parentId: string | null) => void;
+  onDropLink: (url: string, parentId: string | null) => void;
   onCopyNodeContent: (id: string) => void;
   onToggleLock: (id: string, locked: boolean) => void | Promise<void>;
   searchTerm: string;
@@ -45,6 +46,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
   onMoveNode,
   onImportNodes,
   onDropFiles,
+  onDropLink,
   onCopyNodeContent,
   onToggleLock,
   searchTerm,
@@ -146,6 +148,14 @@ const DocumentList: React.FC<DocumentListProps> = ({
       return;
     }
 
+    if (e.dataTransfer.types.includes('text/uri-list')) {
+      const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('URL');
+      if (url) {
+        onDropLink(url, null);
+        return;
+      }
+    }
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       onDropFiles(e.dataTransfer.files, null);
       return;
@@ -181,7 +191,8 @@ const DocumentList: React.FC<DocumentListProps> = ({
     if (
       e.dataTransfer.types.includes('Files') ||
       e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ||
-      e.dataTransfer.types.includes('application/json')
+      e.dataTransfer.types.includes('application/json') ||
+      e.dataTransfer.types.includes('text/uri-list')
     ) {
       const target = e.target as HTMLElement;
       if (!target.closest('li[draggable="true"]')) {
@@ -254,6 +265,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onImportNodes={onImportNodes}
                 onRequestNodeExport={buildTransferPayload}
                 onDropFiles={onDropFiles}
+                onDropLink={onDropLink}
                 onToggleExpand={onToggleExpand}
                 onCopyNodeContent={onCopyNodeContent}
                 onToggleLock={onToggleLock}

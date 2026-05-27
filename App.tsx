@@ -86,6 +86,22 @@ interface FileWithRelativePath extends File {
     readonly webkitRelativePath: string;
 }
 
+const getCleanTitleFromUrl = (urlString: string): string => {
+    try {
+        const url = new URL(urlString);
+        let title = url.hostname;
+        if (url.pathname && url.pathname !== '/') {
+            title += url.pathname;
+        }
+        if (title.length > 50) {
+            title = title.substring(0, 47) + '...';
+        }
+        return title;
+    } catch {
+        return urlString;
+    }
+};
+
 const App: React.FC = () => {
     const { addLog } = useLogger();
     const [isInitialized, setIsInitialized] = useState(false);
@@ -1690,6 +1706,33 @@ export const MainApp: React.FC = () => {
         }
     }, [addDocumentsFromFiles, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
 
+    const handleDropLink = useCallback(async (url: string, parentId: string | null) => {
+        if (!url) return;
+
+        const title = getCleanTitleFromUrl(url);
+        addLog('INFO', `User action: Dropped web link "${url}" to create document "${title}".`);
+
+        try {
+            const newDoc = await addDocument({
+                parentId,
+                title,
+                content: url,
+                doc_type: 'weblink',
+                language_hint: 'html'
+            });
+            ensureNodeVisible(newDoc);
+            activateDocumentTab(newDoc.id);
+            setSelectedIds(new Set([newDoc.id]));
+            setLastClickedId(newDoc.id);
+            setActiveTemplateId(null);
+            setDocumentView('editor');
+            setView('editor');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog('ERROR', `Failed to create web link document: ${message}`);
+        }
+    }, [addDocument, ensureNodeVisible, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, addLog]);
+
     const handleImportNodesFromTransfer = useCallback(async (
         payload: DraggedNodeTransfer,
         targetId: string | null,
@@ -1746,18 +1789,18 @@ export const MainApp: React.FC = () => {
 
     useEffect(() => {
         const handleDragEnter = (e: DragEvent) => {
-            if (e.dataTransfer?.types.includes('Files')) {
+            if (e.dataTransfer?.types.includes('Files') || e.dataTransfer?.types.includes('text/uri-list')) {
                 e.preventDefault();
                 dragCounter.current++;
                 if (dragCounter.current === 1) {
                     setIsDraggingFile(true);
-                    addLog('DEBUG', 'Drag operation with files started over the application window.');
+                    addLog('DEBUG', 'Drag operation with files/links started over the application window.');
                 }
             }
         };
 
         const handleDragOver = (e: DragEvent) => {
-            if (e.dataTransfer?.types.includes('Files')) {
+            if (e.dataTransfer?.types.includes('Files') || e.dataTransfer?.types.includes('text/uri-list')) {
                 e.preventDefault();
             }
         };
@@ -1775,13 +1818,23 @@ export const MainApp: React.FC = () => {
             e.preventDefault();
             dragCounter.current = 0;
             setIsDraggingFile(false);
-            // Global drop is only handled if not caught by a more specific target
-            if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-                 const target = e.target as HTMLElement;
-                 if (!target.closest('[data-item-id]') && !target.closest('[data-sidebar-drop-root]')) {
-                    addLog('INFO', `${e.dataTransfer.files.length} file(s) dropped on the application window (root).`);
-                    handleDropFiles(e.dataTransfer.files, null);
+            
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-item-id]') || target.closest('[data-sidebar-drop-root]')) {
+                return;
+            }
+
+            if (e.dataTransfer?.types.includes('text/uri-list')) {
+                const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('URL');
+                if (url) {
+                    void handleDropLink(url, null);
+                    return;
                 }
+            }
+
+            if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+                addLog('INFO', `${e.dataTransfer.files.length} file(s) dropped on the application window (root).`);
+                handleDropFiles(e.dataTransfer.files, null);
             }
         };
 
@@ -1796,7 +1849,7 @@ export const MainApp: React.FC = () => {
             window.removeEventListener('dragleave', handleDragLeave);
             window.removeEventListener('drop', handleDrop);
         };
-    }, [handleDropFiles, addLog]);
+    }, [handleDropFiles, handleDropLink, addLog]);
 
     useEffect(() => {
         handleDetectServices();
@@ -3322,6 +3375,7 @@ export const MainApp: React.FC = () => {
                                         onMoveNode={moveItems}
                                         onImportNodes={handleImportNodesFromTransfer}
                                         onDropFiles={handleDropFiles}
+                                        onDropLink={handleDropLink}
                                         onNewDocument={() => handleNewDocument()}
                                         onNewRootFolder={handleNewRootFolder}
                                         onNewSubfolder={handleNewSubfolder}

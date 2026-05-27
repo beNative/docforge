@@ -1041,7 +1041,7 @@ export const databaseService = {
         }
 
         if (nodeType === 'document') {
-          const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image', 'rich_text'];
+          const allowedDocTypes: DocType[] = ['prompt', 'source_code', 'pdf', 'image', 'rich_text', 'weblink'];
           const allowedViewModes: ViewMode[] = ['edit', 'preview', 'split-vertical', 'split-horizontal'];
 
           let docType = allowedDocTypes.includes(node.doc_type as DocType)
@@ -1430,6 +1430,7 @@ export const databaseService = {
         JOIN doc_versions dv ON dv.version_id = d.current_version_id
         JOIN content_store cs ON cs.content_id = dv.content_id
         WHERE n.node_type = 'document' 
+          AND d.doc_type != 'weblink'
           AND cs.text_content IS NOT NULL 
           AND cs.text_content != ''
       `).get() as { count: number };
@@ -1484,7 +1485,7 @@ export const databaseService = {
       LEFT JOIN documents d ON d.node_id = n.node_id
       LEFT JOIN doc_versions dv ON dv.version_id = d.current_version_id
       LEFT JOIN content_store cs ON cs.content_id = dv.content_id
-      WHERE n.node_id = ? AND n.node_type = 'document'
+      WHERE n.node_id = ? AND n.node_type = 'document' AND d.doc_type != 'weblink'
     `).get(nodeId) as { title: string; text_content: string } | undefined;
 
     if (!row) {
@@ -1506,6 +1507,7 @@ export const databaseService = {
       JOIN doc_versions dv ON dv.version_id = d.current_version_id
       JOIN content_store cs ON cs.content_id = dv.content_id
       WHERE n.node_type = 'document' 
+        AND d.doc_type != 'weblink'
         AND cs.text_content IS NOT NULL 
         AND cs.text_content != ''
     `).all() as { node_id: string }[];
