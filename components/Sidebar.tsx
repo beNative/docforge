@@ -31,6 +31,7 @@ interface SidebarProps {
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void | Promise<void>;
   onDropFiles: (files: FileList, parentId: string | null) => void;
+  onDropLink: (url: string, parentId: string | null) => void;
   onNewDocument: () => void;
   onNewRootFolder: () => void;
   onNewSubfolder: () => void;
@@ -570,6 +571,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
               onMoveNode={props.onMoveNode}
               onImportNodes={props.onImportNodes}
               onDropFiles={props.onDropFiles}
+              onDropLink={props.onDropLink}
               onCopyNodeContent={props.onCopyNodeContent}
               onToggleLock={props.onToggleNodeLock}
               searchTerm={searchTerm}

@@ -103,6 +103,16 @@ This system provides a consistent and extensible editing experience for all docu
 -   **Renderer Plugins (`services/preview/`):** Each file format with a preview is supported by a dedicated renderer class that implements the `IRenderer` interface. This makes the system highly extensible: to support a new format, one only needs to create a new renderer class and add it to the `previewService` registry. The bundled plugins cover Markdown (with Mermaid + PlantUML support), standalone PlantUML documents, HTML, PDFs, common image formats, and a plaintext fallback renderer.
     -   Both the Markdown renderer and the standalone PlantUML renderer share the `PlantUMLDiagram` component, which routes diagrams through either the remote plantuml.com server or the offline Java-based IPC bridge depending on the active setting.
 
+### Embedded Web Browser (Web Links)
+
+This system handles loading external web content within the desktop application in a secure, performant, and full-bleed layout.
+
+-   **`webviewTag` Enablement:** Enforced secure, sandboxed browsing by enabling `webviewTag: true` in the Electron main process window options (`electron/main.ts`).
+-   **`EmbeddedBrowser.tsx`:** A React component that manages the custom web browser UI. It renders standard navigation controls (Back, Forward, Reload), an editable address bar, and the Electron `<webview>` tag.
+-   **URL Versioning:** Detects when the user navigates to a new page within the guest process. The toolbar highlights the "Save Location" button, allowing users to manually save the current navigated URL into the `content` field of the document, creating a new version entry.
+-   **Drag & Drop Parsing (`dragDropUtils.ts`):** Centralizes URL detection from external drag payloads. It parses formats such as `text/uri-list`, `URL`, `url`, `text/html`, and text fallbacks, automatically creating a document node of type `'weblink'` with a clean title derived from the hostname and path.
+-   **Bypassing Indexing:** Integrates database-level checks to exclude `'weblink'` nodes from the vector indexing pipeline, avoiding indexing overhead on dynamic website content.
+
 ### Document Export Service (`services/documentExportService.ts`)
 
 The export service centralizes all logic for saving documents to disk.

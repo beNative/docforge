@@ -2,6 +2,8 @@ import React, { useState, useMemo, useCallback } from 'react';
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer, SerializedNodeForTransfer } from '../types';
 import DocumentTreeItem, { DocumentNode, DOCFORGE_DRAG_MIME } from './PromptTreeItem';
+import { getDroppedUrl } from './dragDropUtils';
+
 
 interface DocumentListProps {
   tree: DocumentNode[];
@@ -18,6 +20,7 @@ interface DocumentListProps {
   onMoveNode: (draggedIds: string[], targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void | Promise<void>;
   onDropFiles: (files: FileList, parentId: string | null) => void;
+  onDropLink: (url: string, parentId: string | null) => void;
   onCopyNodeContent: (id: string) => void;
   onToggleLock: (id: string, locked: boolean) => void | Promise<void>;
   searchTerm: string;
@@ -45,6 +48,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
   onMoveNode,
   onImportNodes,
   onDropFiles,
+  onDropLink,
   onCopyNodeContent,
   onToggleLock,
   searchTerm,
@@ -146,6 +150,13 @@ const DocumentList: React.FC<DocumentListProps> = ({
       return;
     }
 
+    const url = getDroppedUrl(e.dataTransfer);
+    if (url) {
+      onDropLink(url, null);
+      return;
+    }
+
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       onDropFiles(e.dataTransfer.files, null);
       return;
@@ -181,7 +192,11 @@ const DocumentList: React.FC<DocumentListProps> = ({
     if (
       e.dataTransfer.types.includes('Files') ||
       e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ||
-      e.dataTransfer.types.includes('application/json')
+      e.dataTransfer.types.includes('application/json') ||
+      e.dataTransfer.types.includes('text/uri-list') ||
+      e.dataTransfer.types.includes('URL') ||
+      e.dataTransfer.types.includes('url') ||
+      e.dataTransfer.types.includes('text/plain')
     ) {
       const target = e.target as HTMLElement;
       if (!target.closest('li[draggable="true"]')) {
@@ -197,7 +212,11 @@ const DocumentList: React.FC<DocumentListProps> = ({
         }
         const hasDocforgePayload = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME);
         const hasFiles = e.dataTransfer.types.includes('Files');
-        const shouldCopy = hasFiles || (hasDocforgePayload && !hasKnownLocalIds);
+        const hasLink = e.dataTransfer.types.includes('text/uri-list') || 
+                        e.dataTransfer.types.includes('URL') || 
+                        e.dataTransfer.types.includes('url') ||
+                        (e.dataTransfer.types.includes('text/plain') && !e.dataTransfer.types.includes('application/json'));
+        const shouldCopy = hasFiles || hasLink || (hasDocforgePayload && !hasKnownLocalIds);
         e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
         setIsRootDropping(true);
       }
@@ -254,6 +273,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 onImportNodes={onImportNodes}
                 onRequestNodeExport={buildTransferPayload}
                 onDropFiles={onDropFiles}
+                onDropLink={onDropLink}
                 onToggleExpand={onToggleExpand}
                 onCopyNodeContent={onCopyNodeContent}
                 onToggleLock={onToggleLock}

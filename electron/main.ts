@@ -352,6 +352,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       spellcheck: true,
+      webviewTag: true,
     },
     show: false, // Don't show until ready
     backgroundColor: '#1a1a1a', // Match dark theme to avoid flash
@@ -724,6 +725,15 @@ ipcMain.handle('app:open-executable-folder', async () => {
         const message = error instanceof Error ? error.message : String(error);
         console.error('Failed to open executable folder:', error);
         return { success: false, error: message };
+    }
+});
+ipcMain.handle('app:open-external', async (_, url: string) => {
+    try {
+        await shell.openExternal(url);
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to open external link:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
 });
 

@@ -74,6 +74,7 @@ export const XIcon = createIcon('XIcon');
 export const DocumentDuplicateIcon = createIcon('DocumentDuplicateIcon');
 export const HistoryIcon = createIcon('HistoryIcon');
 export const ArrowLeftIcon = createIcon('ArrowLeftIcon');
+export const ArrowRightIcon = createIcon('ArrowRightIcon');
 export const ArrowUpIcon = createIcon('ArrowUpIcon');
 export const ArrowDownIcon = createIcon('ArrowDownIcon');
 export const EyeIcon = createIcon('EyeIcon');
@@ -91,6 +92,8 @@ export const SaveIcon = createIcon('SaveIcon');
 export const ExpandAllIcon = createIcon('ExpandAllIcon');
 export const CollapseAllIcon = createIcon('CollapseAllIcon');
 export const FormatIcon = createIcon('FormatIcon');
+export const ExternalLinkIcon = createIcon('ExternalLinkIcon');
+export const GlobeIcon = createIcon('GlobeIcon');
 
 export const ChatIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>

@@ -43,6 +43,8 @@ import { formatShortcut, getShortcutMap, formatShortcutForDisplay } from './serv
 import { readClipboardText, ClipboardPermissionError, ClipboardUnavailableError } from './services/clipboardService';
 import ChatPanel from './components/ChatPanel';
 import { monacoEditorPool } from './services/editor/monacoEditorPool';
+import { getDroppedUrl, getCleanTitleFromUrl } from './components/dragDropUtils';
+
 
 const DEFAULT_SIDEBAR_WIDTH = 288;
 const MIN_SIDEBAR_WIDTH = 200;
@@ -1690,6 +1692,47 @@ export const MainApp: React.FC = () => {
         }
     }, [addDocumentsFromFiles, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
 
+    const handleDropLink = useCallback(async (rawUrl: string, parentId: string | null) => {
+        if (!rawUrl) return;
+
+        // Reset drag counter and clear overlay immediately to avoid stuck overlay
+        dragCounter.current = 0;
+        setIsDraggingFile(false);
+
+        // Parse and clean rawUrl (first line is the URL)
+        const lines = rawUrl.split(/[\r\n]+/);
+        const url = lines[0].trim();
+        if (!url) return;
+
+        // Try to get suggested title from lines[1] (anchor text) or parse from URL
+        let title = lines[1]?.trim() || '';
+        if (!title) {
+            title = getCleanTitleFromUrl(url);
+        }
+
+        addLog('INFO', `User action: Dropped web link "${url}" to create document "${title}".`);
+
+        try {
+            const newDoc = await addDocument({
+                parentId,
+                title,
+                content: url,
+                doc_type: 'weblink',
+                language_hint: 'html'
+            });
+            ensureNodeVisible(newDoc);
+            activateDocumentTab(newDoc.id);
+            setSelectedIds(new Set([newDoc.id]));
+            setLastClickedId(newDoc.id);
+            setActiveTemplateId(null);
+            setDocumentView('editor');
+            setView('editor');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog('ERROR', `Failed to create web link document: ${message}`);
+        }
+    }, [addDocument, ensureNodeVisible, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, addLog]);
+
     const handleImportNodesFromTransfer = useCallback(async (
         payload: DraggedNodeTransfer,
         targetId: string | null,
@@ -1746,18 +1789,28 @@ export const MainApp: React.FC = () => {
 
     useEffect(() => {
         const handleDragEnter = (e: DragEvent) => {
-            if (e.dataTransfer?.types.includes('Files')) {
+            if (
+                e.dataTransfer?.types.includes('Files') ||
+                e.dataTransfer?.types.includes('text/uri-list') ||
+                e.dataTransfer?.types.includes('URL') ||
+                e.dataTransfer?.types.includes('url')
+            ) {
                 e.preventDefault();
                 dragCounter.current++;
                 if (dragCounter.current === 1) {
                     setIsDraggingFile(true);
-                    addLog('DEBUG', 'Drag operation with files started over the application window.');
+                    addLog('DEBUG', 'Drag operation with files/links started over the application window.');
                 }
             }
         };
 
         const handleDragOver = (e: DragEvent) => {
-            if (e.dataTransfer?.types.includes('Files')) {
+            if (
+                e.dataTransfer?.types.includes('Files') ||
+                e.dataTransfer?.types.includes('text/uri-list') ||
+                e.dataTransfer?.types.includes('URL') ||
+                e.dataTransfer?.types.includes('url')
+            ) {
                 e.preventDefault();
             }
         };
@@ -1775,28 +1828,47 @@ export const MainApp: React.FC = () => {
             e.preventDefault();
             dragCounter.current = 0;
             setIsDraggingFile(false);
-            // Global drop is only handled if not caught by a more specific target
-            if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-                 const target = e.target as HTMLElement;
-                 if (!target.closest('[data-item-id]') && !target.closest('[data-sidebar-drop-root]')) {
-                    addLog('INFO', `${e.dataTransfer.files.length} file(s) dropped on the application window (root).`);
-                    handleDropFiles(e.dataTransfer.files, null);
+            
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-item-id]') || target.closest('[data-sidebar-drop-root]')) {
+                return;
+            }
+
+            if (e.dataTransfer) {
+                const url = getDroppedUrl(e.dataTransfer);
+                if (url) {
+                    void handleDropLink(url, null);
+                    return;
                 }
             }
+
+            if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+                addLog('INFO', `${e.dataTransfer.files.length} file(s) dropped on the application window (root).`);
+                handleDropFiles(e.dataTransfer.files, null);
+            }
+        };
+
+        const handleGlobalDragReset = () => {
+            dragCounter.current = 0;
+            setIsDraggingFile(false);
         };
 
         window.addEventListener('dragenter', handleDragEnter);
         window.addEventListener('dragover', handleDragOver);
         window.addEventListener('dragleave', handleDragLeave);
         window.addEventListener('drop', handleDrop);
+        window.addEventListener('drop', handleGlobalDragReset, true);
+        window.addEventListener('dragend', handleGlobalDragReset, true);
         
         return () => {
             window.removeEventListener('dragenter', handleDragEnter);
             window.removeEventListener('dragover', handleDragOver);
             window.removeEventListener('dragleave', handleDragLeave);
             window.removeEventListener('drop', handleDrop);
+            window.removeEventListener('drop', handleGlobalDragReset, true);
+            window.removeEventListener('dragend', handleGlobalDragReset, true);
         };
-    }, [handleDropFiles, addLog]);
+    }, [handleDropFiles, handleDropLink, addLog]);
 
     useEffect(() => {
         handleDetectServices();
@@ -3322,6 +3394,7 @@ export const MainApp: React.FC = () => {
                                         onMoveNode={moveItems}
                                         onImportNodes={handleImportNodesFromTransfer}
                                         onDropFiles={handleDropFiles}
+                                        onDropLink={handleDropLink}
                                         onNewDocument={() => handleNewDocument()}
                                         onNewRootFolder={handleNewRootFolder}
                                         onNewSubfolder={handleNewSubfolder}

@@ -39,6 +39,7 @@ declare global {
       getLogPath: () => Promise<string>;
       appendLog: (content: string) => Promise<{ success: boolean; error?: string; canceled?: boolean; filePath?: string }>;
       openExecutableFolder: () => Promise<{ success: boolean; path?: string; error?: string }>;
+      openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
       renderPlantUML: (
         diagram: string,
         format?: 'svg'
@@ -154,7 +155,7 @@ export interface UpdateErrorPayload {
 }
 
 export type NodeType = 'folder' | 'document';
-export type DocType = 'prompt' | 'source_code' | 'pdf' | 'image' | 'rich_text';
+export type DocType = 'prompt' | 'source_code' | 'pdf' | 'image' | 'rich_text' | 'weblink';
 export type ClassificationSource = 'auto' | 'user' | 'imported' | 'unknown';
 
 export type SaveFilePayload =

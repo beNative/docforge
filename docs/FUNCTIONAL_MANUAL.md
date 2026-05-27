@@ -144,7 +144,18 @@ Import PDFs by dragging `.pdf` files from your operating system into the sidebar
  - **Drag-and-Drop**: Drop any image file from your computer onto the open image editor to update the document.
  - **Manual Creation**: Create a new document, change its language to **Image**, and then paste or drop your content.
  
- Editing the underlying binary/text data is optional but discouraged unless you are intentionally replacing the encoded image contents.
+  Editing the underlying binary/text data is optional but discouraged unless you are intentionally replacing the encoded image contents.
+
+#### Web Link Documents
+
+DocForge supports a dedicated **Web Link** (`weblink`) document type. This lets you import and display external web pages directly within the workspace.
+
+-   **Importing via Drag & Drop:** Drag any website address or link directly from your web browser (e.g. Chrome, Edge, Firefox) and drop it into a folder in the sidebar or onto the empty tree area. A new web link node is automatically created, displaying the website icon and a clean title extracted from the link (e.g. `google.com/search`). You can also drop links onto the middle editor area to import and load them instantly.
+-   **Embedded Custom Browser:** When you select a web link node, the editor opens a custom, full-bleed web browser interface under the document toolbar.
+-   **Toolbar Navigation & Controls:** The browser includes controls to navigate back and forward, reload the page, and open the active page in your system's default browser.
+-   **Editable Address Bar:** You can double-click or focus the browser's address bar to directly type a new URL and press `Enter` to navigate.
+-   **Manual Versioning ("Save Location"):** As you navigate within the webview, if the URL changes, the "Save Location" (floppy disk) icon lights up. Click it to manually save the current navigated URL into the database, generating a new document version that preserves your browsing location.
+-   **Locking Web Links:** Locking the document disables the address bar, navigation controls, and prevents location saving, keeping the link node locked to the configured website.
 
 #### RAG (Chat with Workspace)
 

@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('log:append', formatted);
   },
   openExecutableFolder: () => ipcRenderer.invoke('app:open-executable-folder'),
+  openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
   renderPlantUML: (diagram: string, format: 'svg' = 'svg') => ipcRenderer.invoke('plantuml:render-svg', diagram, format),
   updaterSetAllowPrerelease: (allow: boolean) => ipcRenderer.send('updater:set-allow-prerelease', allow),
   updaterSetAutoCheckEnabled: (enabled: boolean) => ipcRenderer.send('updater:set-auto-check-enabled', enabled),

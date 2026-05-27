@@ -2,9 +2,11 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from
 // Fix: Correctly import the DocumentOrFolder type.
 import type { DocumentOrFolder, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FileIcon, FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, LockClosedIcon, LockOpenIcon, TrashIcon } from './Icons';
+import { FileIcon, FolderIcon, FolderOpenIcon, ChevronRightIcon, ChevronDownIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, CodeIcon, LockClosedIcon, LockOpenIcon, TrashIcon, GlobeIcon } from './Icons';
 import Tooltip from './Tooltip';
 import EmojiPickerOverlay from './EmojiPickerOverlay';
+import { getDroppedUrl } from './dragDropUtils';
+
 
 export interface DocumentNode extends DocumentOrFolder {
   children: DocumentNode[];
@@ -29,6 +31,7 @@ interface DocumentTreeItemProps {
   onImportNodes: (payload: DraggedNodeTransfer, targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onRequestNodeExport: (ids: string[]) => DraggedNodeTransfer | null;
   onDropFiles: (files: FileList, parentId: string | null) => void;
+  onDropLink: (url: string, parentId: string | null) => void;
   onToggleExpand: (id: string) => void;
   onCopyNodeContent: (id: string) => void;
   onToggleLock: (id: string, locked: boolean) => void | Promise<void>;
@@ -144,6 +147,7 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     onImportNodes,
     onRequestNodeExport,
     onDropFiles,
+    onDropLink,
     onToggleExpand,
     onCopyNodeContent,
     onToggleLock,
@@ -396,13 +400,21 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     if (
       e.dataTransfer.types.includes('Files') ||
       e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME) ||
-      e.dataTransfer.types.includes('application/json')
+      e.dataTransfer.types.includes('application/json') ||
+      e.dataTransfer.types.includes('text/uri-list') ||
+      e.dataTransfer.types.includes('URL') ||
+      e.dataTransfer.types.includes('url') ||
+      e.dataTransfer.types.includes('text/plain')
     ) {
       const localIds = readLocalDragIds(e.dataTransfer);
       const hasKnownLocalIds = Array.isArray(localIds) && localIds.length > 0 && localIds.every(isKnownNodeId);
       const hasDocforgePayload = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME);
       const hasFiles = e.dataTransfer.types.includes('Files');
-      const shouldCopy = hasFiles || (hasDocforgePayload && !hasKnownLocalIds);
+      const hasLink = e.dataTransfer.types.includes('text/uri-list') || 
+                      e.dataTransfer.types.includes('URL') || 
+                      e.dataTransfer.types.includes('url') ||
+                      (e.dataTransfer.types.includes('text/plain') && !e.dataTransfer.types.includes('application/json'));
+      const shouldCopy = hasFiles || hasLink || (hasDocforgePayload && !hasKnownLocalIds);
       e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
       const isEmptyFolder = isFolder && node.children.length === 0;
       const position = getDropPosition(e, isFolder, itemRef.current, isEmptyFolder, isExpanded);
@@ -413,7 +425,6 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    e.stopPropagation();
     setDropPosition(null);
   };
 
@@ -424,6 +435,13 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
     const isEmptyFolder = isFolder && node.children.length === 0;
     const finalDropPosition = getDropPosition(e, isFolder, itemRef.current, isEmptyFolder, isExpanded);
     setDropPosition(null);
+
+    const url = getDroppedUrl(e.dataTransfer);
+    if (url) {
+      const parentId = finalDropPosition === 'inside' ? node.id : node.parentId;
+      onDropLink(url, parentId);
+      return;
+    }
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const parentId = finalDropPosition === 'inside' ? node.id : node.parentId;
@@ -524,6 +542,8 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
             <FolderIcon className="w-3.5 h-3.5 flex-shrink-0" />
           ) : emojiForNode ? (
             <span className="w-3.5 h-3.5 flex items-center justify-center text-base leading-none" aria-hidden="true">{emojiForNode}</span>
+          ) : node.doc_type === 'weblink' ? (
+            <GlobeIcon className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
           ) : (
             isCodeFile ? <CodeIcon className="w-3.5 h-3.5 flex-shrink-0" /> : <FileIcon className="w-3.5 h-3.5 flex-shrink-0" />
           )}
