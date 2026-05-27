@@ -206,8 +206,7 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
           <webview
             ref={webviewRef}
             src={url}
-            className="w-full h-full border-none block"
-            style={{ width: '100%', height: '100%', display: 'block' }}
+            className="absolute inset-0 w-full h-full border-none block"
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary p-8 text-center select-none">
