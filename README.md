@@ -17,6 +17,7 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Emoji-Enhanced Titles:** Insert emoji directly into document and folder names or let the AI suggest a prefix so your workspace stays scannable at a glance.
 - **Multi-Document Tabs:** Keep several documents open at once, pin important files, and quickly jump between them using the tab strip and overflow picker.
 - **Multi-Format Live Preview:** Get a real-time, rendered preview for Markdown, HTML, PDFs, and common image formats. The preview can be displayed side-by-side (vertically or horizontally) with the editor, and binary formats open straight into preview mode with zoom and pan controls tailored to each viewer.
+- **Embedded Web Browsing:** Drag and drop external web links directly into folders or the editor workspace to create document nodes that load and display corresponding websites in an integrated, sandboxed webview. Features complete navigation controls, editable address inputs, locking support, and manual location saving as versioned documents.
 - **Focused Workspace Zoom:** Use a single set of zoom controls that automatically follow whichever pane—editor or preview—has focus, complete with 5% increments, keyboard and mouse support, and quick resets.
 - **AI-Powered Refinement:** Use your connected local LLM to automatically refine and improve your documents with a single click.
 - **Document Templating:** Create reusable document templates with variables to quickly generate new documents for recurring tasks.

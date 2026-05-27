@@ -220,7 +220,21 @@ This release brings an intelligent context menu to the document editor and intro
 
 ## Unreleased
 
--   _No entries yet._
+### ✨ Features
+
+-   **Embedded Web Browser & Web Link Support**:
+    -   Added a new document type `'weblink'` that loads and displays websites in an integrated, sandboxed web browser viewport using Electron's native `<webview>`.
+    -   Implemented drag-and-drop support for external URLs, allowing users to drag links directly from standard web browsers into the document tree (folders/root) or the main editor space to create new web link nodes.
+    -   Built a browser toolbar featuring standard controls: Back and Forward navigation, page Reload, an interactive Address Bar input, and an "Open in Default Browser" action.
+    -   Added a "Save Location" tool to the browser toolbar which allows users to manually save the current navigated URL as a new document version in the database.
+    -   Integrated document locking for web links, disabling address input and navigation tools when a document is locked.
+    -   Automatically bypassed RAG indexing for web link nodes to prevent vector search database pollution.
+
+### 🛠 Improvements
+
+-   **Workspace Editor Layout Polish**:
+    -   Changed the root document editor container's overflow styling from `overflow-y-auto` to `overflow-hidden`. This prevents double scrollbars, keeps the document toolbar pinned at the top, and forces the code editor, rich text editor, preview panes, and embedded webviews to stretch correctly to fill the client viewport height.
+    -   Updated the webview styling to position absolutely (`absolute inset-0`) and display as `inline-flex` inside the browser container, which guarantees that guest pages (such as GitHub) render full-bleed and layout correctly without collapsing.
 
 ## v0.6.8 - The Shortcut & Clipboard Update
 
