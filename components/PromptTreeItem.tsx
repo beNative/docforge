@@ -410,7 +410,11 @@ const DocumentTreeItem: React.FC<DocumentTreeItemProps> = (props) => {
       const hasKnownLocalIds = Array.isArray(localIds) && localIds.length > 0 && localIds.every(isKnownNodeId);
       const hasDocforgePayload = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME);
       const hasFiles = e.dataTransfer.types.includes('Files');
-      const shouldCopy = hasFiles || (hasDocforgePayload && !hasKnownLocalIds);
+      const hasLink = e.dataTransfer.types.includes('text/uri-list') || 
+                      e.dataTransfer.types.includes('URL') || 
+                      e.dataTransfer.types.includes('url') ||
+                      (e.dataTransfer.types.includes('text/plain') && !e.dataTransfer.types.includes('application/json'));
+      const shouldCopy = hasFiles || hasLink || (hasDocforgePayload && !hasKnownLocalIds);
       e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
       const isEmptyFolder = isFolder && node.children.length === 0;
       const position = getDropPosition(e, isFolder, itemRef.current, isEmptyFolder, isExpanded);

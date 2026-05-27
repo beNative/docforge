@@ -212,7 +212,11 @@ const DocumentList: React.FC<DocumentListProps> = ({
         }
         const hasDocforgePayload = e.dataTransfer.types.includes(DOCFORGE_DRAG_MIME);
         const hasFiles = e.dataTransfer.types.includes('Files');
-        const shouldCopy = hasFiles || (hasDocforgePayload && !hasKnownLocalIds);
+        const hasLink = e.dataTransfer.types.includes('text/uri-list') || 
+                        e.dataTransfer.types.includes('URL') || 
+                        e.dataTransfer.types.includes('url') ||
+                        (e.dataTransfer.types.includes('text/plain') && !e.dataTransfer.types.includes('application/json'));
+        const shouldCopy = hasFiles || hasLink || (hasDocforgePayload && !hasKnownLocalIds);
         e.dataTransfer.dropEffect = shouldCopy ? 'copy' : 'move';
         setIsRootDropping(true);
       }
