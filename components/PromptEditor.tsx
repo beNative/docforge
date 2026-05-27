@@ -1052,7 +1052,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-background overflow-y-auto">
+    <div className="flex-1 flex flex-col bg-background overflow-hidden">
       <div className="flex justify-between items-center px-4 h-7 gap-4 border-b border-border-color flex-shrink-0 bg-secondary">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <input

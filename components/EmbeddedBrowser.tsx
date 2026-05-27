@@ -132,7 +132,7 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-background border border-border-color rounded-md overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-background overflow-hidden">
       {/* Browser Toolbar */}
       <div className="flex items-center gap-2 p-2 bg-secondary border-b border-border-color select-none">
         <div className="flex items-center gap-1">
