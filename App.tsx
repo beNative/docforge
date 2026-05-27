@@ -1706,10 +1706,24 @@ export const MainApp: React.FC = () => {
         }
     }, [addDocumentsFromFiles, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
 
-    const handleDropLink = useCallback(async (url: string, parentId: string | null) => {
+    const handleDropLink = useCallback(async (rawUrl: string, parentId: string | null) => {
+        if (!rawUrl) return;
+
+        // Reset drag counter and clear overlay immediately to avoid stuck overlay
+        dragCounter.current = 0;
+        setIsDraggingFile(false);
+
+        // Parse and clean rawUrl (first line is the URL)
+        const lines = rawUrl.split(/[\r\n]+/);
+        const url = lines[0].trim();
         if (!url) return;
 
-        const title = getCleanTitleFromUrl(url);
+        // Try to get suggested title from lines[1] (anchor text) or parse from URL
+        let title = lines[1]?.trim() || '';
+        if (!title) {
+            title = getCleanTitleFromUrl(url);
+        }
+
         addLog('INFO', `User action: Dropped web link "${url}" to create document "${title}".`);
 
         try {
