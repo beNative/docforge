@@ -1138,7 +1138,12 @@ ipcMain.handle('sync:get-config', () => {
 
 ipcMain.handle('sync:save-config', async (_, config) => {
     const wasEnabled = syncConfig.syncEnabled;
-    Object.assign(syncConfig, config);
+    const allowedKeys = ['syncEnabled', 'clientId', 'clientSecret', 'syncAutoOnOpenClose', 'conflictResolution'];
+    for (const key of allowedKeys) {
+        if (key in config) {
+            (syncConfig as any)[key] = config[key];
+        }
+    }
     await saveSyncConfig();
 
     if (syncConfig.syncEnabled && !wasEnabled) {

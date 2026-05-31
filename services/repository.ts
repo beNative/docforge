@@ -1630,7 +1630,15 @@ export const repository = {
             return;
         }
 
-        const syncKeys = [
+        const syncKeysToSave = [
+            'syncEnabled',
+            'syncClientId',
+            'syncClientSecret',
+            'syncAutoOnOpenClose',
+            'syncConflictResolution'
+        ];
+
+        const allSyncKeys = [
             'syncEnabled',
             'syncClientId',
             'syncClientSecret',
@@ -1644,25 +1652,25 @@ export const repository = {
         ];
 
         const dbSettings: any = {};
-        const syncConfig: any = {};
+        const syncConfigPayload: any = {};
 
         for (const [key, value] of Object.entries(settings)) {
-            if (syncKeys.includes(key)) {
-                if (key === 'syncClientId') syncConfig.clientId = value;
-                else if (key === 'syncClientSecret') syncConfig.clientSecret = value;
-                else if (key === 'syncGoogleEmail') syncConfig.email = value;
-                else if (key === 'syncGoogleRefreshToken') syncConfig.refreshToken = value;
-                else if (key === 'syncConflictResolution') syncConfig.conflictResolution = value;
-                else syncConfig[key] = value;
+            if (allSyncKeys.includes(key)) {
+                if (syncKeysToSave.includes(key)) {
+                    if (key === 'syncClientId') syncConfigPayload.clientId = value;
+                    else if (key === 'syncClientSecret') syncConfigPayload.clientSecret = value;
+                    else if (key === 'syncConflictResolution') syncConfigPayload.conflictResolution = value;
+                    else syncConfigPayload[key] = value;
+                }
             } else {
                 dbSettings[key] = value;
             }
         }
 
         // Save sync config
-        if (window.electronAPI?.syncSaveConfig && Object.keys(syncConfig).length > 0) {
+        if (window.electronAPI?.syncSaveConfig && Object.keys(syncConfigPayload).length > 0) {
             try {
-                await window.electronAPI.syncSaveConfig(syncConfig);
+                await window.electronAPI.syncSaveConfig(syncConfigPayload);
             } catch (e) {
                 console.error('Failed to save sync settings:', e);
             }
