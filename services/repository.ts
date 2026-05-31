@@ -1614,6 +1614,7 @@ export const repository = {
                     syncLastLocalChecksum: syncConfig.lastLocalChecksum ?? null,
                     syncLastRemoteChecksum: syncConfig.lastRemoteChecksum ?? null,
                     syncLastCompletedAt: syncConfig.lastCompletedAt ?? null,
+                    syncDatabaseName: syncConfig.syncDatabaseName ?? 'docforge.db',
                 });
             } catch (e) {
                 console.error('Failed to load sync settings from main process:', e);
@@ -1635,7 +1636,8 @@ export const repository = {
             'syncClientId',
             'syncClientSecret',
             'syncAutoOnOpenClose',
-            'syncConflictResolution'
+            'syncConflictResolution',
+            'syncDatabaseName'
         ];
 
         const allSyncKeys = [
@@ -1648,7 +1650,8 @@ export const repository = {
             'syncConflictResolution',
             'syncLastLocalChecksum',
             'syncLastRemoteChecksum',
-            'syncLastCompletedAt'
+            'syncLastCompletedAt',
+            'syncDatabaseName'
         ];
 
         const dbSettings: any = {};

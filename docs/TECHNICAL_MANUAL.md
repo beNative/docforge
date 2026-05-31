@@ -167,6 +167,15 @@ The chat system supports augmenting the LLM's prompt with specific, user-selecte
 -   **`SettingsView.tsx`:** Manages all application settings, which are now read from and saved to the `settings` table in the database.
 -   **`DocumentHistoryView.tsx`:** This view now fetches version history for a document directly from the database, providing a reliable timeline of changes.
 
+### Google Drive Cloud Database Sync
+
+This subsystem facilitates secure backup and synchronization of the application's SQLite database (`docforge.db`) to the user's private Google Drive.
+
+- **Isolated Application Sandbox (`appDataFolder`):** DocForge requests credentials via OAuth 2.0 with the `https://www.googleapis.com/auth/drive.appdata` scope. This restricts the application's file permissions entirely to the hidden "Application Data folder" on Google Drive, preventing access to any of the user's personal files.
+- **IPC Auth & Token Lifecycle Management:** Credentials (Client ID, Client Secret, and Refresh Token) are securely managed on the backend. When credentials change, the renderer triggers an IPC flow that spawns a temporary loopback HTTP server (listening on local port `52080`). Once authorized in the browser, the callback exchanges the code for a refresh token and stores it locally in the Electron data directory (`sync-config.json`).
+- **Conflict Avoidance & SQLite Backups:** Database updates are performed transactionally. During upload, the main process runs an online backup (`db.backup()`) to avoid database write locks during upload streams. During download/restore, active database handles in `better-sqlite3` are closed before the database is overwritten, followed by an immediate reload of the frontend UI to populate the restored schema state.
+- **Interactive Version Conflict Resolution:** If local edits and cloud edits diverge concurrently, MD5 checksum checks identify the discrepancy, halting automatic synchronization and showing a side-by-side comparison modal so the user can choose which database to keep.
+
 ---
 
 ## 5. Build & Release Workflow

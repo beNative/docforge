@@ -120,6 +120,7 @@ declare global {
       syncGetStatus: () => Promise<{ success: boolean; email: string | null; enabled: boolean; lastCompletedAt: string | null; }>;
       syncGetConfig: () => Promise<any>;
       syncSaveConfig: (config: any) => Promise<{ success: boolean; error?: string }>;
+      syncListRemoteDatabases: () => Promise<{ success: boolean; files?: { name: string; id: string; modifiedTime: string }[]; error?: string }>;
       onSyncStatus: (callback: (payload: { status: 'idle' | 'syncing' | 'error' | 'conflict'; message?: string }) => void) => () => void;
     };
     __DOCFORGE_SCRIPT_PREVIEW__?: ScriptExecutionBridge;
@@ -554,6 +555,7 @@ export interface Settings {
   syncLastLocalChecksum: string | null;
   syncLastRemoteChecksum: string | null;
   syncLastCompletedAt: string | null;
+  syncDatabaseName?: string;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';

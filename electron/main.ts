@@ -352,6 +352,7 @@ interface SyncConfig {
   lastLocalChecksum?: string | null;
   lastRemoteChecksum?: string | null;
   lastCompletedAt?: string | null;
+  syncDatabaseName?: string;
 }
 
 let syncConfig: SyncConfig = {};
@@ -370,6 +371,7 @@ const loadSyncConfig = async () => {
       clientSecret: '',
       syncAutoOnOpenClose: false,
       conflictResolution: 'ask',
+      syncDatabaseName: 'docforge.db',
     };
     console.log('[Sync] Initialized default sync configuration.');
   }
@@ -452,12 +454,13 @@ const runSyncInternal = async (options?: { forcePush?: boolean; forcePull?: bool
 
     // 3. Search remote
     mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Checking Google Drive...' });
-    const cloudFile = await GoogleDriveService.findDatabaseFile(accessToken);
+    const dbName = syncConfig.syncDatabaseName || 'docforge.db';
+    const cloudFile = await GoogleDriveService.findDatabaseFile(accessToken, dbName);
 
     if (!cloudFile) {
       // Create cloud file
       mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Uploading database to cloud...' });
-      const uploaded = await GoogleDriveService.uploadDatabaseFile(accessToken, tempBackupPath);
+      const uploaded = await GoogleDriveService.uploadDatabaseFile(accessToken, tempBackupPath, dbName);
       
       syncConfig.lastLocalChecksum = localChecksum;
       syncConfig.lastRemoteChecksum = uploaded.md5Checksum;
@@ -1133,12 +1136,14 @@ ipcMain.handle('sync:get-config', () => {
         lastLocalChecksum: syncConfig.lastLocalChecksum ?? null,
         lastRemoteChecksum: syncConfig.lastRemoteChecksum ?? null,
         lastCompletedAt: syncConfig.lastCompletedAt ?? null,
+        syncDatabaseName: syncConfig.syncDatabaseName ?? 'docforge.db',
     };
 });
 
 ipcMain.handle('sync:save-config', async (_, config) => {
     const wasEnabled = syncConfig.syncEnabled;
-    const allowedKeys = ['syncEnabled', 'clientId', 'clientSecret', 'syncAutoOnOpenClose', 'conflictResolution'];
+    const oldDbName = syncConfig.syncDatabaseName || 'docforge.db';
+    const allowedKeys = ['syncEnabled', 'clientId', 'clientSecret', 'syncAutoOnOpenClose', 'conflictResolution', 'syncDatabaseName'];
     for (const key of allowedKeys) {
         if (key in config) {
             let val = config[key];
@@ -1148,6 +1153,15 @@ ipcMain.handle('sync:save-config', async (_, config) => {
             (syncConfig as any)[key] = val;
         }
     }
+
+    const newDbName = syncConfig.syncDatabaseName || 'docforge.db';
+    if (newDbName !== oldDbName) {
+        console.log(`[Sync] Target database changed from ${oldDbName} to ${newDbName}. Resetting tracking checksums.`);
+        syncConfig.lastLocalChecksum = null;
+        syncConfig.lastRemoteChecksum = null;
+        syncConfig.lastCompletedAt = null;
+    }
+
     await saveSyncConfig();
 
     if (syncConfig.syncEnabled && !wasEnabled) {
@@ -1156,6 +1170,31 @@ ipcMain.handle('sync:save-config', async (_, config) => {
         stopPeriodicSync();
     }
     return { success: true };
+});
+
+ipcMain.handle('sync:list-remote-dbs', async () => {
+    if (!syncConfig.clientId || !syncConfig.clientSecret || !syncConfig.refreshToken) {
+        return { success: false, error: 'Google Drive sync is not fully configured.' };
+    }
+    try {
+        const refreshRes = await GoogleDriveService.refreshAccessToken(
+            syncConfig.clientId,
+            syncConfig.clientSecret,
+            syncConfig.refreshToken
+        );
+        const files = await GoogleDriveService.listDatabaseFiles(refreshRes.accessToken);
+        return {
+            success: true,
+            files: files.map(f => ({
+                name: f.name,
+                id: f.id,
+                modifiedTime: f.modifiedTime,
+            }))
+        };
+    } catch (error) {
+        console.error('[Sync] Failed to list remote databases:', error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
 });
 
 ipcMain.handle('sync:google-connect', async (_, clientId, clientSecret) => {
