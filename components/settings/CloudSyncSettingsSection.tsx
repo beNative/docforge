@@ -6,6 +6,7 @@ import ToggleSwitch from '../ToggleSwitch';
 import Button from '../Button';
 import SettingRow from '../SettingRow';
 import ConflictResolutionModal from '../ConflictResolutionModal';
+import IconButton from '../IconButton';
 
 export const CloudSyncSettingsSection: React.FC<Pick<SectionProps, 'settings' | 'setCurrentSettings'>> = ({
   settings,
@@ -26,6 +27,45 @@ export const CloudSyncSettingsSection: React.FC<Pick<SectionProps, 'settings' | 
     localStats: any;
     remoteStats: any;
   } | null>(null);
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
+
+  const [remoteDbs, setRemoteDbs] = useState<{ name: string; id: string; modifiedTime: string }[]>([]);
+  const [isLoadingDbs, setIsLoadingDbs] = useState(false);
+  const [selectedDbName, setSelectedDbName] = useState(settings.syncDatabaseName || 'docforge.db');
+  const [customDbNameInput, setCustomDbNameInput] = useState('');
+  const [isCustomNaming, setIsCustomNaming] = useState(false);
+  const [dbNameError, setDbNameError] = useState<string | null>(null);
+
+  const isConnected = !!settings.syncGoogleEmail;
+
+  const fetchRemoteDbs = useCallback(async () => {
+    if (!isElectron || !window.electronAPI?.syncListRemoteDatabases || !settings.syncGoogleEmail) return;
+    setIsLoadingDbs(true);
+    try {
+      const result = await window.electronAPI.syncListRemoteDatabases();
+      if (result.success && result.files) {
+        setRemoteDbs(result.files);
+      } else {
+        console.warn('Failed to fetch remote databases:', result.error);
+      }
+    } catch (err) {
+      console.error('Error fetching remote databases:', err);
+    } finally {
+      setIsLoadingDbs(false);
+    }
+  }, [isElectron, settings.syncGoogleEmail]);
+
+  useEffect(() => {
+    if (isConnected) {
+      fetchRemoteDbs();
+    }
+  }, [isConnected, fetchRemoteDbs]);
+
+  useEffect(() => {
+    if (settings.syncDatabaseName) {
+      setSelectedDbName(settings.syncDatabaseName);
+    }
+  }, [settings.syncDatabaseName]);
 
   // Sync state changes from main process
   useEffect(() => {
@@ -213,7 +253,6 @@ export const CloudSyncSettingsSection: React.FC<Pick<SectionProps, 'settings' | 
     [isElectron, addLog, setCurrentSettings]
   );
 
-  const isConnected = !!settings.syncGoogleEmail;
   const isInputDisabled = isConnecting || isDisconnecting || isSyncing || isConnected;
 
   const toneClass =
@@ -232,6 +271,89 @@ export const CloudSyncSettingsSection: React.FC<Pick<SectionProps, 'settings' | 
           Cloud synchronization is only supported in the desktop build of DocForge.
         </div>
       )}
+
+      {/* Step-by-Step Setup Guide */}
+      <div className="mb-6 p-4 rounded-lg bg-secondary/50 border border-border-color text-xs">
+        <button
+          type="button"
+          onClick={() => setShowSetupGuide(!showSetupGuide)}
+          className="flex items-center justify-between w-full font-medium text-text-main hover:text-primary transition-colors focus:outline-none"
+        >
+          <span className="flex items-center gap-2">
+            <span className="text-sm">ℹ️</span> First-Time Setup & Google Drive API Guide
+          </span>
+          <span className="text-[10px] uppercase tracking-wider text-text-secondary">
+            {showSetupGuide ? 'Hide Guide' : 'Show Guide'}
+          </span>
+        </button>
+        
+        {showSetupGuide && (
+          <div className="mt-4 space-y-3 text-text-secondary leading-relaxed border-t border-border-color pt-3">
+            <p>
+              DocForge uses your own Google Cloud Console credentials to sync your SQLite database securely to a private, isolated application space on your Google Drive. Follow these steps to configure it:
+            </p>
+            
+            <ol className="list-decimal pl-5 space-y-2">
+              <li>
+                <strong>Create a Google Cloud Project:</strong> Go to the{' '}
+                <a
+                  href="https://console.cloud.google.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  Google Cloud Console
+                </a>{' '}
+                and create a new project.
+              </li>
+              <li>
+                <strong>Enable the Google Drive API:</strong> Search for <strong>Google Drive API</strong> in the API Library, or go directly to{' '}
+                <a
+                  href="https://console.developers.google.com/apis/api/drive.googleapis.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline font-semibold"
+                >
+                  Enable Drive API
+                </a>{' '}
+                and click <strong>Enable</strong>. <em>(Failure to do this will cause "Forbidden" errors when syncing).</em>
+              </li>
+              <li>
+                <strong>Configure OAuth Consent Screen:</strong> In your project, set up the OAuth Consent Screen (choose "External" for personal Gmail accounts). Add the scope{' '}
+                <code className="bg-background px-1 py-0.5 rounded border border-border-color font-mono text-[10px]">
+                  https://www.googleapis.com/auth/drive.appdata
+                </code>{' '}
+                and add your email as a <strong>Test User</strong> while the app is in Testing mode.
+              </li>
+              <li>
+                <strong>Create OAuth Credentials:</strong> Go to the <strong>Credentials</strong> page, click <strong>Create Credentials</strong> &gt; <strong>OAuth Client ID</strong>, select <strong>Desktop Application</strong> as the Application Type, name it (e.g. "DocForge Sync"), and click Create.
+              </li>
+              <li>
+                <strong>Copy Credentials:</strong> Enter the generated <strong>Client ID</strong> and <strong>Client Secret</strong> below. Whitespaces are trimmed automatically.
+              </li>
+              <li>
+                <strong>Link Account:</strong> Click <strong>Connect Account</strong>. A local server will temporarily listen on{' '}
+                <code className="bg-background px-1 py-0.5 rounded border border-border-color font-mono text-[10px]">
+                  http://127.0.0.1:52080
+                </code>{' '}
+                to capture the authentication code from your browser.
+              </li>
+            </ol>
+
+            <div className="p-3 rounded bg-primary/5 border border-primary/20 text-text-secondary mt-3">
+              <h4 className="font-semibold text-text-main mb-1">🔒 Privacy & Sandbox Isolation</h4>
+              DocForge requests access <em>only</em> to the isolated <strong>Application Data folder</strong> on your Google Drive. 
+              The application has absolutely no access to your other folders, files, or documents in your main Google Drive.
+            </div>
+            
+            <div className="p-3 rounded bg-destructive-bg/30 border border-destructive-border/50 text-text-secondary mt-2">
+              <h4 className="font-semibold text-text-main mb-1">⚠️ Troubleshooting: "Drive search failed: Forbidden"</h4>
+              If you receive this error when testing sync, it indicates that you have not enabled the <strong>Google Drive API</strong> inside your specific Google Cloud Console project. 
+              Click <a href="https://console.developers.google.com/apis/api/drive.googleapis.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline font-semibold">this link</a>, verify your project is selected in the top-left dropdown, and enable the API.
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="space-y-6">
         {/* Credentials Form */}
@@ -315,6 +437,131 @@ export const CloudSyncSettingsSection: React.FC<Pick<SectionProps, 'settings' | 
                 checked={settings.syncEnabled}
                 onChange={(val) => setCurrentSettings((s) => ({ ...s, syncEnabled: val }))}
               />
+            </SettingRow>
+
+            <SettingRow
+              htmlFor="syncDatabaseName"
+              label="Google Drive Database"
+              description="Select which remote database file to synchronize with on Google Drive, or create/name a new one."
+            >
+              <div className="flex flex-col gap-2 w-full md:w-80">
+                {!isCustomNaming ? (
+                  <div className="flex gap-2">
+                    <select
+                      id="syncDatabaseName"
+                      value={selectedDbName}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '__custom__') {
+                          setIsCustomNaming(true);
+                          setCustomDbNameInput('');
+                          setDbNameError('Database name must end with .db');
+                        } else {
+                          setSelectedDbName(val);
+                          setCurrentSettings((prev) => ({
+                            ...prev,
+                            syncDatabaseName: val,
+                          }));
+                        }
+                      }}
+                      className="flex-1 px-3 py-1.5 text-xs rounded-md border border-border-color bg-background text-text-main focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    >
+                      <option value="docforge.db">docforge.db (Default)</option>
+                      {selectedDbName !== 'docforge.db' && !remoteDbs.some(d => d.name === selectedDbName) && (
+                        <option value={selectedDbName}>
+                          {selectedDbName} (configured)
+                        </option>
+                      )}
+                      {remoteDbs.map((dbFile) => {
+                        if (dbFile.name === 'docforge.db') return null;
+                        return (
+                          <option key={dbFile.id} value={dbFile.name}>
+                            {dbFile.name} (cloud)
+                          </option>
+                        );
+                      })}
+                      <option value="__custom__">+ Create / Use custom name...</option>
+                    </select>
+                    <IconButton
+                      type="button"
+                      onClick={fetchRemoteDbs}
+                      disabled={isLoadingDbs}
+                      tooltip="Refresh cloud database list"
+                      tooltipPosition="top"
+                      className="border border-border-color bg-background hover:bg-secondary text-text-main focus:ring-1 focus:ring-primary/50 flex items-center justify-center rounded-md h-8 w-8"
+                    >
+                      {isLoadingDbs ? (
+                        <div className="w-3.5 h-3.5 border border-primary border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        '🔄'
+                      )}
+                    </IconButton>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={customDbNameInput}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomDbNameInput(val);
+                          if (!val.trim()) {
+                            setDbNameError('Database name cannot be empty');
+                          } else if (!val.toLowerCase().endsWith('.db')) {
+                            setDbNameError('Database name must end with .db');
+                          } else {
+                            setDbNameError(null);
+                          }
+                        }}
+                        className={`flex-1 px-3 py-1.5 text-xs rounded-md border ${
+                          dbNameError ? 'border-destructive' : 'border-border-color'
+                        } bg-background text-text-main focus:outline-none focus:ring-1 ${
+                          dbNameError ? 'focus:ring-destructive/50' : 'focus:ring-primary/50'
+                        }`}
+                        placeholder="e.g. docforge-work.db"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!dbNameError && customDbNameInput.trim()) {
+                            const finalName = customDbNameInput.trim();
+                            setSelectedDbName(finalName);
+                            setCurrentSettings((prev) => ({
+                              ...prev,
+                              syncDatabaseName: finalName,
+                            }));
+                            if (!remoteDbs.some(d => d.name === finalName)) {
+                              setRemoteDbs(prev => [...prev, { name: finalName, id: 'temp-custom', modifiedTime: '' }]);
+                            }
+                            setIsCustomNaming(false);
+                          }
+                        }}
+                        disabled={!!dbNameError}
+                        className="px-3 py-1.5 text-xs font-semibold text-accent-text bg-primary rounded-md hover:bg-primary/95 disabled:opacity-50 focus:outline-none"
+                      >
+                        Apply
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCustomNaming(false);
+                          setDbNameError(null);
+                        }}
+                        className="px-3 py-1.5 text-xs rounded-md border border-border-color bg-background hover:bg-secondary text-text-main focus:outline-none"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {dbNameError && (
+                      <span className="text-[10px] text-destructive-text font-medium px-1">
+                        ⚠️ {dbNameError}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </SettingRow>
 
             <SettingRow

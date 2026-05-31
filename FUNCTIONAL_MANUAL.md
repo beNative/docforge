@@ -258,6 +258,28 @@ DocForge allows you to maintain a complete history of your document's content.
     - You can copy content from an old version or restore the entire document to that state.
     - You can select one or more old versions using the checkboxes and delete them permanently. This action requires confirmation, which can be accepted by pressing the `Enter` key.
 
+### Google Drive Cloud Database Sync
+
+Google Drive Cloud Sync lets you back up and synchronize your SQLite database (`docforge.db`) between different machines securely using your own Google account credentials.
+
+#### 1. OAuth Setup & Prerequisites
+To connect Google Drive Sync, you must supply your own Google Cloud Console credentials. This ensures your data remains completely private and under your control.
+1. **Google Cloud Project:** Create a project in the Google Cloud Console.
+2. **Enable Google Drive API:** Search for the **Google Drive API** in your project's API Library and enable it. *Note: If this API is not enabled, synchronization will fail with a `Drive search failed: Forbidden` error.*
+3. **OAuth Consent Screen:** Configure the consent screen and add the `https://www.googleapis.com/auth/drive.appdata` scope. Since the application will be in testing mode, make sure to add your Gmail address as a **Test User**.
+4. **OAuth Client ID:** Create credentials of type **OAuth Client ID** and select **Desktop Application**. Copy the generated Client ID and Client Secret.
+
+#### 2. Linking Your Account
+In DocForge's **Cloud Sync** settings section, paste your Client ID and Client Secret, then click **Connect Account**. A temporary server will bind to `http://127.0.0.1:52080` to listen for the OAuth response. Complete the consent flow in your default browser, after which DocForge will show your connected Google email.
+
+#### 3. Sandbox Privacy
+DocForge utilizes Google Drive's isolated **Application Data folder** (`appDataFolder`). This is a hidden sandbox space that other applications cannot read or access, and DocForge itself cannot access any other files, folders, or documents in your main Google Drive.
+
+#### 4. Automatic vs. Manual Synchronization
+- **Sync on Startup & Shutdown:** Automatically checks for database changes, pushing or pulling the SQLite database as soon as you launch or close the app.
+- **Manual Sync ("Sync Now"):** Manually run a sync check at any point from the settings screen.
+- **Conflict Resolution:** If local and cloud databases have modified concurrently since the last sync, the synchronization pauses and triggers a **Conflict Resolution Modal**. This dialog displays a side-by-side comparison of local and remote database file sizes, modified dates, document counts, and template counts so you can safely choose which database version to keep ("Keep Local" or "Keep Cloud").
+
 ---
 
 ## 3. Views and Panels
@@ -279,6 +301,7 @@ Accessed via the gear icon in the title bar. The settings are organized into cat
 - **Python:** Choose the interpreter used by the integrated runner. DocForge auto-detects local interpreters, can bootstrap a dedicated virtual environment per workspace, and exposes console preferences such as default working directory, automatic history retention, and whether runs open in split view.
 - **Shell & PowerShell:** Define default environment variables, working directories, and interpreter overrides for each scripting language. Document-specific panels start with these defaults and can layer additional overrides without mutating the workspace baseline.
 - **Database:** View detailed statistics about your local database file, and perform maintenance tasks such as creating a compressed backup, checking file integrity, optimizing the database size (`VACUUM`), or bootstrapping a brand new workspace database.
+- **Cloud Sync:** Securely link DocForge to your personal Google account. Enter your own Google Cloud Client ID and Client Secret (refer to the built-in interactive guide in this section to set up and enable the **Google Drive API** and Desktop OAuth credentials). Once connected, you can enable auto-sync on app startup/shutdown, specify default conflict resolution logic ("Ask", "Prefer Local", "Prefer Cloud"), and trigger manual database synchronizations.
 - **Advanced:** View and edit the raw JSON configuration file using an interactive tree or a raw text editor, and import/export your settings.
 
 ### Info View

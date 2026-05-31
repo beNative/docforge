@@ -203,10 +203,10 @@ export class GoogleDriveService {
   }
 
   // Find file in Google Drive AppData folder
-  static async findDatabaseFile(accessToken: string): Promise<DriveFile | null> {
-    console.log('[Sync] Searching for docforge.db in Google Drive appDataFolder...');
+  static async findDatabaseFile(accessToken: string, dbName: string = 'docforge.db'): Promise<DriveFile | null> {
+    console.log(`[Sync] Searching for ${dbName} in Google Drive appDataFolder...`);
     const url = 'https://www.googleapis.com/drive/v3/files?' +
-      `q=${encodeURIComponent("name='docforge.db' and 'appDataFolder' in parents")}&` +
+      `q=${encodeURIComponent(`name='${dbName}' and 'appDataFolder' in parents`)}&` +
       `spaces=appDataFolder&` +
       `fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime,md5Checksum)')}`;
 
@@ -227,20 +227,48 @@ export class GoogleDriveService {
       console.log(`[Sync] Found cloud file with ID: ${data.files[0].id}, MD5: ${data.files[0].md5Checksum}`);
       return data.files[0];
     }
-    console.log('[Sync] No database file found in Google Drive appDataFolder.');
+    console.log(`[Sync] No database file named ${dbName} found in Google Drive appDataFolder.`);
     return null;
+  }
+
+  // List all database files (*.db) in Google Drive AppData folder
+  static async listDatabaseFiles(accessToken: string): Promise<DriveFile[]> {
+    console.log('[Sync] Listing database files in Google Drive appDataFolder...');
+    const url = 'https://www.googleapis.com/drive/v3/files?' +
+      `q=${encodeURIComponent("'appDataFolder' in parents")}&` +
+      `spaces=appDataFolder&` +
+      `fields=${encodeURIComponent('files(id,name,mimeType,modifiedTime,md5Checksum)')}`;
+
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[Sync] List database files failed:', errText);
+      throw new Error(`Drive list failed: ${res.statusText}`);
+    }
+
+    const data = (await res.json()) as DriveSearchResponse;
+    if (data.files && data.files.length > 0) {
+      return data.files.filter(f => f.name.toLowerCase().endsWith('.db'));
+    }
+    return [];
   }
 
   // Upload file (Create)
   static async uploadDatabaseFile(
     accessToken: string,
-    localFilePath: string
+    localFilePath: string,
+    dbName: string = 'docforge.db'
   ): Promise<DriveFile> {
-    console.log('[Sync] Creating database file in Google Drive appDataFolder...');
+    console.log(`[Sync] Creating database file ${dbName} in Google Drive appDataFolder...`);
     const fileBuffer = await fs.readFile(localFilePath);
     
     const metadata = JSON.stringify({
-      name: 'docforge.db',
+      name: dbName,
       parents: ['appDataFolder'],
     });
 
@@ -274,7 +302,7 @@ export class GoogleDriveService {
     }
 
     const data = (await res.json()) as DriveFile;
-    console.log('[Sync] Database file uploaded successfully. ID:', data.id);
+    console.log(`[Sync] Database file ${dbName} uploaded successfully. ID:`, data.id);
     return data;
   }
 

@@ -22,7 +22,7 @@ DocForge is a desktop application designed to streamline the process of creating
 - **AI-Powered Refinement:** Use your connected local LLM to automatically refine and improve your documents with a single click.
 - **Document Templating:** Create reusable document templates with variables to quickly generate new documents for recurring tasks.
 - **Document Export:** Save any document to your filesystem with a suggested filename and the correct extension for its detected type, whether you're running the Electron app or using the browser build.
-- **Hover-First Tree Actions:** Keep document titles readable while revealing quick actions—duplicate, export, lock, etc.—only when you hover or focus each row in the sidebar.
+- **Google Drive Cloud Sync:** Link DocForge to your Google account using custom OAuth credentials. Securely syncs your SQLite database to an isolated, private space (`drive.appdata`) on Google Drive, complete with automatic startup/shutdown sync options and robust conflict resolution.
 - **Integrated Python Workflow:** Open an inline Python console tied to your documents to execute snippets, review logs, and manage isolated environments without leaving DocForge.
 - **Shell & PowerShell Execution:** Run or syntax-test scripts directly from the editor with per-document environment overrides that merge with workspace defaults configured in Settings.
 - **Version History:** Explicitly save new versions of your documents. Manage your history by viewing diffs, deleting old versions, and restoring to any point in time.
