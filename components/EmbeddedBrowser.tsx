@@ -6,11 +6,12 @@ interface EmbeddedBrowserProps {
   url: string;
   isLocked: boolean;
   onSaveLocation: (url: string) => void;
+  zoomScale?: number;
 }
 
 const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
 
-const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSaveLocation }) => {
+const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSaveLocation, zoomScale = 1.0 }) => {
   const [webviewElement, setWebviewElement] = useState<any>(null);
   const [currentUrl, setCurrentUrl] = useState(url);
   const [inputUrl, setInputUrl] = useState(url);
@@ -43,6 +44,16 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
     setInputUrl(url);
   }, [webviewElement, url]);
 
+  // Apply zoom factor when scale changes or webview is loaded
+  useEffect(() => {
+    if (!webviewElement || typeof webviewElement.setZoomFactor !== 'function') return;
+    try {
+      webviewElement.setZoomFactor(zoomScale);
+    } catch (err) {
+      console.warn('Failed to set zoom factor:', err);
+    }
+  }, [webviewElement, zoomScale]);
+
   // Handle webview event listeners and navigation state updating
   useEffect(() => {
     if (!webviewElement) return;
@@ -61,6 +72,13 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
 
     const handleDomReady = () => {
       updateNavigationState();
+      try {
+        if (typeof webviewElement.setZoomFactor === 'function') {
+          webviewElement.setZoomFactor(zoomScale);
+        }
+      } catch (err) {
+        console.warn('Failed to set zoom factor on dom-ready:', err);
+      }
     };
 
     const handleDidNavigate = () => {
@@ -80,7 +98,7 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
       webviewElement.removeEventListener('did-navigate', handleDidNavigate);
       webviewElement.removeEventListener('did-navigate-in-page', handleDidNavigateInPage);
     };
-  }, [webviewElement]);
+  }, [webviewElement, zoomScale]);
 
   const handleBack = () => {
     if (webviewElement && webviewElement.canGoBack()) {

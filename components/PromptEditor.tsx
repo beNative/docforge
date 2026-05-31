@@ -945,6 +945,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           key={documentNode.id}
           url={content}
           isLocked={isLocked}
+          zoomScale={editorScale}
           onSaveLocation={(newUrl) => onCommitVersion(documentNode.id, newUrl)}
         />
       );
