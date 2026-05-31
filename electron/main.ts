@@ -4,6 +4,8 @@ import { app, BrowserWindow, ipcMain, dialog, clipboard, shell } from 'electron'
 import { platform } from 'process';
 import path from 'path';
 import fs from 'fs/promises';
+import crypto from 'crypto';
+import { GoogleDriveService } from './gdrive';
 import { createReadStream, createWriteStream } from 'fs';
 import { autoUpdater } from 'electron-updater';
 import { GitHubProvider } from 'electron-updater/out/providers/GitHubProvider';
@@ -31,7 +33,7 @@ declare global {
       // The `resourcesPath` property is augmented in `types.ts`
       // FIX: The augmentation from types.ts was not being picked up.
       // Explicitly adding it here resolves the type error in this file.
-      resourcesPath: string;
+      readonly resourcesPath: string;
     }
   }
 }
@@ -191,8 +193,8 @@ scriptRunner.events.on('run-status', (payload) => broadcastScriptEvent('script:r
 // startup while still respecting the expectation that only published,
 // non-prerelease builds are considered when automatic updates are disabled for
 // prerelease channels.
-const originalGetLatestTagName = GitHubProvider.prototype.getLatestTagName;
-GitHubProvider.prototype.getLatestTagName = async function (this: GitHubProvider, cancellationToken) {
+const originalGetLatestTagName = (GitHubProvider.prototype as any).getLatestTagName;
+(GitHubProvider.prototype as any).getLatestTagName = async function (this: any, cancellationToken: any) {
     const { owner, repo, host } = this.options;
     const apiHost = !host || host === 'github.com' ? 'https://api.github.com' : `https://${host}`;
     const apiPathPrefix = host && !['github.com', 'api.github.com'].includes(host) ? '/api/v3' : '';
@@ -281,9 +283,10 @@ GitHubProvider.prototype.getLatestTagName = async function (this: GitHubProvider
 };
 
 const originalChannelDescriptor = Object.getOwnPropertyDescriptor(GitHubProvider.prototype, 'channel');
-if (originalChannelDescriptor?.get) {
+const originalChannelGetter = originalChannelDescriptor?.get;
+if (originalChannelGetter) {
     Object.defineProperty(GitHubProvider.prototype, 'channel', {
-        get(this: GitHubProvider) {
+        get(this: any) {
             const forcedChannel = (this.updater as unknown as { __docforgeWindowsChannel?: string })?.__docforgeWindowsChannel;
             if (typeof forcedChannel === 'string' && forcedChannel.trim().length > 0) {
                 try {
@@ -293,7 +296,7 @@ if (originalChannelDescriptor?.get) {
                 }
             }
 
-            return originalChannelDescriptor.get.call(this);
+            return (originalChannelGetter as any).call(this);
         },
     });
 }
@@ -336,6 +339,312 @@ autoUpdater.on('error', (error) => {
         scheduleAutoUpdateCheck(5 * 60 * 1000);
     }
 });
+
+// --- Google Drive Cloud Sync state & helpers ---
+interface SyncConfig {
+  syncEnabled?: boolean;
+  clientId?: string;
+  clientSecret?: string;
+  refreshToken?: string;
+  email?: string | null;
+  syncAutoOnOpenClose?: boolean;
+  conflictResolution?: 'ask' | 'prefer-local' | 'prefer-cloud';
+  lastLocalChecksum?: string | null;
+  lastRemoteChecksum?: string | null;
+  lastCompletedAt?: string | null;
+}
+
+let syncConfig: SyncConfig = {};
+const SYNC_CONFIG_FILE = 'sync-config.json';
+const getSyncConfigFilePath = () => path.join(app.getPath('userData'), SYNC_CONFIG_FILE);
+
+const loadSyncConfig = async () => {
+  try {
+    const raw = await fs.readFile(getSyncConfigFilePath(), 'utf-8');
+    syncConfig = JSON.parse(raw) as SyncConfig;
+    console.log('[Sync] Local sync-config.json loaded.');
+  } catch (error) {
+    syncConfig = {
+      syncEnabled: false,
+      clientId: '',
+      clientSecret: '',
+      syncAutoOnOpenClose: false,
+      conflictResolution: 'ask',
+    };
+    console.log('[Sync] Initialized default sync configuration.');
+  }
+};
+
+const saveSyncConfig = async () => {
+  try {
+    const configPath = getSyncConfigFilePath();
+    await fs.mkdir(path.dirname(configPath), { recursive: true });
+    await fs.writeFile(configPath, JSON.stringify(syncConfig, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('[Sync] Failed to save sync-config.json:', error);
+  }
+};
+
+let periodicSyncTimer: NodeJS.Timeout | null = null;
+let syncStatus: 'idle' | 'syncing' | 'error' | 'conflict' = 'idle';
+let activeOAuthServerCloseFn: (() => void) | null = null;
+
+const startPeriodicSync = () => {
+  stopPeriodicSync();
+  if (syncConfig.syncEnabled && syncConfig.refreshToken) {
+    console.log('[Sync] Starting periodic cloud sync (every 10 minutes).');
+    periodicSyncTimer = setInterval(() => {
+      console.log('[Sync] Running periodic background sync...');
+      runSyncInternal().catch((err) => console.error('[Sync] Periodic sync error:', err));
+    }, 10 * 60 * 1000);
+  }
+};
+
+const stopPeriodicSync = () => {
+  if (periodicSyncTimer) {
+    clearInterval(periodicSyncTimer);
+    periodicSyncTimer = null;
+    console.log('[Sync] Periodic cloud sync stopped.');
+  }
+};
+
+const getFileChecksum = async (filePath: string): Promise<string> => {
+  const content = await fs.readFile(filePath);
+  return crypto.createHash('md5').update(content).digest('hex');
+};
+
+const runSyncInternal = async (options?: { forcePush?: boolean; forcePull?: boolean }): Promise<{
+  success: boolean;
+  code?: 'in_sync' | 'pushed' | 'pulled' | 'conflict' | 'error';
+  message?: string;
+  localStats?: any;
+  remoteStats?: any;
+  error?: string;
+}> => {
+  if (syncStatus === 'syncing') {
+    return { success: false, error: 'Sync is already in progress.' };
+  }
+
+  if (!syncConfig.syncEnabled || !syncConfig.clientId || !syncConfig.clientSecret || !syncConfig.refreshToken) {
+    return { success: false, error: 'Cloud sync is not fully configured or is disabled.' };
+  }
+
+  syncStatus = 'syncing';
+  mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Authenticating with Google...' });
+
+  let tempBackupPath = '';
+  try {
+    // 1. Refresh token
+    const refreshRes = await GoogleDriveService.refreshAccessToken(
+      syncConfig.clientId,
+      syncConfig.clientSecret,
+      syncConfig.refreshToken
+    );
+    const accessToken = refreshRes.accessToken;
+
+    // 2. Local backup
+    mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Creating database snapshot...' });
+    const localDbPath = databaseService.getDbPath();
+    tempBackupPath = path.join(os.tmpdir(), `docforge_sync_${Date.now()}.db`);
+    await databaseService.backupDatabase(tempBackupPath);
+
+    const localChecksum = await getFileChecksum(tempBackupPath);
+
+    // 3. Search remote
+    mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Checking Google Drive...' });
+    const cloudFile = await GoogleDriveService.findDatabaseFile(accessToken);
+
+    if (!cloudFile) {
+      // Create cloud file
+      mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Uploading database to cloud...' });
+      const uploaded = await GoogleDriveService.uploadDatabaseFile(accessToken, tempBackupPath);
+      
+      syncConfig.lastLocalChecksum = localChecksum;
+      syncConfig.lastRemoteChecksum = uploaded.md5Checksum;
+      syncConfig.lastCompletedAt = new Date().toISOString();
+      await saveSyncConfig();
+
+      await fs.unlink(tempBackupPath).catch(() => {});
+      syncStatus = 'idle';
+      mainWindow?.webContents.send('sync:status', { status: 'idle', message: 'Pushed local database to cloud.' });
+      return { success: true, code: 'pushed', message: 'Pushed local database to cloud.' };
+    }
+
+    // Compare
+    const localChanged = localChecksum !== syncConfig.lastLocalChecksum;
+    const remoteChanged = cloudFile.md5Checksum !== syncConfig.lastRemoteChecksum;
+
+    if (options?.forcePush) {
+      mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Force uploading database...' });
+      const updated = await GoogleDriveService.updateDatabaseFile(accessToken, cloudFile.id, tempBackupPath);
+      
+      syncConfig.lastLocalChecksum = localChecksum;
+      syncConfig.lastRemoteChecksum = updated.md5Checksum;
+      syncConfig.lastCompletedAt = new Date().toISOString();
+      await saveSyncConfig();
+
+      await fs.unlink(tempBackupPath).catch(() => {});
+      syncStatus = 'idle';
+      mainWindow?.webContents.send('sync:status', { status: 'idle', message: 'Force pushed database.' });
+      return { success: true, code: 'pushed', message: 'Force pushed database.' };
+    }
+
+    if (options?.forcePull) {
+      mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Downloading cloud database...' });
+      const downloadPath = path.join(os.tmpdir(), `docforge_download_${Date.now()}.db`);
+      await GoogleDriveService.downloadDatabaseFile(accessToken, cloudFile.id, downloadPath);
+
+      mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Applying cloud database...' });
+      databaseService.close();
+      await fs.copyFile(downloadPath, localDbPath);
+      databaseService.init();
+
+      await fs.unlink(downloadPath).catch(() => {});
+      await fs.unlink(tempBackupPath).catch(() => {});
+
+      const newLocalChecksum = await getFileChecksum(localDbPath);
+      syncConfig.lastLocalChecksum = newLocalChecksum;
+      syncConfig.lastRemoteChecksum = cloudFile.md5Checksum;
+      syncConfig.lastCompletedAt = new Date().toISOString();
+      await saveSyncConfig();
+
+      syncStatus = 'idle';
+      mainWindow?.webContents.send('sync:status', { status: 'idle', message: 'Force pulled database.' });
+      
+      // Reload UI
+      setTimeout(() => {
+        mainWindow?.webContents.reload();
+      }, 500);
+
+      return { success: true, code: 'pulled', message: 'Force pulled database.' };
+    }
+
+    if (!localChanged && !remoteChanged) {
+      syncConfig.lastCompletedAt = new Date().toISOString();
+      await saveSyncConfig();
+      await fs.unlink(tempBackupPath).catch(() => {});
+      syncStatus = 'idle';
+      mainWindow?.webContents.send('sync:status', { status: 'idle', message: 'In sync.' });
+      return { success: true, code: 'in_sync', message: 'Database is in sync.' };
+    }
+
+    if (localChanged && !remoteChanged) {
+      // Push local
+      mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Uploading local changes...' });
+      const updated = await GoogleDriveService.updateDatabaseFile(accessToken, cloudFile.id, tempBackupPath);
+      
+      syncConfig.lastLocalChecksum = localChecksum;
+      syncConfig.lastRemoteChecksum = updated.md5Checksum;
+      syncConfig.lastCompletedAt = new Date().toISOString();
+      await saveSyncConfig();
+
+      await fs.unlink(tempBackupPath).catch(() => {});
+      syncStatus = 'idle';
+      mainWindow?.webContents.send('sync:status', { status: 'idle', message: 'Uploaded local changes.' });
+      return { success: true, code: 'pushed', message: 'Local changes pushed to Google Drive.' };
+    }
+
+    if (!localChanged && remoteChanged) {
+      // Pull remote
+      mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Downloading cloud changes...' });
+      const downloadPath = path.join(os.tmpdir(), `docforge_download_${Date.now()}.db`);
+      await GoogleDriveService.downloadDatabaseFile(accessToken, cloudFile.id, downloadPath);
+
+      mainWindow?.webContents.send('sync:status', { status: 'syncing', message: 'Applying cloud changes...' });
+      databaseService.close();
+      await fs.copyFile(downloadPath, localDbPath);
+      databaseService.init();
+
+      await fs.unlink(downloadPath).catch(() => {});
+      await fs.unlink(tempBackupPath).catch(() => {});
+
+      const newLocalChecksum = await getFileChecksum(localDbPath);
+      syncConfig.lastLocalChecksum = newLocalChecksum;
+      syncConfig.lastRemoteChecksum = cloudFile.md5Checksum;
+      syncConfig.lastCompletedAt = new Date().toISOString();
+      await saveSyncConfig();
+
+      syncStatus = 'idle';
+      mainWindow?.webContents.send('sync:status', { status: 'idle', message: 'Downloaded cloud changes.' });
+      
+      setTimeout(() => {
+        mainWindow?.webContents.reload();
+      }, 500);
+
+      return { success: true, code: 'pulled', message: 'Downloaded cloud changes.' };
+    }
+
+    // Both changed: Conflict!
+    if (syncConfig.conflictResolution === 'prefer-local') {
+      console.log('[Sync] Conflict resolution: Prefer Local. Overwriting cloud...');
+      const updated = await GoogleDriveService.updateDatabaseFile(accessToken, cloudFile.id, tempBackupPath);
+      syncConfig.lastLocalChecksum = localChecksum;
+      syncConfig.lastRemoteChecksum = updated.md5Checksum;
+      syncConfig.lastCompletedAt = new Date().toISOString();
+      await saveSyncConfig();
+      await fs.unlink(tempBackupPath).catch(() => {});
+      syncStatus = 'idle';
+      mainWindow?.webContents.send('sync:status', { status: 'idle', message: 'Conflict resolved: kept local.' });
+      return { success: true, code: 'pushed', message: 'Conflict resolved: kept local.' };
+    }
+
+    if (syncConfig.conflictResolution === 'prefer-cloud') {
+      console.log('[Sync] Conflict resolution: Prefer Cloud. Overwriting local...');
+      const downloadPath = path.join(os.tmpdir(), `docforge_download_${Date.now()}.db`);
+      await GoogleDriveService.downloadDatabaseFile(accessToken, cloudFile.id, downloadPath);
+      databaseService.close();
+      await fs.copyFile(downloadPath, localDbPath);
+      databaseService.init();
+      await fs.unlink(downloadPath).catch(() => {});
+      await fs.unlink(tempBackupPath).catch(() => {});
+
+      const newLocalChecksum = await getFileChecksum(localDbPath);
+      syncConfig.lastLocalChecksum = newLocalChecksum;
+      syncConfig.lastRemoteChecksum = cloudFile.md5Checksum;
+      syncConfig.lastCompletedAt = new Date().toISOString();
+      await saveSyncConfig();
+
+      syncStatus = 'idle';
+      mainWindow?.webContents.send('sync:status', { status: 'idle', message: 'Conflict resolved: kept cloud.' });
+      
+      setTimeout(() => {
+        mainWindow?.webContents.reload();
+      }, 500);
+
+      return { success: true, code: 'pulled', message: 'Conflict resolved: kept cloud.' };
+    }
+
+    // Ask user
+    console.log('[Sync] Conflict detected. Requesting resolution from user.');
+    const conflictDownloadPath = path.join(os.tmpdir(), `docforge_conflict_${Date.now()}.db`);
+    await GoogleDriveService.downloadDatabaseFile(accessToken, cloudFile.id, conflictDownloadPath);
+    
+    const remoteStats = databaseService.getStatsForFile(conflictDownloadPath);
+    await fs.unlink(conflictDownloadPath).catch(() => {});
+    const localStats = databaseService.getStatsForFile(localDbPath);
+    await fs.unlink(tempBackupPath).catch(() => {});
+
+    syncStatus = 'conflict';
+    mainWindow?.webContents.send('sync:status', { status: 'conflict', message: 'Conflict detected.' });
+
+    return {
+      success: true,
+      code: 'conflict',
+      message: 'Conflict detected.',
+      localStats,
+      remoteStats,
+    };
+
+  } catch (error: any) {
+    if (tempBackupPath) {
+      await fs.unlink(tempBackupPath).catch(() => {});
+    }
+    console.error('[Sync] Sync failed:', error);
+    syncStatus = 'error';
+    mainWindow?.webContents.send('sync:status', { status: 'error', message: error.message || 'Sync failed.' });
+    return { success: false, error: error.message || 'Sync failed.' };
+  }
+};
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -443,13 +752,47 @@ app.on('ready', () => {
   } else {
     console.log('Automatic update checks are disabled via settings.');
   }
+
+  // Load sync config and run initial sync if enabled
+  void loadSyncConfig().then(() => {
+    if (syncConfig.syncEnabled) {
+      startPeriodicSync();
+      if (syncConfig.syncAutoOnOpenClose) {
+        setTimeout(() => {
+          console.log('[Sync] Running startup auto-sync...');
+          runSyncInternal().catch((err) => console.error('[Sync] Startup sync failed:', err));
+        }, 5000);
+      }
+    }
+  });
 });
 
 app.on('window-all-closed', () => {
+  stopPeriodicSync();
   databaseService.close();
   // Fix: Error on line 96 is resolved by importing 'platform' from 'process'.
   if (platform !== 'darwin') {
     app.quit();
+  }
+});
+
+let isSyncingBeforeQuit = false;
+app.on('before-quit', (e) => {
+  if (syncConfig.syncEnabled && syncConfig.syncAutoOnOpenClose && !isSyncingBeforeQuit) {
+    e.preventDefault();
+    isSyncingBeforeQuit = true;
+    console.log('[Sync] Running final shutdown sync...');
+    
+    Promise.race([
+      runSyncInternal(),
+      new Promise((resolve) => setTimeout(resolve, 3000))
+    ]).then(() => {
+      console.log('[Sync] Shutdown sync complete or timed out. Quitting.');
+      app.quit();
+    }).catch((err) => {
+      console.error('[Sync] Shutdown sync error:', err);
+      app.quit();
+    });
   }
 });
 
@@ -774,6 +1117,124 @@ ipcMain.handle('updater:check-now', async () => {
         console.error('Manual update check failed:', error);
         return { success: false, error: friendlyMessage, details: detailMessage };
     }
+});
+
+
+// Google Drive Sync
+ipcMain.handle('sync:get-config', () => {
+    return {
+        syncEnabled: syncConfig.syncEnabled ?? false,
+        clientId: syncConfig.clientId ?? '',
+        clientSecret: syncConfig.clientSecret ?? '',
+        email: syncConfig.email ?? null,
+        refreshToken: syncConfig.refreshToken ?? null,
+        syncAutoOnOpenClose: syncConfig.syncAutoOnOpenClose ?? false,
+        conflictResolution: syncConfig.conflictResolution ?? 'ask',
+        lastLocalChecksum: syncConfig.lastLocalChecksum ?? null,
+        lastRemoteChecksum: syncConfig.lastRemoteChecksum ?? null,
+        lastCompletedAt: syncConfig.lastCompletedAt ?? null,
+    };
+});
+
+ipcMain.handle('sync:save-config', async (_, config) => {
+    const wasEnabled = syncConfig.syncEnabled;
+    const allowedKeys = ['syncEnabled', 'clientId', 'clientSecret', 'syncAutoOnOpenClose', 'conflictResolution'];
+    for (const key of allowedKeys) {
+        if (key in config) {
+            let val = config[key];
+            if (typeof val === 'string') {
+                val = val.trim();
+            }
+            (syncConfig as any)[key] = val;
+        }
+    }
+    await saveSyncConfig();
+
+    if (syncConfig.syncEnabled && !wasEnabled) {
+        startPeriodicSync();
+    } else if (!syncConfig.syncEnabled && wasEnabled) {
+        stopPeriodicSync();
+    }
+    return { success: true };
+});
+
+ipcMain.handle('sync:google-connect', async (_, clientId, clientSecret) => {
+    if (activeOAuthServerCloseFn) {
+        activeOAuthServerCloseFn();
+        activeOAuthServerCloseFn = null;
+    }
+
+    const cleanClientId = typeof clientId === 'string' ? clientId.trim() : clientId;
+    const cleanClientSecret = typeof clientSecret === 'string' ? clientSecret.trim() : clientSecret;
+
+    return new Promise((resolve) => {
+        const { authUrl, closeServer } = GoogleDriveService.startOAuthFlow(
+            cleanClientId,
+            cleanClientSecret,
+            async (tokens) => {
+                syncConfig.syncEnabled = true;
+                syncConfig.clientId = cleanClientId;
+                syncConfig.clientSecret = cleanClientSecret;
+                syncConfig.refreshToken = tokens.refreshToken;
+                syncConfig.email = tokens.email;
+                await saveSyncConfig();
+                
+                startPeriodicSync();
+                
+                console.log(`[Sync] Account connected: ${tokens.email}`);
+                resolve({ success: true, email: tokens.email });
+                activeOAuthServerCloseFn = null;
+            },
+            (error) => {
+                console.error(`[Sync] Connection failed: ${error}`);
+                resolve({ success: false, error });
+                activeOAuthServerCloseFn = null;
+            }
+        );
+
+        activeOAuthServerCloseFn = closeServer;
+        shell.openExternal(authUrl);
+    });
+});
+
+ipcMain.handle('sync:google-disconnect', async () => {
+    if (activeOAuthServerCloseFn) {
+        activeOAuthServerCloseFn();
+        activeOAuthServerCloseFn = null;
+    }
+    stopPeriodicSync();
+
+    syncConfig.syncEnabled = false;
+    syncConfig.refreshToken = undefined;
+    syncConfig.email = null;
+    syncConfig.lastLocalChecksum = null;
+    syncConfig.lastRemoteChecksum = null;
+    syncConfig.lastCompletedAt = null;
+    await saveSyncConfig();
+
+    console.log('[Sync] Disconnected from Google Drive.');
+    return { success: true };
+});
+
+ipcMain.handle('sync:run', async (_, options) => {
+    return runSyncInternal(options);
+});
+
+ipcMain.handle('sync:resolve-conflict', async (_, resolution) => {
+    if (resolution === 'local') {
+        return runSyncInternal({ forcePush: true });
+    } else {
+        return runSyncInternal({ forcePull: true });
+    }
+});
+
+ipcMain.handle('sync:get-status', async () => {
+    return {
+        success: true,
+        email: syncConfig.email ?? null,
+        enabled: syncConfig.syncEnabled ?? false,
+        lastCompletedAt: syncConfig.lastCompletedAt ?? null,
+    };
 });
 
 

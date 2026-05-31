@@ -1319,6 +1319,36 @@ export const databaseService = {
     };
   },
 
+  getStatsForFile(filePath: string) {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+    const fileSize = statSync(filePath).size;
+    let connection: Database.Database | null = null;
+    try {
+      connection = new Database(filePath, { readonly: true });
+      const nodeCountRow = connection.prepare("SELECT COUNT(*) as count FROM nodes").get() as { count: number } | undefined;
+      const docCountRow = connection.prepare("SELECT COUNT(*) as count FROM nodes WHERE node_type = 'document'").get() as { count: number } | undefined;
+      const templateCountRow = connection.prepare("SELECT COUNT(*) as count FROM templates").get() as { count: number } | undefined;
+      const modifiedTime = statSync(filePath).mtime.toISOString();
+
+      return {
+        fileSize: `${(fileSize / 1024).toFixed(2)} KB`,
+        nodeCount: nodeCountRow?.count ?? 0,
+        documentCount: docCountRow?.count ?? 0,
+        templateCount: templateCountRow?.count ?? 0,
+        modifiedTime,
+      };
+    } catch (e: any) {
+      console.error('Failed to get stats for database file:', filePath, e);
+      throw e;
+    } finally {
+      if (connection) {
+        connection.close();
+      }
+    }
+  },
+
   // =================================================================
   // RAG (Chat with Workspace) Methods
   // =================================================================

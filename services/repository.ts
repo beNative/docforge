@@ -1599,6 +1599,26 @@ export const repository = {
                 settings[row.key] = row.value;
             }
         }
+        // Merge sync config
+        if (window.electronAPI?.syncGetConfig) {
+            try {
+                const syncConfig = await window.electronAPI.syncGetConfig();
+                Object.assign(settings, {
+                    syncEnabled: syncConfig.syncEnabled ?? false,
+                    syncClientId: syncConfig.clientId ?? '',
+                    syncClientSecret: syncConfig.clientSecret ?? '',
+                    syncGoogleEmail: syncConfig.email ?? null,
+                    syncGoogleRefreshToken: syncConfig.refreshToken ?? null,
+                    syncAutoOnOpenClose: syncConfig.syncAutoOnOpenClose ?? false,
+                    syncConflictResolution: syncConfig.conflictResolution ?? 'ask',
+                    syncLastLocalChecksum: syncConfig.lastLocalChecksum ?? null,
+                    syncLastRemoteChecksum: syncConfig.lastRemoteChecksum ?? null,
+                    syncLastCompletedAt: syncConfig.lastCompletedAt ?? null,
+                });
+            } catch (e) {
+                console.error('Failed to load sync settings from main process:', e);
+            }
+        }
         return settings as Settings;
     },
 
@@ -1609,7 +1629,55 @@ export const repository = {
             persistBrowserState(state);
             return;
         }
+
+        const syncKeysToSave = [
+            'syncEnabled',
+            'syncClientId',
+            'syncClientSecret',
+            'syncAutoOnOpenClose',
+            'syncConflictResolution'
+        ];
+
+        const allSyncKeys = [
+            'syncEnabled',
+            'syncClientId',
+            'syncClientSecret',
+            'syncGoogleEmail',
+            'syncGoogleRefreshToken',
+            'syncAutoOnOpenClose',
+            'syncConflictResolution',
+            'syncLastLocalChecksum',
+            'syncLastRemoteChecksum',
+            'syncLastCompletedAt'
+        ];
+
+        const dbSettings: any = {};
+        const syncConfigPayload: any = {};
+
         for (const [key, value] of Object.entries(settings)) {
+            if (allSyncKeys.includes(key)) {
+                if (syncKeysToSave.includes(key)) {
+                    if (key === 'syncClientId') syncConfigPayload.clientId = value;
+                    else if (key === 'syncClientSecret') syncConfigPayload.clientSecret = value;
+                    else if (key === 'syncConflictResolution') syncConfigPayload.conflictResolution = value;
+                    else syncConfigPayload[key] = value;
+                }
+            } else {
+                dbSettings[key] = value;
+            }
+        }
+
+        // Save sync config
+        if (window.electronAPI?.syncSaveConfig && Object.keys(syncConfigPayload).length > 0) {
+            try {
+                await window.electronAPI.syncSaveConfig(syncConfigPayload);
+            } catch (e) {
+                console.error('Failed to save sync settings:', e);
+            }
+        }
+
+        // Save DB settings
+        for (const [key, value] of Object.entries(dbSettings)) {
             await window.electronAPI!.dbRun(
                 'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
                 [key, JSON.stringify(value)]
