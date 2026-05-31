@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import type { IRenderer, RendererRenderOptions } from './IRenderer';
 import type { LogLevel, Settings } from '../../types';
 import { usePreviewZoom } from '../../contexts/PreviewZoomContext';
@@ -12,28 +12,50 @@ interface HtmlPreviewProps {
  * This ensures React properly re-renders when scale changes.
  */
 const HtmlPreviewInner: React.FC<{ content: string; scale: number }> = ({ content, scale }) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
   const fullHtml = useMemo(
     () =>
       `<html><head><style>body { color-scheme: light dark; font-family: sans-serif; padding: 1rem; margin: 0; }</style></head><body>${content}</body></html>`,
     [content],
   );
 
-  // Apply CSS zoom directly to the iframe element
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const applyZoom = () => {
+      try {
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc && doc.body) {
+          doc.body.style.zoom = String(scale);
+        }
+      } catch (err) {
+        console.warn('Failed to apply zoom to iframe body:', err);
+      }
+    };
+
+    applyZoom();
+
+    iframe.addEventListener('load', applyZoom);
+    return () => {
+      iframe.removeEventListener('load', applyZoom);
+    };
+  }, [scale]);
+
   const iframeStyle: React.CSSProperties = useMemo(() => ({
     width: '100%',
     height: '100%',
-    minHeight: '100vh',
     border: 'none',
     backgroundColor: 'transparent',
-    zoom: scale,
-    transformOrigin: 'top left',
-  }), [scale]);
+  }), []);
 
   return (
     <div className="w-full h-full overflow-auto bg-secondary">
       <iframe
+        ref={iframeRef}
         srcDoc={fullHtml}
-        sandbox="allow-scripts"
+        sandbox="allow-scripts allow-same-origin"
         style={iframeStyle}
         title="HTML Preview"
       />
