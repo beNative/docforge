@@ -1141,7 +1141,11 @@ ipcMain.handle('sync:save-config', async (_, config) => {
     const allowedKeys = ['syncEnabled', 'clientId', 'clientSecret', 'syncAutoOnOpenClose', 'conflictResolution'];
     for (const key of allowedKeys) {
         if (key in config) {
-            (syncConfig as any)[key] = config[key];
+            let val = config[key];
+            if (typeof val === 'string') {
+                val = val.trim();
+            }
+            (syncConfig as any)[key] = val;
         }
     }
     await saveSyncConfig();
@@ -1160,14 +1164,17 @@ ipcMain.handle('sync:google-connect', async (_, clientId, clientSecret) => {
         activeOAuthServerCloseFn = null;
     }
 
+    const cleanClientId = typeof clientId === 'string' ? clientId.trim() : clientId;
+    const cleanClientSecret = typeof clientSecret === 'string' ? clientSecret.trim() : clientSecret;
+
     return new Promise((resolve) => {
         const { authUrl, closeServer } = GoogleDriveService.startOAuthFlow(
-            clientId,
-            clientSecret,
+            cleanClientId,
+            cleanClientSecret,
             async (tokens) => {
                 syncConfig.syncEnabled = true;
-                syncConfig.clientId = clientId;
-                syncConfig.clientSecret = clientSecret;
+                syncConfig.clientId = cleanClientId;
+                syncConfig.clientSecret = cleanClientSecret;
                 syncConfig.refreshToken = tokens.refreshToken;
                 syncConfig.email = tokens.email;
                 await saveSyncConfig();

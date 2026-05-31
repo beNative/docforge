@@ -73,15 +73,15 @@ export const CloudSyncSettingsSection: React.FC<Pick<SectionProps, 'settings' | 
     addLog('INFO', 'User action: Initiating Google Drive connection.');
 
     try {
-      const result = await window.electronAPI.syncGoogleConnect(clientId, clientSecret);
+      const result = await window.electronAPI.syncGoogleConnect(clientId.trim(), clientSecret.trim());
       if (result.success && result.email) {
         addLog('INFO', `Google Drive connected successfully to ${result.email}`);
         setCurrentSettings((prev) => ({
           ...prev,
           syncEnabled: true,
           syncGoogleEmail: result.email ?? null,
-          syncClientId: clientId,
-          syncClientSecret: clientSecret,
+          syncClientId: clientId.trim(),
+          syncClientSecret: clientSecret.trim(),
         }));
         setSyncStatusTone('success');
         setSyncStatusMsg(`Successfully connected to ${result.email}`);
