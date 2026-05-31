@@ -2,6 +2,17 @@
 
 -   _No entries yet._
 
+## v0.9.1 - The Google Drive Multi-Database Sync Update
+
+### ✨ Features
+
+-   **Google Drive Multi-Database Sync**:
+    -   Added support for syncing multiple independent databases under a single Google account.
+    -   Implemented auto-discovery of remote SQLite database files (`*.db`) in the Google Drive `appDataFolder`, displaying them in a dropdown list.
+    -   Added custom database naming support with `.db` file extension enforcement, allowing clear separation of home and work profiles.
+    -   Added a styled refresh button next to the selector with tooltip hover hints ("Refresh cloud database list") matching standard UI patterns.
+    -   Optimized connection transition by resetting local tracking hashes when database targets are changed, triggering normal conflict comparison.
+
 ## v0.9.0 - The Embedded Web Link Update
 
 ### ✨ Features
