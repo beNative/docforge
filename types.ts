@@ -112,13 +112,22 @@ declare global {
       ragClearIndex: () => Promise<{ success: boolean; error?: string }>;
       onRagIndexProgress: (callback: (payload: { current: number; total: number }) => void) => () => void;
       onAppLog: (callback: (payload: { level: LogLevel; message: string; timestamp: string }) => void) => () => void;
+      // Google Drive Sync
+      syncGoogleConnect: (clientId: string, clientSecret: string) => Promise<{ success: boolean; email?: string; error?: string }>;
+      syncGoogleDisconnect: () => Promise<{ success: boolean; error?: string }>;
+      syncRun: (options?: { forcePush?: boolean; forcePull?: boolean }) => Promise<{ success: boolean; code?: 'in_sync' | 'pushed' | 'pulled' | 'conflict' | 'error'; message?: string; localStats?: any; remoteStats?: any; error?: string }>;
+      syncResolveConflict: (resolution: 'local' | 'remote') => Promise<{ success: boolean; message?: string; error?: string }>;
+      syncGetStatus: () => Promise<{ success: boolean; email: string | null; enabled: boolean; lastCompletedAt: string | null; }>;
+      syncGetConfig: () => Promise<any>;
+      syncSaveConfig: (config: any) => Promise<{ success: boolean; error?: string }>;
+      onSyncStatus: (callback: (payload: { status: 'idle' | 'syncing' | 'error' | 'conflict'; message?: string }) => void) => () => void;
     };
     __DOCFORGE_SCRIPT_PREVIEW__?: ScriptExecutionBridge;
   }
   // This is for the Electron main process, to add properties attached by Electron.
   namespace NodeJS {
     interface Process {
-      resourcesPath: string;
+      readonly resourcesPath: string;
     }
   }
 }
@@ -535,6 +544,16 @@ export interface Settings {
   chatEnableAgentMode: boolean;
   chatAgentRequiresApproval: boolean;
   chatEnabledTools: string[];
+  syncEnabled: boolean;
+  syncClientId: string;
+  syncClientSecret: string;
+  syncGoogleEmail: string | null;
+  syncGoogleRefreshToken: string | null;
+  syncAutoOnOpenClose: boolean;
+  syncConflictResolution: 'ask' | 'prefer-local' | 'prefer-cloud';
+  syncLastLocalChecksum: string | null;
+  syncLastRemoteChecksum: string | null;
+  syncLastCompletedAt: string | null;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';

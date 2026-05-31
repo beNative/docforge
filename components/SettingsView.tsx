@@ -8,6 +8,7 @@ import {
   DatabaseIcon,
   KeyboardIcon,
   TerminalIcon,
+  CloudIcon,
 } from './Icons';
 import Button from './Button';
 import KeyboardShortcutsSection from './KeyboardShortcutsSection';
@@ -22,6 +23,7 @@ import { PythonSettingsSection } from './settings/PythonSettingsSection';
 import { ScriptDefaultsSection } from './settings/ScriptDefaultsSection';
 import { GeneralSettingsSection } from './settings/GeneralSettingsSection';
 import { DatabaseSettingsSection } from './settings/DatabaseSettingsSection';
+import { CloudSyncSettingsSection } from './settings/CloudSyncSettingsSection';
 import { AdvancedSettingsSection } from './settings/AdvancedSettingsSection';
 
 interface SettingsViewProps {
@@ -44,6 +46,7 @@ type SettingsCategory =
   | 'powershell'
   | 'general'
   | 'database'
+  | 'sync'
   | 'advanced';
 
 const categories: { id: SettingsCategory; label: string; icon: React.FC<{ className?: string }> }[] = [
@@ -57,6 +60,7 @@ const categories: { id: SettingsCategory; label: string; icon: React.FC<{ classN
   { id: 'powershell', label: 'PowerShell', icon: TerminalIcon },
   { id: 'general', label: 'General', icon: GearIcon },
   { id: 'database', label: 'Database', icon: DatabaseIcon },
+  { id: 'sync', label: 'Cloud Sync', icon: CloudIcon },
   { id: 'advanced', label: 'Advanced', icon: FileIcon },
 ];
 
@@ -222,6 +226,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         );
       case 'database':
         return <DatabaseSettingsSection />;
+      case 'sync':
+        return (
+          <CloudSyncSettingsSection
+            settings={currentSettings}
+            setCurrentSettings={setCurrentSettings}
+          />
+        );
       case 'advanced':
         return (
           <AdvancedSettingsSection
