@@ -1,5 +1,9 @@
 ## Unreleased
 
+-   _No entries yet._
+
+## v0.9.2 - Cloud Sync Computer Name Integration (July 2026)
+
 ### ✨ Features
 
 - **Computer-Name Suffix for Cloud Sync Databases**:
