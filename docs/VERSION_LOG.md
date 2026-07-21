@@ -2,6 +2,14 @@
 
 -   _No entries yet._
 
+## v0.9.5 - Dynamic Local Database Profiles (July 2026)
+
+### ✨ Features
+
+- **Aligned Local-Cloud Database Naming**:
+  - Configured local SQLite database files to match the selected cloud database filename (e.g. `docforge-[selected-name].db`).
+  - Implemented dynamic database switching: selecting a database file in Settings now safely closes the current SQLite connection, opens/bootstraps the new local database, and reloads the interface automatically. This prevents any data overwrites and allows home and work database profiles to exist independently both locally and in the cloud.
+
 ## v0.9.4 - Cloud Sync Conflict Auto-Resolution (July 2026)
 
 ### ✨ Features

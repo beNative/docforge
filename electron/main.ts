@@ -1195,6 +1195,17 @@ ipcMain.handle('sync:save-config', async (_, config) => {
         syncConfig.lastLocalChecksum = null;
         syncConfig.lastRemoteChecksum = null;
         syncConfig.lastCompletedAt = null;
+
+        try {
+            const newLocalDbPath = path.join(app.getPath('userData'), newDbName);
+            databaseService.loadFromPath(newLocalDbPath, { persist: false });
+            console.log(`[Sync] Switched active local database file to ${newLocalDbPath}`);
+            setTimeout(() => {
+                mainWindow?.webContents.reload();
+            }, 500);
+        } catch (dbError) {
+            console.error('[Sync] Failed to switch active local database path:', dbError);
+        }
     }
 
     await saveSyncConfig();

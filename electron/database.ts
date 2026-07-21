@@ -34,7 +34,21 @@ interface DatabaseConfig {
   customPath?: string;
 }
 
-const getDefaultDbPath = () => path.join(app.getPath('userData'), DB_FILE_NAME);
+const getDefaultDbPath = () => {
+  try {
+    const syncConfigPath = path.join(app.getPath('userData'), 'sync-config.json');
+    if (fs.existsSync(syncConfigPath)) {
+      const raw = fs.readFileSync(syncConfigPath, 'utf-8');
+      const config = JSON.parse(raw);
+      if (config && typeof config === 'object' && config.syncDatabaseName) {
+        return path.join(app.getPath('userData'), config.syncDatabaseName);
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to read syncDatabaseName from sync-config.json:', e);
+  }
+  return path.join(app.getPath('userData'), DB_FILE_NAME);
+};
 const getConfigFilePath = () => path.join(app.getPath('userData'), DB_CONFIG_FILE);
 
 const readDatabaseConfig = (): DatabaseConfig | null => {
