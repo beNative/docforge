@@ -2,6 +2,13 @@
 
 -   _No entries yet._
 
+## v0.9.3 - Cloud Sync Conflict UI Fix (July 2026)
+
+### ✨ Features
+
+- **Global Sync Conflict Modal**:
+  - Mounted the conflict resolution modal globally in `App.tsx` and updated IPC events to forward database statistics. This guarantees that background/startup sync conflicts trigger a visual resolution modal, even when the Settings page is closed.
+
 ## v0.9.2 - Cloud Sync Computer Name Integration (July 2026)
 
 ### ✨ Features
