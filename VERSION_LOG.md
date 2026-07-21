@@ -1,6 +1,14 @@
 ## Unreleased
 
--   _No entries yet._
+### ✨ Features
+
+- **Computer-Name Suffix for Cloud Sync Databases**:
+  - Automatically appends the sanitized local computer hostname to the default Google Drive sync database filename (e.g. `docforge-[computer-name].db`).
+  - Supports listing and switching target synchronization databases from other machines via the Database settings dropdown.
+- **Global Sync Status & Error Alerts**:
+  - Integrated real-time sync status updates (`syncing`, `conflict`, `error`) into the bottom status bar.
+  - Added a global, glassmorphic sync error toast notification that appears on any synchronization failure, displaying clear error diagnostics and a one-click button to jump to **Settings**.
+
 
 ## v0.9.1 - The Google Drive Multi-Database Sync Update
 

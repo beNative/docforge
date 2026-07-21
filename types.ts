@@ -556,6 +556,7 @@ export interface Settings {
   syncLastRemoteChecksum: string | null;
   syncLastCompletedAt: string | null;
   syncDatabaseName?: string;
+  defaultSyncDatabaseName?: string;
 }
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';

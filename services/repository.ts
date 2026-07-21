@@ -1614,7 +1614,8 @@ export const repository = {
                     syncLastLocalChecksum: syncConfig.lastLocalChecksum ?? null,
                     syncLastRemoteChecksum: syncConfig.lastRemoteChecksum ?? null,
                     syncLastCompletedAt: syncConfig.lastCompletedAt ?? null,
-                    syncDatabaseName: syncConfig.syncDatabaseName ?? 'docforge.db',
+                    syncDatabaseName: syncConfig.syncDatabaseName ?? syncConfig.defaultSyncDatabaseName,
+                    defaultSyncDatabaseName: syncConfig.defaultSyncDatabaseName,
                 });
             } catch (e) {
                 console.error('Failed to load sync settings from main process:', e);

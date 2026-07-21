@@ -31,7 +31,8 @@ export const CloudSyncSettingsSection: React.FC<Pick<SectionProps, 'settings' | 
 
   const [remoteDbs, setRemoteDbs] = useState<{ name: string; id: string; modifiedTime: string }[]>([]);
   const [isLoadingDbs, setIsLoadingDbs] = useState(false);
-  const [selectedDbName, setSelectedDbName] = useState(settings.syncDatabaseName || 'docforge.db');
+  const defaultDbName = settings.defaultSyncDatabaseName || 'docforge.db';
+  const [selectedDbName, setSelectedDbName] = useState(settings.syncDatabaseName || defaultDbName);
   const [customDbNameInput, setCustomDbNameInput] = useState('');
   const [isCustomNaming, setIsCustomNaming] = useState(false);
   const [dbNameError, setDbNameError] = useState<string | null>(null);
@@ -64,8 +65,10 @@ export const CloudSyncSettingsSection: React.FC<Pick<SectionProps, 'settings' | 
   useEffect(() => {
     if (settings.syncDatabaseName) {
       setSelectedDbName(settings.syncDatabaseName);
+    } else {
+      setSelectedDbName(defaultDbName);
     }
-  }, [settings.syncDatabaseName]);
+  }, [settings.syncDatabaseName, defaultDbName]);
 
   // Sync state changes from main process
   useEffect(() => {
@@ -466,14 +469,17 @@ export const CloudSyncSettingsSection: React.FC<Pick<SectionProps, 'settings' | 
                       }}
                       className="flex-1 px-3 py-1.5 text-xs rounded-md border border-border-color bg-background text-text-main focus:outline-none focus:ring-1 focus:ring-primary/50"
                     >
-                      <option value="docforge.db">docforge.db (Default)</option>
-                      {selectedDbName !== 'docforge.db' && !remoteDbs.some(d => d.name === selectedDbName) && (
+                      <option value={defaultDbName}>{defaultDbName} (Default for this PC)</option>
+                      {defaultDbName !== 'docforge.db' && (
+                        <option value="docforge.db">docforge.db (Standard)</option>
+                      )}
+                      {selectedDbName !== defaultDbName && selectedDbName !== 'docforge.db' && !remoteDbs.some(d => d.name === selectedDbName) && (
                         <option value={selectedDbName}>
                           {selectedDbName} (configured)
                         </option>
                       )}
                       {remoteDbs.map((dbFile) => {
-                        if (dbFile.name === 'docforge.db') return null;
+                        if (dbFile.name === defaultDbName || dbFile.name === 'docforge.db') return null;
                         return (
                           <option key={dbFile.id} value={dbFile.name}>
                             {dbFile.name} (cloud)

@@ -359,10 +359,24 @@ let syncConfig: SyncConfig = {};
 const SYNC_CONFIG_FILE = 'sync-config.json';
 const getSyncConfigFilePath = () => path.join(app.getPath('userData'), SYNC_CONFIG_FILE);
 
+function getSanitizedComputerName(): string {
+  const hostname = os.hostname();
+  const sanitized = hostname.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  return sanitized || 'device';
+}
+
+function getDefaultDatabaseName(): string {
+  const computerName = getSanitizedComputerName();
+  return `docforge-${computerName}.db`;
+}
+
 const loadSyncConfig = async () => {
   try {
     const raw = await fs.readFile(getSyncConfigFilePath(), 'utf-8');
     syncConfig = JSON.parse(raw) as SyncConfig;
+    if (!syncConfig.syncDatabaseName) {
+      syncConfig.syncDatabaseName = getDefaultDatabaseName();
+    }
     console.log('[Sync] Local sync-config.json loaded.');
   } catch (error) {
     syncConfig = {
@@ -371,7 +385,7 @@ const loadSyncConfig = async () => {
       clientSecret: '',
       syncAutoOnOpenClose: false,
       conflictResolution: 'ask',
-      syncDatabaseName: 'docforge.db',
+      syncDatabaseName: getDefaultDatabaseName(),
     };
     console.log('[Sync] Initialized default sync configuration.');
   }
@@ -1136,7 +1150,8 @@ ipcMain.handle('sync:get-config', () => {
         lastLocalChecksum: syncConfig.lastLocalChecksum ?? null,
         lastRemoteChecksum: syncConfig.lastRemoteChecksum ?? null,
         lastCompletedAt: syncConfig.lastCompletedAt ?? null,
-        syncDatabaseName: syncConfig.syncDatabaseName ?? 'docforge.db',
+        syncDatabaseName: syncConfig.syncDatabaseName ?? getDefaultDatabaseName(),
+        defaultSyncDatabaseName: getDefaultDatabaseName(),
     };
 });
 

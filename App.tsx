@@ -233,6 +233,7 @@ export const MainApp: React.FC = () => {
     });
     const [confirmAction, setConfirmAction] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; } | null>(null);
     const [clipboardNotice, setClipboardNotice] = useState<{ title: string; message: React.ReactNode; helpUrl?: string } | null>(null);
+    const [syncToast, setSyncToast] = useState<{ visible: boolean; message: string; }>({ visible: false, message: '' });
     const [searchTerm, setSearchTerm] = useState('');
     const previousSearchTermRef = useRef('');
     const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; position: { x: number, y: number }, items: MenuItem[] }>({ isOpen: false, position: { x: 0, y: 0 }, items: [] });
@@ -1425,7 +1426,27 @@ export const MainApp: React.FC = () => {
             onUpdateDownloadProgress,
             onUpdateDownloaded,
             onUpdateError,
+            onSyncStatus,
         } = window.electronAPI;
+
+        if (onSyncStatus) {
+            cleanups.push(onSyncStatus((payload) => {
+                if (payload.status === 'syncing') {
+                    setDatabaseStatus({ message: payload.message || 'Syncing database...', tone: 'info' });
+                } else if (payload.status === 'conflict') {
+                    setDatabaseStatus({ message: 'Sync conflict detected.', tone: 'error' });
+                } else if (payload.status === 'error') {
+                    setDatabaseStatus({ message: payload.message || 'Sync failed.', tone: 'error' });
+                    setSyncToast({
+                        visible: true,
+                        message: payload.message || 'An error occurred during database synchronization.'
+                    });
+                } else {
+                    setDatabaseStatus({ message: payload.message || 'Database ready', tone: 'info' });
+                    setSyncToast(prev => prev.visible ? { ...prev, visible: false } : prev);
+                }
+            }));
+        }
 
         if (onUpdateAvailable) {
             cleanups.push(onUpdateAvailable((info) => {
@@ -3599,6 +3620,58 @@ export const MainApp: React.FC = () => {
                     onAutoInstallChange={handleAutoInstallPreferenceChange}
                     onClose={handleUpdateToastClose}
                 />
+            )}
+
+            {syncToast.visible && (
+                <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm animate-slide-in-up">
+                    <div className="bg-secondary/95 backdrop-blur-xl rounded-xl shadow-2xl border border-destructive/30 p-5">
+                        <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/15 flex items-center justify-center border border-destructive/35">
+                                <span className="text-lg">⚠️</span>
+                            </div>
+                            <div className="flex-1 space-y-1">
+                                <h4 className="text-sm font-semibold text-text-main">Cloud Sync Error</h4>
+                                <p className="text-xs text-text-secondary leading-normal break-words">
+                                    {syncToast.message || 'An error occurred during database synchronization.'}
+                                </p>
+                                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-border-color/30">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setView('settings');
+                                            setSyncToast(prev => ({ ...prev, visible: false }));
+                                        }}
+                                        className="px-3 py-1.5 text-xs font-semibold text-accent-text bg-primary rounded-md hover:bg-primary/95 focus:outline-none transition-colors"
+                                    >
+                                        Open Settings
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSyncToast(prev => ({ ...prev, visible: false }))}
+                                        className="px-3 py-1.5 text-xs rounded-md border border-border-color bg-background hover:bg-secondary text-text-main focus:outline-none transition-colors"
+                                    >
+                                        Dismiss
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <style>{`
+                        @keyframes slide-in-up {
+                            from {
+                                transform: translateY(1rem);
+                                opacity: 0;
+                            }
+                            to {
+                                transform: translateY(0);
+                                opacity: 1;
+                            }
+                        }
+                        .animate-slide-in-up {
+                            animation: slide-in-up 0.28s ease-out forwards;
+                        }
+                    `}</style>
+                </div>
             )}
 
             {clipboardNotice && (
