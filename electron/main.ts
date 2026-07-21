@@ -642,7 +642,12 @@ const runSyncInternal = async (options?: { forcePush?: boolean; forcePull?: bool
     await fs.unlink(tempBackupPath).catch(() => {});
 
     syncStatus = 'conflict';
-    mainWindow?.webContents.send('sync:status', { status: 'conflict', message: 'Conflict detected.' });
+    mainWindow?.webContents.send('sync:status', {
+      status: 'conflict',
+      message: 'Conflict detected.',
+      localStats,
+      remoteStats
+    });
 
     return {
       success: true,

@@ -201,7 +201,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncGetConfig: () => ipcRenderer.invoke('sync:get-config'),
   syncSaveConfig: (config: any) => ipcRenderer.invoke('sync:save-config', config),
   syncListRemoteDatabases: () => ipcRenderer.invoke('sync:list-remote-dbs'),
-  onSyncStatus: (callback: (payload: { status: 'idle' | 'syncing' | 'error' | 'conflict'; message?: string }) => void) => {
+  onSyncStatus: (callback: (payload: { status: 'idle' | 'syncing' | 'error' | 'conflict'; message?: string; localStats?: any; remoteStats?: any }) => void) => {
     const handler = (_: IpcRendererEvent, data: any) => callback(data);
     ipcRenderer.on('sync:status', handler);
     return () => ipcRenderer.removeListener('sync:status', handler);

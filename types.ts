@@ -121,7 +121,7 @@ declare global {
       syncGetConfig: () => Promise<any>;
       syncSaveConfig: (config: any) => Promise<{ success: boolean; error?: string }>;
       syncListRemoteDatabases: () => Promise<{ success: boolean; files?: { name: string; id: string; modifiedTime: string }[]; error?: string }>;
-      onSyncStatus: (callback: (payload: { status: 'idle' | 'syncing' | 'error' | 'conflict'; message?: string }) => void) => () => void;
+      onSyncStatus: (callback: (payload: { status: 'idle' | 'syncing' | 'error' | 'conflict'; message?: string; localStats?: any; remoteStats?: any }) => void) => () => void;
     };
     __DOCFORGE_SCRIPT_PREVIEW__?: ScriptExecutionBridge;
   }

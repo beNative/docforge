@@ -24,6 +24,7 @@ import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
 import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon, SearchIcon, RefreshIcon, HistoryIcon, UndoIcon, LayoutVerticalIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
+import ConflictResolutionModal from './components/ConflictResolutionModal';
 import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
@@ -234,6 +235,7 @@ export const MainApp: React.FC = () => {
     const [confirmAction, setConfirmAction] = useState<{ title: string; message: React.ReactNode; onConfirm: () => void; } | null>(null);
     const [clipboardNotice, setClipboardNotice] = useState<{ title: string; message: React.ReactNode; helpUrl?: string } | null>(null);
     const [syncToast, setSyncToast] = useState<{ visible: boolean; message: string; }>({ visible: false, message: '' });
+    const [conflictData, setConflictData] = useState<{ localStats: any; remoteStats: any; } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const previousSearchTermRef = useRef('');
     const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; position: { x: number, y: number }, items: MenuItem[] }>({ isOpen: false, position: { x: 0, y: 0 }, items: [] });
@@ -286,6 +288,26 @@ export const MainApp: React.FC = () => {
 
     const clampZoomScale = useCallback((value: number) => {
         return Math.min(Math.max(value, PREVIEW_MIN_SCALE), PREVIEW_MAX_SCALE);
+    }, []);
+
+    const handleResolveConflict = useCallback(async (resolution: 'local' | 'remote') => {
+        if (!window.electronAPI?.syncResolveConflict) return;
+        setConflictData(null);
+        setDatabaseStatus({
+            message: resolution === 'local' ? 'Keeping local database...' : 'Keeping cloud database...',
+            tone: 'info'
+        });
+        try {
+            const result = await window.electronAPI.syncResolveConflict(resolution);
+            if (result.success) {
+                setDatabaseStatus({ message: result.message || 'Conflict resolved successfully.', tone: 'info' });
+            } else {
+                setDatabaseStatus({ message: result.error || 'Conflict resolution failed.', tone: 'error' });
+            }
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : 'Resolution failed.';
+            setDatabaseStatus({ message: errorMsg, tone: 'error' });
+        }
     }, []);
 
     const handlePreviewScaleChange = useCallback((value: number) => {
@@ -1435,6 +1457,12 @@ export const MainApp: React.FC = () => {
                     setDatabaseStatus({ message: payload.message || 'Syncing database...', tone: 'info' });
                 } else if (payload.status === 'conflict') {
                     setDatabaseStatus({ message: 'Sync conflict detected.', tone: 'error' });
+                    if (payload.localStats && payload.remoteStats) {
+                        setConflictData({
+                            localStats: payload.localStats,
+                            remoteStats: payload.remoteStats
+                        });
+                    }
                 } else if (payload.status === 'error') {
                     setDatabaseStatus({ message: payload.message || 'Sync failed.', tone: 'error' });
                     setSyncToast({
@@ -3672,6 +3700,15 @@ export const MainApp: React.FC = () => {
                         }
                     `}</style>
                 </div>
+            )}
+
+            {conflictData && (
+                <ConflictResolutionModal
+                    localStats={conflictData.localStats}
+                    remoteStats={conflictData.remoteStats}
+                    onResolve={handleResolveConflict}
+                    onClose={() => setConflictData(null)}
+                />
             )}
 
             {clipboardNotice && (
