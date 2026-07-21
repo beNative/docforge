@@ -104,15 +104,6 @@ jobs:
               ~/AppData/Local/electron/Cache
               ~/AppData/Local/electron-builder/Cache
             artifact-name: docforge-windows-x64
-          - display-name: Windows ia32
-            os: windows-latest
-            script: package:win:ia32
-            arch: ia32
-            npm-platform: win32
-            cache-paths: |
-              ~/AppData/Local/electron/Cache
-              ~/AppData/Local/electron-builder/Cache
-            artifact-name: docforge-windows-ia32
           - display-name: Linux x64
             os: ubuntu-latest
             script: package:linux:x64
