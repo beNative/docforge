@@ -487,6 +487,21 @@ const runSyncInternal = async (options?: { forcePush?: boolean; forcePull?: bool
       return { success: true, code: 'pushed', message: 'Pushed local database to cloud.' };
     }
 
+    // If local backup and remote cloud file are already byte-for-byte identical,
+    // auto-resolve and align the tracking checksums without flagging a conflict.
+    if (localChecksum === cloudFile.md5Checksum) {
+      console.log('[Sync] Local and remote database files are identical. Auto-resolving.');
+      syncConfig.lastLocalChecksum = localChecksum;
+      syncConfig.lastRemoteChecksum = cloudFile.md5Checksum;
+      syncConfig.lastCompletedAt = new Date().toISOString();
+      await saveSyncConfig();
+
+      await fs.unlink(tempBackupPath).catch(() => {});
+      syncStatus = 'idle';
+      mainWindow?.webContents.send('sync:status', { status: 'idle', message: 'In sync.' });
+      return { success: true, code: 'in_sync', message: 'Database is in sync.' };
+    }
+
     // Compare
     const localChanged = localChecksum !== syncConfig.lastLocalChecksum;
     const remoteChanged = cloudFile.md5Checksum !== syncConfig.lastRemoteChecksum;

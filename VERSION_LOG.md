@@ -2,6 +2,13 @@
 
 -   _No entries yet._
 
+## v0.9.4 - Cloud Sync Conflict Auto-Resolution (July 2026)
+
+### ✨ Features
+
+- **Identical Database Auto-Resolution**:
+  - Automatically compares database file checksums when resolving conflicts. If local and cloud databases are byte-for-byte identical, the app now auto-resolves the sync as successful and baselines the tracking state, preventing confusing conflict prompts.
+
 ## v0.9.3 - Cloud Sync Conflict UI Fix (July 2026)
 
 ### ✨ Features
