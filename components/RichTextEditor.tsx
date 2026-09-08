@@ -57,6 +57,7 @@ interface RichTextEditorProps {
   onFocusChange?: (hasFocus: boolean) => void;
   onSelectionChange?: (selectedText: string | undefined) => void;
   onSaveToFile?: () => void;
+  zoomScale?: number;
 }
 
 const RICH_TEXT_THEME = {
@@ -94,7 +95,7 @@ const RICH_TEXT_THEME = {
 const Placeholder: React.FC = () => null;
 
 const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
-  ({ html, onChange, readOnly = false, onScroll, onFocusChange, onSelectionChange, onSaveToFile }, ref) => {
+  ({ html, onChange, readOnly = false, onScroll, onFocusChange, onSelectionChange, onSaveToFile, zoomScale = 1.0 }, ref) => {
     const [editorRef, setEditorRef] = useState<any>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [toolbarActions, setToolbarActions] = useState<ToolbarButtonConfig[]>([]);
@@ -248,6 +249,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(
           className="relative flex-1 overflow-auto"
           ref={scrollContainerRef}
           onScroll={handleScroll}
+          style={zoomScale && zoomScale !== 1 ? { zoom: zoomScale } : undefined}
         >
           <LexicalComposer initialConfig={initialConfig}>
             {/* Capture the editor instance */}

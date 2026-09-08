@@ -110,18 +110,20 @@ export const mapExtensionToLanguageId = (extension: string | null): string => {
         case 'gif':
         case 'bmp':
         case 'webp':
+            return 'image';
         case 'svg':
         case 'svgz':
-            return 'image';
+            return 'xml';
         case 'image/png':
         case 'image/jpg':
         case 'image/jpeg':
         case 'image/gif':
         case 'image/bmp':
         case 'image/webp':
+            return 'image';
         case 'image/svg':
         case 'image/svg+xml':
-            return 'image';
+            return 'xml';
         default:
             // Try to find a direct match in supported languages by id
             const match = SUPPORTED_LANGUAGES.find(l => l.id === extension.toLowerCase());

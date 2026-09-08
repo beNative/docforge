@@ -30,3 +30,4 @@ npm-test.png
 *.sln
 *.sw?
 /release
+google/

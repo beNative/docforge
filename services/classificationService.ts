@@ -193,7 +193,11 @@ export const classifyDocumentContent = (options: ClassificationOptions): Classif
   if (trimmed.startsWith(PDF_DATA_URI_PREFIX)) {
     return classifyWith('pdf', 'pdf', 'preview', 1, 'Detected PDF data URI');
   }
-  if (trimmed.startsWith(IMAGE_DATA_URI_PREFIX) || /^<svg[\s>]/i.test(trimmed)) {
+  const isSvg = extension === 'svg' || extension === 'svgz' || /<svg[\s>]/i.test(trimmed);
+  if (isSvg) {
+    return classifyWith('xml', 'image', 'preview', 1, extension ? 'Extension indicates SVG image' : 'Detected SVG image payload');
+  }
+  if (trimmed.startsWith(IMAGE_DATA_URI_PREFIX)) {
     return classifyWith('image', 'image', 'preview', 1, 'Detected image payload');
   }
 

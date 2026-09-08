@@ -9,7 +9,7 @@ export interface IRenderer {
   /**
    * Determines if this renderer can handle the given language ID (e.g., 'markdown', 'html').
    */
-  canRender(languageId: string): boolean;
+  canRender(languageId: string, content?: string): boolean;
 
   /**
    * Takes a string of content and transforms it into a renderable React element or HTML string.

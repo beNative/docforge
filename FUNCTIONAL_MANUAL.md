@@ -36,7 +36,14 @@ The resizable left panel is your main navigation and organization area.
 - **Templates List:** A separate panel below your documents for managing reusable templates. This panel is resizable; you can drag its top border to adjust its height.
     - **Action Toolbar:** The templates panel has its own toolbar for creating new templates.
 
-The entire list of documents and templates can be navigated using your keyboard's arrow keys. Use `Up`/`Down` to move between items, `Right` to expand a folder, `Left` to collapse a folder (or move to its parent), and `Enter` to open the selected item. Alternatively, right-clicking on an item or in the empty space of the sidebar will open a context menu with common actions.
+The entire list of documents and templates can be navigated using your keyboard:
+- Use `Up`/`Down` to move between adjacent items.
+- Use `PageUp`/`PageDown` (or `PgUp`/`PgDn`) to jump by page through long lists.
+- Use `Home` or `End` to jump immediately to the top or bottom of the document tree.
+- Hold `Shift` with any of these keys (`Shift+Up/Down`, `Shift+PageUp/PageDown`, `Shift+Home/End`) to perform continuous range selections.
+- Use `Right` to expand a folder, `Left` to collapse a folder (or jump to its parent), and `Enter` to open the selected item.
+- When the **Templates** panel is collapsed, keyboard navigation smartly restricts focus to your document tree, preventing unintended scrolling into hidden template entries.
+Alternatively, right-clicking on an item or in the empty space of the sidebar will open a context menu with common actions.
 
 ### The Main Content Area
 
@@ -78,7 +85,8 @@ The bar at the bottom of the window provides at-a-glance information about the a
 
 - **LLM Connection Status:** A colored dot (green for connected, red for error) and text indicating the connection status to your local AI provider.
 - **Provider & Model Selection:** Dropdown menus to see the currently configured LLM provider and model, and to quickly switch between other detected services and their available models.
-- **Statistics:** Shows the total number of documents and the last save time for the active document.
+- **Statistics:** Shows the total number of documents, the active document's current version (e.g., `v3`), and the last save timestamp.
+- **Save State Feedback:** The save button in the editor toolbar visually transitions across states: `Dirty` (highlighted) → `Saving` (animated spinner) → `Saved` (green checkmark with confirmation tooltip). Pressing `Ctrl+S` manually creates and commits a new version to history.
 - **Workspace Zoom:** A single cluster of zoom buttons, percentage readout, and reset control that automatically targets the preview or editor depending on which pane has focus. Zoom adjustments now move in 5% increments for precise scaling.
 - **App Version:** Displays the current version of DocForge.
 
@@ -90,6 +98,7 @@ The bar at the bottom of the window provides at-a-glance information about the a
 
 - **New Document:** Click the `+` icon at the top of the sidebar or use the `Ctrl+N` shortcut. New documents default to Markdown.
 - **New Code File:** Click the code icon. A dialog will appear asking you to provide a filename with an extension (e.g., `script.js`) for automatic language detection.
+- **New Web Link:** Click the globe icon in the sidebar toolbar, choose "New Web Link" from the empty-space context menu, or run the `New Web Link` command (`new-weblink`). Enter a URL, and DocForge will auto-derive a clean title from the address path and create the link under the selected folder or root workspace.
 - **New from Clipboard:** Use the command palette entry or sidebar menu item to create a document from the current clipboard contents. DocForge will import the text verbatim, detect the document type automatically, generate a title with your connected LLM when it's online, and report the classification in the activity log. If clipboard access is denied, the app shows guidance for restoring permissions.
 - **New Root Folder:** Click the folder icon with a `+` to create a new folder at the root of your document list.
 - **New Subfolder:** Select an existing folder and click the "New Subfolder" icon to create a folder inside it.
@@ -97,12 +106,18 @@ The bar at the bottom of the window provides at-a-glance information about the a
 
 ### Exporting Documents
 
-Use the **Save to File…** action whenever you need a local copy of a document outside DocForge.
+Use the **Save to File…** action whenever you need a local copy of a document outside DocForge:
 
-- **From the Sidebar:** Hover a document in the tree and click the floppy disk quick action, or open the item's context menu and choose **Save to File…**.
-- **From the Command Palette:** Type `Save Document to File` to export whichever document is currently focused in the tree.
-- **Suggested Filenames:** DocForge proposes a sanitized filename based on the document title and strips any duplicate extension you might already have in the title.
-- **Smart Extensions:** The exporter inspects the document type, detected language mode, and embedded MIME hints (for images and PDFs) to choose the most appropriate file extension automatically.
+- **Export Toolbar Dropdown:** When viewing documents with multiple export formats (such as PlantUML and Markdown), the toolbar Save/Download button displays a split dropdown menu with dedicated format options.
+- **PlantUML Multi-Format Export:** PlantUML diagrams can be exported into four distinct formats:
+  - **PNG Image (`.png`):** High-DPI raster image (2x scale) with a transparent background, perfect for presentations and embedding in light or dark themes.
+  - **SVG Vector (`.svg`):** Scalable vector graphic that remains razor-sharp at any resolution.
+  - **JPEG Image (`.jpg`):** High-resolution raster image with a solid white background.
+  - **PlantUML Source (`.puml`):** Plain source text for sharing or backup.
+  *Rendering uses local Java PlantUML in Electron when available, with automatic remote service fallback.*
+- **Markdown to Standalone HTML:** Export any Markdown document as a completely self-contained `.html` file. It bundles GitHub-inspired typography, tables, and code syntax styling, allowing it to be viewed offline in any standard web browser without external network calls.
+- **From Context Menus:** Right-click any document in the treeview to access format-specific export options (*Save to File...*, *Save as HTML...*, *Save as PNG...*, *Save as SVG...*, *Save as JPEG...*).
+- **Suggested Filenames & Extensions:** DocForge automatically proposes a sanitized filename with the appropriate format extension.
 - **Binary Support:** Binary payloads such as PDFs and images are decoded before saving, so the exported file opens natively.
 - **Desktop & Browser Friendly:** On Electron builds the action opens the operating system's save dialog; the web preview falls back to a standard browser download prompt.
 
@@ -137,7 +152,7 @@ Import PDFs by dragging `.pdf` files from your operating system into the sidebar
 
 #### Image Documents
  
- PNG, JPEG, GIF, BMP, WEBP, and SVG assets are detected when you import them from disk, drop them into the sidebar, or pipe image data through **New from Clipboard**. Image documents also open directly in **Preview Only** mode. The preview uses DocForge's zoom and pan surface so you can scroll, drag to reposition, double-click to zoom, or press the on-screen controls to reset the view. Image metadata—such as pixel dimensions and MIME type—appears in the status bar while the preview is active.
+ PNG, JPEG, GIF, BMP, WEBP, and SVG assets are detected when you import them from disk, drop them into the sidebar, or pipe image data through **New from Clipboard**. Image documents also open directly in **Preview Only** mode. The preview uses DocForge's zoom and pan surface so you can scroll, drag to reposition, double-click to zoom, or use `Ctrl + Wheel` to zoom seamlessly. The workspace zoom controls automatically target the image preview container. Image metadata—such as pixel dimensions and MIME type—appears in the status bar while the preview is active.
  
  **Interacting with Images**:
  - **Pasting**: When an image document is open and unlocked, you can paste an image directly from your clipboard (**Ctrl+V**) to replace its content.
@@ -148,10 +163,11 @@ Import PDFs by dragging `.pdf` files from your operating system into the sidebar
 
 #### Web Link Documents
 
-DocForge supports a dedicated **Web Link** (`weblink`) document type. This lets you import and display external web pages directly within the workspace.
+DocForge supports a dedicated **Web Link** (`weblink`) document type. This lets you import, create, and display external web pages directly within the workspace.
 
--   **Importing via Drag & Drop:** Drag any website address or link directly from your web browser (e.g. Chrome, Edge, Firefox) and drop it into a folder in the sidebar or onto the empty tree area. A new web link node is automatically created, displaying the website icon and a clean title extracted from the link (e.g. `google.com/search`). You can also drop links onto the middle editor area to import and load them instantly.
--   **Embedded Custom Browser:** When you select a web link node, the editor opens a custom, full-bleed web browser interface under the document toolbar.
+-   **Manual Creation:** Click the **New Web Link** toolbar button (`GlobeIcon`) or use the `New Web Link` command (`new-weblink`) to create a web link document with a target URL and custom or auto-derived title.
+-   **Importing via Drag & Drop:** Drag any website address or link directly from your web browser (e.g. Chrome, Edge, Firefox) and drop it into a folder in the sidebar or onto the empty tree area. Protected against large or malicious HTML payloads, the parser safely extracts the target link and creates a web link node.
+-   **Embedded Custom Browser:** When you select a web link node, the editor opens a custom, full-bleed web browser interface under the document toolbar. It supports external websites as well as local development servers (`localhost`, `127.0.0.1`), popup windows, and provides a built-in error recovery screen.
 -   **Toolbar Navigation & Controls:** The browser includes controls to navigate back and forward, reload the page, and open the active page in your system's default browser.
 -   **Editable Address Bar:** You can double-click or focus the browser's address bar to directly type a new URL and press `Enter` to navigate.
 -   **Manual Versioning ("Save Location"):** As you navigate within the webview, if the URL changes, the "Save Location" (floppy disk) icon lights up. Click it to manually save the current navigated URL into the database, generating a new document version that preserves your browsing location.

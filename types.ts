@@ -400,6 +400,7 @@ export interface Document {
   current_version_id: number | null;
   // Client-side property, holds content of current version
   content?: string;
+  version?: number | null;
 }
 
 export interface ContentStore {
@@ -440,6 +441,8 @@ export interface DocumentOrFolder {
   doc_type_source?: ClassificationSource | null;
   classification_updated_at?: string | null;
   searchSnippet?: string;
+  current_version_id?: number | null;
+  version?: number | null;
 }
 
 export interface SerializedNodeForTransfer {

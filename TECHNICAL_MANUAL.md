@@ -96,29 +96,35 @@ This is the core data persistence layer, replacing the old JSON file system.
 
 This system provides a consistent and extensible editing experience for all document types. It is built on a decoupled, modular architecture.
 
--   **`monacoEditorPool.ts`:** A singleton service that manages a single, shared Monaco Editor instance inside a persistent offscreen container. It caches `ITextModel` instances and view states (scroll positions and selection ranges) keyed by document ID to make tab switching instantaneous and minimize memory usage.
--   **`CodeEditor.tsx`:** A React component that acts as the container/view for the shared Monaco Editor. It mounts the pooled editor container into its DOM node on activation, dynamically registers/disposes of event listeners and actions, and tells the pool to switch to the active document.
+-   **`monacoEditorPool.ts`:** A singleton service that manages a single, shared Monaco Editor instance inside a persistent offscreen container. It caches `ITextModel` instances and view states (scroll positions and selection ranges) keyed by document ID to make tab switching instantaneous and minimize memory usage. Enables `mouseWheelZoom: true` for direct Ctrl+Wheel scaling.
+-   **`CodeEditor.tsx`:** A React component that acts as the container/view for the shared Monaco Editor. It mounts the pooled editor container into its DOM node on activation, dynamically registers/disposes of event listeners and actions, and updates editor font scaling options smoothly without triggering teardown/recreation of Monaco models.
 -   **`PreviewPane.tsx`:** This component is responsible for displaying the rendered output of a document. It debounces content updates for performance and uses the `PreviewService` to get the correct output.
 -   **`services/previewService.ts`:** This service acts as a registry for all available renderer "plugins." It exposes a method, `getRendererForLanguage()`, which finds and returns the appropriate renderer for a given language ID (e.g., 'markdown').
 -   **Renderer Plugins (`services/preview/`):** Each file format with a preview is supported by a dedicated renderer class that implements the `IRenderer` interface. This makes the system highly extensible: to support a new format, one only needs to create a new renderer class and add it to the `previewService` registry. The bundled plugins cover Markdown (with Mermaid + PlantUML support), standalone PlantUML documents, HTML, PDFs, common image formats, and a plaintext fallback renderer.
     -   Both the Markdown renderer and the standalone PlantUML renderer share the `PlantUMLDiagram` component, which routes diagrams through either the remote plantuml.com server or the offline Java-based IPC bridge depending on the active setting.
+    -   `ZoomPanContainer.tsx` handles responsive zooming with passive-event compliance (`{ passive: false }`) to ensure flawless Ctrl+Wheel zooming across image and document previews.
 
 ### Embedded Web Browser (Web Links)
 
 This system handles loading external web content within the desktop application in a secure, performant, and full-bleed layout.
 
 -   **`webviewTag` Enablement:** Enforced secure, sandboxed browsing by enabling `webviewTag: true` in the Electron main process window options (`electron/main.ts`).
--   **`EmbeddedBrowser.tsx`:** A React component that manages the custom web browser UI. It renders standard navigation controls (Back, Forward, Reload), an editable address bar, and the Electron `<webview>` tag.
+-   **Navigation Scoping:** Main window `will-navigate` event listeners in `electron/main.ts` are strictly scoped to the primary window frame, preventing guest `<webview>` navigations from being erroneously intercepted.
+-   **Certificate Handling:** Added `app.on('certificate-error')` handling in `electron/main.ts` to permit self-signed SSL certificates for `localhost` and `127.0.0.1`, allowing local development servers to load without white screens.
+-   **`EmbeddedBrowser.tsx`:** A React component that manages the custom web browser UI. It renders standard navigation controls (Back, Forward, Reload), an editable address bar, popup enablement (`allowpopups`), and the Electron `<webview>` tag, along with a dedicated error recovery state.
 -   **URL Versioning:** Detects when the user navigates to a new page within the guest process. The toolbar highlights the "Save Location" button, allowing users to manually save the current navigated URL into the `content` field of the document, creating a new version entry.
--   **Drag & Drop Parsing (`dragDropUtils.ts`):** Centralizes URL detection from external drag payloads. It parses formats such as `text/uri-list`, `URL`, `url`, `text/html`, and text fallbacks, automatically creating a document node of type `'weblink'` with a clean title derived from the hostname and path.
+-   **Drag & Drop Hardening (`dragDropUtils.ts`):** Centralizes URL detection from external drag payloads (`text/uri-list`, `URL`, `text/html`, and text fallbacks). Safely bounds payload sizes to 32 KB, uses native `DOMParser` instead of catastrophic backtracking regexes, and validates schemes before creating web link nodes.
 -   **Bypassing Indexing:** Integrates database-level checks to exclude `'weblink'` nodes from the vector indexing pipeline, avoiding indexing overhead on dynamic website content.
 
-### Document Export Service (`services/documentExportService.ts`)
+### Document Export Architecture (`services/documentExportService.ts`)
 
-The export service centralizes all logic for saving documents to disk.
+The export architecture centralizes all logic for saving documents to disk, supporting single-format and multi-format document workflows.
 
 -   **Extension Inference:** It inspects the document's type, Monaco language hint, and any embedded MIME metadata to choose the best file extension. Titles are sanitized and de-duplicated so the suggested filename is always valid.
--   **Payload Preparation:** Text documents are serialized with UTF-8 defaults, while PDFs and images are decoded from data URLs or base64 strings into `Uint8Array` buffers before saving.
+-   **Multi-Format PlantUML Export (`services/plantumlExportService.ts`):** Renders PlantUML diagrams to SVG via local Electron Java IPC or remote service, and provides a canvas-based rasterizer (`svgToRasterBytes`) to output 2x-scaled high-resolution PNG (transparent background) and JPEG (white background) files.
+-   **Markdown Standalone HTML Export (`services/markdownHtmlExportService.ts`):** Transforms Markdown documents into self-contained HTML documents with embedded CSS rules for tables, blockquotes, code blocks, and responsive typography, operating completely offline.
+-   **Direct Export Helper (`exportDocumentDirectly`):** Provides a reusable primitive for format-specific exports with dedicated file dialog filters.
+-   **Export Dropdown Component (`components/ExportDocumentMenu.tsx`):** Displays a contextual dropdown in the editor toolbar offering format choices when viewing PlantUML or Markdown documents, or direct export for standard files.
 -   **Renderer Integration:** Renderer components call `handleSaveNodeToFile()` which delegates to the export service. In Electron builds the payload is sent over IPC to `electron/main.ts`, which opens a native save dialog and streams the bytes. Browser builds fall back to programmatically triggering a download with the correct MIME type.
 -   **Cancellation Handling:** If a user dismisses the save dialog, the service returns a `canceled` result that callers treat as a no-op so logs and notifications stay quiet.
 ### Script Execution Pipeline

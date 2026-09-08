@@ -6,6 +6,8 @@ import { PdfRenderer } from './preview/pdfRenderer';
 import { ImageRenderer } from './preview/imageRenderer';
 import { PlantUMLRenderer } from './preview/plantumlRenderer';
 
+import type { DocType } from '../types';
+
 class PreviewService {
   private renderers: IRenderer[];
 
@@ -22,14 +24,28 @@ class PreviewService {
   }
 
   /**
-   * Finds the first available renderer that can handle the given language ID.
-   * @param languageId The language identifier (e.g., 'markdown', 'html').
+   * Finds the first available renderer that can handle the given language ID, content, and docType.
+   * @param languageId The language identifier (e.g., 'markdown', 'html', 'xml').
+   * @param content The raw content of the document.
+   * @param docType The document classification type (e.g., 'image', 'pdf').
    * @returns The appropriate renderer instance.
    */
-  getRendererForLanguage(languageId: string | null | undefined): IRenderer {
+  getRendererForLanguage(
+    languageId: string | null | undefined,
+    content?: string,
+    docType?: DocType,
+  ): IRenderer {
+    if (docType === 'image') {
+      const imageRenderer = this.renderers.find((r) => r instanceof ImageRenderer);
+      if (imageRenderer) return imageRenderer;
+    }
+    if (docType === 'pdf') {
+      const pdfRenderer = this.renderers.find((r) => r instanceof PdfRenderer);
+      if (pdfRenderer) return pdfRenderer;
+    }
     const lang = languageId || 'plaintext';
     // The fallback PlaintextRenderer will always be found if no other renderer matches.
-    return this.renderers.find(r => r.canRender(lang))!;
+    return this.renderers.find((r) => r.canRender(lang, content))!;
   }
 }
 

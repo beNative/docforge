@@ -112,37 +112,54 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     return unregister;
   }, [previewZoom, setOffset]);
 
-  const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    if (disablePan && disableZoom) {
-      return;
-    }
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-    if (!disableZoom && (event.ctrlKey || event.metaKey)) {
-      event.preventDefault();
-      const { deltaY } = normalizeWheelDelta(event);
-      if (deltaY === 0) {
+    const onWheelNative = (event: WheelEvent) => {
+      if (disablePan && disableZoom) {
         return;
       }
-      const direction = deltaY > 0 ? -1 : 1;
-      const magnitude = Math.min(Math.abs(deltaY) / 300, 1.5);
-      const stepCount = Math.max(1, Math.round(magnitude));
-      const deltaScale = effectiveZoomStep * stepCount;
-      const nextScale = direction > 0
-        ? scaleRef.current + deltaScale
-        : scaleRef.current - deltaScale;
-      setScale(nextScale);
-      return;
-    }
 
-    if (!disablePan) {
-      event.preventDefault();
-      const { deltaX, deltaY } = normalizeWheelDelta(event);
-      const scale = scaleRef.current || 1;
-      setOffset((prev) => ({
-        x: prev.x - deltaX / scale,
-        y: prev.y - deltaY / scale,
-      }));
-    }
+      if (!disableZoom && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        const lineHeight = 16;
+        const pageHeight = el.clientHeight || 800;
+        const s = event.deltaMode === 1 ? lineHeight : event.deltaMode === 2 ? pageHeight : 1;
+        const deltaY = event.deltaY * s;
+        if (deltaY === 0) {
+          return;
+        }
+        const direction = deltaY > 0 ? -1 : 1;
+        const magnitude = Math.min(Math.abs(deltaY) / 300, 1.5);
+        const stepCount = Math.max(1, Math.round(magnitude));
+        const deltaScale = effectiveZoomStep * stepCount;
+        const nextScale = direction > 0
+          ? scaleRef.current + deltaScale
+          : scaleRef.current - deltaScale;
+        setScale(nextScale);
+        return;
+      }
+
+      if (!disablePan) {
+        event.preventDefault();
+        const lineHeight = 16;
+        const pageHeight = el.clientHeight || 800;
+        const s = event.deltaMode === 1 ? lineHeight : event.deltaMode === 2 ? pageHeight : 1;
+        const deltaX = event.deltaX * s;
+        const deltaY = event.deltaY * s;
+        const currentScale = scaleRef.current || 1;
+        setOffset((prev) => ({
+          x: prev.x - deltaX / currentScale,
+          y: prev.y - deltaY / currentScale,
+        }));
+      }
+    };
+
+    el.addEventListener('wheel', onWheelNative, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', onWheelNative);
+    };
   }, [disablePan, disableZoom, effectiveZoomStep, setOffset, setScale]);
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -305,7 +322,6 @@ const ZoomPanContainer = React.forwardRef<HTMLDivElement, ZoomPanContainerProps>
     <div
       ref={containerRef}
       className={containerClasses}
-      onWheel={handleWheel}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={endPan}

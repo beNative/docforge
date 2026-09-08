@@ -23,6 +23,8 @@ const nodeToDocumentOrFolder = (node: Node): DocumentOrFolder => ({
   language_source: node.document?.language_source,
   doc_type_source: node.document?.doc_type_source,
   classification_updated_at: node.document?.classification_updated_at,
+  current_version_id: node.document?.current_version_id ?? null,
+  version: node.document?.version ?? (node.document?.current_version_id ? 1 : null),
 });
 
 /**

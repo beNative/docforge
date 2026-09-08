@@ -20,9 +20,10 @@ interface MonacoDiffEditorProps {
   activeLineHighlightColorLight?: string;
   activeLineHighlightColorDark?: string;
   onFocusChange?: (hasFocus: boolean) => void;
+  onManualSave?: () => void;
 }
 
-const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark, onFocusChange }) => {
+const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, language, renderMode = 'side-by-side', readOnly = false, onChange, onScroll, fontFamily, fontSize, activeLineHighlightColorLight, activeLineHighlightColorDark, onFocusChange, onManualSave }) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const editorInstanceRef = useRef<any>(null);
     const monacoApiRef = useRef<any>(null);
@@ -169,6 +170,15 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
                         onFocusChange(false);
                     });
                 }
+
+                if (onManualSave) {
+                    modifiedEditor.addAction({
+                        id: 'docforge.diff.manualSave',
+                        label: 'Save Document Version',
+                        keybindings: [monacoApi.KeyMod.CtrlCmd | monacoApi.KeyCode.KeyS],
+                        run: () => onManualSave(),
+                    });
+                }
             } catch (error) {
                 // eslint-disable-next-line no-console
                 console.error('Failed to initialize Monaco diff editor', error);
@@ -180,7 +190,7 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
         return () => {
             isCancelled = true;
         };
-    }, [oldText, newText, language, theme, renderMode, readOnly, onChange, onScroll, disposeListeners, computedFontFamily, computedFontSize]);
+    }, [oldText, newText, language, theme, renderMode, readOnly, onChange, onScroll, disposeListeners, computedFontFamily, computedFontSize, onManualSave]);
 
     useEffect(() => {
         if (editorInstanceRef.current) {

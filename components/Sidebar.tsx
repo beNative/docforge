@@ -4,7 +4,7 @@ import DocumentList from './PromptList';
 import TemplateList from './TemplateList';
 import type { DocumentOrFolder, DocumentTemplate, Command, DraggedNodeTransfer } from '../types';
 import IconButton from './IconButton';
-import { FolderPlusIcon, PlusIcon, SearchIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, XIcon, FolderDownIcon, CopyIcon } from './Icons';
+import { FolderPlusIcon, PlusIcon, SearchIcon, ChevronDownIcon, ChevronRightIcon, ExpandAllIcon, CollapseAllIcon, XIcon, FolderDownIcon, CopyIcon, GlobeIcon } from './Icons';
 import { DocumentNode } from './PromptTreeItem';
 import { storageService } from '../services/storageService';
 import { LOCAL_STORAGE_KEYS } from '../constants';
@@ -33,6 +33,7 @@ interface SidebarProps {
   onDropFiles: (files: FileList, parentId: string | null) => void;
   onDropLink: (url: string, parentId: string | null) => void;
   onNewDocument: () => void;
+  onNewWebLink?: () => void;
   onNewRootFolder: () => void;
   onNewSubfolder: () => void;
   onNewFromClipboard: () => void;
@@ -110,6 +111,13 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
   const [templatesPanelHeight, setTemplatesPanelHeight] = useState(DEFAULT_TEMPLATES_PANEL_HEIGHT);
   const { addLog } = useLogger();
 
+  const activeNavigableItems = useMemo(() => {
+    if (isTemplatesCollapsed) {
+      return navigableItems.filter(item => item.type !== 'template');
+    }
+    return navigableItems;
+  }, [navigableItems, isTemplatesCollapsed]);
+
   const openDocumentIdSet = useMemo(() => new Set(props.openDocumentIds), [props.openDocumentIds]);
 
   const canCreateSubfolder = useMemo(() => {
@@ -128,7 +136,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         return;
       }
 
-      const firstNavigableItem = navigableItems[0];
+      const firstNavigableItem = activeNavigableItems[0];
       if (!firstNavigableItem) {
         return;
       }
@@ -152,30 +160,42 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
 
       sidebarRef.current?.focus();
     },
-    [navigableItems, onSelectNode, onSelectTemplate, setLastClickedId, setSelectedIds]
+    [activeNavigableItems, onSelectNode, onSelectTemplate, setLastClickedId, setSelectedIds]
   );
   const isResizingTemplates = useRef(false);
 
+  // When templates collapse, if focused item was a template, reset focus to active document or first active navigable item
+  useEffect(() => {
+    if (isTemplatesCollapsed && focusedItemId) {
+      const isTemplateFocused = navigableItems.some(item => item.id === focusedItemId && item.type === 'template');
+      if (isTemplateFocused) {
+        setFocusedItemId(props.activeNodeId || activeNavigableItems[0]?.id || null);
+      }
+    }
+  }, [isTemplatesCollapsed, focusedItemId, navigableItems, props.activeNodeId, activeNavigableItems]);
+
   // Effect to manage focus state
   useEffect(() => {
-    const activeItem = props.activeNodeId || props.activeTemplateId;
-    if (activeItem && navigableItems.some(item => item.id === activeItem)) {
+    const activeItem = props.activeNodeId || (!isTemplatesCollapsed ? props.activeTemplateId : null);
+    if (activeItem && activeNavigableItems.some(item => item.id === activeItem)) {
       if (focusedItemId !== activeItem) {
         setFocusedItemId(activeItem);
       }
       return;
     }
 
-    if (!focusedItemId || !navigableItems.some(item => item.id === focusedItemId)) {
-      setFocusedItemId(navigableItems[0]?.id || null);
+    if (!focusedItemId || !activeNavigableItems.some(item => item.id === focusedItemId)) {
+      setFocusedItemId(activeNavigableItems[0]?.id || null);
     }
-  }, [navigableItems, focusedItemId, props.activeNodeId, props.activeTemplateId]);
+  }, [activeNavigableItems, focusedItemId, props.activeNodeId, props.activeTemplateId, isTemplatesCollapsed]);
 
   // Effect to scroll focused item into view
   useEffect(() => {
     if (focusedItemId && sidebarRef.current) {
-      const element = sidebarRef.current.querySelector(`[data-item-id='${focusedItemId}']`);
-      element?.scrollIntoView({ block: 'nearest' });
+      const element = sidebarRef.current.querySelector(`[data-item-id='${focusedItemId}']`) as HTMLElement | null;
+      if (typeof element?.scrollIntoView === 'function') {
+        element.scrollIntoView({ block: 'nearest' });
+      }
     }
   }, [focusedItemId]);
 
@@ -315,7 +335,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       }
     }
 
-    if (navigableItems.length === 0) return;
+    if (activeNavigableItems.length === 0) return;
     const platform = typeof navigator !== 'undefined' ? navigator.platform ?? '' : '';
     const isMac = platform.toUpperCase().includes('MAC');
 
@@ -343,8 +363,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       e.stopPropagation();
       if (focusedItemId) {
         handleMoveUp(focusedItemId);
-      } else if (navigableItems.length > 0) {
-        handleMoveUp(navigableItems[0].id);
+      } else if (activeNavigableItems.length > 0) {
+        handleMoveUp(activeNavigableItems[0].id);
       }
       return;
     }
@@ -355,8 +375,8 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       e.stopPropagation();
       if (focusedItemId) {
         handleMoveDown(focusedItemId);
-      } else if (navigableItems.length > 0) {
-        handleMoveDown(navigableItems[0].id);
+      } else if (activeNavigableItems.length > 0) {
+        handleMoveDown(activeNavigableItems[0].id);
       }
       return;
     }
@@ -398,22 +418,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
     }
 
     const key = e.key;
-    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(key)) {
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Home', 'End', 'PageUp', 'PageDown', 'PgUp', 'PgDn'].includes(key)) {
       return;
     }
 
     e.preventDefault();
-
-    const currentItem = navigableItems.find(item => item.id === focusedItemId);
-
-    if (!currentItem) {
-      if (navigableItems.length > 0) {
-        setFocusedItemId(navigableItems[0].id);
-      }
-      return;
-    }
-
-    const currentIndex = navigableItems.indexOf(currentItem);
 
     const selectItem = (
       item: NavigableItem,
@@ -433,20 +442,68 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
       props.onSelectNode(item.id, syntheticEvent);
     };
 
+    const currentItem = activeNavigableItems.find(item => item.id === focusedItemId);
+
+    if (!currentItem) {
+      if (activeNavigableItems.length > 0) {
+        const targetIndex = key === 'End' ? activeNavigableItems.length - 1 : 0;
+        const targetItem = activeNavigableItems[targetIndex];
+        setSelectedIds(new Set([targetItem.id]));
+        setLastClickedId(targetItem.id);
+        setFocusedItemId(targetItem.id);
+        selectItem(targetItem);
+      }
+      return;
+    }
+
+    const currentIndex = activeNavigableItems.indexOf(currentItem);
+
+    const getPageSize = (): number => {
+      if (sidebarRef.current && focusedItemId) {
+        const currentEl = sidebarRef.current.querySelector(`[data-item-id='${focusedItemId}']`) as HTMLElement | null;
+        const scrollContainer = currentEl?.closest('.overflow-y-auto') as HTMLElement | null;
+        if (scrollContainer && currentEl && currentEl.offsetHeight > 0) {
+          const visibleCount = Math.floor(scrollContainer.clientHeight / currentEl.offsetHeight);
+          return Math.max(1, visibleCount);
+        }
+      }
+      return 10;
+    };
+
     switch (key) {
       case 'ArrowUp':
-      case 'ArrowDown': {
-        const direction = key === 'ArrowUp' ? -1 : 1;
-        const nextIndex = Math.max(0, Math.min(navigableItems.length - 1, currentIndex + direction));
-        const newItem = navigableItems[nextIndex];
+      case 'ArrowDown':
+      case 'PageUp':
+      case 'PageDown':
+      case 'PgUp':
+      case 'PgDn':
+      case 'Home':
+      case 'End': {
+        let nextIndex = currentIndex;
+        if (key === 'ArrowUp') {
+          nextIndex = currentIndex - 1;
+        } else if (key === 'ArrowDown') {
+          nextIndex = currentIndex + 1;
+        } else if (key === 'Home') {
+          nextIndex = 0;
+        } else if (key === 'End') {
+          nextIndex = activeNavigableItems.length - 1;
+        } else if (key === 'PageUp' || key === 'PgUp') {
+          nextIndex = currentIndex - getPageSize();
+        } else if (key === 'PageDown' || key === 'PgDn') {
+          nextIndex = currentIndex + getPageSize();
+        }
+
+        nextIndex = Math.max(0, Math.min(activeNavigableItems.length - 1, nextIndex));
+        const newItem = activeNavigableItems[nextIndex];
 
         if (e.shiftKey) {
           const anchorId = lastClickedId || focusedItemId;
-          const anchorIndex = navigableItems.findIndex(i => i.id === anchorId);
+          const anchorIndex = activeNavigableItems.findIndex(i => i.id === anchorId);
           if (anchorIndex !== -1) {
             const start = Math.min(anchorIndex, nextIndex);
             const end = Math.max(anchorIndex, nextIndex);
-            const rangeIds = navigableItems.slice(start, end + 1).map(i => i.id);
+            const rangeIds = activeNavigableItems.slice(start, end + 1).map(i => i.id);
             setSelectedIds(new Set(rangeIds));
           }
         } else {
@@ -468,7 +525,7 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
         if (currentItem.type === 'folder' && props.expandedFolderIds.has(currentItem.id)) {
           props.onToggleExpand(currentItem.id);
         } else if (currentItem.parentId) {
-          const parentItem = navigableItems.find(item => item.id === currentItem.parentId);
+          const parentItem = activeNavigableItems.find(item => item.id === currentItem.parentId);
           if (parentItem) {
             setFocusedItemId(parentItem.id);
             selectItem(parentItem);
@@ -540,6 +597,11 @@ const Sidebar: React.FC<SidebarProps> = (props) => {
               <IconButton onClick={props.onNewDocument} tooltip={getTooltip('new-document', 'New Document')} size="xs" tooltipPosition="bottom">
                 <PlusIcon className="w-4 h-4" />
               </IconButton>
+              {props.onNewWebLink && (
+                <IconButton onClick={props.onNewWebLink} tooltip={getTooltip('new-weblink', 'New Web Link')} size="xs" tooltipPosition="bottom">
+                  <GlobeIcon className="w-4 h-4" />
+                </IconButton>
+              )}
               <IconButton
                 onClick={props.onNewSubfolder}
                 tooltip={canCreateSubfolder ? getTooltip('new-subfolder', 'New Subfolder') : 'Select a folder to add a subfolder'}

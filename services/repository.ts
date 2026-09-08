@@ -84,6 +84,7 @@ const createSampleBrowserState = (): BrowserState => {
         doc_type_source: 'user',
         classification_updated_at: now,
         current_version_id: versionId,
+        version: 1,
         content: sampleContent,
     };
 
@@ -109,6 +110,7 @@ const createSampleBrowserState = (): BrowserState => {
       doc_type_source: 'user',
       classification_updated_at: now,
       current_version_id: shellVersionId,
+      version: 1,
       content: shellContent,
     };
 
@@ -134,6 +136,7 @@ const createSampleBrowserState = (): BrowserState => {
       doc_type_source: 'user',
       classification_updated_at: now,
       current_version_id: powershellVersionId,
+      version: 1,
       content: powershellContent,
     };
 
@@ -368,6 +371,7 @@ const duplicateNodeRecursive = (state: BrowserState, node: Node, newParentId: st
         });
         if (clonedVersions.length > 0) {
             clonedNode.document.current_version_id = clonedVersions[clonedVersions.length - 1].version_id;
+            clonedNode.document.version = clonedVersions.length;
         } else if (clonedNode.document.content) {
             const versionId = state.nextVersionId++;
             clonedVersions.push({
@@ -378,6 +382,7 @@ const duplicateNodeRecursive = (state: BrowserState, node: Node, newParentId: st
                 content: clonedNode.document.content,
             });
             clonedNode.document.current_version_id = versionId;
+            clonedNode.document.version = 1;
         }
         state.docVersions[newDocumentId] = clonedVersions;
     }
@@ -652,6 +657,7 @@ export const repository = {
             SELECT
                 n.*,
                 d.document_id, d.doc_type, d.language_hint, d.language_source, d.doc_type_source, d.classification_updated_at, d.default_view_mode, d.current_version_id,
+                (SELECT COUNT(*) FROM doc_versions dv_count WHERE dv_count.document_id = d.document_id AND dv_count.version_id <= d.current_version_id) as version_number,
                 cs.text_content as content,
                 ps.env_id as python_env_id,
                 ps.auto_detect_env as python_auto_detect_env,
@@ -688,6 +694,7 @@ export const repository = {
                     classification_updated_at: record.classification_updated_at ?? null,
                     default_view_mode: record.default_view_mode,
                     current_version_id: record.current_version_id,
+                    version: record.version_number ? Number(record.version_number) : (record.current_version_id ? 1 : null),
                     content: record.content,
                 } : undefined,
                 pythonSettings: record.python_env_id !== null || record.python_auto_detect_env !== null || record.python_last_run_id !== null ? {
@@ -1056,7 +1063,7 @@ export const repository = {
         }
     },
 
-    async updateDocumentContent(nodeId: string, newContent: string, documentId?: number) {
+    async updateDocumentContent(nodeId: string, newContent: string, documentId?: number): Promise<{ versionId: number; versionNumber: number; updatedAt: string }> {
         if (!isElectron) {
             const state = ensureBrowserState();
             const { node } = findNodeWithParent(nodeId, state.nodes);
@@ -1084,8 +1091,10 @@ export const repository = {
                 content: newContent,
             });
             state.docVersions[docId] = versions;
+            const versionNumber = versions.length;
+            node.document.version = versionNumber;
             persistBrowserState(state);
-            return;
+            return { versionId, versionNumber, updatedAt: now };
         }
 
         const docRecord = await window.electronAPI!.dbGet(
@@ -1117,14 +1126,23 @@ export const repository = {
             contentId = res.lastInsertRowid;
         }
 
+        const now = new Date().toISOString();
         const versionRes = await window.electronAPI!.dbRun(
             'INSERT INTO doc_versions (document_id, created_at, content_id) VALUES (?, ?, ?)',
-            [docId, new Date().toISOString(), contentId]
+            [docId, now, contentId]
         );
-        const newVersionId = versionRes.lastInsertRowid;
+        const newVersionId = Number(versionRes.lastInsertRowid);
 
         await window.electronAPI!.dbRun('UPDATE documents SET current_version_id = ? WHERE document_id = ?', [newVersionId, docId]);
-        await window.electronAPI!.dbRun('UPDATE nodes SET updated_at = ? WHERE node_id = ?', [new Date().toISOString(), nodeId]);
+        await window.electronAPI!.dbRun('UPDATE nodes SET updated_at = ? WHERE node_id = ?', [now, nodeId]);
+
+        const countRes = await window.electronAPI!.dbGet(
+            'SELECT COUNT(*) as count FROM doc_versions WHERE document_id = ? AND version_id <= ?',
+            [docId, newVersionId]
+        );
+        const versionNumber = Number(countRes?.count ?? 1);
+
+        return { versionId: newVersionId, versionNumber, updatedAt: now };
     },
 
     async setNodeLock(nodeId: string, locked: boolean) {

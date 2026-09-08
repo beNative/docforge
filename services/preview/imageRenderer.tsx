@@ -88,8 +88,8 @@ const detectMimeFromBytes = (bytes: Uint8Array): SupportedImageType | null => {
 
   try {
     const decoder = new TextDecoder('utf-8', { fatal: false });
-    const sample = decoder.decode(bytes.slice(0, 120)).trim().toLowerCase();
-    if (sample.startsWith('<svg')) {
+    const sample = decoder.decode(bytes.slice(0, 500)).trim().toLowerCase();
+    if (/<svg[\s>]/i.test(sample)) {
       return 'image/svg+xml';
     }
   } catch {
@@ -132,8 +132,22 @@ const createBlobUrlFromText = (input: string, hintedType: SupportedImageType | n
     const blob = new Blob([input], { type: mimeType });
     return { url: URL.createObjectURL(blob), isBlobUrl: true, mimeType };
   } catch {
-    return { url: null as string | null, isBlobUrl: false, mimeType };
+    try {
+      return {
+        url: `data:${mimeType};charset=utf-8,${encodeURIComponent(input)}`,
+        isBlobUrl: false,
+        mimeType,
+      };
+    } catch {
+      return { url: null as string | null, isBlobUrl: false, mimeType };
+    }
   }
+};
+
+export const isSvgContent = (content: string | null | undefined): boolean => {
+  if (!content) return false;
+  const trimmed = content.trim();
+  return trimmed.startsWith('data:image/svg+xml') || /<svg[\s>]/i.test(trimmed);
 };
 
 interface ImagePreviewProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -143,6 +157,7 @@ interface ImagePreviewProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const ImagePreview = React.forwardRef<HTMLDivElement, ImagePreviewProps>(({ content, className, languageId, onMetadataChange, ...rest }, ref) => {
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const { url, error, isBlobUrl, mimeType } = useMemo(() => {
     const trimmed = content.trim();
@@ -165,8 +180,18 @@ const ImagePreview = React.forwardRef<HTMLDivElement, ImagePreviewProps>(({ cont
       return { url: trimmed, error: null, isBlobUrl: false, mimeType: hintedType };
     }
 
-    if (trimmed.startsWith('<svg')) {
-      return { ...createBlobUrlFromText(trimmed, 'image/svg+xml'), error: null };
+    const isSvg =
+      hintedType === 'image/svg+xml' ||
+      (languageId && ['svg', 'svg+xml', 'image/svg', 'image/svg+xml'].includes(languageId.toLowerCase())) ||
+      /<svg[\s>]/i.test(trimmed);
+
+    if (isSvg) {
+      let svgText = trimmed;
+      // Ensure the root <svg> element has the xmlns="http://www.w3.org/2000/svg" attribute
+      if (!/xmlns\s*=\s*['"]http:\/\/www\.w3\.org\/2000\/svg['"]/i.test(svgText)) {
+        svgText = svgText.replace(/<svg\b([^>]*)>/i, '<svg$1 xmlns="http://www.w3.org/2000/svg">');
+      }
+      return { ...createBlobUrlFromText(svgText, 'image/svg+xml'), error: null };
     }
 
     const char0 = trimmed.charCodeAt(0);
@@ -209,6 +234,10 @@ const ImagePreview = React.forwardRef<HTMLDivElement, ImagePreviewProps>(({ cont
   }, [content, languageId]);
 
   useEffect(() => {
+    setLoadError(null);
+  }, [url]);
+
+  useEffect(() => {
     return () => {
       if (isBlobUrl && url) {
         URL.revokeObjectURL(url);
@@ -237,17 +266,20 @@ const ImagePreview = React.forwardRef<HTMLDivElement, ImagePreviewProps>(({ cont
   };
 
   const handleImageError = () => {
+    setLoadError('Unable to display the stored image. The image data or SVG may be malformed.');
     onMetadataChange?.(null);
   };
 
-  if (error) {
+  const displayError = error || loadError;
+
+  if (displayError) {
     return (
       <div
         ref={ref}
         className={`w-full h-full flex items-center justify-center text-text-secondary text-sm ${className ?? ''}`}
         {...rest}
       >
-        {error}
+        {displayError}
       </div>
     );
   }
@@ -308,9 +340,15 @@ export class ImageRenderer implements IRenderer {
     'image/svg+xml',
   ];
 
-  canRender(languageId: string): boolean {
+  canRender(languageId: string, content?: string): boolean {
     const normalized = languageId.toLowerCase();
-    return this.supportedIds.includes(normalized);
+    if (this.supportedIds.includes(normalized)) {
+      return true;
+    }
+    if ((normalized === 'xml' || normalized === 'plaintext') && content) {
+      return isSvgContent(content);
+    }
+    return false;
   }
 
   async render(

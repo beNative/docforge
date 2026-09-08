@@ -726,12 +726,25 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (event.sender !== mainWindow?.webContents) {
+      return;
+    }
     if (url !== mainWindow?.webContents.getURL() && (url.startsWith('http:') || url.startsWith('https:'))) {
       const isLocalhost = url.includes('localhost:') || url.includes('127.0.0.1:');
       if (!isLocalhost) {
         event.preventDefault();
         shell.openExternal(url);
       }
+    }
+  });
+
+  // Handle self-signed certificates gracefully for localhost dev servers
+  app.on('certificate-error', (event, _webContents, url, _error, _certificate, callback) => {
+    if (url.startsWith('https://localhost') || url.startsWith('https://127.0.0.1')) {
+      event.preventDefault();
+      callback(true);
+    } else {
+      callback(false);
     }
   });
 

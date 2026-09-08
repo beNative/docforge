@@ -247,7 +247,7 @@ const determineExtension = (doc: DocumentOrFolder): string => {
           return extension;
         }
       }
-      if (/^<svg[\s>]/i.test(content)) {
+      if (/<svg[\s>]/i.test(content)) {
         return 'svg';
       }
     }
@@ -309,7 +309,7 @@ const preparePayload = (doc: DocumentOrFolder, extension: string): DocumentExpor
     if (decoded) {
       return { kind: 'binary', data: decoded.bytes, mimeType: decoded.mimeType };
     }
-    if (/^<svg[\s>]/i.test(trimmed)) {
+    if (/<svg[\s>]/i.test(trimmed)) {
       return { kind: 'text', data: trimmed, encoding: 'utf-8', mimeType: 'image/svg+xml' };
     }
     if (isLikelyBase64(trimmed)) {
@@ -335,7 +335,7 @@ const triggerBrowserDownload = (filename: string, payload: DocumentExportPayload
   const mimeType = payload.mimeType ?? (payload.kind === 'text' ? TEXT_MIME_DEFAULT : 'application/octet-stream');
   const blob = payload.kind === 'text'
     ? new Blob([payload.data], { type: mimeType })
-    : new Blob([payload.data], { type: mimeType });
+    : new Blob([payload.data as BlobPart], { type: mimeType });
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -353,6 +353,64 @@ export const exportDocumentToFile = async (doc: DocumentOrFolder): Promise<Docum
   const defaultFileName = extension ? `${strippedTitle}.${extension}` : strippedTitle;
   const filters = buildFilters(extension, doc.doc_type as DocType | undefined);
   const payload = preparePayload(doc, extension);
+
+  if (window.electronAPI?.saveDocument) {
+    const result = await window.electronAPI.saveDocument(
+      {
+        defaultPath: defaultFileName,
+        filters,
+        title: 'Save Document',
+      },
+      toElectronPayload(payload)
+    );
+
+    if (!result.success) {
+      if (result.canceled) {
+        return { success: false, canceled: true, filePath: undefined, suggestedFileName: defaultFileName, extension };
+      }
+      throw new Error(result.error || 'Failed to save document to file.');
+    }
+
+    return {
+      success: true,
+      canceled: false,
+      filePath: result.filePath ?? null,
+      suggestedFileName: defaultFileName,
+      extension,
+    };
+  }
+
+  triggerBrowserDownload(defaultFileName, payload);
+  return { success: true, canceled: false, filePath: null, suggestedFileName: defaultFileName, extension };
+};
+
+export interface DirectExportOptions {
+  format: string;
+  data: string | Uint8Array;
+  isBinary: boolean;
+  mimeType?: string;
+  fileFilterName?: string;
+  extension: string;
+  suggestedFileName?: string;
+}
+
+export const exportDocumentDirectly = async (
+  doc: DocumentOrFolder,
+  options: DirectExportOptions
+): Promise<DocumentExportResult> => {
+  const extension = options.extension.toLowerCase();
+  const baseTitle = sanitizeFileName(doc.title ?? '');
+  const strippedTitle = stripExtension(baseTitle, extension);
+  const defaultFileName = options.suggestedFileName || (extension ? `${strippedTitle}.${extension}` : strippedTitle);
+  const filterLabel = options.fileFilterName ? `${options.fileFilterName} (*.${extension})` : `${extension.toUpperCase()} Files (*.${extension})`;
+  const filters: FileFilter[] = [
+    { name: filterLabel, extensions: [extension] },
+    { name: 'All Files', extensions: ['*'] },
+  ];
+
+  const payload: DocumentExportPayload = options.isBinary
+    ? { kind: 'binary', data: options.data as Uint8Array, mimeType: options.mimeType }
+    : { kind: 'text', data: options.data as string, encoding: 'utf-8', mimeType: options.mimeType };
 
   if (window.electronAPI?.saveDocument) {
     const result = await window.electronAPI.saveDocument(

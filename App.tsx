@@ -22,7 +22,7 @@ import UpdateNotification from './components/UpdateNotification';
 import CreateFromTemplateModal from './components/CreateFromTemplateModal';
 import DocumentHistoryView from './components/PromptHistoryView';
 import FolderOverview, { type FolderOverviewMetrics, type FolderSearchResult, type RecentDocumentSummary, type DocTypeCount, type LanguageCount } from './components/FolderOverview';
-import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon, SearchIcon, RefreshIcon, HistoryIcon, UndoIcon, LayoutVerticalIcon } from './components/Icons';
+import { PlusIcon, FolderPlusIcon, TrashIcon, GearIcon, InfoIcon, TerminalIcon, DocumentDuplicateIcon, PencilIcon, CopyIcon, CommandIcon, CodeIcon, FolderDownIcon, FormatIcon, SparklesIcon, SaveIcon, CheckIcon, DatabaseIcon, ExpandAllIcon, CollapseAllIcon, ArrowUpIcon, ArrowDownIcon, LockClosedIcon, LockOpenIcon, SearchIcon, RefreshIcon, HistoryIcon, UndoIcon, LayoutVerticalIcon, GlobeIcon } from './components/Icons';
 import AboutModal from './components/AboutModal';
 import ConflictResolutionModal from './components/ConflictResolutionModal';
 import Header from './components/Header';
@@ -31,10 +31,13 @@ import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
+import NewWebLinkModal from './components/NewWebLinkModal';
 import type { DocumentOrFolder, Command, LogMessage, DiscoveredLLMModel, DiscoveredLLMService, Settings, DocumentTemplate, ViewMode, DocType, DraggedNodeTransfer, UpdateAvailableInfo, PreviewMetadata, DocumentCommandTriggers } from './types';
 import { IconProvider } from './contexts/IconContext';
 import { storageService } from './services/storageService';
 import { exportDocumentToFile } from './services/documentExportService';
+import { exportMarkdownAsHtml, isMarkdownDocument } from './services/markdownHtmlExportService';
+import { exportPlantUmlDocument, isPlantUMLDocument, type PlantUmlExportFormat } from './services/plantumlExportService';
 import { llmDiscoveryService } from './services/llmDiscoveryService';
 import { llmService } from './services/llmService';
 import { LOCAL_STORAGE_KEYS, DEFAULT_SETTINGS } from './constants';
@@ -212,6 +215,8 @@ export const MainApp: React.FC = () => {
     const [isCreateFromTemplateOpen, setCreateFromTemplateOpen] = useState(false);
     const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
     const [isNewCodeFileModalOpen, setIsNewCodeFileModalOpen] = useState(false);
+    const [isNewWebLinkModalOpen, setIsNewWebLinkModalOpen] = useState(false);
+    const [newWebLinkParentId, setNewWebLinkParentId] = useState<string | null>(null);
     const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
     const [loggerPanelHeight, setLoggerPanelHeight] = useState(DEFAULT_LOGGER_HEIGHT);
     const [isChatPanelVisible, setIsChatPanelVisible] = useState(false);
@@ -312,6 +317,12 @@ export const MainApp: React.FC = () => {
 
     const handlePreviewScaleChange = useCallback((value: number) => {
         setPreviewScale(clampZoomScale(value));
+        setWorkspaceZoomTarget('preview');
+    }, [clampZoomScale]);
+
+    const handleEditorScaleChange = useCallback((value: number) => {
+        setEditorScale(clampZoomScale(value));
+        setWorkspaceZoomTarget('editor');
     }, [clampZoomScale]);
 
     const handlePreviewZoomIn = useCallback(() => {
@@ -634,7 +645,13 @@ export const MainApp: React.FC = () => {
     }, [isPreviewVisible, isPreviewZoomReady, view]);
 
     const editorZoomAvailable = useMemo(() => {
-        return view === 'editor' && documentView === 'editor' && Boolean(activeDocument);
+        if (view !== 'editor' || documentView !== 'editor' || !activeDocument) {
+            return false;
+        }
+        if (activeDocument.doc_type === 'image' || activeDocument.doc_type === 'pdf' || activeDocument.doc_type === 'weblink') {
+            return false;
+        }
+        return true;
     }, [activeDocument, documentView, view]);
 
     useEffect(() => {
@@ -991,7 +1008,7 @@ export const MainApp: React.FC = () => {
         void handleCopyNodeContent(doc.id);
     }, [items, selectedIds, handleCopyNodeContent]);
 
-    const handleSaveNodeToFile = useCallback(async (nodeId: string) => {
+    const handleSaveNodeToFile = useCallback(async (nodeId: string, format?: 'html' | PlantUmlExportFormat) => {
         const item = items.find(p => p.id === nodeId);
         if (!item) {
             addLog('WARNING', 'Cannot save an unknown item to a file.');
@@ -1004,7 +1021,15 @@ export const MainApp: React.FC = () => {
         }
 
         try {
-            const result = await exportDocumentToFile(item);
+            let result;
+            if (format === 'html') {
+                result = await exportMarkdownAsHtml(item);
+            } else if (format === 'puml' || format === 'png' || format === 'svg' || format === 'jpg') {
+                result = await exportPlantUmlDocument(item, format);
+            } else {
+                result = await exportDocumentToFile(item);
+            }
+
             if (result.canceled) {
                 addLog('INFO', `Save to file canceled for document "${item.title}".`);
                 return;
@@ -2714,6 +2739,36 @@ export const MainApp: React.FC = () => {
         setIsNewCodeFileModalOpen(true);
     }, [addLog]);
 
+    const handleOpenNewWebLinkModal = useCallback((parentId: string | null = null) => {
+        addLog('INFO', 'User action: Open "New Web Link" modal.');
+        setNewWebLinkParentId(parentId);
+        setIsNewWebLinkModalOpen(true);
+    }, [addLog]);
+
+    const handleCreateWebLink = useCallback(async (url: string, suggestedTitle?: string) => {
+        const title = suggestedTitle || getCleanTitleFromUrl(url);
+        addLog('INFO', `User action: Creating web link "${url}" with title "${title}".`);
+        try {
+            const newDoc = await addDocument({
+                parentId: newWebLinkParentId,
+                title,
+                content: url,
+                doc_type: 'weblink',
+                language_hint: 'html'
+            });
+            ensureNodeVisible(newDoc);
+            activateDocumentTab(newDoc.id);
+            setSelectedIds(new Set([newDoc.id]));
+            setLastClickedId(newDoc.id);
+            setActiveTemplateId(null);
+            setDocumentView('editor');
+            setView('editor');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            addLog('ERROR', `Failed to create web link document: ${message}`);
+        }
+    }, [newWebLinkParentId, addDocument, ensureNodeVisible, activateDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, addLog]);
+
     const handleOpenAbout = useCallback(() => {
         addLog('INFO', 'User action: Opened About dialog.');
         setIsAboutModalOpen(true);
@@ -3005,6 +3060,7 @@ export const MainApp: React.FC = () => {
         { id: 'new-document', name: 'Create New Document', action: () => handleNewDocument(), category: 'File', icon: PlusIcon, shortcut: ['Control', 'N'], keywords: 'add create file' },
         { id: 'new-from-clipboard', name: 'New from Clipboard', action: () => { addLog('INFO', 'Command: New document from clipboard.'); void handleNewDocumentFromClipboard(); }, category: 'File', icon: CopyIcon, shortcut: ['Control', 'Alt', 'V'], keywords: 'clipboard import paste new' },
         { id: 'new-code-file', name: 'Create New Code File', action: handleOpenNewCodeFileModal, category: 'File', icon: CodeIcon, shortcut: ['Control', 'Shift', 'N'], keywords: 'add create script' },
+        { id: 'new-weblink', name: 'Create New Web Link', action: () => handleOpenNewWebLinkModal(null), category: 'File', icon: GlobeIcon, keywords: 'add create link html web url' },
         { id: 'new-folder', name: 'Create New Folder', action: handleNewRootFolder, category: 'File', icon: FolderPlusIcon, shortcut: ['Control', 'Alt', 'N'], keywords: 'add create directory' },
         { id: 'new-subfolder', name: 'Create New Subfolder', action: handleNewSubfolder, category: 'File', icon: FolderDownIcon, shortcut: ['Control', 'Alt', 'Shift', 'N'], keywords: 'add create directory child' },
         { id: 'new-template', name: 'Create New Template', action: handleNewTemplate, category: 'File', icon: DocumentDuplicateIcon, keywords: 'add create template' },
@@ -3039,7 +3095,7 @@ export const MainApp: React.FC = () => {
             setDocumentView('history');
         }, category: 'View', icon: HistoryIcon, keywords: 'history versions timeline restore' },
         { id: 'document-cancel-unsaved', name: 'Cancel Unsaved Changes', action: () => triggerDocumentCommand('cancelChanges', 'Command: Cancel unsaved document changes.', 'Canceling unsaved changes is only available when a document is open.'), category: 'Editor', icon: UndoIcon, keywords: 'cancel undo revert discard' },
-        { id: 'document-manual-save', name: 'Save Document Version', action: () => triggerDocumentCommand('manualSave', 'Command: Manually save a document version.', 'Manual saves are only available when a document is open.'), category: 'Editor', icon: SaveIcon, keywords: 'save version commit manual' },
+        { id: 'document-manual-save', name: 'Save Document Version', action: () => triggerDocumentCommand('manualSave', 'Command: Manually save a document version.', 'Manual saves are only available when a document is open.'), category: 'Editor', icon: SaveIcon, shortcut: ['Control', 'S'], keywords: 'save version commit manual' },
         { id: 'document-copy-active-content', name: 'Copy Active Document Content', action: () => triggerDocumentCommand('copyContent', 'Command: Copy active document content.', 'Copying document content is only available when a document is open.'), category: 'Editor', icon: CopyIcon, keywords: 'copy clipboard content editor' },
         { id: 'document-ai-refine', name: 'Refine Document with AI', action: () => triggerDocumentCommand('refineWithAI', 'Command: Request AI refinement of the document content.', 'AI refinement is only available when a document is open.'), category: 'Editor', icon: SparklesIcon, keywords: 'ai refine improve suggestions' },
         { id: 'toggle-command-palette', name: 'Toggle Command Palette', action: handleToggleCommandPalette, category: 'View', icon: CommandIcon, shortcut: ['Control', 'Shift', 'P'], keywords: 'find action go to' },
@@ -3049,7 +3105,7 @@ export const MainApp: React.FC = () => {
         { id: 'open-about', name: 'About DocForge', action: handleOpenAbout, category: 'Help', icon: SparklesIcon, keywords: 'about credits information' },
         { id: 'toggle-logs', name: 'Toggle Logs Panel', action: () => { addLog('INFO', 'Command: Toggle Logs Panel.'); setIsLoggerVisible(v => !v); }, category: 'View', icon: TerminalIcon, keywords: 'debug console' },
         { id: 'toggle-chat', name: 'Toggle Chat Panel', action: () => { addLog('INFO', 'Command: Toggle Chat Panel.'); setIsChatPanelVisible(v => !v); }, category: 'View', icon: SearchIcon, keywords: 'rag workspace ask question ai' },
-    ], [handleNewDocument, handleOpenNewCodeFileModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleFocusDocumentTreeSearch, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock, triggerDocumentCommand, view, setDocumentView]);
+    ], [handleNewDocument, handleOpenNewCodeFileModal, handleOpenNewWebLinkModal, handleNewRootFolder, handleNewSubfolder, handleDeleteSelection, handleNewTemplate, toggleSettingsView, handleDuplicateSelection, handleRenameSelection, selectedIds, addLog, handleToggleCommandPalette, handleFormatDocument, handleOpenAbout, handleNewDocumentFromClipboard, handleDocumentTreeSelectAll, handleFocusDocumentTreeSearch, handleExpandAll, handleCollapseAll, handleMoveSelectionUp, handleMoveSelectionDown, handleCopySelectionContent, handleSaveSelectionToFile, activeDocument?.locked, handleToggleActiveDocumentLock, triggerDocumentCommand, view, setDocumentView]);
 
     const enrichedCommands = useMemo(() => {
       return commands.map(command => {
@@ -3098,6 +3154,7 @@ export const MainApp: React.FC = () => {
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(parentIdForNewItem), shortcut: getCommand('new-document')?.shortcutString },
                 { label: 'New from Clipboard', icon: CopyIcon, action: () => { void handleNewDocumentFromClipboard(parentIdForNewItem); }, shortcut: getCommand('new-from-clipboard')?.shortcutString },
                 { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
+                { label: 'New Web Link', icon: GlobeIcon, action: () => handleOpenNewWebLinkModal(parentIdForNewItem), shortcut: getCommand('new-weblink')?.shortcutString },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(parentIdForNewItem), shortcut: getCommand('new-folder')?.shortcutString },
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString },
                 { type: 'separator' },
@@ -3113,6 +3170,14 @@ export const MainApp: React.FC = () => {
                 { type: 'separator' },
                 { label: 'Copy Content', icon: CopyIcon, action: () => primaryDocument && handleCopyNodeContent(primaryDocument.id), disabled: !primaryDocument},
                 { label: 'Save to File…', icon: SaveIcon, action: () => { if (primaryDocument) { void handleSaveNodeToFile(primaryDocument.id); } }, disabled: !primaryDocument, shortcut: getCommand('document-tree-save-to-file')?.shortcutString },
+                ...(primaryDocument && isMarkdownDocument(primaryDocument) ? [
+                    { label: 'Save as HTML…', icon: GlobeIcon, action: () => { void handleSaveNodeToFile(primaryDocument.id, 'html'); } }
+                ] : []),
+                ...(primaryDocument && isPlantUMLDocument(primaryDocument) ? [
+                    { label: 'Save as PNG…', icon: SaveIcon, action: () => { void handleSaveNodeToFile(primaryDocument.id, 'png'); } },
+                    { label: 'Save as SVG…', icon: SaveIcon, action: () => { void handleSaveNodeToFile(primaryDocument.id, 'svg'); } },
+                    { label: 'Save as JPEG…', icon: SaveIcon, action: () => { void handleSaveNodeToFile(primaryDocument.id, 'jpg'); } },
+                ] : []),
                 { type: 'separator' },
                 { label: 'Delete', icon: TrashIcon, action: () => handleDeleteSelection(currentSelection), disabled: currentSelection.size === 0, shortcut: getCommand('delete-item')?.shortcutString }
             );
@@ -3121,6 +3186,7 @@ export const MainApp: React.FC = () => {
                 { label: 'New Document', icon: PlusIcon, action: () => handleNewDocument(null), shortcut: getCommand('new-document')?.shortcutString },
                 { label: 'New from Clipboard', icon: CopyIcon, action: () => { void handleNewDocumentFromClipboard(null); }, shortcut: getCommand('new-from-clipboard')?.shortcutString },
                 { label: 'New Code File', icon: CodeIcon, action: handleOpenNewCodeFileModal, shortcut: getCommand('new-code-file')?.shortcutString },
+                { label: 'New Web Link', icon: GlobeIcon, action: () => handleOpenNewWebLinkModal(null), shortcut: getCommand('new-weblink')?.shortcutString },
                 { label: 'New Folder', icon: FolderPlusIcon, action: () => handleNewFolder(null), shortcut: getCommand('new-folder')?.shortcutString },
                 { label: 'New from Template...', icon: DocumentDuplicateIcon, action: newFromTemplateAction, shortcut: getCommand('new-from-template')?.shortcutString }
             );
@@ -3131,7 +3197,7 @@ export const MainApp: React.FC = () => {
             position: { x: e.clientX, y: e.clientY },
             items: menuItems
         });
-    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile, handleSetNodeLockState, addToChatContextAction]);
+    }, [selectedIds, items, handleNewDocument, handleNewFolder, handleDuplicateSelection, handleDeleteSelection, handleCopyNodeContent, addLog, enrichedCommands, handleOpenNewCodeFileModal, handleOpenNewWebLinkModal, handleFormatDocument, handleStartRenamingNode, handleNewDocumentFromClipboard, handleSaveNodeToFile, handleSetNodeLockState, addToChatContextAction]);
 
 
     const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
@@ -3215,7 +3281,11 @@ export const MainApp: React.FC = () => {
 
         const handleKeyDown = (e: KeyboardEvent) => {
             const shortcut = formatShortcut(e);
-            const command = shortcutMap.get(shortcut);
+            let command = shortcutMap.get(shortcut);
+            if (!command && e.metaKey && !e.ctrlKey) {
+                const macMapped = formatShortcut({ ...e, ctrlKey: true, metaKey: false });
+                command = shortcutMap.get(macMapped);
+            }
 
             const activeEl = document.activeElement;
             const isFormElement = activeEl && ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl.tagName);
@@ -3223,8 +3293,9 @@ export const MainApp: React.FC = () => {
                 activeEl instanceof HTMLElement && Boolean(activeEl.closest('[data-component="rich-text-editor"]'));
             const isPaletteInput = activeEl === commandPaletteInputRef.current;
             const isCommandPaletteToggle = command?.id === 'toggle-command-palette';
+            const isManualSave = command?.id === 'document-manual-save';
 
-            if (isFormElement && !isPaletteInput && !isCommandPaletteToggle) {
+            if (isFormElement && !isPaletteInput && !isCommandPaletteToggle && !isManualSave) {
                 return;
             }
 
@@ -3335,6 +3406,7 @@ export const MainApp: React.FC = () => {
                         previewScale={previewScale}
                         editorScale={editorScale}
                         onPreviewScaleChange={handlePreviewScaleChange}
+                        onEditorScaleChange={handleEditorScaleChange}
                         previewMinScale={PREVIEW_MIN_SCALE}
                         previewMaxScale={PREVIEW_MAX_SCALE}
                         previewZoomStep={PREVIEW_ZOOM_STEP}
@@ -3445,6 +3517,7 @@ export const MainApp: React.FC = () => {
                                         onDropFiles={handleDropFiles}
                                         onDropLink={handleDropLink}
                                         onNewDocument={() => handleNewDocument()}
+                                        onNewWebLink={() => handleOpenNewWebLinkModal(null)}
                                         onNewRootFolder={handleNewRootFolder}
                                         onNewSubfolder={handleNewSubfolder}
                                         onNewFromClipboard={() => { void handleNewDocumentFromClipboard(); }}
@@ -3570,6 +3643,11 @@ export const MainApp: React.FC = () => {
                     llmProviderUrl={settings.llmProviderUrl}
                     documentCount={items.filter(i => i.type === 'document').length}
                     lastSaved={activeDocument?.updatedAt}
+                    documentVersion={activeDocument ? (activeDocument.version ?? (activeDocument.current_version_id ? activeDocument.current_version_id : null)) : null}
+                    onOpenDocumentHistory={activeDocument ? () => {
+                        if (view !== 'editor') setView('editor');
+                        setDocumentView('history');
+                    } : undefined}
                     availableModels={availableModels}
                     onModelChange={handleModelChange}
                     discoveredServices={discoveredServices}
@@ -3624,6 +3702,13 @@ export const MainApp: React.FC = () => {
                 <NewCodeFileModal
                     onClose={() => setIsNewCodeFileModalOpen(false)}
                     onCreate={handleNewCodeFile}
+                />
+            )}
+
+            {isNewWebLinkModalOpen && (
+                <NewWebLinkModal
+                    onClose={() => setIsNewWebLinkModalOpen(false)}
+                    onCreate={handleCreateWebLink}
                 />
             )}
 

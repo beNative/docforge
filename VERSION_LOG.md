@@ -2,6 +2,49 @@
 
 -   _No entries yet._
 
+## v0.9.6 - Multi-Format Export & Navigation Polish (September 2026)
+
+### ✨ Features
+
+- **PlantUML Multi-Format Export**:
+  - Export diagrams directly to **PNG**, **SVG**, **JPEG**, and **PUML** formats from the editor toolbar and document tree context menu.
+  - Leverages local Java PlantUML renderer in Electron with graceful fallback to official remote PlantUML server rendering.
+  - Generates crisp high-DPI (2x scale) raster images with transparent backgrounds for PNG and solid white backgrounds for JPEG.
+- **Markdown Standalone HTML Export**:
+  - Export Markdown documents as fully self-contained HTML files (`.html`) with embedded styles, responsive layout, tables, code block styling, and GitHub-inspired typography.
+  - Exports run completely offline with zero external web dependencies or fonts.
+- **Multi-Format Export Toolbar & Context Menus**:
+  - Added a smart export dropdown (`ExportDocumentMenu`) to the editor toolbar that adapts its options based on document type.
+  - Added format-specific export options to the document tree context menu (*Save as HTML...*, *Save as PNG...*, *Save as SVG...*, *Save as JPEG...*).
+- **Manual Web Link Creation**:
+  - Added a dedicated "New Web Link" modal (`NewWebLinkModal`) accessible via the sidebar toolbar (`GlobeIcon`), context menus, and the `new-weblink` command.
+  - Supports entering target URLs with automatic title derivation from URL paths and folder selection.
+- **Document Treeview Keyboard Navigation**:
+  - Added full navigation support for `Home`, `End`, `PageUp`, and `PageDown` keys in addition to existing arrow keys.
+  - Added multi-item range selection with `Shift+Home`, `Shift+End`, `Shift+PageUp`, and `Shift+PageDown`.
+- **Manual Save (Ctrl+S) Feedback**:
+  - `Ctrl+S` creates and commits a new version of the document to database history.
+  - Updated the toolbar save button to dynamically reflect dirty, saving (with animated spinner), and saved states (green checkmark and tooltip).
+- **Active Document Version in Status Bar**:
+  - Status bar now displays the active document's current version number (e.g. `v3`) directly beside the last save timestamp.
+
+### 🐛 Bug Fixes
+
+- **Template Keyboard Navigation when Collapsed**:
+  - Prevented keyboard navigation (`ArrowUp/Down`, `PgUp/PgDn`, `Home/End`) and search navigation from scrolling into template items when the Templates panel is collapsed. Focus automatically resets if templates are collapsed while a template item is selected.
+- **Drag-and-Drop HTML Link Freeze**:
+  - Hardened URL drop extraction against large or malicious HTML payloads by bounding inspect size to 32 KB, parsing with native `DOMParser` instead of unbounded regex patterns, and enforcing safe URI scheme validation.
+- **Embedded Browser Localhost White Screen**:
+  - Resolved white pages on local development URLs (`localhost`, `127.0.0.1`) by bypassing certificate errors on local origins and scoping top-level navigation listeners away from `<webview>` guest contents.
+  - Added `allowpopups` and an in-browser error recovery view offering retry, HTTP fallback, and external browser launch.
+- **Image Node Zooming**:
+  - Fixed zoom controls failing on image documents by routing image document zoom targets to preview pane scaling.
+  - Attached non-passive wheel event listeners in `ZoomPanContainer` to eliminate passive listener `preventDefault` rejections.
+- **Code Editor and Status Bar Zoom Synchronization**:
+  - Fixed an issue where `Ctrl + MouseWheel` in the code editor changed Monaco's internal zoom without synchronizing with the status bar zoom readout and buttons.
+  - Intercepted `Ctrl + Wheel` events in a non-passive capture phase on the editor container to step `editorScale` uniformly and keep the status bar readout, status bar zoom controls (`+`, `-`, `Reset`), and scaled editor font size in complete synchronization.
+  - Synchronized `Ctrl + MouseWheel` across all preview types (Markdown, PlantUML, Image, PDF) by updating the active zoom target on wheel interaction, ensuring the status bar immediately reflects whichever pane (editor or preview) is being zoomed.
+
 ## v0.9.5 - Dynamic Local Database Profiles (July 2026)
 
 ### ✨ Features

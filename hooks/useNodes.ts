@@ -67,15 +67,23 @@ export const useNodes = () => {
   }, [addLog, refreshNodes]);
 
   const updateDocumentContent = useCallback(async (nodeId: string, newContent: string): Promise<void> => {
-    await repository.updateDocumentContent(nodeId, newContent);
+    const result = await repository.updateDocumentContent(nodeId, newContent);
 
     setNodes(currentNodes => {
       const updateNodeInTree = (nodes: Node[]): Node[] => {
         return nodes.map(node => {
           if (node.node_id === nodeId) {
+            const currentDoc = node.document;
+            const updatedVersion = result?.versionNumber ?? (currentDoc?.version ? currentDoc.version + 1 : 1);
             return {
               ...node,
-              document: node.document ? { ...node.document, content: newContent } : undefined
+              updated_at: result?.updatedAt ?? new Date().toISOString(),
+              document: currentDoc ? {
+                ...currentDoc,
+                content: newContent,
+                current_version_id: result?.versionId ?? currentDoc.current_version_id,
+                version: updatedVersion,
+              } : undefined
             };
           }
           if (node.children) {

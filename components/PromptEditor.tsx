@@ -18,6 +18,7 @@ import ScriptExecutionPanel from './ScriptExecutionPanel';
 import EmojiPickerOverlay from './EmojiPickerOverlay';
 import Tooltip from './Tooltip';
 import EmbeddedBrowser from './EmbeddedBrowser';
+import ExportDocumentMenu from './ExportDocumentMenu';
 
 interface DocumentEditorProps {
   documentNode: DocumentOrFolder;
@@ -40,7 +41,9 @@ interface DocumentEditorProps {
   previewResetSignal: number;
   onPreviewVisibilityChange?: (isVisible: boolean) => void;
   onPreviewZoomAvailabilityChange?: (isAvailable: boolean) => void;
+  onPreviewMetadataChange?: (metadata: PreviewMetadata | null) => void;
   onZoomTargetChange?: (target: 'preview' | 'editor') => void;
+  onEditorScaleChange?: (scale: number) => void;
   onSelectionChange?: (selectedText: string | undefined) => void;
   pendingInsertText?: string | null;
   commandTriggers: DocumentCommandTriggers;
@@ -125,8 +128,15 @@ const sanitizeDocumentContent = (
 
 type EditorEngine = 'lexical' | 'monaco';
 
-const resolveDefaultViewMode = (mode: ViewMode | null | undefined, languageHint: string | null | undefined): ViewMode => {
+const resolveDefaultViewMode = (
+  mode: ViewMode | null | undefined,
+  languageHint: string | null | undefined,
+  docType?: DocType | null,
+): ViewMode => {
   if (mode) return mode;
+  if (docType === 'image' || docType === 'pdf') {
+    return 'preview';
+  }
   const normalizedHint = languageHint?.toLowerCase();
   if (!normalizedHint) {
     return 'edit';
@@ -169,6 +179,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onPreviewZoomAvailabilityChange,
   onPreviewMetadataChange,
   onZoomTargetChange,
+  onEditorScaleChange,
   onSelectionChange,
   pendingInsertText,
   commandTriggers,
@@ -187,13 +198,15 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [refinedContent, setRefinedContent] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const savedTimeoutRef = useRef<number | null>(null);
   const [isGeneratingTitle, setIsGeneratingTitle] = useState(false);
   const [isGeneratingEmoji, setIsGeneratingEmoji] = useState(false);
   const [isTitleEmojiPickerOpen, setIsTitleEmojiPickerOpen] = useState(false);
   const [showUnsavedTooltip, setShowUnsavedTooltip] = useState(false);
   const [titleEmojiAnchor, setTitleEmojiAnchor] = useState<{ x: number; y: number } | null>(null);
   const [isCopied, setIsCopied] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
+  const [viewMode, setViewMode] = useState<ViewMode>(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint, documentNode.doc_type));
   const [splitSize, setSplitSize] = useState(50);
   const isLocked = Boolean(documentNode.locked);
   const [isLocking, setIsLocking] = useState(false);
@@ -250,6 +263,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const languageButtonRef = useRef<HTMLButtonElement | null>(null);
   const unsavedIndicatorRef = useRef<HTMLDivElement>(null);
   const isContentInitialized = useRef(false);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<CodeEditorHandle>(null);
   const richTextEditorRef = useRef<RichTextEditorHandle>(null);
   const previewScrollRef = useRef<HTMLDivElement>(null);
@@ -301,12 +315,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       setTitle(documentNode.title);
       setContent(nextContent);
       setBaselineContent(nextContent);
-      setViewMode(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint));
+      setViewMode(resolveDefaultViewMode(documentNode.default_view_mode, documentNode.language_hint, documentNode.doc_type));
       setSplitSize(50);
       isContentInitialized.current = true;
       setIsDirty(false);
       setIsSaving(false);
+      setIsSaved(false);
       setIsDiffMode(false);
+      if (savedTimeoutRef.current) {
+        clearTimeout(savedTimeoutRef.current);
+      }
       prevDocumentIdRef.current = documentNode.id;
       prevDocumentContentRef.current = sanitizedDocumentContent;
       return;
@@ -352,7 +370,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   useEffect(() => {
     // Only mark as dirty after the initial content has been loaded.
     if (isContentInitialized.current) {
-      setIsDirty(content !== sanitizedDocumentContent);
+      const dirty = content !== sanitizedDocumentContent;
+      setIsDirty(dirty);
+      if (dirty) {
+        setIsSaved(false);
+      }
     }
   }, [content, sanitizedDocumentContent]);
 
@@ -463,8 +485,22 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       addLog('WARNING', `Manual save blocked for locked document "${title}".`);
       return;
     }
-    if (!isDirty || isRefining || isSaving) {
+    if (isRefining || isSaving) {
       return;
+    }
+    if (!isDirty) {
+      // Document is already clean / up to date; provide feedback
+      setIsSaved(true);
+      if (savedTimeoutRef.current) {
+        clearTimeout(savedTimeoutRef.current);
+      }
+      savedTimeoutRef.current = window.setTimeout(() => {
+        setIsSaved(false);
+      }, 2000);
+      return;
+    }
+    if (title !== documentNode.title) {
+      onSave({ title });
     }
     addLog('INFO', `User action: Manually save version for document "${title}".`);
     setIsSaving(true);
@@ -473,6 +509,13 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       .then(() => {
         setIsDirty(false);
         setBaselineContent(content);
+        setIsSaved(true);
+        if (savedTimeoutRef.current) {
+          clearTimeout(savedTimeoutRef.current);
+        }
+        savedTimeoutRef.current = window.setTimeout(() => {
+          setIsSaved(false);
+        }, 2000);
       })
       .catch((err) => {
         const message = err instanceof Error ? err.message : 'Failed to save document version.';
@@ -482,7 +525,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       .finally(() => {
         setIsSaving(false);
       });
-  }, [isLocked, isDirty, isRefining, isSaving, addLog, title, onCommitVersion, content, documentNode.id]);
+  }, [isLocked, isDirty, isRefining, isSaving, addLog, title, onCommitVersion, content, documentNode.id, documentNode.title, onSave]);
 
   const handleCancelChanges = useCallback(() => {
     if (!isDirty || isSaving) {
@@ -498,6 +541,10 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     setBaselineContent(originalContent);
     setTitle(documentNode.title);
     setIsDirty(false);
+    setIsSaved(false);
+    if (savedTimeoutRef.current) {
+      clearTimeout(savedTimeoutRef.current);
+    }
   }, [isDirty, isSaving, sanitizedDocumentContent, documentNode.title, addLog, skipNextAutoSave]);
 
   const handleDeleteDocument = () => {
@@ -771,7 +818,11 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const normalizedLanguage = language.toLowerCase();
   const supportsAiTools = !isWebLink && ['markdown', 'plaintext', 'html'].includes(normalizedLanguage);
   const canAddEmojiToTitle = documentNode.type === 'document';
-  const supportsPreview = !isWebLink && PREVIEWABLE_LANGUAGES.has(normalizedLanguage);
+  const isSvgDocument =
+    documentNode.doc_type === 'image' ||
+    (normalizedLanguage === 'xml' && /<svg[\s>]/i.test(content));
+  const supportsPreview =
+    !isWebLink && (documentNode.doc_type === 'image' || PREVIEWABLE_LANGUAGES.has(normalizedLanguage) || isSvgDocument || documentNode.doc_type === 'pdf');
   const supportsFormatting = !isWebLink && ['javascript', 'typescript', 'json', 'html', 'css', 'xml', 'yaml'].includes(normalizedLanguage);
   const scriptBridgeAvailable =
     typeof window !== 'undefined' && (!!window.electronAPI || !!window.__DOCFORGE_SCRIPT_PREVIEW__);
@@ -870,12 +921,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
   }, [onPreviewVisibilityChange, onPreviewZoomAvailabilityChange, onPreviewMetadataChange]);
 
   useEffect(() => {
-    if (viewMode === 'preview') {
+    if (viewMode === 'preview' || documentNode.doc_type === 'image' || documentNode.doc_type === 'pdf') {
       onZoomTargetChange?.('preview');
     } else if (viewMode === 'edit' || viewMode.startsWith('split-')) {
       onZoomTargetChange?.('editor');
     }
-  }, [onZoomTargetChange, viewMode]);
+  }, [onZoomTargetChange, viewMode, documentNode.doc_type]);
 
   useEffect(() => {
     if (!supportsPreview) {
@@ -932,11 +983,45 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     onZoomTargetChange?.('preview');
   }, [onZoomTargetChange]);
 
+  const handleEditorFocus = useCallback(() => {
+    onZoomTargetChange?.('editor');
+  }, [onZoomTargetChange]);
+
   const handleEditorFocusChange = useCallback((hasFocus: boolean) => {
     if (hasFocus) {
       onZoomTargetChange?.('editor');
     }
   }, [onZoomTargetChange]);
+
+  useEffect(() => {
+    const el = editorContainerRef.current;
+    if (!el) return;
+
+    const onWheelNative = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        const delta = event.deltaY;
+        if (delta === 0) return;
+        const direction = delta > 0 ? -1 : 1;
+        const step = previewZoomStep || 0.05;
+        const minScale = previewMinScale || 0.25;
+        const maxScale = previewMaxScale || 4;
+        const currentScale = editorScale || 1;
+        const nextScale = Math.min(
+          maxScale,
+          Math.max(minScale, Math.round((currentScale + direction * step) * 100) / 100)
+        );
+        onEditorScaleChange?.(nextScale);
+        onZoomTargetChange?.('editor');
+      }
+    };
+
+    el.addEventListener('wheel', onWheelNative, { passive: false, capture: true });
+    return () => {
+      el.removeEventListener('wheel', onWheelNative, { capture: true } as EventListenerOptions);
+    };
+  }, [editorScale, onEditorScaleChange, onZoomTargetChange, previewMaxScale, previewMinScale, previewZoomStep]);
 
   const renderContent = () => {
     if (documentNode.doc_type === 'weblink') {
@@ -966,6 +1051,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           activeLineHighlightColorLight={settings.editorActiveLineHighlightColor}
           activeLineHighlightColorDark={settings.editorActiveLineHighlightColorDark}
           onFocusChange={handleEditorFocusChange}
+          onManualSave={handleManualSave}
         />
       )
       : editorEngine === 'lexical'
@@ -980,6 +1066,7 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             onFocusChange={handleEditorFocusChange}
             onSelectionChange={onSelectionChange}
             onSaveToFile={handleSaveToFile}
+            zoomScale={editorScale}
           />
         )
         : (
@@ -999,18 +1086,37 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
             onFocusChange={handleEditorFocusChange}
             onSelectionChange={onSelectionChange}
             onSaveToFile={handleSaveToFile}
+            onManualSave={handleManualSave}
           />
         );
+
+    const editorWrapper = (
+      <div
+        ref={editorContainerRef}
+        className="h-full w-full overflow-hidden"
+        onPointerDown={handleEditorFocus}
+        onFocusCapture={handleEditorFocus}
+      >
+        {editor}
+      </div>
+    );
+
     const preview = (
       <div
         className="h-full w-full"
         onPointerDown={handlePreviewFocus}
         onFocusCapture={handlePreviewFocus}
+        onWheelCapture={(e) => {
+          if (e.ctrlKey || e.metaKey) {
+            onZoomTargetChange?.('preview');
+          }
+        }}
       >
         <PreviewPane
           ref={previewScrollRef}
           content={content}
           language={language}
+          docType={documentNode.doc_type}
           onScroll={handlePreviewScroll}
           addLog={addLog}
           settings={settings}
@@ -1025,28 +1131,28 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     );
 
     switch (viewMode) {
-      case 'edit': return editor;
-      case 'preview': return supportsPreview ? preview : editor;
+      case 'edit': return editorWrapper;
+      case 'preview': return supportsPreview ? preview : editorWrapper;
       case 'split-vertical':
         return (
           <div ref={splitContainerRef} className="grid h-full" style={{ gridTemplateColumns: `${splitSize}% auto minmax(0, 1fr)` }}>
-            <div className="h-full overflow-hidden min-w-0">{editor}</div>
+            <div className="h-full overflow-hidden min-w-0">{editorWrapper}</div>
             <div
               onMouseDown={handleSplitterMouseDown}
               className="w-1.5 h-full cursor-col-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
             />
-            <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editor}</div>
+            <div className="h-full overflow-hidden min-w-0">{supportsPreview ? preview : editorWrapper}</div>
           </div>
         );
       case 'split-horizontal':
         return (
           <div ref={splitContainerRef} className="grid w-full h-full" style={{ gridTemplateRows: `${splitSize}% auto minmax(0, 1fr)` }}>
-            <div className="w-full overflow-hidden min-h-0">{editor}</div>
+            <div className="w-full overflow-hidden min-h-0">{editorWrapper}</div>
             <div
               onMouseDown={handleSplitterMouseDown}
               className="w-full h-1.5 cursor-row-resize flex-shrink-0 bg-border-color/50 hover:bg-primary transition-colors duration-200"
             />
-            <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editor}</div>
+            <div className="w-full overflow-hidden min-h-0">{supportsPreview ? preview : editorWrapper}</div>
           </div>
         );
     }
@@ -1211,19 +1317,36 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
               </IconButton>
               <IconButton
                 onClick={handleManualSave}
-                disabled={!isDirty || isRefining || isSaving || isLocked || isLocking}
-                tooltip={isSaving ? 'Saving...' : 'Save Version'}
+                disabled={(!isDirty && !isSaved) || isRefining || isSaving || isLocked || isLocking}
+                tooltip={isSaving ? 'Saving...' : isSaved ? 'Saved!' : 'Save Version (Ctrl+S)'}
                 size="xs"
                 variant="ghost"
+                aria-label={isSaving ? 'Saving' : isSaved ? 'Saved' : 'Save Version'}
               >
                 {isSaving ? (
                   <Spinner />
+                ) : isSaved ? (
+                  <CheckIcon className="w-4 h-4 text-success" />
                 ) : (
                   <SaveIcon className={`w-4 h-4 ${isDirty ? 'text-primary' : ''}`} />
                 )}
               </IconButton>
               <IconButton onClick={handleCopy} disabled={!content.trim()} tooltip={isCopied ? 'Copied!' : 'Copy Content'} size="xs" variant="ghost">{isCopied ? <CheckIcon className="w-4 h-4 text-success" /> : <CopyIcon className="w-4 h-4" />}</IconButton>
-              <IconButton onClick={handleSaveToFile} disabled={!content.trim() || !onSaveToFile} tooltip="Save to File" size="xs" variant="ghost"><DownloadIcon className="w-4 h-4" /></IconButton>
+              <ExportDocumentMenu
+                documentNode={documentNode}
+                currentContent={content}
+                disabled={!content.trim() || !onSaveToFile}
+                onExportStarted={() => addLog('INFO', `Export started for "${title}"...`)}
+                onExportCompleted={(result) => {
+                  if (result.canceled) {
+                    addLog('INFO', `Export canceled for document "${title}".`);
+                  } else {
+                    const target = result.filePath ?? result.suggestedFileName;
+                    addLog('INFO', `Document "${title}" saved to ${target}.`);
+                  }
+                }}
+                onError={(err) => addLog('ERROR', `Failed to export document "${title}": ${err}`)}
+              />
               {supportsAiTools && (<IconButton onClick={handleRefine} disabled={!content.trim() || isRefining || isLocked} tooltip="Refine with AI" size="xs" variant="ghost">{isRefining ? <Spinner /> : <SparklesIcon className="w-4 h-4 text-primary" />}</IconButton>)}
             </>
           )}

@@ -27,6 +27,7 @@ interface CodeEditorProps {
   onFocusChange?: (hasFocus: boolean) => void;
   onSelectionChange?: (selectedText: string | undefined) => void;
   onSaveToFile?: () => void;
+  onManualSave?: () => void;
 }
 
 export interface CodeEditorHandle {
@@ -147,7 +148,8 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
     readOnly = false, 
     onFocusChange,
     onSelectionChange,
-    onSaveToFile
+    onSaveToFile,
+    onManualSave
 }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const monacoInstanceRef = useRef<any>(null);
@@ -488,7 +490,26 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                 actionDisposablesRef.current.push(saveToFileDisposable);
             }
         }
-    }, [disposeEditorShortcuts, onSaveToFile]);
+
+        if (onManualSave) {
+            const customSaveKeys = customShortcutsRef.current['document-manual-save'];
+            const saveKeybinding = customSaveKeys && customSaveKeys.length > 0
+                ? toMonacoKeybinding(monacoApi, customSaveKeys)
+                : (monacoApi.KeyMod.CtrlCmd | monacoApi.KeyCode.KeyS);
+
+            if (saveKeybinding !== null) {
+                const manualSaveDisposable = monacoInstanceRef.current.addAction({
+                    id: 'docforge.manualSave',
+                    label: 'Save Document Version',
+                    keybindings: [saveKeybinding],
+                    run: () => onManualSave(),
+                });
+                if (manualSaveDisposable) {
+                    actionDisposablesRef.current.push(manualSaveDisposable);
+                }
+            }
+        }
+    }, [disposeEditorShortcuts, onSaveToFile, onManualSave]);
 
     useEffect(() => {
         customShortcutsRef.current = customShortcuts ?? {};
@@ -677,7 +698,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
             emojiActionDisposableRef.current = null;
             monacoApiRef.current = null;
         };
-    }, [documentId, onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, disposeListeners, computedFontFamily, computedFontSize, readOnly, onFocusChange]);
+    }, [documentId, onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, disposeListeners, readOnly, onFocusChange]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {

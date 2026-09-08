@@ -38,6 +38,12 @@ describe('languageService', () => {
     expect(mapExtensionToLanguageId('Dockerfile')).toBe('dockerfile');
   });
 
+  it('maps SVG file extensions to the xml language id', () => {
+    expect(mapExtensionToLanguageId('svg')).toBe('xml');
+    expect(mapExtensionToLanguageId('SVG')).toBe('xml');
+    expect(mapExtensionToLanguageId('svgz')).toBe('xml');
+  });
+
   it('falls back to plaintext when extension is null', () => {
     expect(mapExtensionToLanguageId(null)).toBe('plaintext');
   });

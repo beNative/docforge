@@ -17,11 +17,16 @@ DocForge is a desktop application designed to streamline the process of creating
 - **Emoji-Enhanced Titles:** Insert emoji directly into document and folder names or let the AI suggest a prefix so your workspace stays scannable at a glance.
 - **Multi-Document Tabs:** Keep several documents open at once, pin important files, and quickly jump between them using the tab strip and overflow picker.
 - **Multi-Format Live Preview:** Get a real-time, rendered preview for Markdown, HTML, PDFs, and common image formats. The preview can be displayed side-by-side (vertically or horizontally) with the editor, and binary formats open straight into preview mode with zoom and pan controls tailored to each viewer.
-- **Embedded Web Browsing:** Drag and drop external web links directly into folders or the editor workspace to create document nodes that load and display corresponding websites in an integrated, sandboxed webview. Features complete navigation controls, editable address inputs, locking support, and manual location saving as versioned documents.
-- **Focused Workspace Zoom:** Use a single set of zoom controls that automatically follow whichever pane—editor or preview—has focus, complete with 5% increments, keyboard and mouse support, and quick resets.
+- **Embedded Web Browsing & Web Links:** Create web links manually or drag and drop external links from your browser. Display websites inside an integrated, sandboxed webview supporting local development servers (`localhost`), popup windows, address navigation, and versioned URL saving.
+- **Focused Workspace Zoom:** Use a single set of zoom controls that automatically follow whichever pane—editor or preview—has focus, complete with 5% increments, Ctrl+Wheel zoom in Monaco and image preview containers, and quick resets.
 - **AI-Powered Refinement:** Use your connected local LLM to automatically refine and improve your documents with a single click.
 - **Document Templating:** Create reusable document templates with variables to quickly generate new documents for recurring tasks.
-- **Document Export:** Save any document to your filesystem with a suggested filename and the correct extension for its detected type, whether you're running the Electron app or using the browser build.
+- **Multi-Format Document Export:** Save any document to your filesystem with format-specific choices:
+  - **PlantUML:** Export directly to **PNG** (high-DPI with transparent background), **SVG** vector, **JPEG**, or raw **PUML** source.
+  - **Markdown:** Export as standalone, styled **HTML** documents with embedded CSS that open completely offline in any browser.
+  - **Standard Files:** Export with smart extension inference for code, PDFs, images, and text.
+- **Comprehensive Keyboard Navigation:** Seamlessly browse your document tree using `Arrow` keys, `PageUp`/`PageDown`, and `Home`/`End`, with `Shift` modifiers for continuous range selections and smart isolation when templates are collapsed.
+- **Version History & Live Save Feedback:** Explicitly save new document versions via `Ctrl+S` with dynamic toolbar state feedback (dirty, saving spinner, saved checkmark), view diffs, restore points in time, and see active document versions in the status bar.
 - **Google Drive Cloud Sync:** Link DocForge to your Google account using custom OAuth credentials. Securely syncs your SQLite database to an isolated, private space (`drive.appdata`) on Google Drive, complete with automatic startup/shutdown sync options and robust conflict resolution.
 - **Integrated Python Workflow:** Open an inline Python console tied to your documents to execute snippets, review logs, and manage isolated environments without leaving DocForge.
 - **Shell & PowerShell Execution:** Run or syntax-test scripts directly from the editor with per-document environment overrides that merge with workspace defaults configured in Settings.

@@ -15,6 +15,8 @@ interface StatusBarProps {
   llmProviderUrl: string;
   documentCount: number;
   lastSaved?: string;
+  documentVersion?: number | string | null;
+  onOpenDocumentHistory?: () => void;
   availableModels: DiscoveredLLMModel[];
   onModelChange: (modelId: string) => void;
   discoveredServices: DiscoveredLLMService[];
@@ -123,6 +125,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
   llmProviderUrl,
   documentCount,
   lastSaved,
+  documentVersion,
+  onOpenDocumentHistory,
   availableModels,
   onModelChange,
   discoveredServices,
@@ -234,6 +238,19 @@ const StatusBar: React.FC<StatusBarProps> = ({
   });
   const lastSavedTriggerRef = React.useRef<HTMLSpanElement>(null);
   const [showLastSavedTooltip, setShowLastSavedTooltip] = React.useState(false);
+
+  const formattedDocumentVersion = React.useMemo(() => {
+    if (documentVersion === undefined || documentVersion === null) {
+      return null;
+    }
+    const str = String(documentVersion).trim();
+    if (!str) {
+      return null;
+    }
+    return str.startsWith('v') || str.startsWith('V') ? str : `v${str}`;
+  }, [documentVersion]);
+  const documentVersionTriggerRef = React.useRef<HTMLElement>(null);
+  const [showDocumentVersionTooltip, setShowDocumentVersionTooltip] = React.useState(false);
 
   React.useEffect(() => {
     let intervalId: number | undefined;
@@ -485,6 +502,47 @@ const StatusBar: React.FC<StatusBarProps> = ({
               </span>
             )}
           />
+        )}
+        {formattedDocumentVersion && (
+          <>
+            <div className="h-4 w-px bg-border-color"></div>
+            <span className="flex items-center gap-1">
+              Version:
+              {onOpenDocumentHistory ? (
+                <button
+                  type="button"
+                  ref={documentVersionTriggerRef as React.RefObject<HTMLButtonElement>}
+                  onClick={onOpenDocumentHistory}
+                  className="px-1 -mx-1 rounded-sm font-semibold text-text-main hover:bg-border-color focus:outline-none focus:ring-1 focus:ring-primary"
+                  onMouseEnter={() => setShowDocumentVersionTooltip(true)}
+                  onMouseLeave={() => setShowDocumentVersionTooltip(false)}
+                  onFocus={() => setShowDocumentVersionTooltip(true)}
+                  onBlur={() => setShowDocumentVersionTooltip(false)}
+                  aria-label={`Document version ${formattedDocumentVersion}, click to view history`}
+                >
+                  {formattedDocumentVersion}
+                </button>
+              ) : (
+                <span
+                  ref={documentVersionTriggerRef as React.RefObject<HTMLSpanElement>}
+                  className="font-semibold text-text-main"
+                  onMouseEnter={() => setShowDocumentVersionTooltip(true)}
+                  onMouseLeave={() => setShowDocumentVersionTooltip(false)}
+                  onFocus={() => setShowDocumentVersionTooltip(true)}
+                  onBlur={() => setShowDocumentVersionTooltip(false)}
+                  tabIndex={0}
+                >
+                  {formattedDocumentVersion}
+                </span>
+              )}
+            </span>
+            {showDocumentVersionTooltip && documentVersionTriggerRef.current && (
+              <Tooltip
+                targetRef={documentVersionTriggerRef}
+                content={onOpenDocumentHistory ? `Version ${formattedDocumentVersion} (click to view history)` : `Version ${formattedDocumentVersion}`}
+              />
+            )}
+          </>
         )}
         {appVersion && <div className="h-4 w-px bg-border-color"></div>}
         {appVersion && (

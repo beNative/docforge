@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { previewService } from '../services/previewService';
 import Spinner from './Spinner';
 import { useTheme } from '../hooks/useTheme';
-import type { LogLevel, PreviewMetadata, Settings } from '../types';
+import type { DocType, LogLevel, PreviewMetadata, Settings } from '../types';
 import { PreviewZoomProvider } from '../contexts/PreviewZoomContext';
 
 interface PreviewPaneProps {
   content: string;
   language: string | null;
+  docType?: DocType;
   onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
   addLog: (level: LogLevel, message: string) => void;
   settings: Settings;
@@ -27,6 +28,7 @@ interface PreviewPaneProps {
 const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({ 
   content,
   language,
+  docType,
   onScroll,
   addLog,
   settings,
@@ -53,7 +55,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
 
       setError(null);
       onMetadataChange?.(null);
-      const renderer = previewService.getRendererForLanguage(language);
+      const renderer = previewService.getRendererForLanguage(language, content, docType);
       const result = await renderer.render(content, addLog, language, settings, {
         onMetadataChange,
       });
@@ -87,7 +89,7 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
       clearTimeout(debounceTimer);
       onMetadataChange?.(null);
     };
-  }, [content, language, addLog, ref, onScroll, settings, onMetadataChange]);
+  }, [content, language, docType, addLog, ref, onScroll, settings, onMetadataChange]);
   useEffect(() => {
     return () => {
       onMetadataChange?.(null);

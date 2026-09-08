@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeftIcon, ArrowRightIcon, RefreshIcon, ExternalLinkIcon, SaveIcon, GlobeIcon } from './Icons';
+import { ArrowLeftIcon, ArrowRightIcon, RefreshIcon, ExternalLinkIcon, SaveIcon, GlobeIcon, WarningIcon } from './Icons';
 import IconButton from './IconButton';
 
 interface EmbeddedBrowserProps {
@@ -11,12 +11,27 @@ interface EmbeddedBrowserProps {
 
 const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
 
+const normalizeBrowserUrl = (raw: string): string => {
+  let target = raw.trim();
+  if (!target) return '';
+  if (/^(https?|file):\/\//i.test(target)) {
+    return target;
+  }
+  // Localhost or direct IP addresses default to http
+  if (/^(localhost|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i.test(target)) {
+    return `http://${target}`;
+  }
+  return `https://${target}`;
+};
+
 const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSaveLocation, zoomScale = 1.0 }) => {
   const [webviewElement, setWebviewElement] = useState<any>(null);
   const [currentUrl, setCurrentUrl] = useState(url);
   const [inputUrl, setInputUrl] = useState(url);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<{ errorCode: number; errorDescription: string; validatedURL: string } | null>(null);
 
   const webviewRef = useCallback((node: any) => {
     if (node !== null) {
@@ -26,6 +41,7 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
 
   // Sync loaded URL with the prop url when it changes
   useEffect(() => {
+    setLoadError(null);
     if (!webviewElement) return;
 
     try {
@@ -81,6 +97,16 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
       }
     };
 
+    const handleDidStartLoading = () => {
+      setIsLoading(true);
+      setLoadError(null);
+    };
+
+    const handleDidStopLoading = () => {
+      setIsLoading(false);
+      updateNavigationState();
+    };
+
     const handleDidNavigate = () => {
       updateNavigationState();
     };
@@ -89,16 +115,34 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
       updateNavigationState();
     };
 
+    const handleDidFailLoad = (event: any) => {
+      setIsLoading(false);
+      // errorCode -3 is ERR_ABORTED (e.g. user clicked another link or navigated away) - ignore it
+      if (event.errorCode && event.errorCode !== -3) {
+        setLoadError({
+          errorCode: event.errorCode,
+          errorDescription: event.errorDescription || 'The page failed to load.',
+          validatedURL: event.validatedURL || currentUrl,
+        });
+      }
+    };
+
     webviewElement.addEventListener('dom-ready', handleDomReady);
+    webviewElement.addEventListener('did-start-loading', handleDidStartLoading);
+    webviewElement.addEventListener('did-stop-loading', handleDidStopLoading);
     webviewElement.addEventListener('did-navigate', handleDidNavigate);
     webviewElement.addEventListener('did-navigate-in-page', handleDidNavigateInPage);
+    webviewElement.addEventListener('did-fail-load', handleDidFailLoad);
 
     return () => {
       webviewElement.removeEventListener('dom-ready', handleDomReady);
+      webviewElement.removeEventListener('did-start-loading', handleDidStartLoading);
+      webviewElement.removeEventListener('did-stop-loading', handleDidStopLoading);
       webviewElement.removeEventListener('did-navigate', handleDidNavigate);
       webviewElement.removeEventListener('did-navigate-in-page', handleDidNavigateInPage);
+      webviewElement.removeEventListener('did-fail-load', handleDidFailLoad);
     };
-  }, [webviewElement, zoomScale]);
+  }, [webviewElement, zoomScale, currentUrl]);
 
   const handleBack = () => {
     if (webviewElement && webviewElement.canGoBack()) {
@@ -113,6 +157,7 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
   };
 
   const handleReload = () => {
+    setLoadError(null);
     if (webviewElement) {
       webviewElement.reload();
     }
@@ -133,18 +178,29 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
 
   const handleAddressSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    let targetUrl = inputUrl.trim();
+    const targetUrl = normalizeBrowserUrl(inputUrl);
     if (!targetUrl) return;
 
-    if (!/^https?:\/\//i.test(targetUrl)) {
-      targetUrl = 'https://' + targetUrl;
-    }
-
+    setLoadError(null);
     if (webviewElement) {
       try {
         webviewElement.loadURL(targetUrl);
       } catch (err) {
         console.error('Failed to navigate webview:', err);
+      }
+    }
+  };
+
+  const handleTryHttp = () => {
+    if (!loadError) return;
+    const httpUrl = loadError.validatedURL.replace(/^https:\/\//i, 'http://');
+    setInputUrl(httpUrl);
+    setLoadError(null);
+    if (webviewElement) {
+      try {
+        webviewElement.loadURL(httpUrl);
+      } catch (err) {
+        console.error('Failed to navigate to http:', err);
       }
     }
   };
@@ -175,7 +231,7 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
             tooltip="Reload"
             size="sm"
           >
-            <RefreshIcon className="w-4 h-4" />
+            <RefreshIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </IconButton>
         </div>
 
@@ -221,11 +277,50 @@ const EmbeddedBrowser: React.FC<EmbeddedBrowserProps> = ({ url, isLocked, onSave
       {/* WebView Container */}
       <div className="flex-1 w-full bg-white relative">
         {isElectron ? (
-          <webview
-            ref={webviewRef}
-            src={url}
-            className="absolute inset-0 w-full h-full border-none inline-flex"
-          />
+          <>
+            <webview
+              ref={webviewRef}
+              src={url}
+              allowpopups=""
+              className="absolute inset-0 w-full h-full border-none inline-flex"
+            />
+            {loadError && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-secondary p-8 text-center select-none">
+                <div className="w-14 h-14 rounded-full bg-destructive-bg flex items-center justify-center mb-4 text-destructive-text">
+                  <WarningIcon className="w-7 h-7" />
+                </div>
+                <h3 className="text-lg font-semibold text-text-main mb-2">Page Failed to Load</h3>
+                <p className="text-sm text-text-secondary max-w-md mb-2 font-mono break-all">
+                  {loadError.validatedURL}
+                </p>
+                <p className="text-xs text-text-secondary/80 max-w-md mb-6">
+                  {loadError.errorDescription} (Code {loadError.errorCode})
+                </p>
+                <div className="flex items-center gap-3">
+                  {loadError.validatedURL.startsWith('https://') && (
+                    <button
+                      onClick={handleTryHttp}
+                      className="px-4 py-2 bg-primary/20 hover:bg-primary/30 text-primary rounded text-sm font-medium transition"
+                    >
+                      Try with HTTP
+                    </button>
+                  )}
+                  <button
+                    onClick={handleReload}
+                    className="px-4 py-2 bg-background hover:bg-surface border border-border-color text-text-main rounded text-sm font-medium transition"
+                  >
+                    Retry
+                  </button>
+                  <button
+                    onClick={handleOpenExternal}
+                    className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded text-sm font-medium transition"
+                  >
+                    Open Externally
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary p-8 text-center select-none">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 text-primary">
