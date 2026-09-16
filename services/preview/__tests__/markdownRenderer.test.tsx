@@ -28,6 +28,7 @@ vi.mock('../shikiHighlighter', () => ({
 vi.mock('mermaid', () => ({
   default: {
     initialize: vi.fn(),
+    parse: vi.fn().mockResolvedValue(true),
     render: vi.fn().mockResolvedValue({ svg: '<svg></svg>' }),
   },
 }));
@@ -704,4 +705,37 @@ describe('MarkdownRenderer', () => {
       expect(docforgeText).toBe(githubText);
     },
   );
+
+  describe('Mermaid diagram rendering robustness', () => {
+    it('displays error details within the diagram card when syntax is invalid without polluting document.body', async () => {
+      const mermaidModule = await import('mermaid');
+      const parseMock = vi.mocked(mermaidModule.default.parse);
+      parseMock.mockRejectedValue(
+        new Error('No diagram type detected matching given configuration for text: bar')
+      );
+
+      try {
+        const invalidMarkdown = '```mermaid\nbar\n  title Weekly Signups\n```';
+        const { container } = await renderMarkdown(invalidMarkdown);
+
+        await waitFor(() => {
+          const errorBlock = container.querySelector('.df-mermaid-error');
+          expect(errorBlock).not.toBeNull();
+          expect(errorBlock?.textContent).toContain('Unable to render the Mermaid diagram');
+          expect(errorBlock?.textContent).toContain('No diagram type detected');
+        });
+
+        // Ensure no stray mermaid elements leaked into document.body
+        const strayBodyElements = document.querySelectorAll(
+          'body > [id^="dmermaid-"], body > [id^="mermaid-"], body > [id^="imermaid-"]'
+        );
+        expect(strayBodyElements.length).toBe(0);
+      } finally {
+        parseMock.mockResolvedValue(true);
+      }
+    });
+  });
 });
+
+
+

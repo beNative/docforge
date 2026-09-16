@@ -479,16 +479,48 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }
   }, [onSaveToFile, documentNode.id]);
 
+  const manualSaveStateRef = useRef({
+    isLocked,
+    isDirty,
+    isRefining,
+    isSaving,
+    title,
+    content,
+    documentNode,
+  });
+
+  useEffect(() => {
+    manualSaveStateRef.current = {
+      isLocked,
+      isDirty,
+      isRefining,
+      isSaving,
+      title,
+      content,
+      documentNode,
+    };
+  }, [isLocked, isDirty, isRefining, isSaving, title, content, documentNode]);
+
   const handleManualSave = useCallback(() => {
-    if (isLocked) {
+    const {
+      isLocked: locked,
+      isDirty: dirty,
+      isRefining: refining,
+      isSaving: saving,
+      title: currentTitle,
+      content: currentContent,
+      documentNode: currentDoc,
+    } = manualSaveStateRef.current;
+
+    if (locked) {
       setError('Document is locked and cannot be modified.');
-      addLog('WARNING', `Manual save blocked for locked document "${title}".`);
+      addLog('WARNING', `Manual save blocked for locked document "${currentTitle}".`);
       return;
     }
-    if (isRefining || isSaving) {
+    if (refining || saving) {
       return;
     }
-    if (!isDirty) {
+    if (!dirty) {
       // Document is already clean / up to date; provide feedback
       setIsSaved(true);
       if (savedTimeoutRef.current) {
@@ -499,16 +531,16 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       }, 2000);
       return;
     }
-    if (title !== documentNode.title) {
-      onSave({ title });
+    if (currentTitle !== currentDoc.title) {
+      onSave({ title: currentTitle });
     }
-    addLog('INFO', `User action: Manually save version for document "${title}".`);
+    addLog('INFO', `User action: Manually save version for document "${currentTitle}".`);
     setIsSaving(true);
-    const commitPromise = Promise.resolve(onCommitVersion(documentNode.id, content));
+    const commitPromise = Promise.resolve(onCommitVersion(currentDoc.id, currentContent));
     commitPromise
       .then(() => {
         setIsDirty(false);
-        setBaselineContent(content);
+        setBaselineContent(currentContent);
         setIsSaved(true);
         if (savedTimeoutRef.current) {
           clearTimeout(savedTimeoutRef.current);
@@ -520,12 +552,12 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
       .catch((err) => {
         const message = err instanceof Error ? err.message : 'Failed to save document version.';
         setError(message);
-        addLog('ERROR', `Manual save failed for document "${title}": ${message}`);
+        addLog('ERROR', `Manual save failed for document "${currentTitle}": ${message}`);
       })
       .finally(() => {
         setIsSaving(false);
       });
-  }, [isLocked, isDirty, isRefining, isSaving, addLog, title, onCommitVersion, content, documentNode.id, documentNode.title, onSave]);
+  }, [addLog, onCommitVersion, onSave]);
 
   const handleCancelChanges = useCallback(() => {
     if (!isDirty || isSaving) {

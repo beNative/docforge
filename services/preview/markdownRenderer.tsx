@@ -38,6 +38,18 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
   useEffect(() => {
     let cancelled = false;
 
+    const cleanupStrayArtifacts = () => {
+      const id = renderIdRef.current;
+      document.getElementById(id)?.remove();
+      document.getElementById(`d${id}`)?.remove();
+      document.getElementById(`i${id}`)?.remove();
+      if (typeof document !== 'undefined') {
+        document.querySelectorAll<HTMLElement>(
+          'body > [id^="dmermaid-"], body > [id^="mermaid-"], body > [id^="imermaid-"]'
+        ).forEach((el) => el.remove());
+      }
+    };
+
     const renderDiagram = async () => {
       const target = containerRef.current;
       const trimmed = code.trim();
@@ -50,6 +62,7 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
         target.innerHTML = '';
         setError(null);
         setErrorDetails(null);
+        cleanupStrayArtifacts();
         return;
       }
 
@@ -57,10 +70,20 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
         setError(null);
         mermaid.initialize({
           startOnLoad: false,
+          suppressErrorRendering: true,
           securityLevel: 'loose',
           theme: theme === 'dark' ? 'dark' : 'default',
         });
-        const { svg } = await mermaid.render(renderIdRef.current, trimmed);
+
+        // Validate syntax first to prevent Mermaid from injecting error SVG artifacts into the DOM
+        if (typeof mermaid.parse === 'function') {
+          await mermaid.parse(trimmed, { suppressErrors: false });
+        }
+
+        // Render using a detached temporary container to isolate any internal DOM mutations
+        const tempContainer = document.createElement('div');
+        const { svg } = await mermaid.render(renderIdRef.current, trimmed, tempContainer);
+
         if (!cancelled) {
           target.innerHTML = svg;
           setError(null);
@@ -74,6 +97,8 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
           setError('Unable to render the Mermaid diagram. Please verify the diagram syntax.');
           setErrorDetails(details);
         }
+      } finally {
+        cleanupStrayArtifacts();
       }
     };
 
@@ -81,6 +106,7 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ code, theme }) => {
 
     return () => {
       cancelled = true;
+      cleanupStrayArtifacts();
     };
   }, [code, theme]);
 

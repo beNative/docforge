@@ -68,6 +68,27 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
         highlightColorRef.current = computedActiveLineHighlightColor;
     }, [computedActiveLineHighlightColor]);
 
+    const onChangeRef = useRef(onChange);
+    const onScrollRef = useRef(onScroll);
+    const onFocusChangeRef = useRef(onFocusChange);
+    const onManualSaveRef = useRef(onManualSave);
+
+    useEffect(() => {
+        onChangeRef.current = onChange;
+    }, [onChange]);
+
+    useEffect(() => {
+        onScrollRef.current = onScroll;
+    }, [onScroll]);
+
+    useEffect(() => {
+        onFocusChangeRef.current = onFocusChange;
+    }, [onFocusChange]);
+
+    useEffect(() => {
+        onManualSaveRef.current = onManualSave;
+    }, [onManualSave]);
+
     const disposeListeners = useCallback(() => {
         if (changeListenerRef.current) {
             changeListenerRef.current.dispose();
@@ -146,37 +167,33 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
 
                 const modifiedEditor = editor.getModifiedEditor();
 
-                if (onChange && !readOnly) {
+                if (!readOnly) {
                     changeListenerRef.current = modifiedEditor.onDidChangeModelContent(() => {
-                        onChange(modifiedEditor.getValue());
+                        onChangeRef.current?.(modifiedEditor.getValue());
                     });
                 }
 
-                if (onScroll) {
-                    scrollListenerRef.current = modifiedEditor.onDidScrollChange(() => {
-                        onScroll({
-                            scrollTop: modifiedEditor.getScrollTop(),
-                            scrollHeight: modifiedEditor.getScrollHeight(),
-                            clientHeight: modifiedEditor.getLayoutInfo().height,
-                        });
+                scrollListenerRef.current = modifiedEditor.onDidScrollChange(() => {
+                    onScrollRef.current?.({
+                        scrollTop: modifiedEditor.getScrollTop(),
+                        scrollHeight: modifiedEditor.getScrollHeight(),
+                        clientHeight: modifiedEditor.getLayoutInfo().height,
                     });
-                }
+                });
 
-                if (onFocusChange) {
-                    focusListenerRef.current = modifiedEditor.onDidFocusEditorWidget(() => {
-                        onFocusChange(true);
-                    });
-                    blurListenerRef.current = modifiedEditor.onDidBlurEditorWidget(() => {
-                        onFocusChange(false);
-                    });
-                }
+                focusListenerRef.current = modifiedEditor.onDidFocusEditorWidget(() => {
+                    onFocusChangeRef.current?.(true);
+                });
+                blurListenerRef.current = modifiedEditor.onDidBlurEditorWidget(() => {
+                    onFocusChangeRef.current?.(false);
+                });
 
-                if (onManualSave) {
+                if (onManualSaveRef.current) {
                     modifiedEditor.addAction({
                         id: 'docforge.diff.manualSave',
                         label: 'Save Document Version',
                         keybindings: [monacoApi.KeyMod.CtrlCmd | monacoApi.KeyCode.KeyS],
-                        run: () => onManualSave(),
+                        run: () => onManualSaveRef.current?.(),
                     });
                 }
             } catch (error) {
@@ -190,7 +207,23 @@ const MonacoDiffEditor: React.FC<MonacoDiffEditorProps> = ({ oldText, newText, l
         return () => {
             isCancelled = true;
         };
-    }, [oldText, newText, language, theme, renderMode, readOnly, onChange, onScroll, disposeListeners, computedFontFamily, computedFontSize, onManualSave]);
+    }, [language, theme, renderMode, readOnly, disposeListeners, computedFontFamily, computedFontSize]);
+
+    // Effect to update modified text externally without tearing down the diff editor
+    useEffect(() => {
+        const modified = modelsRef.current?.modified;
+        if (modified && modified.getValue() !== (newText ?? '')) {
+            modified.setValue(newText ?? '');
+        }
+    }, [newText]);
+
+    // Effect to update original text externally
+    useEffect(() => {
+        const original = modelsRef.current?.original;
+        if (original && original.getValue() !== (oldText ?? '')) {
+            original.setValue(oldText ?? '');
+        }
+    }, [oldText]);
 
     useEffect(() => {
         if (editorInstanceRef.current) {

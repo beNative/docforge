@@ -438,6 +438,37 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
         emojiActionDisposableRef.current = null;
     }, []);
 
+    const onChangeRef = useRef(onChange);
+    const onScrollRef = useRef(onScroll);
+    const onSelectionChangeRef = useRef(onSelectionChange);
+    const onFocusChangeRef = useRef(onFocusChange);
+    const onSaveToFileRef = useRef(onSaveToFile);
+    const onManualSaveRef = useRef(onManualSave);
+
+    useEffect(() => {
+        onChangeRef.current = onChange;
+    }, [onChange]);
+
+    useEffect(() => {
+        onScrollRef.current = onScroll;
+    }, [onScroll]);
+
+    useEffect(() => {
+        onSelectionChangeRef.current = onSelectionChange;
+    }, [onSelectionChange]);
+
+    useEffect(() => {
+        onFocusChangeRef.current = onFocusChange;
+    }, [onFocusChange]);
+
+    useEffect(() => {
+        onSaveToFileRef.current = onSaveToFile;
+    }, [onSaveToFile]);
+
+    useEffect(() => {
+        onManualSaveRef.current = onManualSave;
+    }, [onManualSave]);
+
     const disposeFocusListeners = useCallback(() => {
         focusDisposableRef.current?.dispose();
         focusDisposableRef.current = null;
@@ -478,20 +509,20 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
             }
         });
 
-        if (onSaveToFile) {
+        if (onSaveToFileRef.current) {
             const saveToFileDisposable = monacoInstanceRef.current.addAction({
                 id: 'docforge.saveToFile',
                 label: 'Save to File…',
                 contextMenuGroupId: 'navigation',
                 contextMenuOrder: 1.5,
-                run: () => onSaveToFile(),
+                run: () => onSaveToFileRef.current?.(),
             });
             if (saveToFileDisposable) {
                 actionDisposablesRef.current.push(saveToFileDisposable);
             }
         }
 
-        if (onManualSave) {
+        if (onManualSaveRef.current) {
             const customSaveKeys = customShortcutsRef.current['document-manual-save'];
             const saveKeybinding = customSaveKeys && customSaveKeys.length > 0
                 ? toMonacoKeybinding(monacoApi, customSaveKeys)
@@ -502,21 +533,21 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                     id: 'docforge.manualSave',
                     label: 'Save Document Version',
                     keybindings: [saveKeybinding],
-                    run: () => onManualSave(),
+                    run: () => onManualSaveRef.current?.(),
                 });
                 if (manualSaveDisposable) {
                     actionDisposablesRef.current.push(manualSaveDisposable);
                 }
             }
         }
-    }, [disposeEditorShortcuts, onSaveToFile, onManualSave]);
+    }, [disposeEditorShortcuts]);
 
     useEffect(() => {
         customShortcutsRef.current = customShortcuts ?? {};
         if (monacoInstanceRef.current) {
             applyEditorShortcuts();
         }
-    }, [customShortcuts, applyEditorShortcuts]);
+    }, [customShortcuts, applyEditorShortcuts, Boolean(onSaveToFile), Boolean(onManualSave)]);
 
     useEffect(() => {
         contentRef.current = content;
@@ -604,14 +635,14 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                 const contentDisposable = editorInstance.onDidChangeModelContent(() => {
                     const currentValue = editorInstance.getValue();
                     if (currentValue !== contentRef.current) {
-                        onChange(currentValue);
+                        onChangeRef.current(currentValue);
                     }
                 });
                 listenerDisposablesRef.current.push(contentDisposable);
 
                 const scrollDisposable = editorInstance.onDidScrollChange((e: any) => {
                     if (e.scrollTopChanged) {
-                        onScroll?.({
+                        onScrollRef.current?.({
                             scrollTop: e.scrollTop,
                             scrollHeight: e.scrollHeight,
                             clientHeight: editorInstance.getLayoutInfo().height
@@ -624,9 +655,9 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                 const selectionDisposable = editorInstance.onDidChangeCursorSelection(() => {
                     const selection = editorInstance.getSelection();
                     if (selection && !selection.isEmpty()) {
-                        onSelectionChange?.(editorInstance.getModel().getValueInRange(selection));
+                        onSelectionChangeRef.current?.(editorInstance.getModel().getValueInRange(selection));
                     } else {
-                        onSelectionChange?.(undefined);
+                        onSelectionChangeRef.current?.(undefined);
                     }
                 });
                 listenerDisposablesRef.current.push(selectionDisposable);
@@ -642,17 +673,15 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
                 });
                 listenerDisposablesRef.current.push(contextDisposable);
 
-                if (onFocusChange) {
-                    const focusDisposable = editorInstance.onDidFocusEditorWidget(() => {
-                        onFocusChange(true);
-                    });
-                    listenerDisposablesRef.current.push(focusDisposable);
-                    
-                    const blurDisposable = editorInstance.onDidBlurEditorWidget(() => {
-                        onFocusChange(false);
-                    });
-                    listenerDisposablesRef.current.push(blurDisposable);
-                }
+                const focusDisposable = editorInstance.onDidFocusEditorWidget(() => {
+                    onFocusChangeRef.current?.(true);
+                });
+                listenerDisposablesRef.current.push(focusDisposable);
+                
+                const blurDisposable = editorInstance.onDidBlurEditorWidget(() => {
+                    onFocusChangeRef.current?.(false);
+                });
+                listenerDisposablesRef.current.push(blurDisposable);
 
                 monacoInstanceRef.current = editorInstance;
                 applyEditorShortcuts();
@@ -698,7 +727,7 @@ const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(({
             emojiActionDisposableRef.current = null;
             monacoApiRef.current = null;
         };
-    }, [documentId, onChange, onScroll, applyEditorShortcuts, disposeEditorShortcuts, disposeListeners, readOnly, onFocusChange]);
+    }, [documentId, disposeEditorShortcuts, disposeListeners]);
 
     // Effect to update content from props if it changes externally
     useEffect(() => {

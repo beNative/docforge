@@ -1,6 +1,20 @@
 ## Unreleased
 
--   _No entries yet._
+- _No entries yet._
+
+## v0.9.7 - Code Editor Focus Stability & Mermaid Error Isolation (September 2026)
+
+### 🐛 Bug Fixes & Stability
+
+- **Code Editor Focus Preservation on Text Entry**:
+  - Fixed a regression where typing into the Monaco code editor caused immediate loss of focus after entering the first character.
+  - Stabilized event and action callback references (`onManualSave`, `onSaveToFile`, `onChange`, `onScroll`, `onFocusChange`, `onSelectionChange`) via mutable refs in `CodeEditor`, `PromptEditor`, and `MonacoDiffEditor`.
+  - Decoupled Monaco editor mounting and shortcut registration dependencies to prevent the editor DOM container from detaching, tearing down, and recreating on keystrokes.
+- **Mermaid Syntax Error DOM Pollution Fix**:
+  - Prevented Mermaid from injecting "Syntax error in text" bomb SVGs into `document.body` when diagram syntax is invalid.
+  - Enabled `suppressErrorRendering: true`, pre-validated syntax with `mermaid.parse()`, rendered into detached containers, and added active cleanup and CSS containment rules to isolate diagram errors cleanly within the preview pane error card without distorting the application layout.
+- **Cross-Platform Test Runner**:
+  - Resolved Windows path prefix resolution in test plan validation script using `fileURLToPath`.
 
 ## v0.9.6 - Multi-Format Export & Navigation Polish (September 2026)
 

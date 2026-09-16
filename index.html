@@ -202,6 +202,19 @@
         ::-webkit-scrollbar-corner {
             background: transparent;
         }
+
+        /* Prevent any stray Mermaid error SVGs or temporary scratch elements from polluting the layout */
+        body > [id^="dmermaid-"],
+        body > [id^="mermaid-"],
+        body > [id^="imermaid-"] {
+            display: none !important;
+            visibility: hidden !important;
+            position: absolute !important;
+            width: 0 !important;
+            height: 0 !important;
+            overflow: hidden !important;
+            pointer-events: none !important;
+        }
     </style>
 </head>
 
