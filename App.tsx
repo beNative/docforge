@@ -29,6 +29,7 @@ import Header from './components/Header';
 import CustomTitleBar from './components/CustomTitleBar';
 import ConfirmModal from './components/ConfirmModal';
 import FatalError from './components/FatalError';
+import ErrorBoundary from './components/ErrorBoundary';
 import ContextMenu, { MenuItem } from './components/ContextMenu';
 import NewCodeFileModal from './components/NewCodeFileModal';
 import NewWebLinkModal from './components/NewWebLinkModal';
@@ -2325,6 +2326,9 @@ export const MainApp: React.FC = () => {
         }
 
         const selectedNode = items.find(item => item.id === id);
+        if (selectedNode) {
+            addLog('DEBUG', `[Navigation] Selected ${selectedNode.type} node "${selectedNode.title}" (id: ${selectedNode.id}${selectedNode.type === 'document' ? `, doc_type: ${selectedNode.doc_type ?? 'none'}, language: ${selectedNode.language_hint ?? 'none'}` : ''})`);
+        }
         if (selectedNode?.type === 'document') {
             activateDocumentTab(id);
         } else {
@@ -2332,7 +2336,7 @@ export const MainApp: React.FC = () => {
         }
         setActiveTemplateId(null);
         setView('editor');
-    }, [activeNodeId, lastClickedId, navigableItems, items, activateDocumentTab, setActiveItem]);
+    }, [activeNodeId, lastClickedId, navigableItems, items, activateDocumentTab, setActiveItem, addLog]);
 
     const handleSelectTemplate = (id: string) => {
         setActiveTemplateId(id);
@@ -2348,13 +2352,14 @@ export const MainApp: React.FC = () => {
             closeDocumentTab(id);
             return;
         }
+        addLog('DEBUG', `[Navigation] Activated document tab "${node.title}" (id: ${node.id}, doc_type: ${node.doc_type ?? 'none'}, language: ${node.language_hint ?? 'none'})`);
         activateDocumentTab(id);
         setSelectedIds(new Set([id]));
         setLastClickedId(id);
         setActiveTemplateId(null);
         setDocumentView('editor');
         setView('editor');
-    }, [items, activateDocumentTab, closeDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView]);
+    }, [items, activateDocumentTab, closeDocumentTab, setSelectedIds, setLastClickedId, setActiveTemplateId, setDocumentView, setView, addLog]);
 
     const handleCloseTab = useCallback((id: string) => {
         if (!openDocumentIds.includes(id)) {
@@ -3568,7 +3573,14 @@ export const MainApp: React.FC = () => {
                                             />
                                         )}
                                         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                                            {renderMainContent()}
+                                            <ErrorBoundary
+                                                fallbackTitle="Document Display Error"
+                                                contextInfo={activeNode ? `Document "${activeNode.title}" (id: ${activeNode.id}${activeNode.type === 'document' ? `, doc_type: ${activeNode.doc_type ?? 'none'}, lang: ${activeNode.language_hint ?? 'none'}` : ''})` : 'Workspace'}
+                                                resetKeys={[activeNode?.id, documentView, view]}
+                                                onError={(err) => addLog('ERROR', `[Document Error] Failed to render document "${activeNode?.title ?? 'Unknown'}": ${err.message}`)}
+                                            >
+                                                {renderMainContent()}
+                                            </ErrorBoundary>
                                         </div>
                                     </div>
                                     <ChatPanel
@@ -3624,7 +3636,14 @@ export const MainApp: React.FC = () => {
                         ) : (
                             <section className="flex-1 flex flex-col overflow-hidden bg-background">
                                 <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                                    {renderMainContent()}
+                                    <ErrorBoundary
+                                        fallbackTitle="Document Display Error"
+                                        contextInfo={activeNode ? `Document "${activeNode.title}" (id: ${activeNode.id}${activeNode.type === 'document' ? `, doc_type: ${activeNode.doc_type ?? 'none'}, lang: ${activeNode.language_hint ?? 'none'}` : ''})` : 'Workspace'}
+                                        resetKeys={[activeNode?.id, documentView, view]}
+                                        onError={(err) => addLog('ERROR', `[Document Error] Failed to render document "${activeNode?.title ?? 'Unknown'}": ${err.message}`)}
+                                    >
+                                        {renderMainContent()}
+                                    </ErrorBoundary>
                                 </div>
                             </section>
                         )}

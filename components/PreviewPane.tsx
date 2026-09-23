@@ -4,6 +4,7 @@ import Spinner from './Spinner';
 import { useTheme } from '../hooks/useTheme';
 import type { DocType, LogLevel, PreviewMetadata, Settings } from '../types';
 import { PreviewZoomProvider } from '../contexts/PreviewZoomContext';
+import ErrorBoundary from './ErrorBoundary';
 
 interface PreviewPaneProps {
   content: string;
@@ -142,7 +143,14 @@ const PreviewPane = React.forwardRef<HTMLDivElement, PreviewPaneProps>(({
         </div>
       )}
       {error && <div className="text-destructive-text p-3 bg-destructive-bg rounded-md m-6">{error}</div>}
-      {contentElement}
+      <ErrorBoundary
+        fallbackTitle="Preview Render Error"
+        contextInfo={`Language: ${language ?? 'plaintext'}, Type: ${docType ?? 'default'}`}
+        resetKeys={[content, language, docType]}
+        onError={(err) => addLog('ERROR', `[PreviewPane] Rendering error: ${err.message}`)}
+      >
+        {contentElement}
+      </ErrorBoundary>
     </div>
   );
 });

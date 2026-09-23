@@ -42,4 +42,29 @@ describe('ImageRenderer', () => {
     const resolved = previewService.getRendererForLanguage('xml', '<svg viewBox="0 0 10 10"></svg>');
     expect(resolved).toBeInstanceOf(ImageRenderer);
   });
+
+  it('renders PNG base64 data without crashing and displays the image', async () => {
+    const { render, screen } = await import('@testing-library/react');
+    const { IconProvider } = await import('../../../contexts/IconContext');
+    const React = await import('react');
+    const pngContent = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    const result = await renderer.render(pngContent, undefined, 'image');
+    render(
+      <IconProvider value={{ iconSet: 'heroicons' }}>
+        {result.output as React.ReactElement}
+      </IconProvider>
+    );
+
+    const img = screen.getByAltText('Document preview');
+    expect(img).toBeInTheDocument();
+    expect(img.getAttribute('src')).toBe(pngContent);
+  });
+
+  it('renders fallback message for empty content', async () => {
+    const { render, screen } = await import('@testing-library/react');
+    const result = await renderer.render('', undefined, 'image');
+    render(result.output as React.ReactElement);
+
+    expect(screen.getByText('This document does not contain any image data.')).toBeInTheDocument();
+  });
 });

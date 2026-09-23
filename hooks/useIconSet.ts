@@ -1,10 +1,9 @@
 import { useContext } from 'react';
 import { IconContext } from '../contexts/IconContext';
 
+const DEFAULT_ICON_CONTEXT = { iconSet: 'heroicons' as const };
+
 export const useIconSet = () => {
   const context = useContext(IconContext);
-  if (context === undefined) {
-    throw new Error('useIconSet must be used within an IconProvider');
-  }
-  return context;
+  return context ?? DEFAULT_ICON_CONTEXT;
 };

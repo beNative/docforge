@@ -12,6 +12,7 @@ import MonacoEditor, { CodeEditorHandle } from './CodeEditor';
 import MonacoDiffEditor from './MonacoDiffEditor';
 import RichTextEditor, { type RichTextEditorHandle } from './RichTextEditor';
 import PreviewPane from './PreviewPane';
+import ErrorBoundary from './ErrorBoundary';
 import LanguageDropdown from './LanguageDropdown';
 import PythonExecutionPanel from './PythonExecutionPanel';
 import ScriptExecutionPanel from './ScriptExecutionPanel';
@@ -1129,7 +1130,14 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
         onPointerDown={handleEditorFocus}
         onFocusCapture={handleEditorFocus}
       >
-        {editor}
+        <ErrorBoundary
+          fallbackTitle="Editor Display Error"
+          contextInfo={`Editor for "${documentNode.title}" (${language})`}
+          resetKeys={[documentNode.id, editorEngine, language]}
+          onError={(err) => addLog('ERROR', `[Editor] Failed to render editor for "${documentNode.title}": ${err.message}`)}
+        >
+          {editor}
+        </ErrorBoundary>
       </div>
     );
 
@@ -1144,21 +1152,28 @@ const DocumentEditor: React.FC<DocumentEditorProps> = ({
           }
         }}
       >
-        <PreviewPane
-          ref={previewScrollRef}
-          content={content}
-          language={language}
-          docType={documentNode.doc_type}
-          onScroll={handlePreviewScroll}
-          addLog={addLog}
-          settings={settings}
-          previewScale={previewScale}
-          onPreviewScaleChange={onPreviewScaleChange}
-          previewZoomOptions={previewZoomOptions}
-          previewResetSignal={previewResetSignal}
-          onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
-          onMetadataChange={onPreviewMetadataChange}
-        />
+        <ErrorBoundary
+          fallbackTitle="Preview Display Error"
+          contextInfo={`Preview for "${documentNode.title}" (${language})`}
+          resetKeys={[documentNode.id, content, language, documentNode.doc_type]}
+          onError={(err) => addLog('ERROR', `[Preview] Failed to render preview for "${documentNode.title}": ${err.message}`)}
+        >
+          <PreviewPane
+            ref={previewScrollRef}
+            content={content}
+            language={language}
+            docType={documentNode.doc_type}
+            onScroll={handlePreviewScroll}
+            addLog={addLog}
+            settings={settings}
+            previewScale={previewScale}
+            onPreviewScaleChange={onPreviewScaleChange}
+            previewZoomOptions={previewZoomOptions}
+            previewResetSignal={previewResetSignal}
+            onPreviewZoomAvailabilityChange={onPreviewZoomAvailabilityChange}
+            onMetadataChange={onPreviewMetadataChange}
+          />
+        </ErrorBoundary>
       </div>
     );
 

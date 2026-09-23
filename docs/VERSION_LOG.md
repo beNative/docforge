@@ -2,6 +2,26 @@
 
 - _No entries yet._
 
+## v0.9.8 - Error Isolation Boundaries & Global Crash Diagnostics (September 2026)
+
+### 🛡️ Resilience & Fault Isolation
+
+- **Component-Level Error Boundaries**:
+  - Introduced a robust `ErrorBoundary` component with error diagnosis, context metadata (document title, ID, type, language), retry mechanisms, and one-click error copying.
+  - Wrapped root application, main document views, code editor, and preview panes in discrete error boundaries to prevent local render faults from crashing the entire app or resulting in a blank window.
+  - Automatically reports caught errors and component stack traces to the persistent application log file on disk via `electronAPI.log`.
+
+### 🐛 Bug Fixes & Stability
+
+- **Global Uncaught Exception Logging**:
+  - Added global window error and unhandled promise rejection listeners in `index.tsx` that capture and persist uncaught exceptions directly to disk logs.
+- **Safe Icon Context Fallback**:
+  - Updated `useIconSet` to return a safe default fallback (`heroicons`) instead of throwing an error when called outside an `IconProvider`.
+- **Navigation & Document State Diagnostics**:
+  - Added structured debug logging in `App.tsx` for treeview navigation and document tab activations with document type and language metadata.
+- **Image Preview Validation & Test Coverage**:
+  - Added unit test coverage for `ErrorBoundary`, image document rendering, and base64 preview handling.
+
 ## v0.9.7 - Code Editor Focus Stability & Mermaid Error Isolation (September 2026)
 
 ### 🐛 Bug Fixes & Stability

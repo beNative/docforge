@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import ZoomPanContainer from '../../components/ZoomPanContainer';
 import type { IRenderer, RendererRenderOptions } from './IRenderer';
 import type { LogLevel, PreviewMetadata, Settings } from '../../types';
